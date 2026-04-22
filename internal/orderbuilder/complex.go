@@ -1,7 +1,11 @@
 // Package orderbuilder constructs Schwab order payloads.
 package orderbuilder
 
-import "github.com/major/schwab-agent/internal/models"
+import (
+	"cmp"
+
+	"github.com/major/schwab-agent/internal/models"
+)
 
 // OCOParams holds parameters for building a standalone one-cancels-other order.
 // Unlike bracket orders, OCO orders have no entry leg - they attach exit
@@ -136,8 +140,8 @@ func buildOCOStopExit(params *OCOParams) models.OrderRequest {
 
 // applyOCODefaults fills in Schwab's standard session and duration defaults.
 func applyOCODefaults(params *OCOParams) {
-	params.Duration = defaultDuration(params.Duration)
-	params.Session = defaultSession(params.Session)
+	params.Duration = cmp.Or(params.Duration, models.DurationDay)
+	params.Session = cmp.Or(params.Session, models.SessionNormal)
 }
 
 // buildExitStrategies constructs the child order strategies based on which exit
@@ -199,8 +203,8 @@ func buildStopLossOrder(params *BracketParams, exitInstruction models.Instructio
 
 // applyBracketDefaults fills in Schwab's standard session and duration defaults.
 func applyBracketDefaults(params *BracketParams) {
-	params.Duration = defaultDuration(params.Duration)
-	params.Session = defaultSession(params.Session)
+	params.Duration = cmp.Or(params.Duration, models.DurationDay)
+	params.Session = cmp.Or(params.Session, models.SessionNormal)
 }
 
 // bracketExitInstruction returns the closing instruction for the bracket exit legs.

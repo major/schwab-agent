@@ -1,6 +1,7 @@
 package orderbuilder
 
 import (
+	"cmp"
 	"fmt"
 	"math"
 	"strconv"
@@ -35,8 +36,8 @@ func BuildOptionOrder(params *OptionParams) (*models.OrderRequest, error) {
 	multiplier := optionContractMultiplier
 
 	order := &models.OrderRequest{
-		Session:           defaultSession(params.Session),
-		Duration:          defaultDuration(params.Duration),
+		Session:           cmp.Or(params.Session, models.SessionNormal),
+		Duration:          cmp.Or(params.Duration, models.DurationDay),
 		OrderType:         params.OrderType,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
 		OrderLegCollection: []models.OrderLegCollection{
