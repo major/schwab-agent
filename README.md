@@ -140,7 +140,6 @@ schwab-agent order place --spec @order.json --confirm
 | `market` | Market hours and top movers |
 | `symbol` | Build and parse OCC option symbols (no auth required) |
 | `instrument` | Search instruments |
-| `skills` | Generate agent skill files |
 | `schema` | CLI schema introspection (auto-generated) |
 
 ### Global flags
