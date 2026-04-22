@@ -70,7 +70,7 @@ func FuzzBuildParseOCCRoundTrip(f *testing.F) {
 		// Filter out inputs that can't produce valid OCC symbols.
 		// Real ticker symbols are ASCII uppercase letters only.
 		trimmed := strings.TrimSpace(underlying)
-		if len(trimmed) == 0 || len(trimmed) > 6 {
+		if trimmed == "" || len(trimmed) > 6 {
 			return
 		}
 
