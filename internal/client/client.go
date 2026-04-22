@@ -77,9 +77,9 @@ func NewClient(token string, opts ...Option) *Client {
 }
 
 // WithBaseURL sets the base URL for the client.
-func WithBaseURL(url string) Option {
+func WithBaseURL(baseURL string) Option {
 	return func(c *Client) {
-		c.baseURL = url
+		c.baseURL = baseURL
 	}
 }
 
@@ -121,8 +121,8 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 		reqBody = bytes.NewReader(encoded)
 	}
 
-	url := c.baseURL + path
-	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
+	endpoint := c.baseURL + path
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, reqBody)
 	if err != nil {
 		return fmt.Errorf("build request: %w", err)
 	}
