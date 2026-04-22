@@ -41,6 +41,14 @@ const (
 	callbackSuccessHTML = "<html><body><p>Authentication successful! You can close this tab.</p></body></html>"
 )
 
+const (
+	// oauthHTTPTimeout is the timeout for OAuth token exchange and refresh requests.
+	// Separate from the API client timeout since these hit a different endpoint and
+	// are critical path for authentication. 30 seconds is generous but prevents
+	// indefinite hangs if Schwab's OAuth endpoint is unresponsive.
+	oauthHTTPTimeout = 30 * time.Second
+)
+
 var (
 	// callbackServerTimeout bounds how long the local HTTPS callback server waits.
 	callbackServerTimeout = 300 * time.Second
@@ -50,6 +58,13 @@ var (
 
 	// browserOpenFunc opens the authorization URL in the user's browser.
 	browserOpenFunc = browser.OpenURL
+
+	// oauthHTTPClient is used for OAuth token exchange and refresh requests.
+	// Has an explicit timeout to avoid hanging on network issues, unlike
+	// http.DefaultClient which has no timeout.
+	oauthHTTPClient = &http.Client{
+		Timeout: oauthHTTPTimeout,
+	}
 )
 
 // AuthorizeURL builds the Schwab authorization URL and returns it with a random state value.
@@ -86,7 +101,7 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string) (*TokenFile, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth(cfg.ClientID, cfg.ClientSecret)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := oauthHTTPClient.Do(req)
 	if err != nil {
 		return nil, schwabErrors.NewAuthCallbackError("token exchange request failed", err)
 	}

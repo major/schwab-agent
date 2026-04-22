@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,6 +37,7 @@ func TestNewClient_Defaults(t *testing.T) {
 	assert.Equal(t, "test-token", c.token)
 	assert.NotNil(t, c.httpClient)
 	assert.NotNil(t, c.logger)
+	assert.Equal(t, 30*time.Second, c.httpClient.Timeout, "default client must have a timeout to prevent hanging requests")
 }
 
 func TestNewClient_WithBaseURL(t *testing.T) {
@@ -45,10 +47,11 @@ func TestNewClient_WithBaseURL(t *testing.T) {
 }
 
 func TestNewClient_WithHTTPClient(t *testing.T) {
-	custom := &http.Client{Timeout: 42}
+	custom := &http.Client{Timeout: 42 * time.Second}
 	c := NewClient("tok", WithHTTPClient(custom))
 
 	assert.Equal(t, custom, c.httpClient)
+	assert.Equal(t, 42*time.Second, c.httpClient.Timeout, "WithHTTPClient must override the default timeout")
 }
 
 func TestNewClient_WithLogger(t *testing.T) {

@@ -12,11 +12,20 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	schwabErrors "github.com/major/schwab-agent/internal/errors"
 )
 
-const defaultBaseURL = "https://api.schwabapi.com"
+const (
+	defaultBaseURL = "https://api.schwabapi.com"
+
+	// defaultTimeout is the overall request timeout for the Schwab API client.
+	// Covers the full request lifecycle: DNS, connect, TLS handshake, sending
+	// the request, and reading the response. 30 seconds is generous for a REST
+	// API but prevents indefinite hangs on network issues.
+	defaultTimeout = 30 * time.Second
+)
 
 // Client is an authenticated HTTP client for the Schwab API.
 type Client struct {
@@ -32,10 +41,12 @@ type Option func(*Client)
 // NewClient creates a new Client with the given token and options.
 func NewClient(token string, opts ...Option) *Client {
 	c := &Client{
-		baseURL:    defaultBaseURL,
-		httpClient: &http.Client{},
-		token:      token,
-		logger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+		baseURL: defaultBaseURL,
+		httpClient: &http.Client{
+			Timeout: defaultTimeout,
+		},
+		token:  token,
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 	for _, opt := range opts {
 		opt(c)
