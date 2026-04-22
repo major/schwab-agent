@@ -23,19 +23,19 @@ func TestQuotes_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := map[string]*models.QuoteEquity{
 			"AAPL": {
-				Symbol: strPtr("AAPL"),
+				Symbol: ptr("AAPL"),
 				Quote: &models.QuoteData{
-					LastPrice: floatPtr(150.25),
-					BidPrice:  floatPtr(150.20),
-					AskPrice:  floatPtr(150.30),
+					LastPrice: ptr(150.25),
+					BidPrice:  ptr(150.20),
+					AskPrice:  ptr(150.30),
 				},
 			},
 			"NVDA": {
-				Symbol: strPtr("NVDA"),
+				Symbol: ptr("NVDA"),
 				Quote: &models.QuoteData{
-					LastPrice: floatPtr(850.50),
-					BidPrice:  floatPtr(850.40),
-					AskPrice:  floatPtr(850.60),
+					LastPrice: ptr(850.50),
+					BidPrice:  ptr(850.40),
+					AskPrice:  ptr(850.60),
 				},
 			},
 		}
@@ -96,15 +96,15 @@ func TestQuote_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := map[string]*models.QuoteEquity{
 			"AAPL": {
-				Symbol: strPtr("AAPL"),
+				Symbol: ptr("AAPL"),
 				Quote: &models.QuoteData{
-					LastPrice:   floatPtr(150.25),
-					BidPrice:    floatPtr(150.20),
-					AskPrice:    floatPtr(150.30),
-					TotalVolume: int64Ptr(45000000),
+					LastPrice:   ptr(150.25),
+					BidPrice:    ptr(150.20),
+					AskPrice:    ptr(150.30),
+					TotalVolume: ptr(int64(45000000)),
 				},
 				Reference: &models.QuoteReference{
-					Description: strPtr("Apple Inc"),
+					Description: ptr("Apple Inc"),
 				},
 			},
 		}
@@ -177,9 +177,4 @@ func TestQuote_401_ReturnsAuthExpiredError(t *testing.T) {
 
 	var authErr *apperr.AuthExpiredError
 	require.ErrorAs(t, err, &authErr)
-}
-
-// int64Ptr is a test helper for creating *int64 values.
-func int64Ptr(i int64) *int64 {
-	return &i
 }

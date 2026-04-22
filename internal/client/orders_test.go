@@ -238,7 +238,7 @@ func TestPreviewOrder_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		commValue := 0.65
 		response := models.PreviewOrder{
-			OrderID: int64Ptr(11111),
+			OrderID: ptr(int64(11111)),
 			CommissionAndFee: &models.CommissionAndFee{
 				Commission: &models.CommissionDetail{
 					CommissionLegs: []models.CommissionLeg{

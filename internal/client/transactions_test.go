@@ -27,20 +27,20 @@ func TestTransactions_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := []models.Transaction{
 			{
-				ActivityID:  int64Ptr(1001),
-				Time:        strPtr("2024-01-15T10:30:00Z"),
+				ActivityID:  ptr(int64(1001)),
+				Time:        ptr("2024-01-15T10:30:00Z"),
 				Type:        transactionTypePtr(models.TransactionTypeTrade),
-				Status:      strPtr("FILLED"),
-				Description: strPtr("BUY 100 AAPL"),
-				NetAmount:   floatPtr(-15000.00),
+				Status:      ptr("FILLED"),
+				Description: ptr("BUY 100 AAPL"),
+				NetAmount:   ptr(-15000.00),
 			},
 			{
-				ActivityID:  int64Ptr(1002),
-				Time:        strPtr("2024-01-16T14:45:00Z"),
+				ActivityID:  ptr(int64(1002)),
+				Time:        ptr("2024-01-16T14:45:00Z"),
 				Type:        transactionTypePtr(models.TransactionTypeDividend),
-				Status:      strPtr("SETTLED"),
-				Description: strPtr("DIVIDEND AAPL"),
-				NetAmount:   floatPtr(50.00),
+				Status:      ptr("SETTLED"),
+				Description: ptr("DIVIDEND AAPL"),
+				NetAmount:   ptr(50.00),
 			},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
@@ -70,9 +70,9 @@ func TestTransactions_WithTypeFilter(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := []models.Transaction{
 			{
-				ActivityID:  int64Ptr(1001),
+				ActivityID:  ptr(int64(1001)),
 				Type:        transactionTypePtr(models.TransactionTypeTrade),
-				Description: strPtr("BUY 100 AAPL"),
+				Description: ptr("BUY 100 AAPL"),
 			},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
@@ -101,9 +101,9 @@ func TestTransactions_WithDateFilters(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := []models.Transaction{
 			{
-				ActivityID:  int64Ptr(1001),
-				Time:        strPtr("2024-01-15T10:30:00Z"),
-				Description: strPtr("BUY 100 AAPL"),
+				ActivityID:  ptr(int64(1001)),
+				Time:        ptr("2024-01-15T10:30:00Z"),
+				Description: ptr("BUY 100 AAPL"),
 			},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
@@ -164,12 +164,12 @@ func TestTransaction_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		response := models.Transaction{
-			ActivityID:  int64Ptr(1001),
-			Time:        strPtr("2024-01-15T10:30:00Z"),
+			ActivityID:  ptr(int64(1001)),
+			Time:        ptr("2024-01-15T10:30:00Z"),
 			Type:        transactionTypePtr(models.TransactionTypeTrade),
-			Status:      strPtr("FILLED"),
-			Description: strPtr("BUY 100 AAPL"),
-			NetAmount:   floatPtr(-15000.00),
+			Status:      ptr("FILLED"),
+			Description: ptr("BUY 100 AAPL"),
+			NetAmount:   ptr(-15000.00),
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
@@ -189,29 +189,29 @@ func TestTransaction_WithComplexData(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.Transaction{
-			ActivityID:     int64Ptr(1001),
-			Time:           strPtr("2024-01-15T10:30:00Z"),
+			ActivityID:     ptr(int64(1001)),
+			Time:           ptr("2024-01-15T10:30:00Z"),
 			Type:           transactionTypePtr(models.TransactionTypeTrade),
-			Status:         strPtr("FILLED"),
-			Description:    strPtr("BUY 100 AAPL"),
-			NetAmount:      floatPtr(-15000.00),
-			AccountNumber:  strPtr("123456789"),
-			SubAccount:     strPtr("CASH"),
-			ActivityType:   strPtr("ORDER"),
-			OrderID:        int64Ptr(5001),
-			PositionID:     int64Ptr(9001),
-			TradeDate:      strPtr("2024-01-15"),
-			SettlementDate: strPtr("2024-01-17"),
+			Status:         ptr("FILLED"),
+			Description:    ptr("BUY 100 AAPL"),
+			NetAmount:      ptr(-15000.00),
+			AccountNumber:  ptr("123456789"),
+			SubAccount:     ptr("CASH"),
+			ActivityType:   ptr("ORDER"),
+			OrderID:        ptr(int64(5001)),
+			PositionID:     ptr(int64(9001)),
+			TradeDate:      ptr("2024-01-15"),
+			SettlementDate: ptr("2024-01-17"),
 			TransferItems: []models.TransferItem{
 				{
 					Instrument: &models.TransferInstrument{
-						AssetType:   strPtr("EQUITY"),
-						Symbol:      strPtr("AAPL"),
-						Description: strPtr("Apple Inc"),
+						AssetType:   ptr("EQUITY"),
+						Symbol:      ptr("AAPL"),
+						Description: ptr("Apple Inc"),
 					},
-					Position:         floatPtr(100),
-					PositionEffect:   strPtr("OPENING"),
-					PositionQuantity: floatPtr(100),
+				Position:         ptr(float64(100)),
+				PositionEffect:   ptr("OPENING"),
+				PositionQuantity: ptr(float64(100)),
 				},
 			},
 		}

@@ -28,16 +28,16 @@ func TestMarkets_Success(t *testing.T) {
 		response := map[string]map[string]models.MarketHours{
 			"equity": {
 				"EQ": {
-					MarketType: strPtr("EQUITY"),
-					IsOpen:     boolPtr(true),
-					Date:       strPtr("2025-04-21"),
+					MarketType: ptr("EQUITY"),
+					IsOpen:     ptr(true),
+					Date:       ptr("2025-04-21"),
 				},
 			},
 			"option": {
 				"EQO": {
-					MarketType: strPtr("OPTION"),
-					IsOpen:     boolPtr(true),
-					Date:       strPtr("2025-04-21"),
+					MarketType: ptr("OPTION"),
+					IsOpen:     ptr(true),
+					Date:       ptr("2025-04-21"),
 				},
 			},
 		}
@@ -83,15 +83,15 @@ func TestMarket_Success(t *testing.T) {
 		response := map[string]map[string]models.MarketHours{
 			"equity": {
 				"EQ": {
-					MarketType:  strPtr("EQUITY"),
-					ProductName: strPtr("equity"),
-					IsOpen:      boolPtr(true),
-					Date:        strPtr("2025-04-21"),
+					MarketType:  ptr("EQUITY"),
+					ProductName: ptr("equity"),
+					IsOpen:      ptr(true),
+					Date:        ptr("2025-04-21"),
 					SessionHours: &models.SessionHours{
 						RegularMarket: []models.MarketSession{
 							{
-								Start: strPtr("2025-04-21T09:30:00-04:00"),
-								End:   strPtr("2025-04-21T16:00:00-04:00"),
+								Start: ptr("2025-04-21T09:30:00-04:00"),
+								End:   ptr("2025-04-21T16:00:00-04:00"),
 							},
 						},
 					},

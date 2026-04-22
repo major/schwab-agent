@@ -42,12 +42,12 @@ func BuildEquityOrder(params *EquityParams) (*models.OrderRequest, error) {
 func applyEquityPriceFields(order *models.OrderRequest, params *EquityParams) {
 	switch params.OrderType {
 	case models.OrderTypeLimit:
-		order.Price = float64Ptr(params.Price)
+		order.Price = ptr(params.Price)
 	case models.OrderTypeStop:
-		order.StopPrice = float64Ptr(params.StopPrice)
+		order.StopPrice = ptr(params.StopPrice)
 	case models.OrderTypeStopLimit:
-		order.Price = float64Ptr(params.Price)
-		order.StopPrice = float64Ptr(params.StopPrice)
+		order.Price = ptr(params.Price)
+		order.StopPrice = ptr(params.StopPrice)
 	}
 }
 
@@ -69,7 +69,7 @@ func defaultSession(session models.Session) models.Session {
 	return session
 }
 
-// float64Ptr returns a pointer to the provided float64 value.
-func float64Ptr(value float64) *float64 {
-	return &value
+// ptr returns a pointer to the provided value.
+func ptr[T any](v T) *T {
+	return &v
 }

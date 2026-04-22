@@ -55,11 +55,11 @@ func BuildBracketOrder(params *BracketParams) (*models.OrderRequest, error) {
 	}
 
 	if params.OrderType == models.OrderTypeLimit || params.OrderType == models.OrderTypeStopLimit {
-		order.Price = float64Ptr(params.Price)
+		order.Price = ptr(params.Price)
 	}
 
 	if params.OrderType == models.OrderTypeStop || params.OrderType == models.OrderTypeStopLimit {
-		order.StopPrice = float64Ptr(params.Price)
+		order.StopPrice = ptr(params.Price)
 	}
 
 	return order, nil
@@ -113,7 +113,7 @@ func buildOCOLimitExit(params *OCOParams) models.OrderRequest {
 		Duration:          params.Duration,
 		OrderType:         models.OrderTypeLimit,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		Price:             float64Ptr(params.TakeProfit),
+		Price:             ptr(params.TakeProfit),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Symbol, params.Action, params.Quantity),
 		},
@@ -127,7 +127,7 @@ func buildOCOStopExit(params *OCOParams) models.OrderRequest {
 		Duration:          params.Duration,
 		OrderType:         models.OrderTypeStop,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		StopPrice:         float64Ptr(params.StopLoss),
+		StopPrice:         ptr(params.StopLoss),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Symbol, params.Action, params.Quantity),
 		},
@@ -176,7 +176,7 @@ func buildTakeProfitOrder(params *BracketParams, exitInstruction models.Instruct
 		Duration:          params.Duration,
 		OrderType:         models.OrderTypeLimit,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		Price:             float64Ptr(params.TakeProfit),
+		Price:             ptr(params.TakeProfit),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Symbol, exitInstruction, params.Quantity),
 		},
@@ -190,7 +190,7 @@ func buildStopLossOrder(params *BracketParams, exitInstruction models.Instructio
 		Duration:          params.Duration,
 		OrderType:         models.OrderTypeStop,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		StopPrice:         float64Ptr(params.StopLoss),
+		StopPrice:         ptr(params.StopLoss),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Symbol, exitInstruction, params.Quantity),
 		},

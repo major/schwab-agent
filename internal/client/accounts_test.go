@@ -82,14 +82,14 @@ func TestAccounts_Success(t *testing.T) {
 		response := []models.Account{
 			{
 				SecuritiesAccount: &models.SecuritiesAccount{
-					Type:          strPtr("MARGIN"),
-					AccountNumber: strPtr("123456789"),
+					Type:          ptr("MARGIN"),
+					AccountNumber: ptr("123456789"),
 				},
 			},
 			{
 				SecuritiesAccount: &models.SecuritiesAccount{
-					Type:          strPtr("CASH"),
-					AccountNumber: strPtr("987654321"),
+					Type:          ptr("CASH"),
+					AccountNumber: ptr("987654321"),
 				},
 			},
 		}
@@ -149,8 +149,8 @@ func TestAccount_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.Account{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				Type:          strPtr("MARGIN"),
-				AccountNumber: strPtr("123456789"),
+				Type:          ptr("MARGIN"),
+				AccountNumber: ptr("123456789"),
 			},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
@@ -189,22 +189,22 @@ func TestAccount_WithComplexData(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.Account{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				Type:          strPtr("MARGIN"),
-				AccountNumber: strPtr("123456789"),
-				RoundTrips:    intPtr(5),
-				IsForeign:     boolPtr(false),
+				Type:          ptr("MARGIN"),
+				AccountNumber: ptr("123456789"),
+				RoundTrips:    ptr(5),
+				IsForeign:     ptr(false),
 				CurrentBalances: &models.MarginBalance{
-					CashBalance:    floatPtr(50000.00),
-					BuyingPower:    floatPtr(100000.00),
-					EquityPercentage: floatPtr(0.75),
+					CashBalance:    ptr(50000.00),
+					BuyingPower:    ptr(100000.00),
+					EquityPercentage: ptr(0.75),
 				},
 				Positions: []models.Position{
 					{
-						LongQuantity: floatPtr(100),
-						MarketValue:  floatPtr(15000.00),
+						LongQuantity: ptr(float64(100)),
+						MarketValue:  ptr(15000.00),
 						Instrument: &models.AccountsInstrument{
-							Symbol:    strPtr("AAPL"),
-							AssetType: strPtr("EQUITY"),
+							Symbol:    ptr("AAPL"),
+							AssetType: ptr("EQUITY"),
 						},
 					},
 				},
@@ -288,19 +288,7 @@ func TestAccount_BearerTokenAuth(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// Helper functions for pointer creation
-func strPtr(s string) *string {
-	return &s
-}
-
-func intPtr(i int) *int {
-	return &i
-}
-
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-func floatPtr(f float64) *float64 {
-	return &f
+// ptr returns a pointer to the provided value (generic test helper).
+func ptr[T any](v T) *T {
+	return &v
 }

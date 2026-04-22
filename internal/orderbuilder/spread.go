@@ -43,7 +43,7 @@ func BuildVerticalOrder(params *VerticalParams) (*models.OrderRequest, error) {
 		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    float64Ptr(params.Price),
+		Price:                    ptr(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildOptionLeg(&optionLegParams{
 				Underlying: params.Underlying, Expiration: params.Expiration,
@@ -134,7 +134,7 @@ func BuildIronCondorOrder(params *IronCondorParams) (*models.OrderRequest, error
 		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    float64Ptr(params.Price),
+		Price:                    ptr(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildOptionLeg(&optionLegParams{
 				Underlying: params.Underlying, Expiration: params.Expiration,
@@ -194,7 +194,7 @@ func BuildStraddleOrder(params *StraddleParams) (*models.OrderRequest, error) {
 		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    float64Ptr(params.Price),
+		Price:                    ptr(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildOptionLeg(&optionLegParams{
 				Underlying: params.Underlying, Expiration: params.Expiration,
@@ -245,7 +245,7 @@ func BuildStrangleOrder(params *StrangleParams) (*models.OrderRequest, error) {
 		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    float64Ptr(params.Price),
+		Price:                    ptr(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildOptionLeg(&optionLegParams{
 				Underlying: params.Underlying, Expiration: params.Expiration,
@@ -322,7 +322,7 @@ func BuildCoveredCallOrder(params *CoveredCallParams) (*models.OrderRequest, err
 		OrderType:                models.OrderTypeNetDebit,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    float64Ptr(params.Price),
+		Price:                    ptr(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Underlying, models.InstructionBuy, params.Quantity*optionContractMultiplier),
 			buildOptionLeg(&optionLegParams{

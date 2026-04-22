@@ -57,7 +57,7 @@ func BuildOptionOrder(params *OptionParams) (*models.OrderRequest, error) {
 	}
 
 	if params.OrderType == models.OrderTypeLimit {
-		order.Price = float64Ptr(params.Price)
+		order.Price = ptr(params.Price)
 	}
 
 	return order, nil
