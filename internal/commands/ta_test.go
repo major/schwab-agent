@@ -257,6 +257,43 @@ func TestTASMA_MissingSymbol(t *testing.T) {
 	assert.ErrorAs(t, err, &valErr)
 }
 
+// TestTASMA_LargePeriodScalesHistory verifies that SMA with a large period (e.g. 200)
+// works without requesting excessive history. SMA only needs exactly period candles,
+// so SMA 200 fits in a 1-year window (252 trading days). Before the fix for #12, the
+// generic formula over-requested 600 candles and then failed validation.
+func TestTASMA_LargePeriodScalesHistory(t *testing.T) {
+	// Arrange: handler that verifies SMA 200 only requests 1 year of data
+	// (SMA needs exactly period candles, and 252 > 200).
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
+
+		// SMA 200 needs exactly 200 candles. 1 year of daily data provides 252,
+		// which is sufficient. No need to request multiple years.
+		period := r.URL.Query().Get("period")
+		assert.Equal(t, "1", period,
+			"SMA 200 needs 200 candles; 1 year (252 trading days) is sufficient")
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(mockCandleListJSON("IBM", 252)))
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	require.NoError(t, runTestCommand(t, cmd, "ta", "sma", "--period", "200", "--points", "1", "IBM"))
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	assert.Equal(t, "sma", data["indicator"])
+	assert.Equal(t, "IBM", data["symbol"])
+	assert.InDelta(t, 200, data["period"], 0.1)
+
+	values, ok := data["values"].([]any)
+	require.True(t, ok, "values should be an array")
+	assert.Len(t, values, 1, "--points 1 should limit output to 1 entry")
+}
+
 func TestTAEMA_ValidEnvelope(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(priceHistoryHandler(t, "MSFT", 80))
@@ -336,7 +373,7 @@ func TestTARSI_MissingSymbol(t *testing.T) {
 }
 
 func TestTAMACD_ValidEnvelope(t *testing.T) {
-	// Arrange - 80 candles needed for MACD (slow=26, data window = max(78, 46) = 78)
+	// Arrange - MACD needs (slow+signal)*2 = (26+9)*2 = 70 candles; 80 provides headroom
 	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 80))
 	defer srv.Close()
 
@@ -370,7 +407,7 @@ func TestTAMACD_ValidEnvelope(t *testing.T) {
 }
 
 func TestTAMACD_CustomFlags(t *testing.T) {
-	// Arrange - fast=8, slow=21, signal=5; data window = max(63, 41) = 63
+	// Arrange - fast=8, slow=21, signal=5; required = (21+5)*2 = 52 candles
 	srv := httptest.NewServer(priceHistoryHandler(t, "MSFT", 80))
 	defer srv.Close()
 
@@ -409,7 +446,7 @@ func TestTAMACD_MissingSymbol(t *testing.T) {
 }
 
 func TestTAATR_ValidEnvelope(t *testing.T) {
-	// Arrange - 60 candles for ATR (period=14, data window = max(42, 34) = 42)
+	// Arrange - ATR needs period*3 = 14*3 = 42 candles; 60 provides headroom
 	srv := httptest.NewServer(priceHistoryHandler(t, "GOOG", 60))
 	defer srv.Close()
 
@@ -457,7 +494,7 @@ func TestTAATR_MissingSymbol(t *testing.T) {
 }
 
 func TestTABBands_ValidEnvelope(t *testing.T) {
-	// Arrange - 80 candles for BBands (period=20, data window = max(60, 40) = 60)
+	// Arrange - BBands needs exactly period = 20 candles; 80 provides headroom
 	srv := httptest.NewServer(priceHistoryHandler(t, "AMZN", 80))
 	defer srv.Close()
 
@@ -511,7 +548,7 @@ func TestTABBands_MissingSymbol(t *testing.T) {
 }
 
 func TestTAStochastic_ValidEnvelope(t *testing.T) {
-	// Arrange - k-period=14 default, data window = max(42, 34) = 42, use 60 candles for headroom
+	// Arrange - Stochastic needs k+smoothK+d = 14+3+3 = 20 candles; 60 provides headroom
 	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 60))
 	defer srv.Close()
 
@@ -712,8 +749,7 @@ func TestTAVWAP_NoPointsFlag(t *testing.T) {
 }
 
 func TestTAHV_ValidEnvelope(t *testing.T) {
-	// Arrange - period+21 passed to fetchAndValidateCandles, which applies max(p*3, p+20).
-	// For default period=20: 41*3=123 candles required. Use 200 for headroom.
+	// Arrange - HV passes period+21 = 41 directly as requiredCandles. Use 200 for headroom.
 	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 200))
 	defer srv.Close()
 
@@ -751,7 +787,7 @@ func TestTAHV_ValidEnvelope(t *testing.T) {
 }
 
 func TestTAHV_WithPeriod(t *testing.T) {
-	// Arrange - period=30, so 51 passed to fetchAndValidateCandles -> max(153, 71)=153 required.
+	// Arrange - period=30, so period+21 = 51 passed directly as requiredCandles.
 	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 200))
 	defer srv.Close()
 
