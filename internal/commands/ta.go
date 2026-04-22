@@ -207,7 +207,8 @@ func taEMACommand(c *client.Ref, w io.Writer) *cli.Command {
 			interval := cmd.String("interval")
 			points := cmd.Int("points")
 
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period, "ema")
+			// EMA uses exponential smoothing; 3x period provides convergence stability.
+			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period*3, "ema")
 			if err != nil {
 				return err
 			}
@@ -242,7 +243,8 @@ func taRSICommand(c *client.Ref, w io.Writer) *cli.Command {
 			interval := cmd.String("interval")
 			points := cmd.Int("points")
 
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period, "rsi")
+			// RSI uses Wilder smoothing; 3x period provides convergence stability.
+			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period*3, "rsi")
 			if err != nil {
 				return err
 			}
@@ -285,8 +287,8 @@ func taMACDCommand(c *client.Ref, w io.Writer) *cli.Command {
 			interval := cmd.String("interval")
 			points := cmd.Int("points")
 
-			// Use slow period for data window calculation since it's the largest lookback
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, slow, "macd")
+			// MACD layers slow EMA + signal EMA; 2x the combined period provides convergence.
+			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, (slow+signal)*2, "macd")
 			if err != nil {
 				return err
 			}
@@ -347,7 +349,8 @@ func taATRCommand(c *client.Ref, w io.Writer) *cli.Command {
 			interval := cmd.String("interval")
 			points := cmd.Int("points")
 
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period, "atr")
+			// ATR uses Wilder smoothing; 3x period provides convergence stability.
+			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period*3, "atr")
 			if err != nil {
 				return err
 			}
@@ -464,7 +467,9 @@ func taStochCommand(c *client.Ref, w io.Writer) *cli.Command {
 			interval := cmd.String("interval")
 			points := cmd.Int("points")
 
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, kPeriod, "stoch")
+			// Stochastic chains three windowed ops (raw %K, smoothed %K, %D);
+			// total depth is the sum of all window sizes.
+			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, kPeriod+smoothK+dPeriod, "stoch")
 			if err != nil {
 				return err
 			}
@@ -532,7 +537,8 @@ func taADXCommand(c *client.Ref, w io.Writer) *cli.Command {
 			interval := cmd.String("interval")
 			points := cmd.Int("points")
 
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period, "adx")
+			// ADX double-smooths (DI pass + ADX pass); 4x period ensures both converge.
+			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period*4, "adx")
 			if err != nil {
 				return err
 			}
@@ -854,15 +860,18 @@ func mustParseFloat(s string) float64 {
 }
 
 // fetchAndValidateCandles fetches price history and validates minimum candle count.
-// Returns the candle slice and pre-extracted timestamps for alignment.
+// requiredCandles is indicator-specific: each caller computes its own minimum based
+// on warmup needs (e.g. SMA needs exactly period, EMA needs 3x for convergence,
+// ADX needs 4x for double smoothing). The history lookback window is scaled to
+// match. See https://github.com/major/schwab-agent/issues/12.
 func fetchAndValidateCandles(
 	ctx context.Context,
 	c *client.Ref,
 	symbol, interval string,
-	period int,
+	requiredCandles int,
 	indicator string,
 ) ([]models.Candle, []string, error) {
-	periodType, periodVal, freqType, freq, err := ta.IntervalToHistoryParams(interval)
+	periodType, periodVal, freqType, freq, err := ta.IntervalToHistoryParams(interval, requiredCandles)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -878,8 +887,7 @@ func fetchAndValidateCandles(
 		return nil, nil, err
 	}
 
-	required := max(period*3, period+20)
-	if err := ta.ValidateMinCandles(result.Candles, required, indicator); err != nil {
+	if err := ta.ValidateMinCandles(result.Candles, requiredCandles, indicator); err != nil {
 		return nil, nil, err
 	}
 
