@@ -26,4 +26,17 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go test -v -race -coverprofile=coverage.out ./...
+      - uses: codecov/codecov-action@aa56896cf108bd10b5eb883cd1d24196da57f695 # v5.5.4
+        with:
+          files: coverage.out
+          token: ${{ secrets.CODECOV_TOKEN }}
       - run: go build ./cmd/schwab-agent/
+
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version-file: go.mod
+      - uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1.0.4

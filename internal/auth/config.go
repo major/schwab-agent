@@ -81,7 +81,7 @@ func SaveConfig(configPath string, cfg *Config) error {
 	}
 
 	// Marshal config to JSON
-	data, err := json.MarshalIndent(cfg, "", "  ")
+	data, err := json.MarshalIndent(cfg, "", "  ") //nolint:gosec // G117: config file intentionally stores client_secret with 0600 perms
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}

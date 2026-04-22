@@ -32,7 +32,7 @@ const (
 	authorizeEndpoint = "https://api.schwabapi.com/v1/oauth/authorize"
 
 	// oauthTokenEndpoint is Schwab's OAuth token endpoint.
-	oauthTokenEndpoint = "https://api.schwabapi.com/v1/oauth/token"
+	oauthTokenEndpoint = "https://api.schwabapi.com/v1/oauth/token" //nolint:gosec // G101: API endpoint URL, not a credential
 
 	// defaultCallbackAddr limits the local callback server to loopback.
 	defaultCallbackAddr = "127.0.0.1:8182"
@@ -260,7 +260,10 @@ func startCallbackServer(addr, expectedState string, readyCh chan<- struct{}) (s
 	resultCh := make(chan callbackResult, 1)
 	var once sync.Once
 
-	server := &http.Server{Handler: callbackHandler(expectedState, resultCh, &once)}
+	server := &http.Server{
+		Handler:           callbackHandler(expectedState, resultCh, &once),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 
 	go func() {
 		serveErr := server.Serve(tlsListener)

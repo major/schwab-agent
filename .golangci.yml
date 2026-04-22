@@ -6,6 +6,7 @@ linters:
     - bodyclose
     - errorlint
     - gocritic
+    - gosec
     - misspell
     - nolintlint
     - revive
@@ -48,6 +49,7 @@ linters:
         linters:
           - bodyclose
           - goconst
+          - gosec
           - unparam
 
 run:

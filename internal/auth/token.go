@@ -16,7 +16,7 @@ import (
 
 const (
 	// tokenEndpoint is the Schwab OAuth token endpoint.
-	tokenEndpoint = "https://api.schwabapi.com/v1/oauth/token"
+	tokenEndpoint = "https://api.schwabapi.com/v1/oauth/token" //nolint:gosec // G101: API endpoint URL, not a credential
 
 	// refreshTokenMaxAge is 6.5 days in seconds, matching schwab-py's default.
 	refreshTokenMaxAge = 561600
