@@ -536,3 +536,551 @@ func TestOrderPlaceOCOPipeline(t *testing.T) {
 func int64Ptr(value int64) *int64 {
 	return &value
 }
+
+// --- Spread build tests (iron condor, vertical, strangle, straddle, covered call) ---
+//
+// These tests exercise the full CLI pipeline: CLI flags → parseXxxParams → validate → build → JSON.
+// The builder functions are independently tested in orderbuilder/spread_test.go; these tests verify
+// the parsing layer wires flags to params correctly, which is the untested gap that matters most
+// for order correctness.
+
+func TestOrderBuildIronCondorOpen(t *testing.T) {
+	t.Parallel()
+
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "iron-condor",
+		"--underlying", "SPY",
+		"--expiration", "2026-06-19",
+		"--put-long-strike", "400",
+		"--put-short-strike", "410",
+		"--call-short-strike", "420",
+		"--call-long-strike", "430",
+		"--open",
+		"--quantity", "5",
+		"--price", "2.50",
+		"--duration", "DAY",
+		"--session", "NORMAL",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+
+	// Order-level fields.
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeIronCondor, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 2.50, *order.Price)
+	assert.Equal(t, models.DurationDay, order.Duration)
+	assert.Equal(t, models.SessionNormal, order.Session)
+
+	// 4 legs: put-long, put-short, call-short, call-long.
+	require.Len(t, order.OrderLegCollection, 4)
+
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
+	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
+	assert.Equal(t, models.PutCallPut, *order.OrderLegCollection[0].Instrument.PutCall)
+	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.Equal(t, 400.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
+	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.Equal(t, 410.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[2].Instruction)
+	require.NotNil(t, order.OrderLegCollection[2].Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[2].Instrument.PutCall)
+	require.NotNil(t, order.OrderLegCollection[2].Instrument.OptionStrikePrice)
+	assert.Equal(t, 420.0, *order.OrderLegCollection[2].Instrument.OptionStrikePrice)
+
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[3].Instruction)
+	require.NotNil(t, order.OrderLegCollection[3].Instrument.OptionStrikePrice)
+	assert.Equal(t, 430.0, *order.OrderLegCollection[3].Instrument.OptionStrikePrice)
+
+	// All legs should have the same quantity.
+	for i, leg := range order.OrderLegCollection {
+		assert.Equal(t, 5.0, leg.Quantity, "leg %d quantity", i)
+	}
+}
+
+func TestOrderBuildIronCondorClose(t *testing.T) {
+	t.Parallel()
+
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "iron-condor",
+		"--underlying", "SPY",
+		"--expiration", "2026-06-19",
+		"--put-long-strike", "400",
+		"--put-short-strike", "410",
+		"--call-short-strike", "420",
+		"--call-long-strike", "430",
+		"--close",
+		"--quantity", "5",
+		"--price", "1.00",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+
+	// Closing: long legs SELL_TO_CLOSE, short legs BUY_TO_CLOSE.
+	require.Len(t, order.OrderLegCollection, 4)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[1].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[2].Instruction)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[3].Instruction)
+}
+
+func TestOrderBuildVerticalCallDebit(t *testing.T) {
+	t.Parallel()
+
+	// Bull call spread: buy lower strike, sell higher strike = NET_DEBIT.
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "vertical",
+		"--underlying", "AAPL",
+		"--expiration", "2026-07-17",
+		"--long-strike", "180",
+		"--short-strike", "190",
+		"--call",
+		"--open",
+		"--quantity", "3",
+		"--price", "4.00",
+		"--duration", "GOOD_TILL_CANCEL",
+		"--session", "AM",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeVertical, *order.ComplexOrderStrategyType)
+	assert.Equal(t, models.DurationGoodTillCancel, order.Duration)
+	assert.Equal(t, models.SessionAM, order.Session)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 4.00, *order.Price)
+
+	require.Len(t, order.OrderLegCollection, 2)
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, 3.0, order.OrderLegCollection[0].Quantity)
+	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.Equal(t, 180.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
+	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.Equal(t, 190.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+}
+
+func TestOrderBuildVerticalPutCredit(t *testing.T) {
+	t.Parallel()
+
+	// Bull put spread: buy lower strike put, sell higher strike put = NET_CREDIT.
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "vertical",
+		"--underlying", "AAPL",
+		"--expiration", "2026-07-17",
+		"--long-strike", "170",
+		"--short-strike", "180",
+		"--put",
+		"--open",
+		"--quantity", "2",
+		"--price", "3.00",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeVertical, *order.ComplexOrderStrategyType)
+	require.Len(t, order.OrderLegCollection, 2)
+
+	// Both legs should be puts.
+	for _, leg := range order.OrderLegCollection {
+		require.NotNil(t, leg.Instrument.PutCall)
+		assert.Equal(t, models.PutCallPut, *leg.Instrument.PutCall)
+	}
+}
+
+func TestOrderBuildStrangleBuyOpen(t *testing.T) {
+	t.Parallel()
+
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "strangle",
+		"--underlying", "TSLA",
+		"--expiration", "2026-06-19",
+		"--call-strike", "300",
+		"--put-strike", "250",
+		"--buy",
+		"--open",
+		"--quantity", "2",
+		"--price", "15.00",
+		"--duration", "DAY",
+		"--session", "NORMAL",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeStrangle, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 15.00, *order.Price)
+
+	require.Len(t, order.OrderLegCollection, 2)
+
+	// Leg 0: call at 300.
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
+	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[0].Instrument.PutCall)
+	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.Equal(t, 300.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+
+	// Leg 1: put at 250.
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[1].Instruction)
+	require.NotNil(t, order.OrderLegCollection[1].Instrument.PutCall)
+	assert.Equal(t, models.PutCallPut, *order.OrderLegCollection[1].Instrument.PutCall)
+	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.Equal(t, 250.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+}
+
+func TestOrderBuildStrangleSellOpen(t *testing.T) {
+	t.Parallel()
+
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "strangle",
+		"--underlying", "TSLA",
+		"--expiration", "2026-06-19",
+		"--call-strike", "300",
+		"--put-strike", "250",
+		"--sell",
+		"--open",
+		"--quantity", "1",
+		"--price", "12.00",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
+}
+
+func TestOrderBuildStraddleBuyOpen(t *testing.T) {
+	t.Parallel()
+
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "straddle",
+		"--underlying", "NVDA",
+		"--expiration", "2026-06-19",
+		"--strike", "130",
+		"--buy",
+		"--open",
+		"--quantity", "4",
+		"--price", "20.00",
+		"--duration", "DAY",
+		"--session", "NORMAL",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeStraddle, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 20.00, *order.Price)
+
+	// Both legs at same strike, both BUY_TO_OPEN, one call + one put.
+	require.Len(t, order.OrderLegCollection, 2)
+
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
+	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[0].Instrument.PutCall)
+	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.Equal(t, 130.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[1].Instruction)
+	require.NotNil(t, order.OrderLegCollection[1].Instrument.PutCall)
+	assert.Equal(t, models.PutCallPut, *order.OrderLegCollection[1].Instrument.PutCall)
+	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.Equal(t, 130.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+
+	for i, leg := range order.OrderLegCollection {
+		assert.Equal(t, 4.0, leg.Quantity, "leg %d quantity", i)
+	}
+}
+
+func TestOrderBuildStraddleSellOpen(t *testing.T) {
+	t.Parallel()
+
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "straddle",
+		"--underlying", "NVDA",
+		"--expiration", "2026-06-19",
+		"--strike", "130",
+		"--sell",
+		"--open",
+		"--quantity", "1",
+		"--price", "18.00",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
+}
+
+func TestOrderBuildCoveredCallOutputsRequestJSON(t *testing.T) {
+	t.Parallel()
+
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "covered-call",
+		"--underlying", "F",
+		"--expiration", "2026-06-19",
+		"--strike", "14",
+		"--quantity", "2",
+		"--price", "12.50",
+		"--duration", "DAY",
+		"--session", "NORMAL",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeCovered, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 12.50, *order.Price)
+
+	// Two legs: equity BUY + option SELL_TO_OPEN.
+	require.Len(t, order.OrderLegCollection, 2)
+
+	// Equity leg: 2 contracts = 200 shares.
+	equityLeg := order.OrderLegCollection[0]
+	assert.Equal(t, models.InstructionBuy, equityLeg.Instruction)
+	assert.Equal(t, 200.0, equityLeg.Quantity)
+	assert.Equal(t, models.AssetTypeEquity, equityLeg.Instrument.AssetType)
+	assert.Equal(t, "F", equityLeg.Instrument.Symbol)
+
+	// Option leg: SELL_TO_OPEN call.
+	optionLeg := order.OrderLegCollection[1]
+	assert.Equal(t, models.InstructionSellToOpen, optionLeg.Instruction)
+	assert.Equal(t, 2.0, optionLeg.Quantity)
+	assert.Equal(t, models.AssetTypeOption, optionLeg.Instrument.AssetType)
+	require.NotNil(t, optionLeg.Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *optionLeg.Instrument.PutCall)
+	require.NotNil(t, optionLeg.Instrument.OptionStrikePrice)
+	assert.Equal(t, 14.0, *optionLeg.Instrument.OptionStrikePrice)
+}
+
+func TestOrderBuildSpreadDefaultDurationSession(t *testing.T) {
+	t.Parallel()
+
+	// Omit --duration and --session; defaults should be DAY and NORMAL.
+	testCases := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "iron-condor defaults",
+			args: []string{
+				"order", "build", "iron-condor",
+				"--underlying", "SPY", "--expiration", "2026-06-19",
+				"--put-long-strike", "400", "--put-short-strike", "410",
+				"--call-short-strike", "420", "--call-long-strike", "430",
+				"--open", "--quantity", "1", "--price", "1.00",
+			},
+		},
+		{
+			name: "vertical defaults",
+			args: []string{
+				"order", "build", "vertical",
+				"--underlying", "AAPL", "--expiration", "2026-06-19",
+				"--long-strike", "180", "--short-strike", "190",
+				"--call", "--open", "--quantity", "1", "--price", "2.00",
+			},
+		},
+		{
+			name: "strangle defaults",
+			args: []string{
+				"order", "build", "strangle",
+				"--underlying", "TSLA", "--expiration", "2026-06-19",
+				"--call-strike", "300", "--put-strike", "250",
+				"--buy", "--open", "--quantity", "1", "--price", "10.00",
+			},
+		},
+		{
+			name: "straddle defaults",
+			args: []string{
+				"order", "build", "straddle",
+				"--underlying", "NVDA", "--expiration", "2026-06-19",
+				"--strike", "130",
+				"--buy", "--open", "--quantity", "1", "--price", "15.00",
+			},
+		},
+		{
+			name: "covered-call defaults",
+			args: []string{
+				"order", "build", "covered-call",
+				"--underlying", "F", "--expiration", "2026-06-19",
+				"--strike", "14", "--quantity", "1", "--price", "12.00",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			stdout, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "", tc.args...)
+			require.NoError(t, err)
+
+			order := decodeOrderRequest(t, stdout)
+			assert.Equal(t, models.DurationDay, order.Duration, "default duration should be DAY")
+			assert.Equal(t, models.SessionNormal, order.Session, "default session should be NORMAL")
+		})
+	}
+}
+
+func TestOrderBuildSpreadParseErrors(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		args    []string
+		wantMsg string
+	}{
+		// Invalid expiration format.
+		{
+			name: "iron-condor bad expiration",
+			args: []string{
+				"order", "build", "iron-condor",
+				"--underlying", "SPY", "--expiration", "June-19-2026",
+				"--put-long-strike", "400", "--put-short-strike", "410",
+				"--call-short-strike", "420", "--call-long-strike", "430",
+				"--open", "--quantity", "1", "--price", "1.00",
+			},
+			wantMsg: "expiration must use YYYY-MM-DD format",
+		},
+		{
+			name: "vertical bad expiration",
+			args: []string{
+				"order", "build", "vertical",
+				"--underlying", "AAPL", "--expiration", "not-a-date",
+				"--long-strike", "180", "--short-strike", "190",
+				"--call", "--open", "--quantity", "1", "--price", "2.00",
+			},
+			wantMsg: "expiration must use YYYY-MM-DD format",
+		},
+		{
+			name: "covered-call bad expiration",
+			args: []string{
+				"order", "build", "covered-call",
+				"--underlying", "F", "--expiration", "2026/06/19",
+				"--strike", "14", "--quantity", "1", "--price", "12.00",
+			},
+			wantMsg: "expiration must use YYYY-MM-DD format",
+		},
+		// Missing mutually exclusive open/close.
+		{
+			name: "iron-condor missing open/close",
+			args: []string{
+				"order", "build", "iron-condor",
+				"--underlying", "SPY", "--expiration", "2026-06-19",
+				"--put-long-strike", "400", "--put-short-strike", "410",
+				"--call-short-strike", "420", "--call-long-strike", "430",
+				"--quantity", "1", "--price", "1.00",
+			},
+			wantMsg: "exactly one of --open or --close is required",
+		},
+		{
+			name: "vertical missing open/close",
+			args: []string{
+				"order", "build", "vertical",
+				"--underlying", "AAPL", "--expiration", "2026-06-19",
+				"--long-strike", "180", "--short-strike", "190",
+				"--call", "--quantity", "1", "--price", "2.00",
+			},
+			wantMsg: "exactly one of --open or --close is required",
+		},
+		// Missing mutually exclusive buy/sell.
+		{
+			name: "strangle missing buy/sell",
+			args: []string{
+				"order", "build", "strangle",
+				"--underlying", "TSLA", "--expiration", "2026-06-19",
+				"--call-strike", "300", "--put-strike", "250",
+				"--open", "--quantity", "1", "--price", "10.00",
+			},
+			wantMsg: "exactly one of --buy or --sell is required",
+		},
+		{
+			name: "straddle missing buy/sell",
+			args: []string{
+				"order", "build", "straddle",
+				"--underlying", "NVDA", "--expiration", "2026-06-19",
+				"--strike", "130",
+				"--open", "--quantity", "1", "--price", "15.00",
+			},
+			wantMsg: "exactly one of --buy or --sell is required",
+		},
+		// Missing mutually exclusive call/put.
+		{
+			name: "vertical missing call/put",
+			args: []string{
+				"order", "build", "vertical",
+				"--underlying", "AAPL", "--expiration", "2026-06-19",
+				"--long-strike", "180", "--short-strike", "190",
+				"--open", "--quantity", "1", "--price", "2.00",
+			},
+			wantMsg: "exactly one of --call or --put is required",
+		},
+		// Invalid duration.
+		{
+			name: "strangle invalid duration",
+			args: []string{
+				"order", "build", "strangle",
+				"--underlying", "TSLA", "--expiration", "2026-06-19",
+				"--call-strike", "300", "--put-strike", "250",
+				"--buy", "--open", "--quantity", "1", "--price", "10.00",
+				"--duration", "FOREVER",
+			},
+			wantMsg: "duration is invalid",
+		},
+		// Invalid session.
+		{
+			name: "straddle invalid session",
+			args: []string{
+				"order", "build", "straddle",
+				"--underlying", "NVDA", "--expiration", "2026-06-19",
+				"--strike", "130",
+				"--buy", "--open", "--quantity", "1", "--price", "15.00",
+				"--session", "AFTERHOURS",
+			},
+			wantMsg: "session is invalid",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			stdout, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "", tc.args...)
+			require.Error(t, err)
+			assert.Empty(t, stdout)
+
+			var validationErr *schwabErrors.ValidationError
+			require.ErrorAs(t, err, &validationErr)
+			assert.Equal(t, tc.wantMsg, validationErr.Error())
+		})
+	}
+}

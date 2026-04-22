@@ -43,6 +43,7 @@ config.json
 *.har
 image.png
 INITIAL_PLAN.md
+PRODUCTION_CHECKS.md
 
 # Old git history backup
 .git-bak/
