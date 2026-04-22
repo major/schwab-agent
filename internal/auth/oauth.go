@@ -68,9 +68,11 @@ var (
 )
 
 // AuthorizeURL builds the Schwab authorization URL and returns it with a random state value.
-// It panics if the system CSPRNG is unavailable.
-func AuthorizeURL(cfg *Config) (authURL, state string) {
-	state = randomOAuthState()
+func AuthorizeURL(cfg *Config) (authURL, state string, err error) {
+	state, err = randomOAuthState()
+	if err != nil {
+		return "", "", schwabErrors.NewAuthCallbackError("failed to generate OAuth state", err)
+	}
 
 	query := url.Values{}
 	query.Set("client_id", cfg.ClientID)
@@ -79,7 +81,7 @@ func AuthorizeURL(cfg *Config) (authURL, state string) {
 	query.Set("scope", "api")
 	query.Set("state", state)
 
-	return authorizeEndpoint + "?" + query.Encode(), state
+	return authorizeEndpoint + "?" + query.Encode(), state, nil
 }
 
 // ExchangeCode exchanges an OAuth authorization code for a token file.
@@ -140,7 +142,11 @@ func StartCallbackServer(addr, expectedState string) (code string, err error) {
 
 // RunLogin performs the full OAuth login flow and persists the resulting token.
 func RunLogin(cfg *Config, tokenPath, tokenEndpoint string, openBrowser bool, w io.Writer) error {
-	authURL, state := AuthorizeURL(cfg)
+	authURL, state, err := AuthorizeURL(cfg)
+	if err != nil {
+		return err
+	}
+
 	callbackAddr, err := callbackAddress(cfg)
 	if err != nil {
 		return err
@@ -197,13 +203,15 @@ type callbackResult struct {
 }
 
 // randomOAuthState creates a 32-byte random hex state value.
-func randomOAuthState() string {
+// Returns an error if the system CSPRNG is unavailable instead of panicking,
+// since this runs in a CLI tool where a clean error message beats a stack trace.
+func randomOAuthState() (string, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
-		panic(fmt.Errorf("failed to generate OAuth state: %w", err))
+		return "", fmt.Errorf("failed to generate OAuth state: %w", err)
 	}
 
-	return hex.EncodeToString(buf)
+	return hex.EncodeToString(buf), nil
 }
 
 // callbackAddress extracts and validates the callback server address from config.

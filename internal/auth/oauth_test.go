@@ -61,9 +61,11 @@ func TestAuthorizeURL_ReturnsExpectedParametersAndState(t *testing.T) {
 	}
 
 	// Act
-	authURL, state := AuthorizeURL(cfg)
+	authURL, state, err := AuthorizeURL(cfg)
 
 	// Assert
+	require.NoError(t, err)
+
 	parsedURL, err := url.Parse(authURL)
 	require.NoError(t, err)
 
