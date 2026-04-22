@@ -11,7 +11,7 @@ import (
 )
 
 // ChainCommand returns the CLI command for option chain operations.
-func ChainCommand(c *client.Client, w io.Writer) *cli.Command {
+func ChainCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "chain",
 		Usage: "Option chain operations",
@@ -23,7 +23,7 @@ func ChainCommand(c *client.Client, w io.Writer) *cli.Command {
 }
 
 // chainGetCommand returns the subcommand for retrieving an option chain.
-func chainGetCommand(c *client.Client, w io.Writer) *cli.Command {
+func chainGetCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:      "get",
 		Usage:     "Get option chain for a symbol",
@@ -122,7 +122,7 @@ func chainGetCommand(c *client.Client, w io.Writer) *cli.Command {
 }
 
 // chainExpirationCommand returns the subcommand for retrieving option expiration dates.
-func chainExpirationCommand(c *client.Client, w io.Writer) *cli.Command {
+func chainExpirationCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:      "expiration",
 		Usage:     "Get expiration dates for a symbol",

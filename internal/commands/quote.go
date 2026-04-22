@@ -14,7 +14,7 @@ import (
 )
 
 // QuoteCommand returns the CLI command for stock quote operations.
-func QuoteCommand(c *client.Client, w io.Writer) *cli.Command {
+func QuoteCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "quote",
 		Usage: "Stock quote operations",
@@ -25,7 +25,7 @@ func QuoteCommand(c *client.Client, w io.Writer) *cli.Command {
 }
 
 // quoteGetCommand returns the subcommand for retrieving quotes.
-func quoteGetCommand(c *client.Client, w io.Writer) *cli.Command {
+func quoteGetCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:      "get",
 		Usage:     "Get quotes for one or more symbols",
@@ -45,7 +45,7 @@ func quoteGetCommand(c *client.Client, w io.Writer) *cli.Command {
 }
 
 // quoteSingle fetches and writes a quote for a single symbol.
-func quoteSingle(ctx context.Context, c *client.Client, w io.Writer, symbol string) error {
+func quoteSingle(ctx context.Context, c *client.Ref, w io.Writer, symbol string) error {
 	quote, err := c.Quote(ctx, symbol)
 	if err != nil {
 		return err
@@ -54,7 +54,7 @@ func quoteSingle(ctx context.Context, c *client.Client, w io.Writer, symbol stri
 }
 
 // quoteMulti fetches quotes for multiple symbols, using WritePartial when some are missing.
-func quoteMulti(ctx context.Context, c *client.Client, w io.Writer, symbols []string) error {
+func quoteMulti(ctx context.Context, c *client.Ref, w io.Writer, symbols []string) error {
 	quotes, err := c.Quotes(ctx, symbols)
 	if err != nil {
 		return err

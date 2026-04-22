@@ -11,7 +11,7 @@ import (
 )
 
 // InstrumentCommand returns the CLI command for instrument search and lookup.
-func InstrumentCommand(c *client.Client, w io.Writer) *cli.Command {
+func InstrumentCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "instrument",
 		Usage: "Search and look up instruments",

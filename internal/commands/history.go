@@ -12,7 +12,7 @@ import (
 )
 
 // HistoryCommand returns the CLI command for price history lookups.
-func HistoryCommand(c *client.Client, w io.Writer) *cli.Command {
+func HistoryCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "history",
 		Usage: "Retrieve price history for a symbol",

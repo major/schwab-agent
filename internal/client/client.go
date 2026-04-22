@@ -39,6 +39,14 @@ const (
 	defaultUserAgent = "schwab-agent/dev"
 )
 
+// Ref holds a lazily-populated reference to a Client. Command constructors
+// capture the Ref at build time; the Before hook populates it after
+// authentication, so all commands share the live client via simple field
+// assignment instead of the Go-unusual *x = *y dereference pattern.
+type Ref struct {
+	*Client
+}
+
 // Client is an authenticated HTTP client for the Schwab API.
 type Client struct {
 	baseURL    string

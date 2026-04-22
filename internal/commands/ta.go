@@ -28,7 +28,7 @@ func taIndicatorFlags(defaultPeriod int) []cli.Flag {
 }
 
 // TACommand returns the CLI command for technical analysis indicators.
-func TACommand(c *client.Client, w io.Writer) *cli.Command {
+func TACommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "ta",
 		Usage: "Technical analysis indicators",
@@ -48,7 +48,7 @@ func TACommand(c *client.Client, w io.Writer) *cli.Command {
 	}
 }
 
-func taSMACommand(c *client.Client, w io.Writer) *cli.Command {
+func taSMACommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "sma",
 		Usage: "Simple Moving Average",
@@ -83,7 +83,7 @@ func taSMACommand(c *client.Client, w io.Writer) *cli.Command {
 	}
 }
 
-func taEMACommand(c *client.Client, w io.Writer) *cli.Command {
+func taEMACommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "ema",
 		Usage: "Exponential Moving Average",
@@ -118,7 +118,7 @@ func taEMACommand(c *client.Client, w io.Writer) *cli.Command {
 	}
 }
 
-func taRSICommand(c *client.Client, w io.Writer) *cli.Command {
+func taRSICommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "rsi",
 		Usage: "Relative Strength Index",
@@ -153,7 +153,7 @@ func taRSICommand(c *client.Client, w io.Writer) *cli.Command {
 	}
 }
 
-func taMACDCommand(c *client.Client, w io.Writer) *cli.Command {
+func taMACDCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "macd",
 		Usage: "Moving Average Convergence/Divergence",
@@ -223,7 +223,7 @@ func taMACDCommand(c *client.Client, w io.Writer) *cli.Command {
 	}
 }
 
-func taATRCommand(c *client.Client, w io.Writer) *cli.Command {
+func taATRCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "atr",
 		Usage: "Average True Range",
@@ -266,7 +266,7 @@ func taATRCommand(c *client.Client, w io.Writer) *cli.Command {
 	}
 }
 
-func taBBandsCommand(c *client.Client, w io.Writer) *cli.Command {
+func taBBandsCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "bbands",
 		Usage: "Bollinger Bands",
@@ -332,7 +332,7 @@ func taBBandsCommand(c *client.Client, w io.Writer) *cli.Command {
 	}
 }
 
-func taStochCommand(c *client.Client, w io.Writer) *cli.Command {
+func taStochCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "stoch",
 		Usage: "Stochastic Oscillator",
@@ -408,7 +408,7 @@ func taStochCommand(c *client.Client, w io.Writer) *cli.Command {
 	}
 }
 
-func taADXCommand(c *client.Client, w io.Writer) *cli.Command {
+func taADXCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "adx",
 		Usage: "Average Directional Index",
@@ -475,7 +475,7 @@ func taADXCommand(c *client.Client, w io.Writer) *cli.Command {
 	}
 }
 
-func taVWAPCommand(c *client.Client, w io.Writer) *cli.Command {
+func taVWAPCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "vwap",
 		Usage: "Volume Weighted Average Price",
@@ -528,7 +528,7 @@ func taVWAPCommand(c *client.Client, w io.Writer) *cli.Command {
 	}
 }
 
-func taHVCommand(c *client.Client, w io.Writer) *cli.Command {
+func taHVCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "hv",
 		Usage: "Historical Volatility with regime classification",
@@ -581,7 +581,7 @@ func taHVCommand(c *client.Client, w io.Writer) *cli.Command {
 	}
 }
 
-func taExpectedMoveCommand(c *client.Client, w io.Writer) *cli.Command {
+func taExpectedMoveCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "expected-move",
 		Usage: "Expected price move from ATM straddle pricing",
@@ -748,7 +748,7 @@ func mustParseFloat(s string) float64 {
 // Returns the candle slice and pre-extracted timestamps for alignment.
 func fetchAndValidateCandles(
 	ctx context.Context,
-	c *client.Client,
+	c *client.Ref,
 	symbol, interval string,
 	period int,
 	indicator string,

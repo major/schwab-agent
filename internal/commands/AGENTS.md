@@ -9,7 +9,7 @@ CLI command handlers for schwab-agent. Each file defines one command group (e.g.
 Every command group exports one public constructor that returns `*cli.Command`:
 
 ```go
-func QuoteCommand(c *client.Client, w io.Writer) *cli.Command {
+func QuoteCommand(c *client.Ref, w io.Writer) *cli.Command {
     return &cli.Command{
         Name:  "quote",
         Usage: "Stock quote operations",
@@ -22,7 +22,7 @@ func QuoteCommand(c *client.Client, w io.Writer) *cli.Command {
 
 - Public function returns the parent command (registered in `main.go`'s `buildApp()`)
 - Private functions return subcommands
-- All commands accept `*client.Client` and `io.Writer` (some also take `configPath string`), except `symbol` which only takes `io.Writer` (no API client needed)
+- All commands accept `*client.Ref` and `io.Writer` (some also take `configPath string`), except `symbol` which only takes `io.Writer` (no API client needed)
 - Action functions use `context.Context` and `*cli.Command` from urfave/cli v3
 
 ## Adding a New Command
@@ -93,7 +93,7 @@ All return `ValidationError` on invalid input.
 Test helpers in `helpers_test.go`:
 
 - `runTestCommand(t, cmd, args...)`: Suppresses `os.Exit` and runs the command
-- `testClient(t, server)`: Creates `*client.Client` backed by httptest server
+- `testClient(t, server)`: Creates `*client.Ref` backed by httptest server
 - `jsonServer(body)`: Returns httptest server that always responds with given JSON
 
 Pattern: Create httptest server with expected response -> build command -> run via `runTestCommand` -> decode output -> assert envelope contents.

@@ -26,7 +26,7 @@ const mutableDisabledMessage = `Mutable operations are disabled by default. ` +
 	`Set "i-also-like-to-live-dangerously": true in your config file to enable order placement, cancellation, and replacement.`
 
 // OrderCommand returns the parent order command and all nested order workflows.
-func OrderCommand(c *client.Client, configPath string, w io.Writer) *cli.Command {
+func OrderCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "order",
 		Usage: "List, build, preview, place, cancel, and replace orders",
@@ -43,7 +43,7 @@ func OrderCommand(c *client.Client, configPath string, w io.Writer) *cli.Command
 }
 
 // orderListCommand lists orders for a specific account or all accounts.
-func orderListCommand(c *client.Client, _ string, w io.Writer) *cli.Command {
+func orderListCommand(c *client.Ref, _ string, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "list",
 		Usage: "List orders",
@@ -81,7 +81,7 @@ func orderListCommand(c *client.Client, _ string, w io.Writer) *cli.Command {
 }
 
 // orderGetCommand returns a single order by account and ID.
-func orderGetCommand(c *client.Client, configPath string, w io.Writer) *cli.Command {
+func orderGetCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:      "get",
 		Usage:     "Get an order by ID",
@@ -111,7 +111,7 @@ func orderGetCommand(c *client.Client, configPath string, w io.Writer) *cli.Comm
 }
 
 // orderPlaceCommand places new orders from either flags or a JSON spec.
-func orderPlaceCommand(c *client.Client, configPath string, w io.Writer) *cli.Command {
+func orderPlaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "place",
 		Usage: "Place an order",
@@ -172,7 +172,7 @@ func orderPlaceCommand(c *client.Client, configPath string, w io.Writer) *cli.Co
 // Same generic pattern as makeBuildOrderCommand but adds mutable + confirm gates
 // and the actual API call.
 func makePlaceOrderCommand[P any](
-	c *client.Client,
+	c *client.Ref,
 	configPath string,
 	w io.Writer,
 	name, usage string,
@@ -227,7 +227,7 @@ func makePlaceOrderCommand[P any](
 }
 
 // orderPreviewCommand previews an order from a JSON spec.
-func orderPreviewCommand(c *client.Client, configPath string, w io.Writer) *cli.Command {
+func orderPreviewCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "preview",
 		Usage: "Preview an order from JSON spec",
@@ -266,7 +266,7 @@ func orderPreviewCommand(c *client.Client, configPath string, w io.Writer) *cli.
 }
 
 // orderCancelCommand cancels an existing order.
-func orderCancelCommand(c *client.Client, configPath string, w io.Writer) *cli.Command {
+func orderCancelCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:      "cancel",
 		Usage:     "Cancel an order",
@@ -304,7 +304,7 @@ func orderCancelCommand(c *client.Client, configPath string, w io.Writer) *cli.C
 }
 
 // orderReplaceCommand replaces an existing order with an equity order payload.
-func orderReplaceCommand(c *client.Client, configPath string, w io.Writer) *cli.Command {
+func orderReplaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:      "replace",
 		Usage:     "Replace an order with a new equity order spec",

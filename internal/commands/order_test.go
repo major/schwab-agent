@@ -54,7 +54,7 @@ func writeTestConfigMutable(t *testing.T, defaultAccount string) string {
 }
 
 // runOrderCommand runs the order command tree with the provided args and stdin.
-func runOrderCommand(t *testing.T, c *client.Client, configPath, stdin string, args ...string) (string, error) {
+func runOrderCommand(t *testing.T, c *client.Ref, configPath, stdin string, args ...string) (string, error) {
 	t.Helper()
 
 	var stdout strings.Builder
@@ -167,7 +167,7 @@ func TestOrderPreviewSpecModes(t *testing.T) {
 	defer server.Close()
 
 	configPath := writeTestConfig(t, "hash123")
-	cliClient := client.NewClient("test-token", client.WithBaseURL(server.URL))
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
 	spec := mustMarshalJSON(t, &models.OrderRequest{
 		Session:           models.SessionNormal,
 		Duration:          models.DurationDay,
@@ -271,7 +271,7 @@ func TestOrderPlaceEquityPipeline(t *testing.T) {
 	defer server.Close()
 
 	configPath := writeTestConfigMutable(t, "default-hash")
-	cliClient := client.NewClient("test-token", client.WithBaseURL(server.URL))
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
 
 	stdout, err := runOrderCommand(
 		t,
@@ -322,7 +322,7 @@ func TestOrderPlaceSpecFromFile(t *testing.T) {
 	defer server.Close()
 
 	configPath := writeTestConfigMutable(t, "hash123")
-	cliClient := client.NewClient("test-token", client.WithBaseURL(server.URL))
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
 	orderRequest, err := orderbuilder.BuildEquityOrder(&orderbuilder.EquityParams{
 		Symbol:    "MSFT",
 		Action:    models.InstructionBuy,
@@ -419,7 +419,7 @@ func TestOrderPreviewNotBlockedByMutableGuard(t *testing.T) {
 
 	// Config WITHOUT mutable flag - preview should still work.
 	configPath := writeTestConfig(t, "hash123")
-	cliClient := client.NewClient("test-token", client.WithBaseURL(server.URL))
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
 
 	spec := `{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderLegCollection":[{"instruction":"BUY","quantity":1,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}`
 	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "preview", "--spec", spec)
@@ -505,7 +505,7 @@ func TestOrderPlaceOCOPipeline(t *testing.T) {
 	defer server.Close()
 
 	configPath := writeTestConfigMutable(t, "default-hash")
-	cliClient := client.NewClient("test-token", client.WithBaseURL(server.URL))
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
 
 	stdout, err := runOrderCommand(
 		t,

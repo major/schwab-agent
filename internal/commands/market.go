@@ -15,7 +15,7 @@ import (
 var allMarkets = []string{"equity", "option", "bond", "future", "forex"}
 
 // MarketCommand returns the CLI command for market hours and movers lookups.
-func MarketCommand(c *client.Client, w io.Writer) *cli.Command {
+func MarketCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "market",
 		Usage: "Market hours and top movers",

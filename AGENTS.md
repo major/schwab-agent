@@ -75,7 +75,7 @@ All command output uses `internal/output` JSON envelopes:
 
 ## CLI Structure
 
-urfave/cli v3. `buildApp()` in main.go constructs the command tree. Before hook skips auth for `auth`, `skills`, `schema`, and `symbol` commands, then loads config + token, refreshes if expired, injects `*client.Client` into command context.
+urfave/cli v3. `buildApp()` in main.go constructs the command tree. Before hook skips auth for `auth`, `skills`, `schema`, and `symbol` commands, then loads config + token, refreshes if expired, populates `*client.Ref` for command access.
 
 10 subcommands: auth (setup/login/status), account (list/get/numbers/set-default/transaction), quote (get), order (list/get/place/preview/build/cancel/replace; place/build sub-types: equity/option/bracket/oco), chain, history, instrument, market (hours/movers), symbol (build/parse), schema. Account list/get enriches results with nicknames from the preferences API (best-effort, degrades gracefully).
 
@@ -107,7 +107,7 @@ Renovate bot auto-merges patch/minor/digest after 7 days. Major versions require
 
 ## Intentional Design Decisions
 
-1. **Shared client instance**: Single `*client.Client` injected via Before hook for consistent token lifecycle
+1. **Shared client ref**: `client.Ref` (embedding `*Client`) is pre-allocated and shared by all commands; the Before hook populates `ref.Client` after auth
 2. **Env vars override config**: Priority is env vars > config file > defaults
 3. **Schema introspection**: `schema` command auto-generates from CLI definitions, not manually maintained
 4. **Skill files as plain markdown**: Skill files live in `skills/` as plain `.md` files, not generated from Go code

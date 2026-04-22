@@ -86,7 +86,7 @@ func TestAccountList_Success(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := client.NewClient("test-token", client.WithBaseURL(srv.URL))
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
 	cmd := AccountCommand(c, "", &buf)
@@ -129,7 +129,7 @@ func TestAccountList_PreferencesFailure_StillReturnsAccounts(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := client.NewClient("test-token", client.WithBaseURL(srv.URL))
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
 	cmd := AccountCommand(c, "", &buf)
@@ -159,7 +159,7 @@ func TestAccountList_APIError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := client.NewClient("test-token", client.WithBaseURL(srv.URL))
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
 	cmd := AccountCommand(c, "", &buf)
@@ -182,7 +182,7 @@ func TestAccountNumbers_Success(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := client.NewClient("test-token", client.WithBaseURL(srv.URL))
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
 	cmd := AccountCommand(c, "", &buf)
@@ -217,7 +217,7 @@ func TestAccountGet_FlagOverridesAll(t *testing.T) {
 	defer srv.Close()
 
 	configPath := writeAccountTestConfig(t, t.TempDir(), "CONFIG_HASH")
-	c := client.NewClient("test-token", client.WithBaseURL(srv.URL))
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
 	cmd := AccountCommand(c, configPath, &buf)
@@ -242,7 +242,7 @@ func TestAccountGet_PositionalArg(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := client.NewClient("test-token", client.WithBaseURL(srv.URL))
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
 	cmd := AccountCommand(c, "", &buf)
@@ -265,7 +265,7 @@ func TestAccountGet_ConfigDefault(t *testing.T) {
 	defer srv.Close()
 
 	configPath := writeAccountTestConfig(t, t.TempDir(), "CONFIG_HASH")
-	c := client.NewClient("test-token", client.WithBaseURL(srv.URL))
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
 	cmd := AccountCommand(c, configPath, &buf)
@@ -282,7 +282,7 @@ func TestAccountGet_NoAccount_Error(t *testing.T) {
 	srv := accountMockServer(t, map[string]any{})
 	defer srv.Close()
 
-	c := client.NewClient("test-token", client.WithBaseURL(srv.URL))
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
 	cmd := AccountCommand(c, "", &buf)
@@ -307,7 +307,7 @@ func TestAccountGet_MetadataContainsHash(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := client.NewClient("test-token", client.WithBaseURL(srv.URL))
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
 	cmd := AccountCommand(c, "", &buf)
@@ -329,7 +329,7 @@ func TestAccountGet_APIError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := client.NewClient("test-token", client.WithBaseURL(srv.URL))
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
 	cmd := AccountCommand(c, "", &buf)

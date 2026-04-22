@@ -19,7 +19,7 @@ import (
 // AccountCommand returns the parent CLI command for account operations.
 // Subcommands: list, get, numbers, set-default, transaction.
 // The --account flag overrides the default account hash for all subcommands.
-func AccountCommand(c *client.Client, configPath string, w io.Writer) *cli.Command {
+func AccountCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "account",
 		Usage: "Manage Schwab trading accounts",
@@ -40,7 +40,7 @@ func AccountCommand(c *client.Client, configPath string, w io.Writer) *cli.Comma
 }
 
 // accountListCommand returns the CLI command for listing all accounts.
-func accountListCommand(c *client.Client, w io.Writer) *cli.Command {
+func accountListCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "list",
 		Usage: "List all accounts with nicknames and settings",
@@ -65,7 +65,7 @@ func accountListCommand(c *client.Client, w io.Writer) *cli.Command {
 }
 
 // accountGetCommand returns the CLI command for getting a specific account.
-func accountGetCommand(c *client.Client, configPath string, w io.Writer) *cli.Command {
+func accountGetCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "get",
 		Usage: "Get account details by hash value",
@@ -95,7 +95,7 @@ func accountGetCommand(c *client.Client, configPath string, w io.Writer) *cli.Co
 }
 
 // accountNumbersCommand returns the CLI command for listing account numbers and hash values.
-func accountNumbersCommand(c *client.Client, w io.Writer) *cli.Command {
+func accountNumbersCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "numbers",
 		Usage: "List account numbers and hash values",
@@ -183,7 +183,7 @@ func enrichAccountsWithPreferences(accounts []models.Account, prefs *models.User
 // accountTransactionCommand returns the CLI subcommand for transaction queries.
 // Transactions are account-scoped, so they live under the account parent command
 // and inherit the --account flag.
-func accountTransactionCommand(c *client.Client, configPath string, w io.Writer) *cli.Command {
+func accountTransactionCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "transaction",
 		Usage: "List and look up account transactions",

@@ -62,8 +62,9 @@ func buildApp(w io.Writer) *cli.Command {
 		loadedConfig = &auth.Config{CallbackURL: "https://127.0.0.1:8182"}
 	}
 
-	// Pre-allocate the API client so command closures always share the live token.
-	apiClient := &client.Client{}
+	// Pre-allocate the client ref so command closures always share the live
+	// client. The Before hook populates ref.Client after authentication.
+	apiClient := &client.Ref{}
 
 	app := &cli.Command{
 		Name:      "schwab-agent",
@@ -146,7 +147,7 @@ func buildApp(w io.Writer) *cli.Command {
 				token = refreshed
 			}
 
-			*apiClient = *newClientFunc(token.Token.AccessToken,
+			apiClient.Client = newClientFunc(token.Token.AccessToken,
 			client.WithUserAgent("schwab-agent/"+version),
 		)
 			return ctx, nil

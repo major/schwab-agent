@@ -17,10 +17,10 @@ func runTestCommand(t *testing.T, cmd *cli.Command, args ...string) error {
 	return cmd.Run(context.Background(), args)
 }
 
-// testClient creates a *client.Client backed by the given httptest server.
-func testClient(t *testing.T, server *httptest.Server) *client.Client {
+// testClient creates a *client.Ref backed by the given httptest server.
+func testClient(t *testing.T, server *httptest.Server) *client.Ref {
 	t.Helper()
-	return client.NewClient("test-token", client.WithBaseURL(server.URL))
+	return &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
 }
 
 // jsonServer returns an httptest.Server that always responds with the given JSON body.
