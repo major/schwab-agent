@@ -452,6 +452,76 @@ func TestDoRequest_ResponseBodyCappedAtMaxSize(t *testing.T) {
 	assert.Contains(t, err.Error(), "decode response")
 }
 
+func TestDoRequest_UserAgentHeader(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "schwab-agent/dev", r.Header.Get("User-Agent"))
+
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 1}))
+	}))
+	defer srv.Close()
+
+	c := NewClient("tok", WithBaseURL(srv.URL))
+	var result testResponse
+	err := c.doGet(context.Background(), "/test", nil, &result)
+
+	require.NoError(t, err)
+}
+
+func TestDoRequest_CustomUserAgent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "schwab-agent/1.2.3", r.Header.Get("User-Agent"))
+
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 1}))
+	}))
+	defer srv.Close()
+
+	c := NewClient("tok", WithBaseURL(srv.URL), WithUserAgent("schwab-agent/1.2.3"))
+	var result testResponse
+	err := c.doGet(context.Background(), "/test", nil, &result)
+
+	require.NoError(t, err)
+}
+
+func TestDoRequest_NonJSONContentType_ReturnsDescriptiveError(t *testing.T) {
+	// Simulates a proxy or maintenance page returning HTML instead of JSON.
+	// Without Content-Type validation, this would produce a cryptic
+	// json.Unmarshal error instead of telling the caller what happened.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte("<html><body>Service Unavailable</body></html>"))
+	}))
+	defer srv.Close()
+
+	c := NewClient("tok", WithBaseURL(srv.URL))
+	var result testResponse
+	err := c.doGet(context.Background(), "/test", nil, &result)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unexpected Content-Type")
+	assert.Contains(t, err.Error(), "text/html")
+	assert.Contains(t, err.Error(), "Service Unavailable")
+}
+
+func TestDoRequest_JSONContentTypeWithCharset_Succeeds(t *testing.T) {
+	// Schwab sometimes sends "application/json;charset=UTF-8" - make sure
+	// the Content-Type check doesn't reject valid JSON with charset params.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 42}))
+	}))
+	defer srv.Close()
+
+	c := NewClient("tok", WithBaseURL(srv.URL))
+	var result testResponse
+	err := c.doGet(context.Background(), "/test", nil, &result)
+
+	require.NoError(t, err)
+	assert.Equal(t, "ok", result.Name)
+	assert.Equal(t, 42, result.Value)
+}
+
 func TestDoRequest_MultipleOptions(t *testing.T) {
 	custom := &http.Client{Timeout: 99}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))

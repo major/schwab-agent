@@ -146,7 +146,9 @@ func buildApp(w io.Writer) *cli.Command {
 				token = refreshed
 			}
 
-			*apiClient = *newClientFunc(token.Token.AccessToken)
+			*apiClient = *newClientFunc(token.Token.AccessToken,
+			client.WithUserAgent("schwab-agent/"+version),
+		)
 			return ctx, nil
 		},
 		Commands: []*cli.Command{

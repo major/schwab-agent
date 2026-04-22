@@ -106,6 +106,7 @@ func (c *Client) PlaceOrder(ctx context.Context, hashValue string, order *models
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", c.userAgent)
 
 	c.logger.Debug("http request", "method", http.MethodPost, "path", path)
 

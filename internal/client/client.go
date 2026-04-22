@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"net/url"
 	"time"
@@ -32,6 +33,10 @@ const (
 	// memory. 10 MB is far larger than any legitimate Schwab API response
 	// (option chains with all expirations are the biggest, typically under 1 MB).
 	maxResponseSize = 10 * 1024 * 1024 // 10 MB
+
+	// defaultUserAgent identifies this client to the Schwab API. Overridden at
+	// build time via WithUserAgent to include the real version from ldflags.
+	defaultUserAgent = "schwab-agent/dev"
 )
 
 // Client is an authenticated HTTP client for the Schwab API.
@@ -39,6 +44,7 @@ type Client struct {
 	baseURL    string
 	httpClient *http.Client
 	token      string
+	userAgent  string
 	logger     *slog.Logger
 }
 
@@ -52,8 +58,9 @@ func NewClient(token string, opts ...Option) *Client {
 		httpClient: &http.Client{
 			Timeout: defaultTimeout,
 		},
-		token:  token,
-		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		token:     token,
+		userAgent: defaultUserAgent,
+		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -82,6 +89,13 @@ func WithLogger(l *slog.Logger) Option {
 	}
 }
 
+// WithUserAgent sets the User-Agent header sent with every request.
+func WithUserAgent(ua string) Option {
+	return func(c *Client) {
+		c.userAgent = ua
+	}
+}
+
 // SetToken updates the Bearer token (used by Before hook after refresh).
 func (c *Client) SetToken(token string) {
 	c.token = token
@@ -107,6 +121,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", c.userAgent)
 	// Only set Content-Type when sending a body. The Schwab API returns 400
 	// on GET requests that include Content-Type: application/json.
 	if body != nil {
@@ -144,6 +159,23 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 
 	// Decode JSON response if a result target was provided and there is a body.
 	if result != nil && len(respBody) > 0 {
+		// Validate Content-Type before attempting JSON decode. Without this,
+		// an HTML error page from a proxy or maintenance window produces a
+		// cryptic json.Unmarshal error instead of a clear diagnostic.
+		ct := resp.Header.Get("Content-Type")
+		if ct != "" {
+			mediaType, _, err := mime.ParseMediaType(ct)
+			if err == nil && mediaType != "application/json" {
+				// Show a body preview so the caller can see what came back
+				// (e.g., an HTML maintenance page or a proxy error).
+				preview := string(respBody)
+				if len(preview) > 200 {
+					preview = preview[:200] + "..."
+				}
+				return fmt.Errorf("unexpected Content-Type %q (expected application/json): %s", ct, preview)
+			}
+		}
+
 		if err := json.Unmarshal(respBody, result); err != nil {
 			return fmt.Errorf("decode response: %w", err)
 		}
