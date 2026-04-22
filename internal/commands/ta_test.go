@@ -926,6 +926,54 @@ func TestTAExpectedMove_EmptyChain(t *testing.T) {
 	assert.Contains(t, err.Error(), "no options available")
 }
 
+func TestTASMA_APIError(t *testing.T) {
+	// Arrange: server returns 500 for price history request.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	err := runTestCommand(t, cmd, "ta", "sma", "IBM", "--period", "20")
+
+	// Assert
+	require.Error(t, err)
+
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+}
+
+func TestTASMA_InsufficientCandles(t *testing.T) {
+	// SMA 20 requires 20 candles; returning only 10 should fail validation.
+	srv := httptest.NewServer(priceHistoryHandler(t, "IBM", 10))
+	defer srv.Close()
+
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	err := runTestCommand(t, cmd, "ta", "sma", "IBM", "--period", "20")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "requires at least 20 candles")
+}
+
+func TestTAEMA_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	err := runTestCommand(t, cmd, "ta", "ema", "IBM", "--period", "20")
+
+	require.Error(t, err)
+
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+}
+
 func TestMustParseFloat(t *testing.T) {
 	tests := []struct {
 		name string

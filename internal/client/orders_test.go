@@ -305,3 +305,154 @@ func TestCancelOrder_Success(t *testing.T) {
 
 	require.NoError(t, err)
 }
+
+func TestPlaceOrder_401_ReturnsAuthExpiredError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	_, err := c.PlaceOrder(context.Background(), "abc123", testOrderRequest())
+
+	require.Error(t, err)
+
+	var authErr *apperr.AuthExpiredError
+	require.ErrorAs(t, err, &authErr)
+}
+
+func TestPlaceOrder_500_ReturnsHTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("internal server error"))
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	_, err := c.PlaceOrder(context.Background(), "abc123", testOrderRequest())
+
+	require.Error(t, err)
+
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
+}
+
+func TestPlaceOrder_NoLocationHeader(t *testing.T) {
+	// 201 Created with no Location header should return empty PlaceOrderResponse.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	resp, err := c.PlaceOrder(context.Background(), "abc123", testOrderRequest())
+
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), resp.OrderID)
+}
+
+func TestPlaceOrder_MalformedLocationHeader(t *testing.T) {
+	// Location header with non-integer trailing segment should return a parse error.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "/trader/v1/accounts/abc123/orders/not-a-number")
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	_, err := c.PlaceOrder(context.Background(), "abc123", testOrderRequest())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parse order ID from Location header")
+}
+
+func TestListOrders_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	_, err := c.ListOrders(context.Background(), "abc123", OrderListParams{})
+
+	require.Error(t, err)
+
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+}
+
+func TestAllOrders_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	_, err := c.AllOrders(context.Background(), OrderListParams{})
+
+	require.Error(t, err)
+
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+}
+
+func TestGetOrder_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	_, err := c.GetOrder(context.Background(), "abc123", 12345)
+
+	require.Error(t, err)
+
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+}
+
+func TestPreviewOrder_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	_, err := c.PreviewOrder(context.Background(), "abc123", testOrderRequest())
+
+	require.Error(t, err)
+
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+}
+
+func TestReplaceOrder_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	err := c.ReplaceOrder(context.Background(), "abc123", 12345, testOrderRequest())
+
+	require.Error(t, err)
+
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+}
+
+func TestCancelOrder_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	err := c.CancelOrder(context.Background(), "abc123", 12345)
+
+	require.Error(t, err)
+
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+}
