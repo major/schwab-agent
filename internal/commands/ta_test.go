@@ -79,6 +79,100 @@ func priceHistoryHandler(t *testing.T, symbol string, nCandles int) http.Handler
 	})
 }
 
+// mockOptionChainJSON builds a realistic option chain JSON for testing.
+// underlying=150.0, ATM strike=150.0, call Mark=5.0, put Mark=4.5.
+func mockOptionChainJSON(symbol string) string {
+	return fmt.Sprintf(`{
+		"symbol": %q,
+		"underlying": {
+			"mark": 150.0,
+			"last": 149.5,
+			"bid": 149.0,
+			"ask": 150.0
+		},
+		"underlyingPrice": 150.0,
+		"callExpDateMap": {
+			"2025-06-20:30": {
+				"148.0": [{"mark": 7.0, "bid": 6.9, "ask": 7.1, "strikePrice": 148.0, "daysToExpiration": 30, "inTheMoney": true}],
+				"150.0": [{"mark": 5.0, "bid": 4.9, "ask": 5.1, "strikePrice": 150.0, "daysToExpiration": 30, "inTheMoney": false}],
+				"152.0": [{"mark": 3.0, "bid": 2.9, "ask": 3.1, "strikePrice": 152.0, "daysToExpiration": 30, "inTheMoney": false}]
+			}
+		},
+		"putExpDateMap": {
+			"2025-06-20:30": {
+				"148.0": [{"mark": 2.5, "bid": 2.4, "ask": 2.6, "strikePrice": 148.0, "daysToExpiration": 30, "inTheMoney": false}],
+				"150.0": [{"mark": 4.5, "bid": 4.4, "ask": 4.6, "strikePrice": 150.0, "daysToExpiration": 30, "inTheMoney": false}],
+				"152.0": [{"mark": 6.5, "bid": 6.4, "ask": 6.6, "strikePrice": 152.0, "daysToExpiration": 30, "inTheMoney": true}]
+			}
+		}
+	}`, symbol)
+}
+
+// mockOptionChainTwoDTEJSON builds a chain with two expirations.
+func mockOptionChainTwoDTEJSON(symbol string) string {
+	return fmt.Sprintf(`{
+		"symbol": %q,
+		"underlying": {"mark": 150.0},
+		"underlyingPrice": 150.0,
+		"callExpDateMap": {
+			"2025-06-20:30": {
+				"150.0": [{"mark": 5.0, "bid": 4.9, "ask": 5.1, "strikePrice": 150.0, "daysToExpiration": 30}]
+			},
+			"2025-07-18:60": {
+				"150.0": [{"mark": 7.0, "bid": 6.9, "ask": 7.1, "strikePrice": 150.0, "daysToExpiration": 60}]
+			}
+		},
+		"putExpDateMap": {
+			"2025-06-20:30": {
+				"150.0": [{"mark": 4.5, "bid": 4.4, "ask": 4.6, "strikePrice": 150.0, "daysToExpiration": 30}]
+			},
+			"2025-07-18:60": {
+				"150.0": [{"mark": 6.5, "bid": 6.4, "ask": 6.6, "strikePrice": 150.0, "daysToExpiration": 60}]
+			}
+		}
+	}`, symbol)
+}
+
+// mockOptionChainNilMarkJSON builds a chain where ATM options need bid/ask midpoint fallback.
+func mockOptionChainNilMarkJSON(symbol string) string {
+	return fmt.Sprintf(`{
+		"symbol": %q,
+		"underlying": {"mark": 150.0},
+		"underlyingPrice": 150.0,
+		"callExpDateMap": {
+			"2025-06-20:30": {
+				"150.0": [{"bid": 4.9, "ask": 5.1, "strikePrice": 150.0, "daysToExpiration": 30}]
+			}
+		},
+		"putExpDateMap": {
+			"2025-06-20:30": {
+				"150.0": [{"bid": 4.4, "ask": 4.6, "strikePrice": 150.0, "daysToExpiration": 30}]
+			}
+		}
+	}`, symbol)
+}
+
+// mockEmptyOptionChainJSON builds a chain with no expirations.
+func mockEmptyOptionChainJSON(symbol string) string {
+	return fmt.Sprintf(`{
+		"symbol": %q,
+		"underlying": {"mark": 150.0},
+		"underlyingPrice": 150.0,
+		"callExpDateMap": {},
+		"putExpDateMap": {}
+	}`, symbol)
+}
+
+// optionChainHandler returns an http.Handler that responds with mock option chain data.
+func optionChainHandler(t *testing.T, body string) http.Handler {
+	t.Helper()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Path, "/marketdata/v1/chains")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
+	})
+}
+
 func TestTASMA_ValidEnvelope(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 80))
@@ -702,4 +796,96 @@ func TestTAHV_InvalidPeriod(t *testing.T) {
 	require.Error(t, err)
 	var valErr *schwabErrors.ValidationError
 	require.ErrorAs(t, err, &valErr)
+}
+
+func TestTAExpectedMove_ValidEnvelope(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(optionChainHandler(t, mockOptionChainJSON("AAPL")))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	require.NoError(t, runTestCommand(t, cmd, "ta", "expected-move", "AAPL"))
+
+	// Assert
+	envelope, data := decodeTAEnvelope(t, &buf)
+	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.Equal(t, "expected-move", data["indicator"])
+	assert.Equal(t, "AAPL", data["symbol"])
+	assert.Contains(t, data, "underlying_price")
+	assert.Contains(t, data, "expiration")
+	assert.Contains(t, data, "dte")
+	assert.Contains(t, data, "straddle_price")
+	assert.Contains(t, data, "expected_move")
+	assert.Contains(t, data, "adjusted_move")
+	assert.Contains(t, data, "upper_1x")
+	assert.Contains(t, data, "lower_1x")
+	assert.Contains(t, data, "upper_2x")
+	assert.Contains(t, data, "lower_2x")
+	assert.InDelta(t, 9.5, data["straddle_price"], 0.01)
+	assert.InDelta(t, 8.075, data["adjusted_move"], 0.01)
+}
+
+func TestTAExpectedMove_WithDTE(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(optionChainHandler(t, mockOptionChainTwoDTEJSON("AAPL")))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	require.NoError(t, runTestCommand(t, cmd, "ta", "expected-move", "AAPL", "--dte", "50"))
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	assert.InDelta(t, 60, data["dte"], 0.1)
+	assert.Equal(t, "2025-07-18", data["expiration"])
+}
+
+func TestTAExpectedMove_MissingSymbol(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(optionChainHandler(t, mockOptionChainJSON("AAPL")))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	err := runTestCommand(t, cmd, "ta", "expected-move")
+
+	// Assert
+	require.Error(t, err)
+	var valErr *schwabErrors.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.Contains(t, valErr.Error(), "symbol")
+}
+
+func TestTAExpectedMove_NilMark_FallbackBidAsk(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(optionChainHandler(t, mockOptionChainNilMarkJSON("AAPL")))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	require.NoError(t, runTestCommand(t, cmd, "ta", "expected-move", "AAPL"))
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	assert.InDelta(t, 9.5, data["straddle_price"], 0.01)
+}
+
+func TestTAExpectedMove_EmptyChain(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(optionChainHandler(t, mockEmptyOptionChainJSON("AAPL")))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	err := runTestCommand(t, cmd, "ta", "expected-move", "AAPL")
+
+	// Assert
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no options available")
 }

@@ -3,7 +3,11 @@ package commands
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"math"
+	"strconv"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 
@@ -39,6 +43,7 @@ func TACommand(c *client.Client, w io.Writer) *cli.Command {
 			taADXCommand(c, w),
 			taVWAPCommand(c, w),
 			taHVCommand(c, w),
+			taExpectedMoveCommand(c, w),
 		},
 	}
 }
@@ -574,6 +579,169 @@ func taHVCommand(c *client.Client, w io.Writer) *cli.Command {
 			return output.WriteSuccess(w, data, output.TimestampMeta())
 		},
 	}
+}
+
+func taExpectedMoveCommand(c *client.Client, w io.Writer) *cli.Command {
+	return &cli.Command{
+		Name:  "expected-move",
+		Usage: "Expected price move from ATM straddle pricing",
+		Flags: []cli.Flag{
+			&cli.IntFlag{Name: "dte", Usage: "Target days to expiration", Value: 30},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			symbol := cmd.Args().First()
+			if err := requireArg(symbol, "symbol"); err != nil {
+				return err
+			}
+
+			targetDTE := cmd.Int("dte")
+
+			// Expected Move needs the underlying quote and near-the-money contracts in one response.
+			// Keep this to a single chain call so the underlying snapshot and option prices stay aligned.
+			chain, err := c.OptionChain(ctx, symbol, &client.ChainParams{
+				ContractType:           "ALL",
+				IncludeUnderlyingQuote: "true",
+				StrikeRange:            "NTM",
+			})
+			if err != nil {
+				return err
+			}
+
+			if chain.Underlying == nil {
+				return fmt.Errorf("no underlying data available for %s", symbol)
+			}
+
+			var underlyingPrice float64
+			switch {
+			case chain.Underlying.Mark != nil:
+				underlyingPrice = *chain.Underlying.Mark
+			case chain.Underlying.Last != nil:
+				underlyingPrice = *chain.Underlying.Last
+			case chain.UnderlyingPrice != nil:
+				underlyingPrice = *chain.UnderlyingPrice
+			default:
+				return fmt.Errorf("unable to determine underlying price for %s", symbol)
+			}
+
+			if len(chain.CallExpDateMap) == 0 {
+				return fmt.Errorf("no options available for %s", symbol)
+			}
+
+			selectedExpKey := ""
+			bestDiff := -1
+			for expKey := range chain.CallExpDateMap {
+				parts := strings.Split(expKey, ":")
+				if len(parts) != 2 {
+					continue
+				}
+
+				dte, err := strconv.Atoi(parts[1])
+				if err != nil {
+					continue
+				}
+
+				diff := int(math.Abs(float64(dte - targetDTE)))
+				if bestDiff < 0 || diff < bestDiff || (diff == bestDiff && expKey < selectedExpKey) {
+					bestDiff = diff
+					selectedExpKey = expKey
+				}
+			}
+			if selectedExpKey == "" {
+				return fmt.Errorf("no options available for %s", symbol)
+			}
+
+			expParts := strings.Split(selectedExpKey, ":")
+			expDate := expParts[0]
+
+			callStrikes := chain.CallExpDateMap[selectedExpKey]
+			putStrikes := chain.PutExpDateMap[selectedExpKey]
+			if len(callStrikes) == 0 || len(putStrikes) == 0 {
+				return fmt.Errorf("no options available for %s at expiration %s", symbol, expDate)
+			}
+
+			atmStrikeKey := ""
+			bestStrikeDiff := -1.0
+			for strikeKey := range callStrikes {
+				strike, err := strconv.ParseFloat(strikeKey, 64)
+				if err != nil {
+					continue
+				}
+
+				diff := math.Abs(strike - underlyingPrice)
+				if bestStrikeDiff < 0 || diff < bestStrikeDiff || (diff == bestStrikeDiff && strike < mustParseFloat(atmStrikeKey)) {
+					bestStrikeDiff = diff
+					atmStrikeKey = strikeKey
+				}
+			}
+			if atmStrikeKey == "" {
+				return fmt.Errorf("no strikes available for %s at expiration %s", symbol, expDate)
+			}
+
+			callContracts := callStrikes[atmStrikeKey]
+			putContracts := putStrikes[atmStrikeKey]
+			if len(callContracts) == 0 {
+				return fmt.Errorf("no call contracts for %s at strike %s", symbol, atmStrikeKey)
+			}
+			if len(putContracts) == 0 {
+				return fmt.Errorf("no put contracts for %s at strike %s", symbol, atmStrikeKey)
+			}
+
+			callPrice, err := contractPrice(callContracts[0], symbol, atmStrikeKey, "call")
+			if err != nil {
+				return err
+			}
+			putPrice, err := contractPrice(putContracts[0], symbol, atmStrikeKey, "put")
+			if err != nil {
+				return err
+			}
+
+			result, err := ta.ExpectedMove(underlyingPrice, callPrice, putPrice, ta.DefaultMultiplier)
+			if err != nil {
+				return err
+			}
+
+			actualDTE, _ := strconv.Atoi(expParts[1])
+			data := map[string]any{
+				"indicator":        "expected-move",
+				"symbol":           symbol,
+				"underlying_price": underlyingPrice,
+				"expiration":       expDate,
+				"dte":              actualDTE,
+				"straddle_price":   result.StraddlePrice,
+				"expected_move":    result.ExpectedMove,
+				"adjusted_move":    result.AdjustedMove,
+				"upper_1x":         result.Upper1x,
+				"lower_1x":         result.Lower1x,
+				"upper_2x":         result.Upper2x,
+				"lower_2x":         result.Lower2x,
+			}
+			return output.WriteSuccess(w, data, output.TimestampMeta())
+		},
+	}
+}
+
+// contractPrice extracts the best available option price.
+// The chain API sometimes omits mark, so fall back to the bid/ask midpoint.
+func contractPrice(contract *models.OptionContract, symbol, strike, putCall string) (float64, error) {
+	if contract.Mark != nil {
+		return *contract.Mark, nil
+	}
+	if contract.Bid != nil && contract.Ask != nil {
+		return (*contract.Bid + *contract.Ask) / 2, nil
+	}
+
+	return 0, fmt.Errorf("unable to determine %s price for %s at strike %s", putCall, symbol, strike)
+}
+
+// mustParseFloat parses a strike key for ATM tie-breaking.
+// Returning 0 on parse failure is fine because this helper is only used after empty-string checks.
+func mustParseFloat(s string) float64 {
+	if s == "" {
+		return 0
+	}
+
+	v, _ := strconv.ParseFloat(s, 64)
+	return v
 }
 
 // fetchAndValidateCandles fetches price history and validates minimum candle count.
