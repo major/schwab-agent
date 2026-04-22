@@ -960,6 +960,158 @@ func TestOrderBuildSpreadDefaultDurationSession(t *testing.T) {
 	}
 }
 
+// TestOrderBuildParseErrors covers error paths in the param parser functions
+// (parseEquityParams, parseOptionParams, parseBracketParams, parseOCOParams)
+// that aren't exercised by the spread tests.
+func TestOrderBuildParseErrors(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		args    []string
+		wantMsg string
+	}{
+		// parseInstruction invalid value (exercises default branch).
+		{
+			name: "equity invalid action",
+			args: []string{
+				"order", "build", "equity",
+				"--symbol", "AAPL", "--action", "YOLO",
+				"--quantity", "10",
+			},
+			wantMsg: "action is invalid",
+		},
+		{
+			name: "option invalid action",
+			args: []string{
+				"order", "build", "option",
+				"--underlying", "AAPL", "--action", "YOLO",
+				"--call", "--expiration", "2026-06-19",
+				"--strike", "150", "--quantity", "1",
+			},
+			wantMsg: "action is invalid",
+		},
+		{
+			name: "bracket invalid action",
+			args: []string{
+				"order", "build", "bracket",
+				"--symbol", "AAPL", "--action", "YOLO",
+				"--quantity", "10", "--take-profit", "200",
+			},
+			wantMsg: "action is invalid",
+		},
+		{
+			name: "oco invalid action",
+			args: []string{
+				"order", "build", "oco",
+				"--symbol", "AAPL", "--action", "YOLO",
+				"--quantity", "10", "--stop-loss", "140",
+			},
+			wantMsg: "action is invalid",
+		},
+		// parseOrderType invalid value (exercises default branch).
+		{
+			name: "equity invalid order type",
+			args: []string{
+				"order", "build", "equity",
+				"--symbol", "AAPL", "--action", "BUY",
+				"--quantity", "10", "--type", "BANANAS",
+			},
+			wantMsg: "type is invalid",
+		},
+		// parseDurationSession error in OCO path.
+		{
+			name: "oco invalid duration",
+			args: []string{
+				"order", "build", "oco",
+				"--symbol", "AAPL", "--action", "SELL",
+				"--quantity", "10", "--stop-loss", "140",
+				"--duration", "ETERNITY",
+			},
+			wantMsg: "duration is invalid",
+		},
+		{
+			name: "oco invalid session",
+			args: []string{
+				"order", "build", "oco",
+				"--symbol", "AAPL", "--action", "SELL",
+				"--quantity", "10", "--stop-loss", "140",
+				"--session", "MIDNIGHT",
+			},
+			wantMsg: "session is invalid",
+		},
+		// parseDurationSession error in equity path.
+		{
+			name: "equity invalid duration",
+			args: []string{
+				"order", "build", "equity",
+				"--symbol", "AAPL", "--action", "BUY",
+				"--quantity", "10", "--duration", "FOREVER",
+			},
+			wantMsg: "duration is invalid",
+		},
+		// parseDurationSession error in bracket path.
+		{
+			name: "bracket invalid duration",
+			args: []string{
+				"order", "build", "bracket",
+				"--symbol", "AAPL", "--action", "BUY",
+				"--quantity", "10", "--take-profit", "200",
+				"--duration", "FOREVER",
+			},
+			wantMsg: "duration is invalid",
+		},
+		// parseExpiration error in option path (put/call valid but expiration bad).
+		{
+			name: "option bad expiration",
+			args: []string{
+				"order", "build", "option",
+				"--underlying", "AAPL", "--action", "BUY_TO_OPEN",
+				"--call", "--expiration", "not-a-date",
+				"--strike", "150", "--quantity", "1",
+			},
+			wantMsg: "expiration must use YYYY-MM-DD format",
+		},
+		// parsePutCall error in option path.
+		{
+			name: "option missing put/call",
+			args: []string{
+				"order", "build", "option",
+				"--underlying", "AAPL", "--action", "BUY_TO_OPEN",
+				"--expiration", "2026-06-19",
+				"--strike", "150", "--quantity", "1",
+			},
+			wantMsg: "exactly one of --call or --put is required",
+		},
+		// parseDurationSession error in option path.
+		{
+			name: "option invalid session",
+			args: []string{
+				"order", "build", "option",
+				"--underlying", "AAPL", "--action", "BUY_TO_OPEN",
+				"--call", "--expiration", "2026-06-19",
+				"--strike", "150", "--quantity", "1",
+				"--session", "MIDNIGHT",
+			},
+			wantMsg: "session is invalid",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			stdout, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "", tc.args...)
+			require.Error(t, err)
+			assert.Empty(t, stdout)
+
+			var validationErr *apperr.ValidationError
+			require.ErrorAs(t, err, &validationErr)
+			assert.Equal(t, tc.wantMsg, validationErr.Error())
+		})
+	}
+}
+
 func TestOrderBuildSpreadParseErrors(t *testing.T) {
 	t.Parallel()
 

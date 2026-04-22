@@ -114,3 +114,34 @@ func TestBBands_InvalidPeriod(t *testing.T) {
 	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
+
+func TestBBands_InsufficientData(t *testing.T) {
+	// 5 closes with period=20 should fail
+	closes := make([]float64, 5)
+	for i := range closes {
+		closes[i] = float64(i + 1)
+	}
+	_, _, _, err := BBands(closes, 20, 2.0)
+	require.Error(t, err)
+	var valErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), "requires at least 20 values")
+}
+
+func TestATR_InsufficientData(t *testing.T) {
+	// period=14 requires at least 15 values; provide only 10
+	n := 10
+	highs := make([]float64, n)
+	lows := make([]float64, n)
+	closes := make([]float64, n)
+	for i := range highs {
+		closes[i] = 100.0 + float64(i)
+		highs[i] = closes[i] + 1.0
+		lows[i] = closes[i] - 1.0
+	}
+	_, err := ATR(highs, lows, closes, 14)
+	require.Error(t, err)
+	var valErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), "requires at least 15 values")
+}
