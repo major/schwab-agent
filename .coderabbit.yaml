@@ -1,0 +1,133 @@
+# CodeRabbit Configuration for schwab-agent
+# Docs: https://docs.coderabbit.ai/configuration/
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: en-US
+tone_instructions: >
+  You are a brilliant but world-weary senior developer who has seen too much.
+  Deliver feedback with dry wit and gentle sarcasm, but always be helpful.
+  Use programming puns when the opportunity arises.
+
+reviews:
+  profile: chill
+  collapse_walkthrough: false
+  poem: false
+  request_changes_workflow: true
+  high_level_summary: false
+  high_level_summary_placeholder: "@coderabbitai summary"
+  abort_on_close: true
+  review_status: true
+  suggested_labels: false
+  suggested_reviewers: false
+  in_progress_fortune: false
+
+  pre_merge_checks:
+    title:
+      mode: "off"
+    docstrings:
+      mode: "off"
+    description:
+      mode: warning
+
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_pause_after_reviewed_commits: 0
+    base_branches:
+      - main
+    ignore_title_keywords:
+      - "WIP"
+      - "[WIP]"
+      - "DO NOT MERGE"
+
+  path_filters:
+    - "!**/vendor/**"
+    - "!**/dist/**"
+    - "!**/coverage.out"
+    - "!skills/**"
+
+  path_instructions:
+    - path: "internal/**/*.go"
+      instructions: |
+        Focus on correctness and project conventions:
+        - Error wrapping must use fmt.Errorf("context: %w", err) with %w verb
+        - Use errors.As() for typed error matching, constructor functions to create errors
+        - No init() functions; all setup belongs in main() and the Before hook
+        - Command factories must follow FooCommand(ref *client.Ref, w io.Writer) *cli.Command pattern
+        - All output must go through output.WriteSuccess/WriteError/WritePartial JSON envelopes
+        - Always SetEscapeHTML(false) on JSON encoders
+        - Don't nitpick style (golangci-lint handles formatting and lint)
+
+    - path: "internal/auth/**/*.go"
+      instructions: |
+        Auth and config review:
+        - OAuth2 flow with token refresh in the Before hook
+        - Config from JSON file (~/.config/schwab-agent/config.json) with env var overrides
+        - Env vars (SCHWAB_CLIENT_ID, SCHWAB_CLIENT_SECRET, SCHWAB_CALLBACK_URL) override file values
+        - Verify no credentials are logged or exposed in error messages
+        - Token file handling must degrade gracefully on permission errors
+
+    - path: "internal/client/**/*.go"
+      instructions: |
+        HTTP client review:
+        - client.Ref embeds *Client; pre-allocated and shared by all commands
+        - The Before hook populates ref.Client after auth completes
+        - HTTP errors must be wrapped in typed errors from internal/errors
+        - Verify proper context propagation for cancellation
+
+    - path: "internal/errors/**/*.go"
+      instructions: |
+        Error hierarchy review:
+        - All errors must embed SchwabError base type
+        - Use constructor functions, not raw struct literals
+        - Each error type has a specific exit code (see AGENTS.md)
+        - Use errors.As() for type checking, never raw type assertions
+
+    - path: "internal/orderbuilder/**/*.go"
+      instructions: |
+        Order builder review:
+        - Validates order construction for equity, option, bracket, and OCO orders
+        - OCC symbol build/parse must follow standard OCC format
+        - Market orders must exclude price fields
+        - Safety guards: mutable operations require config flag + --confirm flag
+
+    - path: "internal/models/**/*.go"
+      instructions: |
+        Data model review:
+        - Structs map to Schwab API payloads
+        - Verify JSON tags match API field names
+        - Check for missing fields that could cause silent data loss on unmarshal
+
+    - path: "**/*_test.go"
+      instructions: |
+        Focus on test quality:
+        - Use testify/assert and testify/require, not bare if-checks
+        - Mock HTTP with httptest.NewServer and inline request validation (no external mock libraries)
+        - Test helpers marked with t.Helper() (runTestCommand, testClient, jsonServer)
+        - Table-driven subtests with t.Run()
+        - Typed error checks with assert.ErrorAs()
+        - t.TempDir() for file I/O, no testdata/ directory
+        - Don't nitpick coverage percentages
+
+    - path: ".github/workflows/**"
+      instructions: "Validate workflow syntax and security (no secrets in logs, pin action SHAs)"
+
+    - path: "Makefile"
+      instructions: |
+        Makefile validation:
+        - .PHONY declarations for all non-file targets
+        - Avoid flags that are already defaults
+
+    - path: ".goreleaser.yml"
+      instructions: "Verify goreleaser v2 config, CGO disabled, correct platform matrix"
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  learnings:
+    scope: global
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "**/AGENTS.md"
