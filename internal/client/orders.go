@@ -115,7 +115,8 @@ func (c *Client) PlaceOrder(ctx context.Context, hashValue string, order *models
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	// Capped at maxResponseSize to prevent memory exhaustion.
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
 	if err != nil {
 		return nil, fmt.Errorf("read response body: %w", err)
 	}

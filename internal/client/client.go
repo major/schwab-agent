@@ -26,6 +26,12 @@ const (
 	// the request, and reading the response. 30 seconds is generous for a REST
 	// API but prevents indefinite hangs on network issues.
 	defaultTimeout = 30 * time.Second
+
+	// maxResponseSize caps how many bytes we'll read from any API response.
+	// Prevents a misbehaving server from sending a huge payload that exhausts
+	// memory. 10 MB is far larger than any legitimate Schwab API response
+	// (option chains with all expirations are the biggest, typically under 1 MB).
+	maxResponseSize = 10 * 1024 * 1024 // 10 MB
 )
 
 // Client is an authenticated HTTP client for the Schwab API.
@@ -116,7 +122,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 	defer resp.Body.Close()
 
 	// Read the full response body for error messages or JSON decoding.
-	respBody, err := io.ReadAll(resp.Body)
+	// Capped at maxResponseSize to prevent memory exhaustion from a
+	// misbehaving server or proxy returning an unexpectedly large payload.
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
 	if err != nil {
 		return fmt.Errorf("read response body: %w", err)
 	}

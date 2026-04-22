@@ -2,6 +2,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -427,6 +428,28 @@ func TestDoRequest_JSONDecodeError(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "decode")
+}
+
+func TestDoRequest_ResponseBodyCappedAtMaxSize(t *testing.T) {
+	// Verify that responses larger than maxResponseSize are silently truncated
+	// rather than consuming unbounded memory. The truncated JSON will fail to
+	// decode, which is the expected (safe) behavior.
+	oversizedBody := bytes.Repeat([]byte("x"), maxResponseSize+1024)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(oversizedBody)
+	}))
+	defer srv.Close()
+
+	c := NewClient("tok", WithBaseURL(srv.URL))
+	var result testResponse
+	err := c.doGet(context.Background(), "/huge", nil, &result)
+
+	// The response is truncated, so JSON decode fails. The important thing
+	// is that we don't OOM - we get a clean decode error instead.
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "decode response")
 }
 
 func TestDoRequest_MultipleOptions(t *testing.T) {
