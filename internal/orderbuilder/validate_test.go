@@ -811,6 +811,406 @@ func TestValidateBracketSellAcceptsValidPrices(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestValidateEquityOrderRequiresSymbol verifies empty symbol rejection.
+func TestValidateEquityOrderRequiresSymbol(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateEquityOrder(&EquityParams{
+		Quantity:  10,
+		OrderType: models.OrderTypeMarket,
+	})
+
+	assertValidationError(t, err, "symbol is required", "Add `--symbol <TICKER>` to specify the stock symbol")
+}
+
+// TestValidateEquityOrderRequiresBothPricesForStopLimit verifies STOP_LIMIT requires price and stop price.
+func TestValidateEquityOrderRequiresBothPricesForStopLimit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		price     float64
+		stopPrice float64
+	}{
+		{"missing price", 0, 150},
+		{"missing stop price", 150, 0},
+		{"missing both", 0, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateEquityOrder(&EquityParams{
+				Symbol:    "AAPL",
+				Quantity:  10,
+				OrderType: models.OrderTypeStopLimit,
+				Price:     tt.price,
+				StopPrice: tt.stopPrice,
+			})
+
+			assertValidationError(t, err,
+				"STOP_LIMIT order requires both price and stop price",
+				"Add `--price <amount> --stop-price <amount>`",
+			)
+		})
+	}
+}
+
+// TestValidateEquityOrderAcceptsValidMarketOrder verifies market orders pass validation.
+func TestValidateEquityOrderAcceptsValidMarketOrder(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateEquityOrder(&EquityParams{
+		Symbol:    "AAPL",
+		Action:    models.InstructionBuy,
+		Quantity:  10,
+		OrderType: models.OrderTypeMarket,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateVerticalOrderRemainingBranches covers quantity, expiration, and individual strike checks.
+func TestValidateVerticalOrderRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	futureDate := time.Now().UTC().Add(30 * 24 * time.Hour)
+
+	tests := []struct {
+		name    string
+		params  VerticalParams
+		wantMsg string
+	}{
+		{
+			name: "zero quantity",
+			params: VerticalParams{
+				Underlying:  "F",
+				Expiration:  futureDate,
+				LongStrike:  12,
+				ShortStrike: 14,
+				Price:       0.50,
+			},
+			wantMsg: "quantity must be greater than zero",
+		},
+		{
+			name: "past expiration",
+			params: VerticalParams{
+				Underlying:  "F",
+				Expiration:  time.Now().UTC().Add(-24 * time.Hour),
+				LongStrike:  12,
+				ShortStrike: 14,
+				Quantity:    1,
+				Price:       0.50,
+			},
+			wantMsg: "option expiration date is in the past",
+		},
+		{
+			name: "zero long strike",
+			params: VerticalParams{
+				Underlying:  "F",
+				Expiration:  futureDate,
+				ShortStrike: 14,
+				Quantity:    1,
+				Price:       0.50,
+			},
+			wantMsg: "long strike price must be greater than zero",
+		},
+		{
+			name: "zero short strike",
+			params: VerticalParams{
+				Underlying:  "F",
+				Expiration:  futureDate,
+				LongStrike:  12,
+				Quantity:    1,
+				Price:       0.50,
+			},
+			wantMsg: "short strike price must be greater than zero",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateVerticalOrder(&tt.params)
+
+			require.Error(t, err)
+			var validationErr *apperr.ValidationError
+			require.True(t, errors.As(err, &validationErr))
+			assert.Equal(t, tt.wantMsg, validationErr.Message)
+		})
+	}
+}
+
+// TestValidateIronCondorRemainingBranches covers quantity, expiration, zero strikes,
+// and the call-short >= call-long ordering check.
+func TestValidateIronCondorRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	futureDate := time.Now().UTC().Add(30 * 24 * time.Hour)
+
+	tests := []struct {
+		name    string
+		params  IronCondorParams
+		wantMsg string
+	}{
+		{
+			name: "zero quantity",
+			params: IronCondorParams{
+				Underlying:      "F",
+				Expiration:      futureDate,
+				PutLongStrike:   8,
+				PutShortStrike:  10,
+				CallShortStrike: 14,
+				CallLongStrike:  16,
+				Price:           1.50,
+			},
+			wantMsg: "quantity must be greater than zero",
+		},
+		{
+			name: "past expiration",
+			params: IronCondorParams{
+				Underlying:      "F",
+				Expiration:      time.Now().UTC().Add(-24 * time.Hour),
+				PutLongStrike:   8,
+				PutShortStrike:  10,
+				CallShortStrike: 14,
+				CallLongStrike:  16,
+				Quantity:        1,
+				Price:           1.50,
+			},
+			wantMsg: "option expiration date is in the past",
+		},
+		{
+			name: "zero put-long-strike",
+			params: IronCondorParams{
+				Underlying:      "F",
+				Expiration:      futureDate,
+				PutShortStrike:  10,
+				CallShortStrike: 14,
+				CallLongStrike:  16,
+				Quantity:        1,
+				Price:           1.50,
+			},
+			wantMsg: "put-long-strike must be greater than zero",
+		},
+		{
+			name: "call-short >= call-long",
+			params: IronCondorParams{
+				Underlying:      "F",
+				Expiration:      futureDate,
+				PutLongStrike:   8,
+				PutShortStrike:  10,
+				CallShortStrike: 16,
+				CallLongStrike:  14,
+				Quantity:        1,
+				Price:           1.50,
+			},
+			wantMsg: "call-short-strike must be below call-long-strike",
+		},
+		{
+			name: "missing price",
+			params: IronCondorParams{
+				Underlying:      "F",
+				Expiration:      futureDate,
+				PutLongStrike:   8,
+				PutShortStrike:  10,
+				CallShortStrike: 14,
+				CallLongStrike:  16,
+				Quantity:        1,
+			},
+			wantMsg: "price is required for iron condors",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateIronCondorOrder(&tt.params)
+
+			require.Error(t, err)
+			var validationErr *apperr.ValidationError
+			require.True(t, errors.As(err, &validationErr))
+			assert.Equal(t, tt.wantMsg, validationErr.Message)
+		})
+	}
+}
+
+// TestValidateStrangleRemainingBranches covers quantity, expiration, and individual strike checks.
+func TestValidateStrangleRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	futureDate := time.Now().UTC().Add(30 * 24 * time.Hour)
+
+	tests := []struct {
+		name    string
+		params  StrangleParams
+		wantMsg string
+	}{
+		{
+			name: "zero quantity",
+			params: StrangleParams{
+				Underlying: "F",
+				Expiration: futureDate,
+				CallStrike: 14,
+				PutStrike:  10,
+				Price:      0.80,
+			},
+			wantMsg: "quantity must be greater than zero",
+		},
+		{
+			name: "past expiration",
+			params: StrangleParams{
+				Underlying: "F",
+				Expiration: time.Now().UTC().Add(-24 * time.Hour),
+				CallStrike: 14,
+				PutStrike:  10,
+				Quantity:   1,
+				Price:      0.80,
+			},
+			wantMsg: "option expiration date is in the past",
+		},
+		{
+			name: "zero call strike",
+			params: StrangleParams{
+				Underlying: "F",
+				Expiration: futureDate,
+				PutStrike:  10,
+				Quantity:   1,
+				Price:      0.80,
+			},
+			wantMsg: "call strike price must be greater than zero",
+		},
+		{
+			name: "zero put strike",
+			params: StrangleParams{
+				Underlying: "F",
+				Expiration: futureDate,
+				CallStrike: 14,
+				Quantity:   1,
+				Price:      0.80,
+			},
+			wantMsg: "put strike price must be greater than zero",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateStrangleOrder(&tt.params)
+
+			require.Error(t, err)
+			var validationErr *apperr.ValidationError
+			require.True(t, errors.As(err, &validationErr))
+			assert.Equal(t, tt.wantMsg, validationErr.Message)
+		})
+	}
+}
+
+// TestValidateStraddleRemainingBranches covers quantity and expiration checks.
+func TestValidateStraddleRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		params  StraddleParams
+		wantMsg string
+	}{
+		{
+			name: "zero quantity",
+			params: StraddleParams{
+				Underlying: "F",
+				Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+				Strike:     12,
+				Price:      1.50,
+			},
+			wantMsg: "quantity must be greater than zero",
+		},
+		{
+			name: "past expiration",
+			params: StraddleParams{
+				Underlying: "F",
+				Expiration: time.Now().UTC().Add(-24 * time.Hour),
+				Strike:     12,
+				Quantity:   1,
+				Price:      1.50,
+			},
+			wantMsg: "option expiration date is in the past",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateStraddleOrder(&tt.params)
+
+			require.Error(t, err)
+			var validationErr *apperr.ValidationError
+			require.True(t, errors.As(err, &validationErr))
+			assert.Equal(t, tt.wantMsg, validationErr.Message)
+		})
+	}
+}
+
+// TestValidateCoveredCallRemainingBranches covers quantity and expiration checks.
+func TestValidateCoveredCallRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		params  CoveredCallParams
+		wantMsg string
+	}{
+		{
+			name: "zero quantity",
+			params: CoveredCallParams{
+				Underlying: "F",
+				Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+				Strike:     14,
+				Price:      12.00,
+			},
+			wantMsg: "quantity must be greater than zero",
+		},
+		{
+			name: "past expiration",
+			params: CoveredCallParams{
+				Underlying: "F",
+				Expiration: time.Now().UTC().Add(-24 * time.Hour),
+				Strike:     14,
+				Quantity:   1,
+				Price:      12.00,
+			},
+			wantMsg: "option expiration date is in the past",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateCoveredCallOrder(&tt.params)
+
+			require.Error(t, err)
+			var validationErr *apperr.ValidationError
+			require.True(t, errors.As(err, &validationErr))
+			assert.Equal(t, tt.wantMsg, validationErr.Message)
+		})
+	}
+}
+
+// TestBracketExitInstructionInvertsAction verifies the exit instruction for both directions.
+func TestBracketExitInstructionInvertsAction(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, models.InstructionSell, bracketExitInstruction(models.InstructionBuy),
+		"BUY entry should produce SELL exit")
+	assert.Equal(t, models.InstructionBuy, bracketExitInstruction(models.InstructionSell),
+		"SELL entry should produce BUY exit")
+}
 // assertValidationError verifies message and fix suggestion for validation failures.
 func assertValidationError(t *testing.T, err error, expectedMessage, expectedDetails string) {
 	t.Helper()

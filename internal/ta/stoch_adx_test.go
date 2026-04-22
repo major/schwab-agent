@@ -121,3 +121,25 @@ func TestADX_MismatchedLengths(t *testing.T) {
 	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
+
+func TestStochastic_InvalidSmoothK(t *testing.T) {
+	highs := make([]float64, 50)
+	lows := make([]float64, 50)
+	closes := make([]float64, 50)
+	_, _, err := Stochastic(highs, lows, closes, 14, 0, 3)
+	require.Error(t, err)
+	var valErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), "all periods must be > 0")
+}
+
+func TestStochastic_InvalidDPeriod(t *testing.T) {
+	highs := make([]float64, 50)
+	lows := make([]float64, 50)
+	closes := make([]float64, 50)
+	_, _, err := Stochastic(highs, lows, closes, 14, 3, 0)
+	require.Error(t, err)
+	var valErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), "all periods must be > 0")
+}
