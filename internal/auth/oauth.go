@@ -19,10 +19,10 @@ import (
 	"net/url"
 	"os"
 	"strings"
-
-	"github.com/pkg/browser"
 	"sync"
 	"time"
+
+	"github.com/pkg/browser"
 
 	schwabErrors "github.com/major/schwab-agent/internal/errors"
 )
@@ -47,25 +47,17 @@ const (
 	// are critical path for authentication. 30 seconds is generous but prevents
 	// indefinite hangs if Schwab's OAuth endpoint is unresponsive.
 	oauthHTTPTimeout = 30 * time.Second
-)
 
-var (
 	// callbackServerTimeout bounds how long the local HTTPS callback server waits.
 	callbackServerTimeout = 300 * time.Second
-
-	// oauthNow returns the current time. Tests override it for deterministic assertions.
-	oauthNow = time.Now
-
-	// browserOpenFunc opens the authorization URL in the user's browser.
-	browserOpenFunc = browser.OpenURL
-
-	// oauthHTTPClient is used for OAuth token exchange and refresh requests.
-	// Has an explicit timeout to avoid hanging on network issues, unlike
-	// http.DefaultClient which has no timeout.
-	oauthHTTPClient = &http.Client{
-		Timeout: oauthHTTPTimeout,
-	}
 )
+
+// oauthHTTPClient is the HTTP client for OAuth token exchange and refresh
+// requests. Has an explicit timeout to prevent hanging on network issues,
+// unlike http.DefaultClient which has no timeout.
+var oauthHTTPClient = &http.Client{
+	Timeout: oauthHTTPTimeout,
+}
 
 // AuthorizeURL builds the Schwab authorization URL and returns it with a random state value.
 func AuthorizeURL(cfg *Config) (authURL, state string, err error) {
@@ -85,7 +77,9 @@ func AuthorizeURL(cfg *Config) (authURL, state string, err error) {
 }
 
 // ExchangeCode exchanges an OAuth authorization code for a token file.
-func ExchangeCode(cfg *Config, code, tokenEndpoint string) (*TokenFile, error) {
+// The now parameter controls the timestamp used for token expiry calculation,
+// making the function deterministic for tests.
+func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*TokenFile, error) {
 	if tokenEndpoint == "" {
 		tokenEndpoint = oauthTokenEndpoint
 	}
@@ -126,7 +120,7 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string) (*TokenFile, error) {
 		return nil, schwabErrors.NewAuthCallbackError("failed to parse token exchange response", err)
 	}
 
-	nowUnix := oauthNow().Unix()
+	nowUnix := now.Unix()
 	token.ExpiresAt = float64(nowUnix) + float64(token.ExpiresIn)
 
 	return &TokenFile{
@@ -166,7 +160,7 @@ func RunLogin(cfg *Config, tokenPath, tokenEndpoint string, openBrowser bool, w 
 
 	if openBrowser {
 		logger.Info("Opening browser for Schwab login")
-		if err := browserOpenFunc(authURL); err != nil {
+		if err := browser.OpenURL(authURL); err != nil {
 			return schwabErrors.NewAuthCallbackError("failed to open browser", err)
 		}
 	} else {
@@ -183,7 +177,7 @@ func RunLogin(cfg *Config, tokenPath, tokenEndpoint string, openBrowser bool, w 
 	}
 
 	logger.Info("Exchanging authorization code for token")
-	tokenFile, err := ExchangeCode(cfg, result.code, tokenEndpoint)
+	tokenFile, err := ExchangeCode(cfg, result.code, tokenEndpoint, time.Now())
 	if err != nil {
 		return err
 	}
@@ -363,7 +357,7 @@ func generateSelfSignedCertificate() (tls.Certificate, error) {
 		return tls.Certificate{}, fmt.Errorf("failed to generate private key: %w", err)
 	}
 
-	now := oauthNow()
+	now := time.Now()
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{

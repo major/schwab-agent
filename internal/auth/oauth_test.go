@@ -83,11 +83,6 @@ func TestAuthorizeURL_ReturnsExpectedParametersAndState(t *testing.T) {
 func TestExchangeCode_Success_UsesBasicAuthAndReturnsTokenFile(t *testing.T) {
 	// Arrange
 	fixedNow := time.Date(2026, time.April, 21, 12, 0, 0, 0, time.UTC)
-	originalNow := oauthNow
-	oauthNow = func() time.Time { return fixedNow }
-	defer func() {
-		oauthNow = originalNow
-	}()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
@@ -122,7 +117,7 @@ func TestExchangeCode_Success_UsesBasicAuthAndReturnsTokenFile(t *testing.T) {
 	}
 
 	// Act
-	tokenFile, err := ExchangeCode(cfg, "auth-code-123", server.URL)
+	tokenFile, err := ExchangeCode(cfg, "auth-code-123", server.URL, fixedNow)
 
 	// Assert
 	require.NoError(t, err)
@@ -151,7 +146,7 @@ func TestExchangeCode_Failure_ReturnsAuthCallbackError(t *testing.T) {
 	}
 
 	// Act
-	tokenFile, err := ExchangeCode(cfg, "bad-code", server.URL)
+	tokenFile, err := ExchangeCode(cfg, "bad-code", server.URL, time.Now())
 
 	// Assert
 	assert.Nil(t, tokenFile)
@@ -207,13 +202,6 @@ func TestStartCallbackServer_StateMismatch_ReturnsAuthCallbackError(t *testing.T
 
 func TestRunLogin_PrintsURLAndSavesToken(t *testing.T) {
 	// Arrange
-	fixedNow := time.Date(2026, time.April, 21, 12, 30, 0, 0, time.UTC)
-	originalNow := oauthNow
-	oauthNow = func() time.Time { return fixedNow }
-	defer func() {
-		oauthNow = originalNow
-	}()
-
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 	callbackAddr := freeLoopbackAddress(t)
@@ -241,6 +229,7 @@ func TestRunLogin_PrintsURLAndSavesToken(t *testing.T) {
 
 	writer := &synchronizedBuffer{}
 	errCh := make(chan error, 1)
+	before := time.Now().Unix()
 
 	go func() {
 		errCh <- RunLogin(cfg, tokenPath, tokenServer.URL, false, writer)
@@ -253,6 +242,7 @@ func TestRunLogin_PrintsURLAndSavesToken(t *testing.T) {
 	// Act
 	_, statusCode := sendCallbackRequest(t, callbackAddr, "login-code", parsedURL.Query().Get("state"))
 	err = <-errCh
+	after := time.Now().Unix()
 
 	// Assert
 	require.NoError(t, err)
@@ -261,10 +251,11 @@ func TestRunLogin_PrintsURLAndSavesToken(t *testing.T) {
 
 	tokenFile, err := LoadToken(tokenPath)
 	require.NoError(t, err)
-	assert.Equal(t, fixedNow.Unix(), tokenFile.CreationTimestamp)
+	assert.GreaterOrEqual(t, tokenFile.CreationTimestamp, before)
+	assert.LessOrEqual(t, tokenFile.CreationTimestamp, after)
 	assert.Equal(t, "saved-access-token", tokenFile.Token.AccessToken)
 	assert.Equal(t, "saved-refresh-token", tokenFile.Token.RefreshToken)
-	assert.Equal(t, float64(fixedNow.Unix()+900), tokenFile.Token.ExpiresAt)
+	assert.InDelta(t, float64(tokenFile.CreationTimestamp+900), tokenFile.Token.ExpiresAt, 1)
 }
 
 // freeLoopbackAddress reserves and returns an available loopback port for tests.

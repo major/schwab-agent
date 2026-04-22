@@ -36,6 +36,21 @@ func runApp(t *testing.T, args ...string) (string, error) {
 	return stdout.String(), err
 }
 
+// runAppWithDeps is like runApp but uses the given deps for dependency overrides.
+func runAppWithDeps(t *testing.T, deps appDeps, args ...string) (string, error) {
+	t.Helper()
+
+	var stdout strings.Builder
+	app := buildAppWithDeps(&stdout, deps)
+	app.Writer = &stdout
+	app.ErrWriter = io.Discard
+	app.ExitErrHandler = func(_ context.Context, _ *cli.Command, _ error) {}
+
+	err := app.Run(context.Background(), args)
+
+	return stdout.String(), err
+}
+
 // writeTestConfig persists a valid auth config for Before hook tests.
 func writeTestConfig(t *testing.T, path string) {
 	t.Helper()
@@ -182,21 +197,13 @@ func TestBeforeHook_RefreshesExpiredToken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	originalEndpointFunc := tokenRefreshEndpointFunc
-	tokenRefreshEndpointFunc = func() string { return server.URL + "/oauth/token" }
-	defer func() {
-		tokenRefreshEndpointFunc = originalEndpointFunc
-	}()
-
-	originalClientFunc := newClientFunc
-	newClientFunc = func(token string, _ ...client.Option) *client.Client {
+	deps := defaultAppDeps()
+	deps.tokenRefreshEndpoint = func() string { return server.URL + "/oauth/token" }
+	deps.newClient = func(token string, _ ...client.Option) *client.Client {
 		return client.NewClient(token, client.WithBaseURL(server.URL))
 	}
-	defer func() {
-		newClientFunc = originalClientFunc
-	}()
 
-	_, err := runApp(t, "schwab-agent", "--config", configPath, "--token", tokenPath, "account", "numbers")
+	_, err := runAppWithDeps(t, deps, "schwab-agent", "--config", configPath, "--token", tokenPath, "account", "numbers")
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), refreshCalls.Load())
 
@@ -243,15 +250,12 @@ func TestIntegration_ValidToken_QuoteGet(t *testing.T) {
 	}))
 	defer server.Close()
 
-	originalClientFunc := newClientFunc
-	newClientFunc = func(token string, _ ...client.Option) *client.Client {
+	deps := defaultAppDeps()
+	deps.newClient = func(token string, _ ...client.Option) *client.Client {
 		return client.NewClient(token, client.WithBaseURL(server.URL))
 	}
-	defer func() {
-		newClientFunc = originalClientFunc
-	}()
 
-	stdout, err := runApp(t, "schwab-agent", "--config", configPath, "--token", tokenPath, "quote", "get", "AAPL")
+	stdout, err := runAppWithDeps(t, deps, "schwab-agent", "--config", configPath, "--token", tokenPath, "quote", "get", "AAPL")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, `"data"`)
 	assert.Contains(t, stdout, `"AAPL"`)
@@ -303,15 +307,12 @@ func TestIntegration_OrderConfirmGate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	originalClientFunc := newClientFunc
-	newClientFunc = func(token string, _ ...client.Option) *client.Client {
+	deps := defaultAppDeps()
+	deps.newClient = func(token string, _ ...client.Option) *client.Client {
 		return client.NewClient(token, client.WithBaseURL(server.URL))
 	}
-	defer func() {
-		newClientFunc = originalClientFunc
-	}()
 
-	stdout, err := runApp(t,
+	stdout, err := runAppWithDeps(t, deps,
 		"schwab-agent",
 		"--config", configPath,
 		"--token", tokenPath,

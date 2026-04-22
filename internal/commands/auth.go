@@ -19,28 +19,29 @@ import (
 
 const refreshTokenMaxAgeSeconds int64 = 561600
 
-var (
-	// authConfigPathFunc resolves the config file path for commands that need it.
-	authConfigPathFunc = defaultAuthConfigPath
-	// oauthTokenEndpointFunc resolves the OAuth token endpoint, mainly for tests.
-	oauthTokenEndpointFunc = func() string { return "" }
-	// loadConfigFunc wraps auth.LoadConfig for test overrides.
-	loadConfigFunc = auth.LoadConfig
-	// loadTokenFunc wraps auth.LoadToken for test overrides.
-	loadTokenFunc = auth.LoadToken
-	// saveTokenFunc wraps auth.SaveToken for test overrides.
-	saveTokenFunc = auth.SaveToken
-	// refreshAccessTokenFunc wraps auth.RefreshAccessToken for test overrides.
-	refreshAccessTokenFunc = auth.RefreshAccessToken
-	// runLoginFunc wraps auth.RunLogin for test overrides.
-	runLoginFunc = auth.RunLogin
-	// setDefaultAccountFunc wraps auth.SetDefaultAccount for test overrides.
-	setDefaultAccountFunc = auth.SetDefaultAccount
-	// newAccountClientFunc constructs account-capable API clients for login follow-up.
-	newAccountClientFunc = func(token string) accountNumbersClient {
-		return client.NewClient(token)
+// authDeps holds injectable dependencies for auth commands. Production code
+// uses defaultAuthDeps(); tests provide custom implementations for the
+// specific dependencies they need to control.
+type authDeps struct {
+	configPath         func() string
+	oauthTokenEndpoint func() string
+	refreshAccessToken func(*auth.Config, *auth.TokenFile, string) (*auth.TokenFile, error)
+	runLogin           func(*auth.Config, string, string, bool, io.Writer) error
+	newAccountClient   func(string) accountNumbersClient
+}
+
+// defaultAuthDeps returns the production dependency set.
+func defaultAuthDeps() authDeps {
+	return authDeps{
+		configPath:         defaultAuthConfigPath,
+		oauthTokenEndpoint: func() string { return "" },
+		refreshAccessToken: auth.RefreshAccessToken,
+		runLogin:           auth.RunLogin,
+		newAccountClient: func(token string) accountNumbersClient {
+			return client.NewClient(token)
+		},
 	}
-)
+}
 
 // accountNumbersClient captures the client behavior needed by auth login.
 type accountNumbersClient interface {
@@ -73,13 +74,19 @@ type authRefreshData struct {
 
 // AuthCommand returns the parent auth command with setup, login, status, and refresh subcommands.
 func AuthCommand(cfg *auth.Config, tokenPath string, w io.Writer) *cli.Command {
+	return newAuthCommand(cfg, tokenPath, w, defaultAuthDeps())
+}
+
+// newAuthCommand builds the auth command tree with the given dependencies.
+// Tests call this directly with custom deps; production goes through AuthCommand.
+func newAuthCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps authDeps) *cli.Command {
 	return &cli.Command{
 		Name:  "auth",
 		Usage: "Authentication commands",
 		Commands: []*cli.Command{
-			authLoginCommand(cfg, tokenPath, w),
-			authStatusCommand(cfg, tokenPath, w),
-			authRefreshCommand(cfg, tokenPath, w),
+			authLoginCommand(cfg, tokenPath, w, deps),
+			authStatusCommand(cfg, tokenPath, w, deps),
+			authRefreshCommand(cfg, tokenPath, w, deps),
 		},
 	}
 }
@@ -96,7 +103,7 @@ func AccountSetDefaultCommand(configPath string, w io.Writer) *cli.Command {
 				return err
 			}
 
-			if err := setDefaultAccountFunc(configPath, hash); err != nil {
+			if err := auth.SetDefaultAccount(configPath, hash); err != nil {
 				return err
 			}
 
@@ -108,7 +115,7 @@ func AccountSetDefaultCommand(configPath string, w io.Writer) *cli.Command {
 }
 
 // authLoginCommand returns the auth login command.
-func authLoginCommand(cfg *auth.Config, tokenPath string, w io.Writer) *cli.Command {
+func authLoginCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps authDeps) *cli.Command {
 	return &cli.Command{
 		Name:  "login",
 		Usage: "Run the OAuth login flow",
@@ -119,32 +126,32 @@ func authLoginCommand(cfg *auth.Config, tokenPath string, w io.Writer) *cli.Comm
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			loginConfig, err := requireAuthConfig(cfg)
+			loginConfig, err := requireAuthConfig(cfg, deps.configPath)
 			if err != nil {
 				return err
 			}
 
 			var loginOutput strings.Builder
 			openBrowser := !cmd.Bool("no-browser")
-			if err := runLoginFunc(loginConfig, tokenPath, oauthTokenEndpointFunc(), openBrowser, &loginOutput); err != nil {
+			if err := deps.runLogin(loginConfig, tokenPath, deps.oauthTokenEndpoint(), openBrowser, &loginOutput); err != nil {
 				return err
 			}
 
-			tokenFile, err := loadTokenFunc(tokenPath)
+			tokenFile, err := auth.LoadToken(tokenPath)
 			if err != nil {
 				return err
 			}
 
 			defaultAccount := configDefaultAccount(loginConfig)
 			autoSetDefault := false
-			accounts, err := newAccountClientFunc(tokenFile.Token.AccessToken).AccountNumbers(ctx)
+			accounts, err := deps.newAccountClient(tokenFile.Token.AccessToken).AccountNumbers(ctx)
 			if err != nil {
 				return err
 			}
 
 			if len(accounts) == 1 {
 				defaultAccount = accounts[0].HashValue
-				if err := setDefaultAccountFunc(authConfigPathFunc(), defaultAccount); err != nil {
+				if err := auth.SetDefaultAccount(deps.configPath(), defaultAccount); err != nil {
 					return err
 				}
 				autoSetDefault = true
@@ -165,17 +172,17 @@ func authLoginCommand(cfg *auth.Config, tokenPath string, w io.Writer) *cli.Comm
 }
 
 // authStatusCommand returns the auth status command.
-func authStatusCommand(cfg *auth.Config, tokenPath string, w io.Writer) *cli.Command {
+func authStatusCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps authDeps) *cli.Command {
 	return &cli.Command{
 		Name:  "status",
 		Usage: "Show token and config status",
 		Action: func(_ context.Context, _ *cli.Command) error {
-			tokenFile, err := loadTokenFunc(tokenPath)
+			tokenFile, err := auth.LoadToken(tokenPath)
 			if err != nil {
 				return err
 			}
 
-			statusConfig := optionalAuthConfig(cfg)
+			statusConfig := optionalAuthConfig(cfg, deps.configPath)
 			data := authStatusData{
 				Valid:            !auth.IsAccessTokenExpired(tokenFile),
 				ExpiresAt:        unixSecondsToRFC3339(tokenFile.Token.ExpiresAt),
@@ -190,27 +197,27 @@ func authStatusCommand(cfg *auth.Config, tokenPath string, w io.Writer) *cli.Com
 }
 
 // authRefreshCommand returns the auth refresh command.
-func authRefreshCommand(cfg *auth.Config, tokenPath string, w io.Writer) *cli.Command {
+func authRefreshCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps authDeps) *cli.Command {
 	return &cli.Command{
 		Name:  "refresh",
 		Usage: "Refresh the current access token",
 		Action: func(_ context.Context, _ *cli.Command) error {
-			refreshConfig, err := requireAuthConfig(cfg)
+			refreshConfig, err := requireAuthConfig(cfg, deps.configPath)
 			if err != nil {
 				return err
 			}
 
-			tokenFile, err := loadTokenFunc(tokenPath)
+			tokenFile, err := auth.LoadToken(tokenPath)
 			if err != nil {
 				return err
 			}
 
-			refreshedToken, err := refreshAccessTokenFunc(refreshConfig, tokenFile, oauthTokenEndpointFunc())
+			refreshedToken, err := deps.refreshAccessToken(refreshConfig, tokenFile, deps.oauthTokenEndpoint())
 			if err != nil {
 				return err
 			}
 
-			if err := saveTokenFunc(tokenPath, refreshedToken); err != nil {
+			if err := auth.SaveToken(tokenPath, refreshedToken); err != nil {
 				return err
 			}
 
@@ -222,21 +229,21 @@ func authRefreshCommand(cfg *auth.Config, tokenPath string, w io.Writer) *cli.Co
 }
 
 // requireAuthConfig returns a valid auth config or loads it from disk.
-func requireAuthConfig(cfg *auth.Config) (*auth.Config, error) {
+func requireAuthConfig(cfg *auth.Config, configPath func() string) (*auth.Config, error) {
 	if cfg != nil && cfg.ClientID != "" && cfg.ClientSecret != "" {
 		return cfg, nil
 	}
 
-	return loadConfigFunc(authConfigPathFunc())
+	return auth.LoadConfig(configPath())
 }
 
 // optionalAuthConfig returns the provided config or best-effort loaded config.
-func optionalAuthConfig(cfg *auth.Config) *auth.Config {
+func optionalAuthConfig(cfg *auth.Config, configPath func() string) *auth.Config {
 	if cfg != nil {
 		return cfg
 	}
 
-	loadedConfig, err := loadConfigFunc(authConfigPathFunc())
+	loadedConfig, err := auth.LoadConfig(configPath())
 	if err != nil {
 		return &auth.Config{}
 	}

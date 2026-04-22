@@ -24,24 +24,19 @@ import (
 // version is set via ldflags at build time.
 var version = "dev"
 
-var (
-	// loadConfigFunc wraps auth.LoadConfig for test overrides.
-	loadConfigFunc = auth.LoadConfig
-	// loadTokenFunc wraps auth.LoadToken for test overrides.
-	loadTokenFunc = auth.LoadToken
-	// saveTokenFunc wraps auth.SaveToken for test overrides.
-	saveTokenFunc = auth.SaveToken
-	// isRefreshTokenStaleFunc wraps auth.IsRefreshTokenStale for test overrides.
-	isRefreshTokenStaleFunc = auth.IsRefreshTokenStale
-	// isAccessTokenExpiredFunc wraps auth.IsAccessTokenExpired for test overrides.
-	isAccessTokenExpiredFunc = auth.IsAccessTokenExpired
-	// refreshAccessTokenFunc wraps auth.RefreshAccessToken for test overrides.
-	refreshAccessTokenFunc = auth.RefreshAccessToken
-	// newClientFunc wraps client.NewClient for test overrides.
-	newClientFunc = client.NewClient
-	// tokenRefreshEndpointFunc returns the OAuth token refresh endpoint.
-	tokenRefreshEndpointFunc = func() string { return "https://api.schwabapi.com/v1/oauth/token" }
-)
+// appDeps holds injectable dependencies for the Before hook.
+// Tests override individual fields; production uses defaultAppDeps().
+type appDeps struct {
+	newClient            func(token string, opts ...client.Option) *client.Client
+	tokenRefreshEndpoint func() string
+}
+
+func defaultAppDeps() appDeps {
+	return appDeps{
+		newClient:            client.NewClient,
+		tokenRefreshEndpoint: func() string { return "https://api.schwabapi.com/v1/oauth/token" },
+	}
+}
 
 func main() {
 	app := buildApp(os.Stdout)
@@ -53,11 +48,16 @@ func main() {
 	}
 }
 
-// buildApp constructs the CLI root command.
+// buildApp constructs the CLI root command with production defaults.
 func buildApp(w io.Writer) *cli.Command {
+	return buildAppWithDeps(w, defaultAppDeps())
+}
+
+// buildAppWithDeps constructs the CLI root command with the given dependencies.
+func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 	configPath := defaultConfigPath()
 	tokenPath := defaultTokenPath()
-	loadedConfig, err := loadConfigFunc(configPath)
+	loadedConfig, err := auth.LoadConfig(configPath)
 	if err != nil {
 		loadedConfig = &auth.Config{CallbackURL: "https://127.0.0.1:8182"}
 	}
@@ -116,40 +116,40 @@ func buildApp(w io.Writer) *cli.Command {
 				resolvedTokenPath = tokenPath
 			}
 
-			cfg, err := loadConfigFunc(resolvedConfigPath)
+			cfg, err := auth.LoadConfig(resolvedConfigPath)
 			if err != nil {
 			authErr := errors.NewAuthRequiredError("Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file", err)
 			authErr.Details = "Run `schwab-agent auth login` to authenticate"
 				return ctx, authErr
 			}
 
-			token, err := loadTokenFunc(resolvedTokenPath)
+			token, err := auth.LoadToken(resolvedTokenPath)
 			if err != nil {
 				authErr := errors.NewAuthRequiredError("No authentication token found", err)
 				authErr.Details = "Run `schwab-agent auth login` to authenticate"
 				return ctx, authErr
 			}
 
-			if isRefreshTokenStaleFunc(token) {
+			if auth.IsRefreshTokenStale(token) {
 				authErr := errors.NewAuthExpiredError("refresh token expired", nil)
 				authErr.Details = "Run `schwab-agent auth login` to re-authenticate"
 				return ctx, authErr
 			}
 
-			if isAccessTokenExpiredFunc(token) {
-				refreshed, err := refreshAccessTokenFunc(cfg, token, tokenRefreshEndpointFunc())
+			if auth.IsAccessTokenExpired(token) {
+				refreshed, err := auth.RefreshAccessToken(cfg, token, deps.tokenRefreshEndpoint())
 				if err != nil {
 					return ctx, err
 				}
-				if err := saveTokenFunc(resolvedTokenPath, refreshed); err != nil {
+				if err := auth.SaveToken(resolvedTokenPath, refreshed); err != nil {
 					return ctx, err
 				}
 				token = refreshed
 			}
 
-			apiClient.Client = newClientFunc(token.Token.AccessToken,
-			client.WithUserAgent("schwab-agent/"+version),
-		)
+			apiClient.Client = deps.newClient(token.Token.AccessToken,
+				client.WithUserAgent("schwab-agent/"+version),
+			)
 			return ctx, nil
 		},
 		Commands: []*cli.Command{

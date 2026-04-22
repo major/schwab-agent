@@ -105,8 +105,8 @@ func TestAuthRefreshCommand_CallsRefresh(t *testing.T) {
 	require.NoError(t, auth.SaveToken(tokenPath, originalToken))
 
 	called := false
-	originalRefresh := refreshAccessTokenFunc
-	refreshAccessTokenFunc = func(cfg *auth.Config, tf *auth.TokenFile, endpoint string) (*auth.TokenFile, error) {
+	deps := defaultAuthDeps()
+	deps.refreshAccessToken = func(cfg *auth.Config, tf *auth.TokenFile, endpoint string) (*auth.TokenFile, error) {
 		called = true
 		assert.Equal(t, "client-id", cfg.ClientID)
 		assert.Equal(t, originalToken.Token.RefreshToken, tf.Token.RefreshToken)
@@ -120,12 +120,9 @@ func TestAuthRefreshCommand_CallsRefresh(t *testing.T) {
 			},
 		}, nil
 	}
-	defer func() {
-		refreshAccessTokenFunc = originalRefresh
-	}()
 
 	var stdout bytes.Buffer
-	cmd := AuthCommand(&auth.Config{ClientID: "client-id", ClientSecret: "client-secret"}, tokenPath, &stdout)
+	cmd := newAuthCommand(&auth.Config{ClientID: "client-id", ClientSecret: "client-secret"}, tokenPath, &stdout, deps)
 
 	err := cmd.Run(context.Background(), []string{"auth", "refresh"})
 	require.NoError(t, err)
@@ -146,8 +143,6 @@ func TestAuthLoginCommand_AutoSetsDefaultAccount(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	tokenPath := filepath.Join(tmpDir, "token.json")
-	restoreConfigPath := stubConfigPath(configPath)
-	defer restoreConfigPath()
 
 	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
 		ClientID:       "client-id",
@@ -165,6 +160,7 @@ func TestAuthLoginCommand_AutoSetsDefaultAccount(t *testing.T) {
 			_, _ = io.WriteString(w, `{"access_token":"access-token","token_type":"Bearer","expires_in":1800,"refresh_token":"refresh-token","scope":"api"}`)
 		case "/trader/v1/accounts/accountNumbers":
 			assert.Equal(t, "Bearer access-token", r.Header.Get("Authorization"))
+			w.Header().Set("Content-Type", "application/json")
 			_, _ = io.WriteString(w, `[{"accountNumber":"123456789","hashValue":"hash-abc"}]`)
 		default:
 			http.NotFound(w, r)
@@ -172,22 +168,13 @@ func TestAuthLoginCommand_AutoSetsDefaultAccount(t *testing.T) {
 	}))
 	defer server.Close()
 
-	originalTokenEndpoint := oauthTokenEndpointFunc
-	oauthTokenEndpointFunc = func() string { return server.URL + "/v1/oauth/token" }
-	defer func() {
-		oauthTokenEndpointFunc = originalTokenEndpoint
-	}()
-
-	originalClientFactory := newAccountClientFunc
-	newAccountClientFunc = func(token string) accountNumbersClient {
+	deps := defaultAuthDeps()
+	deps.configPath = func() string { return configPath }
+	deps.oauthTokenEndpoint = func() string { return server.URL + "/v1/oauth/token" }
+	deps.newAccountClient = func(token string) accountNumbersClient {
 		return client.NewClient(token, client.WithBaseURL(server.URL))
 	}
-	defer func() {
-		newAccountClientFunc = originalClientFactory
-	}()
-
-	originalLogin := runLoginFunc
-	runLoginFunc = func(cfg *auth.Config, targetTokenPath string, tokenEndpoint string, openBrowser bool, w io.Writer) error {
+	deps.runLogin = func(cfg *auth.Config, targetTokenPath string, tokenEndpoint string, openBrowser bool, w io.Writer) error {
 		assert.False(t, openBrowser)
 		_, err := fmt.Fprintln(w, "https://example.com/authorize")
 		require.NoError(t, err)
@@ -206,19 +193,16 @@ func TestAuthLoginCommand_AutoSetsDefaultAccount(t *testing.T) {
 		token.ExpiresAt = float64(expiresAt)
 		return auth.SaveToken(targetTokenPath, &auth.TokenFile{
 			CreationTimestamp: time.Now().UTC().Add(-1 * time.Hour).Unix(),
-			Token:             token,
+			Token:            token,
 		})
 	}
-	defer func() {
-		runLoginFunc = originalLogin
-	}()
 
 	var stdout bytes.Buffer
-	cmd := AuthCommand(&auth.Config{
+	cmd := newAuthCommand(&auth.Config{
 		ClientID:     "client-id",
 		ClientSecret: "client-secret",
 		CallbackURL:  "https://127.0.0.1:8182",
-	}, tokenPath, &stdout)
+	}, tokenPath, &stdout, deps)
 
 	err := cmd.Run(context.Background(), []string{"auth", "login", "--no-browser"})
 	require.NoError(t, err)
@@ -268,15 +252,6 @@ func decodeAuthEnvelope(t *testing.T, raw []byte) testEnvelope {
 	require.NoError(t, json.Unmarshal(raw, &envelope))
 	require.NotNil(t, envelope.Data)
 	return envelope
-}
-
-// stubConfigPath overrides the config path resolver for tests.
-func stubConfigPath(path string) func() {
-	original := authConfigPathFunc
-	authConfigPathFunc = func() string { return path }
-	return func() {
-		authConfigPathFunc = original
-	}
 }
 
 
