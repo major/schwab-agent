@@ -343,3 +343,33 @@ func TestWrappedOrderBuildError(t *testing.T) {
 		t.Errorf("ExitCodeFor(wrapped OrderBuildError) = %d, want 1", code)
 	}
 }
+
+// TestWithDetails_AllConstructors verifies the WithDetails option sets the
+// details field on every error constructor. The existing TestDetailsFieldPreservation
+// covers AuthRequiredError; this table-driven test covers the remaining types.
+func TestWithDetails_AllConstructors(t *testing.T) {
+	const hint = "check your settings"
+
+	tests := []struct {
+		name    string
+		details string
+	}{
+		{"AuthExpired", NewAuthExpiredError("expired", nil, WithDetails(hint)).Details()},
+		{"AuthCallback", NewAuthCallbackError("callback", nil, WithDetails(hint)).Details()},
+		{"OrderRejected", NewOrderRejectedError("rejected", nil, WithDetails(hint)).Details()},
+		{"SymbolNotFound", NewSymbolNotFoundError("not found", nil, WithDetails(hint)).Details()},
+		{"AccountNotFound", NewAccountNotFoundError("not found", nil, WithDetails(hint)).Details()},
+		{"HTTPError", NewHTTPError("http", 500, "body", nil, WithDetails(hint)).Details()},
+		{"Validation", NewValidationError("invalid", nil, WithDetails(hint)).Details()},
+		{"OrderBuild", NewOrderBuildError("build", nil, WithDetails(hint)).Details()},
+		{"SchwabError", NewSchwabError("generic", nil, WithDetails(hint)).Details()},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.details != hint {
+				t.Errorf("Details() = %q, want %q", tt.details, hint)
+			}
+		})
+	}
+}

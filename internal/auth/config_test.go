@@ -503,6 +503,36 @@ func TestLoadConfig_IAlsoLikeToLiveDangerously_LoadsFalse(t *testing.T) {
 	assert.False(t, cfg.IAlsoLikeToLiveDangerously)
 }
 
+func TestSaveConfig_MkdirAllFailure(t *testing.T) {
+	// Arrange: use a path under /dev/null which is not a directory,
+	// so MkdirAll will fail trying to create the parent.
+	badPath := "/dev/null/impossible/config.json"
+	cfg := &Config{ClientID: "id", ClientSecret: "secret"}
+
+	// Act
+	err := SaveConfig(badPath, cfg)
+
+	// Assert
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create config directory")
+}
+
+func TestSaveConfig_WriteFileFailure(t *testing.T) {
+	// Arrange: create a read-only directory so WriteFile fails.
+	tmpDir := t.TempDir()
+	readOnlyDir := filepath.Join(tmpDir, "readonly")
+	require.NoError(t, os.MkdirAll(readOnlyDir, 0o500))
+	configPath := filepath.Join(readOnlyDir, "config.json")
+	cfg := &Config{ClientID: "id", ClientSecret: "secret"}
+
+	// Act
+	err := SaveConfig(configPath, cfg)
+
+	// Assert
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to write config file")
+}
+
 func TestSaveConfig_PreservesIAlsoLikeToLiveDangerously(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()

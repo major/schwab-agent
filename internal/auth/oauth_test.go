@@ -258,6 +258,36 @@ func TestRunLogin_PrintsURLAndSavesToken(t *testing.T) {
 	assert.InDelta(t, float64(tokenFile.CreationTimestamp+900), tokenFile.Token.ExpiresAt, 1)
 }
 
+func TestValidateCallbackAddr_EdgeCases(t *testing.T) {
+	t.Run("empty addr returns default", func(t *testing.T) {
+		addr, err := validateCallbackAddr("")
+		require.NoError(t, err)
+		assert.Equal(t, defaultCallbackAddr, addr)
+	})
+
+	t.Run("missing port returns error", func(t *testing.T) {
+		_, err := validateCallbackAddr("127.0.0.1")
+		require.Error(t, err)
+		var callbackErr *apperr.AuthCallbackError
+		assert.ErrorAs(t, err, &callbackErr)
+		assert.Contains(t, err.Error(), "host and port")
+	})
+
+	t.Run("non-loopback host returns error", func(t *testing.T) {
+		_, err := validateCallbackAddr("192.168.1.1:8182")
+		require.Error(t, err)
+		var callbackErr *apperr.AuthCallbackError
+		assert.ErrorAs(t, err, &callbackErr)
+		assert.Contains(t, err.Error(), "127.0.0.1")
+	})
+
+	t.Run("valid loopback addr passes through", func(t *testing.T) {
+		addr, err := validateCallbackAddr("127.0.0.1:9999")
+		require.NoError(t, err)
+		assert.Equal(t, "127.0.0.1:9999", addr)
+	})
+}
+
 // freeLoopbackAddress reserves and returns an available loopback port for tests.
 func freeLoopbackAddress(t *testing.T) string {
 	t.Helper()
