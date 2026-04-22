@@ -1,0 +1,552 @@
+package orderbuilder
+
+import (
+	"testing"
+	"time"
+
+	"github.com/major/schwab-agent/internal/models"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// TestBuildVerticalOrderBullCallOpen verifies a bull call spread (debit to open).
+// BUY lower strike call + SELL higher strike call = NET_DEBIT.
+func TestBuildVerticalOrderBullCallOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildVerticalOrder(&VerticalParams{
+		Underlying:  "F",
+		Expiration:  expiration,
+		LongStrike:  12,
+		ShortStrike: 14,
+		PutCall:     models.PutCallCall,
+		Open:        true,
+		Quantity:    1,
+		Price:       0.50,
+	})
+
+	// Arrange/Act assertions on order-level fields.
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeVertical, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 0.50, *order.Price)
+	assert.Equal(t, models.DurationDay, order.Duration)
+	assert.Equal(t, models.SessionNormal, order.Session)
+
+	// Assert two legs with correct instructions and OCC symbols.
+	require.Len(t, order.OrderLegCollection, 2)
+
+	longLeg := order.OrderLegCollection[0]
+	assert.Equal(t, models.InstructionBuyToOpen, longLeg.Instruction)
+	assert.Equal(t, 1.0, longLeg.Quantity)
+	assert.Equal(t, models.AssetTypeOption, longLeg.Instrument.AssetType)
+	assert.Equal(t, "F     260618C00012000", longLeg.Instrument.Symbol)
+	require.NotNil(t, longLeg.Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *longLeg.Instrument.PutCall)
+	require.NotNil(t, longLeg.Instrument.OptionStrikePrice)
+	assert.Equal(t, 12.0, *longLeg.Instrument.OptionStrikePrice)
+
+	shortLeg := order.OrderLegCollection[1]
+	assert.Equal(t, models.InstructionSellToOpen, shortLeg.Instruction)
+	assert.Equal(t, 1.0, shortLeg.Quantity)
+	assert.Equal(t, "F     260618C00014000", shortLeg.Instrument.Symbol)
+	require.NotNil(t, shortLeg.Instrument.OptionStrikePrice)
+	assert.Equal(t, 14.0, *shortLeg.Instrument.OptionStrikePrice)
+}
+
+// TestBuildVerticalOrderBearCallOpen verifies a bear call spread (credit to open).
+// BUY higher strike call + SELL lower strike call = NET_CREDIT.
+func TestBuildVerticalOrderBearCallOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildVerticalOrder(&VerticalParams{
+		Underlying:  "F",
+		Expiration:  expiration,
+		LongStrike:  14,
+		ShortStrike: 12,
+		PutCall:     models.PutCallCall,
+		Open:        true,
+		Quantity:    1,
+		Price:       0.50,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+}
+
+// TestBuildVerticalOrderBearPutOpen verifies a bear put spread (debit to open).
+// BUY higher strike put + SELL lower strike put = NET_DEBIT.
+func TestBuildVerticalOrderBearPutOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildVerticalOrder(&VerticalParams{
+		Underlying:  "F",
+		Expiration:  expiration,
+		LongStrike:  14,
+		ShortStrike: 12,
+		PutCall:     models.PutCallPut,
+		Open:        true,
+		Quantity:    1,
+		Price:       0.50,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+}
+
+// TestBuildVerticalOrderBullPutOpen verifies a bull put spread (credit to open).
+// BUY lower strike put + SELL higher strike put = NET_CREDIT.
+func TestBuildVerticalOrderBullPutOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildVerticalOrder(&VerticalParams{
+		Underlying:  "F",
+		Expiration:  expiration,
+		LongStrike:  12,
+		ShortStrike: 14,
+		PutCall:     models.PutCallPut,
+		Open:        true,
+		Quantity:    1,
+		Price:       0.50,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+}
+
+// TestBuildVerticalOrderCloseReversesOrderType verifies closing a spread flips
+// the order type from debit to credit (or vice versa) and uses close instructions.
+func TestBuildVerticalOrderCloseReversesOrderType(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	// A bull call spread opens as NET_DEBIT, closes as NET_CREDIT.
+	order, err := BuildVerticalOrder(&VerticalParams{
+		Underlying:  "F",
+		Expiration:  expiration,
+		LongStrike:  12,
+		ShortStrike: 14,
+		PutCall:     models.PutCallCall,
+		Open:        false,
+		Quantity:    1,
+		Price:       0.30,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[1].Instruction)
+}
+
+// TestBuildIronCondorOrderOpen verifies an opening iron condor produces 4 legs with
+// correct instructions and NET_CREDIT order type.
+func TestBuildIronCondorOrderOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildIronCondorOrder(&IronCondorParams{
+		Underlying:      "F",
+		Expiration:      expiration,
+		PutLongStrike:   8,
+		PutShortStrike:  10,
+		CallShortStrike: 14,
+		CallLongStrike:  16,
+		Open:            true,
+		Quantity:        1,
+		Price:           1.50,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeIronCondor, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 1.50, *order.Price)
+
+	// Verify 4 legs in correct order.
+	require.Len(t, order.OrderLegCollection, 4)
+
+	// Leg 1: BUY put at lowest strike (protection).
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
+	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
+	assert.Equal(t, models.PutCallPut, *order.OrderLegCollection[0].Instrument.PutCall)
+	assert.Equal(t, "F     260618P00008000", order.OrderLegCollection[0].Instrument.Symbol)
+
+	// Leg 2: SELL put at mid-low strike (premium).
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
+	require.NotNil(t, order.OrderLegCollection[1].Instrument.PutCall)
+	assert.Equal(t, models.PutCallPut, *order.OrderLegCollection[1].Instrument.PutCall)
+	assert.Equal(t, "F     260618P00010000", order.OrderLegCollection[1].Instrument.Symbol)
+
+	// Leg 3: SELL call at mid-high strike (premium).
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[2].Instruction)
+	require.NotNil(t, order.OrderLegCollection[2].Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[2].Instrument.PutCall)
+	assert.Equal(t, "F     260618C00014000", order.OrderLegCollection[2].Instrument.Symbol)
+
+	// Leg 4: BUY call at highest strike (protection).
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[3].Instruction)
+	require.NotNil(t, order.OrderLegCollection[3].Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[3].Instrument.PutCall)
+	assert.Equal(t, "F     260618C00016000", order.OrderLegCollection[3].Instrument.Symbol)
+}
+
+// TestBuildIronCondorOrderClose verifies closing flips to NET_DEBIT with close instructions.
+func TestBuildIronCondorOrderClose(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildIronCondorOrder(&IronCondorParams{
+		Underlying:      "F",
+		Expiration:      expiration,
+		PutLongStrike:   8,
+		PutShortStrike:  10,
+		CallShortStrike: 14,
+		CallLongStrike:  16,
+		Open:            false,
+		Quantity:        1,
+		Price:           0.50,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+
+	// Close: long legs SELL_TO_CLOSE, short legs BUY_TO_CLOSE.
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[1].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[2].Instruction)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[3].Instruction)
+}
+
+// TestBuildStraddleOrderLongOpen verifies a long straddle (buy to open, net debit).
+// BUY_TO_OPEN call + BUY_TO_OPEN put at same strike = NET_DEBIT.
+func TestBuildStraddleOrderLongOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildStraddleOrder(&StraddleParams{
+		Underlying: "F",
+		Expiration: expiration,
+		Strike:     12,
+		Buy:        true,
+		Open:       true,
+		Quantity:   1,
+		Price:      1.50,
+	})
+
+	// Assert order-level fields.
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeStraddle, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 1.50, *order.Price)
+	assert.Equal(t, models.DurationDay, order.Duration)
+	assert.Equal(t, models.SessionNormal, order.Session)
+
+	// Assert two legs: call and put at the same strike, both BUY_TO_OPEN.
+	require.Len(t, order.OrderLegCollection, 2)
+
+	callLeg := order.OrderLegCollection[0]
+	assert.Equal(t, models.InstructionBuyToOpen, callLeg.Instruction)
+	assert.Equal(t, 1.0, callLeg.Quantity)
+	assert.Equal(t, models.AssetTypeOption, callLeg.Instrument.AssetType)
+	assert.Equal(t, "F     260618C00012000", callLeg.Instrument.Symbol)
+	require.NotNil(t, callLeg.Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *callLeg.Instrument.PutCall)
+
+	putLeg := order.OrderLegCollection[1]
+	assert.Equal(t, models.InstructionBuyToOpen, putLeg.Instruction)
+	assert.Equal(t, 1.0, putLeg.Quantity)
+	assert.Equal(t, "F     260618P00012000", putLeg.Instrument.Symbol)
+	require.NotNil(t, putLeg.Instrument.PutCall)
+	assert.Equal(t, models.PutCallPut, *putLeg.Instrument.PutCall)
+}
+
+// TestBuildStraddleOrderShortOpen verifies a short straddle (sell to open, net credit).
+func TestBuildStraddleOrderShortOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildStraddleOrder(&StraddleParams{
+		Underlying: "F",
+		Expiration: expiration,
+		Strike:     12,
+		Buy:        false,
+		Open:       true,
+		Quantity:   1,
+		Price:      1.50,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
+}
+
+// TestBuildStraddleOrderCloseShort verifies closing a short straddle (buy to close, net debit).
+func TestBuildStraddleOrderCloseShort(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildStraddleOrder(&StraddleParams{
+		Underlying: "F",
+		Expiration: expiration,
+		Strike:     12,
+		Buy:        true,
+		Open:       false,
+		Quantity:   1,
+		Price:      0.80,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[1].Instruction)
+}
+
+// TestBuildStraddleOrderCloseLong verifies closing a long straddle (sell to close, net credit).
+func TestBuildStraddleOrderCloseLong(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildStraddleOrder(&StraddleParams{
+		Underlying: "F",
+		Expiration: expiration,
+		Strike:     12,
+		Buy:        false,
+		Open:       false,
+		Quantity:   1,
+		Price:      0.80,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[1].Instruction)
+}
+
+// TestBuildStrangleOrderLongOpen verifies a long strangle (buy to open, net debit).
+// BUY_TO_OPEN call at higher strike + BUY_TO_OPEN put at lower strike = NET_DEBIT.
+func TestBuildStrangleOrderLongOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildStrangleOrder(&StrangleParams{
+		Underlying: "F",
+		Expiration: expiration,
+		CallStrike: 14,
+		PutStrike:  10,
+		Buy:        true,
+		Open:       true,
+		Quantity:   1,
+		Price:      0.80,
+	})
+
+	// Assert order-level fields.
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeStrangle, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 0.80, *order.Price)
+
+	// Assert two legs with different strikes, both BUY_TO_OPEN.
+	require.Len(t, order.OrderLegCollection, 2)
+
+	callLeg := order.OrderLegCollection[0]
+	assert.Equal(t, models.InstructionBuyToOpen, callLeg.Instruction)
+	assert.Equal(t, "F     260618C00014000", callLeg.Instrument.Symbol)
+	require.NotNil(t, callLeg.Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *callLeg.Instrument.PutCall)
+
+	putLeg := order.OrderLegCollection[1]
+	assert.Equal(t, models.InstructionBuyToOpen, putLeg.Instruction)
+	assert.Equal(t, "F     260618P00010000", putLeg.Instrument.Symbol)
+	require.NotNil(t, putLeg.Instrument.PutCall)
+	assert.Equal(t, models.PutCallPut, *putLeg.Instrument.PutCall)
+}
+
+// TestBuildStrangleOrderShortOpen verifies a short strangle (sell to open, net credit).
+func TestBuildStrangleOrderShortOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildStrangleOrder(&StrangleParams{
+		Underlying: "F",
+		Expiration: expiration,
+		CallStrike: 14,
+		PutStrike:  10,
+		Buy:        false,
+		Open:       true,
+		Quantity:   1,
+		Price:      0.80,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
+}
+
+// TestBuildStrangleOrderCloseShort verifies closing a short strangle (buy to close, net debit).
+func TestBuildStrangleOrderCloseShort(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildStrangleOrder(&StrangleParams{
+		Underlying: "F",
+		Expiration: expiration,
+		CallStrike: 14,
+		PutStrike:  10,
+		Buy:        true,
+		Open:       false,
+		Quantity:   1,
+		Price:      0.50,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[1].Instruction)
+}
+
+// TestBuildVerticalOrderAppliesCustomDurationAndSession verifies non-default overrides.
+func TestBuildVerticalOrderAppliesCustomDurationAndSession(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildVerticalOrder(&VerticalParams{
+		Underlying:  "SPY",
+		Expiration:  expiration,
+		LongStrike:  500,
+		ShortStrike: 510,
+		PutCall:     models.PutCallCall,
+		Open:        true,
+		Quantity:    5,
+		Price:       2.00,
+		Duration:    models.DurationGoodTillCancel,
+		Session:     models.SessionPM,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.DurationGoodTillCancel, order.Duration)
+	assert.Equal(t, models.SessionPM, order.Session)
+}
+
+// TestBuildCoveredCallOrder verifies a covered call (buy shares + sell call).
+// 1 contract = 100 shares equity + 1 call option sold.
+func TestBuildCoveredCallOrder(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildCoveredCallOrder(&CoveredCallParams{
+		Underlying: "F",
+		Expiration: expiration,
+		Strike:     14,
+		Quantity:   1,
+		Price:      12.00,
+	})
+
+	// Assert order-level fields.
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeCovered, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 12.00, *order.Price)
+	assert.Equal(t, models.DurationDay, order.Duration)
+	assert.Equal(t, models.SessionNormal, order.Session)
+
+	// Assert two legs: equity BUY + option SELL_TO_OPEN.
+	require.Len(t, order.OrderLegCollection, 2)
+
+	equityLeg := order.OrderLegCollection[0]
+	assert.Equal(t, models.InstructionBuy, equityLeg.Instruction)
+	assert.Equal(t, 100.0, equityLeg.Quantity, "1 contract = 100 shares")
+	assert.Equal(t, models.AssetTypeEquity, equityLeg.Instrument.AssetType)
+	assert.Equal(t, "F", equityLeg.Instrument.Symbol)
+
+	optionLeg := order.OrderLegCollection[1]
+	assert.Equal(t, models.InstructionSellToOpen, optionLeg.Instruction)
+	assert.Equal(t, 1.0, optionLeg.Quantity)
+	assert.Equal(t, models.AssetTypeOption, optionLeg.Instrument.AssetType)
+	assert.Equal(t, "F     260618C00014000", optionLeg.Instrument.Symbol)
+	require.NotNil(t, optionLeg.Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *optionLeg.Instrument.PutCall)
+	require.NotNil(t, optionLeg.Instrument.OptionStrikePrice)
+	assert.Equal(t, 14.0, *optionLeg.Instrument.OptionStrikePrice)
+}
+
+// TestBuildCoveredCallOrderMultipleContracts verifies quantity scaling (2 contracts = 200 shares).
+func TestBuildCoveredCallOrderMultipleContracts(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildCoveredCallOrder(&CoveredCallParams{
+		Underlying: "F",
+		Expiration: expiration,
+		Strike:     14,
+		Quantity:   2,
+		Price:      12.00,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, order.OrderLegCollection, 2)
+	assert.Equal(t, 200.0, order.OrderLegCollection[0].Quantity, "2 contracts = 200 shares")
+	assert.Equal(t, 2.0, order.OrderLegCollection[1].Quantity)
+}
+
+// TestBuildCoveredCallOrderCustomDurationSession verifies non-default duration and session.
+func TestBuildCoveredCallOrderCustomDurationSession(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildCoveredCallOrder(&CoveredCallParams{
+		Underlying: "F",
+		Expiration: expiration,
+		Strike:     14,
+		Quantity:   1,
+		Price:      12.00,
+		Duration:   models.DurationGoodTillCancel,
+		Session:    models.SessionNormal,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.DurationGoodTillCancel, order.Duration)
+	assert.Equal(t, models.SessionNormal, order.Session)
+}

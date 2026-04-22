@@ -1,0 +1,577 @@
+package orderbuilder
+
+import (
+	"errors"
+	"testing"
+	"time"
+
+	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/models"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// TestValidateEquityOrderRequiresPriceForLimit verifies fix-suggesting limit validation.
+func TestValidateEquityOrderRequiresPriceForLimit(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateEquityOrder(&EquityParams{
+		Symbol:    "AAPL",
+		Quantity:  10,
+		OrderType: models.OrderTypeLimit,
+	})
+
+	assertValidationError(t, err, "LIMIT order requires a price", "Add `--price <amount>` to specify the limit price")
+}
+
+// TestValidateEquityOrderRequiresStopPriceForStop verifies fix-suggesting stop validation.
+func TestValidateEquityOrderRequiresStopPriceForStop(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateEquityOrder(&EquityParams{
+		Symbol:    "AAPL",
+		Quantity:  10,
+		OrderType: models.OrderTypeStop,
+	})
+
+	assertValidationError(t, err, "STOP order requires a stop price", "Add `--stop-price <amount>` to specify the stop price")
+}
+
+// TestValidateEquityOrderRejectsNonPositiveQuantity verifies quantity validation.
+func TestValidateEquityOrderRejectsNonPositiveQuantity(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateEquityOrder(&EquityParams{
+		Symbol:    "AAPL",
+		Quantity:  0,
+		OrderType: models.OrderTypeMarket,
+	})
+
+	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
+}
+
+// TestValidateOptionOrderRejectsPastExpiration verifies option expiration validation.
+func TestValidateOptionOrderRejectsPastExpiration(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOptionOrder(&OptionParams{
+		Underlying: "AAPL",
+		Expiration: time.Now().UTC().Add(-24 * time.Hour),
+		Strike:     150,
+		Quantity:   1,
+	})
+
+	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+}
+
+// TestValidateOCOOrderRequiresSymbol verifies symbol validation.
+func TestValidateOCOOrderRequiresSymbol(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOCOOrder(&OCOParams{
+		Action:   models.InstructionSell,
+		Quantity: 10,
+		StopLoss: 140,
+	})
+
+	assertValidationError(t, err, "symbol is required", "Add `--symbol <TICKER>` to specify the stock symbol")
+}
+
+// TestValidateOCOOrderRequiresQuantity verifies quantity validation.
+func TestValidateOCOOrderRequiresQuantity(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOCOOrder(&OCOParams{
+		Symbol:   "AAPL",
+		Action:   models.InstructionSell,
+		Quantity: 0,
+		StopLoss: 140,
+	})
+
+	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
+}
+
+// TestValidateOCOOrderRequiresAtLeastOneExit verifies that at least one exit is needed.
+func TestValidateOCOOrderRequiresAtLeastOneExit(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOCOOrder(&OCOParams{
+		Symbol:   "AAPL",
+		Action:   models.InstructionSell,
+		Quantity: 10,
+	})
+
+	assertValidationError(t, err, "OCO order requires at least one exit condition", "Add `--take-profit <amount>` and/or `--stop-loss <amount>`")
+}
+
+// TestValidateOCOOrderAcceptsStopLossOnly verifies stop-loss-only is valid.
+func TestValidateOCOOrderAcceptsStopLossOnly(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOCOOrder(&OCOParams{
+		Symbol:   "AAPL",
+		Action:   models.InstructionSell,
+		Quantity: 10,
+		StopLoss: 140,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateOCOOrderAcceptsTakeProfitOnly verifies take-profit-only is valid.
+func TestValidateOCOOrderAcceptsTakeProfitOnly(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOCOOrder(&OCOParams{
+		Symbol:     "AAPL",
+		Action:     models.InstructionSell,
+		Quantity:   10,
+		TakeProfit: 160,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateOCOOrderSellRejectsTakeProfitBelowStopLoss verifies price relationship
+// for SELL exits (closing a long position).
+func TestValidateOCOOrderSellRejectsTakeProfitBelowStopLoss(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOCOOrder(&OCOParams{
+		Symbol:     "AAPL",
+		Action:     models.InstructionSell,
+		Quantity:   10,
+		TakeProfit: 130,
+		StopLoss:   140,
+	})
+
+	assertValidationError(t, err,
+		"take-profit must be above stop-loss for a SELL OCO",
+		"The take-profit target should be higher than the stop-loss level",
+	)
+}
+
+// TestValidateOCOOrderSellRejectsEqualPrices verifies SELL rejects equal take-profit and stop-loss.
+func TestValidateOCOOrderSellRejectsEqualPrices(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOCOOrder(&OCOParams{
+		Symbol:     "AAPL",
+		Action:     models.InstructionSell,
+		Quantity:   10,
+		TakeProfit: 140,
+		StopLoss:   140,
+	})
+
+	assertValidationError(t, err,
+		"take-profit must be above stop-loss for a SELL OCO",
+		"The take-profit target should be higher than the stop-loss level",
+	)
+}
+
+// TestValidateOCOOrderBuyRejectsTakeProfitAboveStopLoss verifies price relationship
+// for BUY exits (closing a short position).
+func TestValidateOCOOrderBuyRejectsTakeProfitAboveStopLoss(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOCOOrder(&OCOParams{
+		Symbol:     "TSLA",
+		Action:     models.InstructionBuy,
+		Quantity:   10,
+		TakeProfit: 200,
+		StopLoss:   150,
+	})
+
+	assertValidationError(t, err,
+		"take-profit must be below stop-loss for a BUY OCO",
+		"The take-profit target should be lower than the stop-loss level",
+	)
+}
+
+// TestValidateOCOOrderBuyAcceptsValidPrices verifies correct BUY price relationship passes.
+func TestValidateOCOOrderBuyAcceptsValidPrices(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOCOOrder(&OCOParams{
+		Symbol:     "TSLA",
+		Action:     models.InstructionBuy,
+		Quantity:   10,
+		TakeProfit: 100,
+		StopLoss:   200,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateBracketOrderRequiresAtLeastOneExit verifies that at least one exit is needed.
+func TestValidateBracketOrderRequiresAtLeastOneExit(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateBracketOrder(&BracketParams{
+		Symbol:    "AAPL",
+		Action:    models.InstructionBuy,
+		Quantity:  10,
+		OrderType: models.OrderTypeMarket,
+	})
+
+	assertValidationError(t, err, "bracket order requires at least one exit condition", "Add `--take-profit <amount>` and/or `--stop-loss <amount>`")
+}
+
+// TestValidateBracketOrderAcceptsStopLossOnly verifies stop-loss-only is valid.
+func TestValidateBracketOrderAcceptsStopLossOnly(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateBracketOrder(&BracketParams{
+		Symbol:    "AAPL",
+		Action:    models.InstructionBuy,
+		Quantity:  10,
+		OrderType: models.OrderTypeMarket,
+		StopLoss:  140,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateBracketOrderAcceptsTakeProfitOnly verifies take-profit-only is valid.
+func TestValidateBracketOrderAcceptsTakeProfitOnly(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateBracketOrder(&BracketParams{
+		Symbol:     "AAPL",
+		Action:     models.InstructionBuy,
+		Quantity:   10,
+		OrderType:  models.OrderTypeMarket,
+		TakeProfit: 160,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateVerticalOrderRequiresUnderlying verifies underlying symbol validation.
+func TestValidateVerticalOrderRequiresUnderlying(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateVerticalOrder(&VerticalParams{
+		Expiration:  time.Now().UTC().Add(30 * 24 * time.Hour),
+		LongStrike:  12,
+		ShortStrike: 14,
+		Quantity:    1,
+		Price:       0.50,
+	})
+
+	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+}
+
+// TestValidateVerticalOrderRejectsEqualStrikes verifies same-strike rejection.
+func TestValidateVerticalOrderRejectsEqualStrikes(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateVerticalOrder(&VerticalParams{
+		Underlying:  "F",
+		Expiration:  time.Now().UTC().Add(30 * 24 * time.Hour),
+		LongStrike:  12,
+		ShortStrike: 12,
+		Quantity:    1,
+		Price:       0.50,
+	})
+
+	assertValidationError(t, err, "long and short strikes must be different", "Use different values for `--long-strike` and `--short-strike`")
+}
+
+// TestValidateVerticalOrderRequiresPrice verifies price validation.
+func TestValidateVerticalOrderRequiresPrice(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateVerticalOrder(&VerticalParams{
+		Underlying:  "F",
+		Expiration:  time.Now().UTC().Add(30 * 24 * time.Hour),
+		LongStrike:  12,
+		ShortStrike: 14,
+		Quantity:    1,
+	})
+
+	assertValidationError(t, err, "price is required for vertical spreads", "Add `--price <amount>` to specify the net debit or credit")
+}
+
+// TestValidateVerticalOrderAcceptsValidParams verifies valid parameters pass.
+func TestValidateVerticalOrderAcceptsValidParams(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateVerticalOrder(&VerticalParams{
+		Underlying:  "F",
+		Expiration:  time.Now().UTC().Add(30 * 24 * time.Hour),
+		LongStrike:  12,
+		ShortStrike: 14,
+		Quantity:    1,
+		Price:       0.50,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateIronCondorRequiresUnderlying verifies underlying is required.
+func TestValidateIronCondorRequiresUnderlying(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateIronCondorOrder(&IronCondorParams{
+		Expiration:      time.Now().UTC().Add(30 * 24 * time.Hour),
+		PutLongStrike:   8,
+		PutShortStrike:  10,
+		CallShortStrike: 14,
+		CallLongStrike:  16,
+		Quantity:        1,
+		Price:           1.50,
+	})
+
+	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+}
+
+// TestValidateIronCondorRejectsUnorderedStrikes verifies strike ordering enforcement.
+func TestValidateIronCondorRejectsUnorderedStrikes(t *testing.T) {
+	t.Parallel()
+
+	// put-long >= put-short
+	err := ValidateIronCondorOrder(&IronCondorParams{
+		Underlying:      "F",
+		Expiration:      time.Now().UTC().Add(30 * 24 * time.Hour),
+		PutLongStrike:   10,
+		PutShortStrike:  10,
+		CallShortStrike: 14,
+		CallLongStrike:  16,
+		Quantity:        1,
+		Price:           1.50,
+	})
+
+	assertValidationError(t, err, "put-long-strike must be below put-short-strike",
+		"The protective put (bought) must be at a lower strike than the sold put")
+}
+
+// TestValidateIronCondorRejectsOverlappingPutCall verifies put-short < call-short.
+func TestValidateIronCondorRejectsOverlappingPutCall(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateIronCondorOrder(&IronCondorParams{
+		Underlying:      "F",
+		Expiration:      time.Now().UTC().Add(30 * 24 * time.Hour),
+		PutLongStrike:   8,
+		PutShortStrike:  14,
+		CallShortStrike: 12,
+		CallLongStrike:  16,
+		Quantity:        1,
+		Price:           1.50,
+	})
+
+	assertValidationError(t, err, "put-short-strike must be below call-short-strike",
+		"The put and call short strikes define the profit zone and must not overlap")
+}
+
+// TestValidateIronCondorAcceptsValidParams verifies valid parameters pass.
+func TestValidateIronCondorAcceptsValidParams(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateIronCondorOrder(&IronCondorParams{
+		Underlying:      "F",
+		Expiration:      time.Now().UTC().Add(30 * 24 * time.Hour),
+		PutLongStrike:   8,
+		PutShortStrike:  10,
+		CallShortStrike: 14,
+		CallLongStrike:  16,
+		Quantity:        1,
+		Price:           1.50,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateStrangleRequiresUnderlying verifies underlying is required.
+func TestValidateStrangleRequiresUnderlying(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateStrangleOrder(&StrangleParams{
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		CallStrike: 14,
+		PutStrike:  10,
+		Quantity:   1,
+		Price:      0.80,
+	})
+
+	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+}
+
+// TestValidateStrangleRejectsEqualStrikes verifies same-strike rejection.
+func TestValidateStrangleRejectsEqualStrikes(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateStrangleOrder(&StrangleParams{
+		Underlying: "F",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		CallStrike: 12,
+		PutStrike:  12,
+		Quantity:   1,
+		Price:      0.80,
+	})
+
+	assertValidationError(t, err, "call and put strikes must be different (use straddle for same strike)",
+		"Use different values for `--call-strike` and `--put-strike`")
+}
+
+// TestValidateStrangleRequiresPrice verifies price is required.
+func TestValidateStrangleRequiresPrice(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateStrangleOrder(&StrangleParams{
+		Underlying: "F",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		CallStrike: 14,
+		PutStrike:  10,
+		Quantity:   1,
+	})
+
+	assertValidationError(t, err, "price is required for strangles", "Add `--price <amount>` to specify the net debit or credit")
+}
+
+// TestValidateStrangleAcceptsValidParams verifies valid parameters pass.
+func TestValidateStrangleAcceptsValidParams(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateStrangleOrder(&StrangleParams{
+		Underlying: "F",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		CallStrike: 14,
+		PutStrike:  10,
+		Buy:        true,
+		Open:       true,
+		Quantity:   1,
+		Price:      0.80,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateStraddleRequiresUnderlying verifies underlying is required.
+func TestValidateStraddleRequiresUnderlying(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateStraddleOrder(&StraddleParams{
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Strike:     12,
+		Quantity:   1,
+		Price:      1.50,
+	})
+
+	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+}
+
+// TestValidateStraddleRequiresStrike verifies strike is required.
+func TestValidateStraddleRequiresStrike(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateStraddleOrder(&StraddleParams{
+		Underlying: "F",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Quantity:   1,
+		Price:      1.50,
+	})
+
+	assertValidationError(t, err, "strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+}
+
+// TestValidateStraddleRequiresPrice verifies price is required.
+func TestValidateStraddleRequiresPrice(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateStraddleOrder(&StraddleParams{
+		Underlying: "F",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Strike:     12,
+		Quantity:   1,
+	})
+
+	assertValidationError(t, err, "price is required for straddles", "Add `--price <amount>` to specify the net debit or credit")
+}
+
+// TestValidateStraddleAcceptsValidParams verifies valid parameters pass.
+func TestValidateStraddleAcceptsValidParams(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateStraddleOrder(&StraddleParams{
+		Underlying: "F",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Strike:     12,
+		Buy:        true,
+		Open:       true,
+		Quantity:   1,
+		Price:      1.50,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateCoveredCallOrderRequiresUnderlying verifies underlying is mandatory.
+func TestValidateCoveredCallOrderRequiresUnderlying(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCoveredCallOrder(&CoveredCallParams{
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Strike:     14,
+		Quantity:   1,
+		Price:      12.00,
+	})
+
+	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+}
+
+// TestValidateCoveredCallOrderRequiresStrike verifies strike is mandatory.
+func TestValidateCoveredCallOrderRequiresStrike(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCoveredCallOrder(&CoveredCallParams{
+		Underlying: "F",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Quantity:   1,
+		Price:      12.00,
+	})
+
+	assertValidationError(t, err, "call strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+}
+
+// TestValidateCoveredCallOrderRequiresPrice verifies price is mandatory.
+func TestValidateCoveredCallOrderRequiresPrice(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCoveredCallOrder(&CoveredCallParams{
+		Underlying: "F",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Strike:     14,
+		Quantity:   1,
+	})
+
+	assertValidationError(t, err, "price is required for covered calls", "Add `--price <amount>` to specify the net debit")
+}
+
+// TestValidateCoveredCallOrderAcceptsValidParams verifies a valid covered call passes.
+func TestValidateCoveredCallOrderAcceptsValidParams(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCoveredCallOrder(&CoveredCallParams{
+		Underlying: "F",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Strike:     14,
+		Quantity:   1,
+		Price:      12.00,
+	})
+
+	require.NoError(t, err)
+}
+
+// assertValidationError verifies message and fix suggestion for validation failures.
+func assertValidationError(t *testing.T, err error, expectedMessage, expectedDetails string) {
+	t.Helper()
+
+	require.Error(t, err)
+
+	var validationErr *schwabErrors.ValidationError
+	require.True(t, errors.As(err, &validationErr))
+	assert.Equal(t, expectedMessage, validationErr.Message)
+	assert.Equal(t, expectedDetails, validationErr.Details)
+}

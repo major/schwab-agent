@@ -1,0 +1,29 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"],
+  "packageRules": [
+    {
+      "description": "Auto-merge patch, minor, and digest updates",
+      "matchUpdateTypes": ["patch", "minor", "digest"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Require manual review for major updates",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "Group Go toolchain updates",
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "groupName": "Go toolchain",
+      "automerge": false
+    }
+  ],
+  "schedule": ["before 3am on Monday"],
+  "timezone": "America/Chicago"
+}

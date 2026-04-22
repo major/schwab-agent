@@ -1,0 +1,118 @@
+# AGENTS.md - internal/commands
+
+> Leave generous comments when fixing bugs or working around API quirks. Anything that might save a future developer from re-discovering the same issue is worth writing down.
+
+CLI command handlers for schwab-agent. Each file defines one command group (e.g., `quote.go` defines the `quote` command tree). This is the largest package.
+
+## Command Pattern
+
+Every command group exports one public constructor that returns `*cli.Command`:
+
+```go
+func QuoteCommand(c *client.Client, w io.Writer) *cli.Command {
+    return &cli.Command{
+        Name:  "quote",
+        Usage: "Stock quote operations",
+        Commands: []*cli.Command{
+            quoteGetCommand(c, w),
+        },
+    }
+}
+```
+
+- Public function returns the parent command (registered in `main.go`'s `buildApp()`)
+- Private functions return subcommands
+- All commands accept `*client.Client` and `io.Writer` (some also take `configPath string`), except `symbol` which only takes `io.Writer` (no API client needed)
+- Action functions use `context.Context` and `*cli.Command` from urfave/cli v3
+
+## Adding a New Command
+
+1. Create `<name>.go` with a public `<Name>Command()` constructor
+2. Register in `cmd/schwab-agent/main.go` inside `buildApp()`
+3. Create `<name>_test.go` with tests
+4. Update the relevant skill file in `skills/` if the command is agent-facing
+
+## Output Rules
+
+All command output goes through `internal/output` envelopes:
+
+- `output.WriteSuccess(w, data, output.TimestampMeta())` for success
+- Return typed errors from `internal/errors` for failures (the Before hook handles formatting)
+- `output.WritePartial(w, data, missing, meta)` when some results succeed and some fail (e.g., multi-symbol quote)
+
+Exception: `schema` and `order build` commands write raw JSON (not envelope-wrapped).
+
+## Safety Guards
+
+Mutable commands (order place/cancel/replace) enforce two safety checks:
+
+```go
+if err := requireMutableEnabled(configPath); err != nil { return err }
+if err := requireConfirm(cmd.Bool("confirm")); err != nil { return err }
+```
+
+- `requireMutableEnabled`: Checks `i-also-like-to-live-dangerously` in config
+- `requireConfirm`: Checks `--confirm` flag is set
+
+## Account Resolution
+
+All commands needing an account use `resolveAccount(accountFlag, configPath, positionalArgs)` from account.go:
+
+1. Check `--account` flag first
+2. Check positional args (if non-nil, used by `account get`)
+3. Fall back to `default_account` from config
+4. Return `AccountNotFoundError` if none found
+
+Pass `nil` for `positionalArgs` when the command doesn't accept positional account arguments.
+
+## Order Workflows
+
+Three order types share a common pattern: parse flags -> validate -> build -> place/preview.
+
+- **Equity**: `parseEquityParams` -> `orderbuilder.ValidateEquityOrder` -> `orderbuilder.BuildEquityOrder`
+- **Option**: `parseOptionParams` -> `orderbuilder.ValidateOptionOrder` -> `orderbuilder.BuildOptionOrder`
+- **Bracket**: `parseBracketParams` -> `orderbuilder.ValidateBracketOrder` -> `orderbuilder.BuildBracketOrder`
+- **OCO**: `parseOCOParams` -> `orderbuilder.ValidateOCOOrder` -> `orderbuilder.BuildOCOOrder`
+
+Spec mode (`--spec`): Accepts inline JSON, `@file` path, or `-` for stdin via `readSpecSource()`.
+
+## Enum Parsing
+
+CLI string inputs are validated against `models` constants via switch statements:
+
+- `parseInstruction()`: BUY, SELL, BUY_TO_COVER, etc.
+- `parseOrderType()`: MARKET, LIMIT, STOP, STOP_LIMIT, etc.
+- `parseDuration()`: DAY, GOOD_TILL_CANCEL, FILL_OR_KILL, etc.
+- `parseSession()`: NORMAL, AM, PM, SEAMLESS
+- `parsePutCall()`: Mutually exclusive `--call`/`--put` flags
+
+All return `ValidationError` on invalid input.
+
+## Testing
+
+Test helpers in `helpers_test.go`:
+
+- `runTestCommand(t, cmd, args...)`: Suppresses `os.Exit` and runs the command
+- `testClient(t, server)`: Creates `*client.Client` backed by httptest server
+- `jsonServer(body)`: Returns httptest server that always responds with given JSON
+
+Pattern: Create httptest server with expected response -> build command -> run via `runTestCommand` -> decode output -> assert envelope contents.
+
+Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
+
+## File Map
+
+| File | Command | Subcommands |
+|---|---|---|
+| auth.go | auth | setup, login, status |
+| account.go | account | list, get, numbers, set-default, transaction (list, get) |
+| quote.go | quote | get |
+| order.go | order | list, get, place (equity/option/bracket/oco), preview, cancel, replace |
+| order_build.go | order build | equity, option, bracket, oco |
+| chain.go | chain | (direct) |
+| history.go | history | (direct) |
+| instrument.go | instrument | (direct) |
+| market.go | market | hours, movers |
+
+| symbol.go | symbol | build, parse |
+| schema.go | schema | (direct) |

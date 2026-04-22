@@ -1,0 +1,252 @@
+// Package commands provides urfave/cli command builders for schwab-agent.
+package commands
+
+import (
+	"context"
+	"io"
+	"strconv"
+	"strings"
+
+	"github.com/urfave/cli/v3"
+
+	"github.com/major/schwab-agent/internal/auth"
+	"github.com/major/schwab-agent/internal/client"
+	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/models"
+	"github.com/major/schwab-agent/internal/output"
+)
+
+// AccountCommand returns the parent CLI command for account operations.
+// Subcommands: list, get, numbers, set-default, transaction.
+// The --account flag overrides the default account hash for all subcommands.
+func AccountCommand(c *client.Client, configPath string, w io.Writer) *cli.Command {
+	return &cli.Command{
+		Name:  "account",
+		Usage: "Manage Schwab trading accounts",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "account",
+				Usage: "Account hash to use (overrides config default)",
+			},
+		},
+		Commands: []*cli.Command{
+			accountListCommand(c, w),
+			accountGetCommand(c, configPath, w),
+			accountNumbersCommand(c, w),
+			AccountSetDefaultCommand(configPath, w),
+			accountTransactionCommand(c, configPath, w),
+		},
+	}
+}
+
+// accountListCommand returns the CLI command for listing all accounts.
+func accountListCommand(c *client.Client, w io.Writer) *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List all accounts with nicknames and settings",
+		Action: func(ctx context.Context, _ *cli.Command) error {
+			accounts, err := c.Accounts(ctx)
+			if err != nil {
+				return err
+			}
+
+			// Enrich accounts with nicknames from user preferences.
+			// Best-effort: if preferences fail, return accounts without nicknames.
+			prefs, prefsErr := c.UserPreference(ctx)
+			if prefsErr == nil {
+				enrichAccountsWithPreferences(accounts, prefs)
+			}
+
+			data := map[string]any{"accounts": accounts}
+
+			return output.WriteSuccess(w, data, output.TimestampMeta())
+		},
+	}
+}
+
+// accountGetCommand returns the CLI command for getting a specific account.
+func accountGetCommand(c *client.Client, configPath string, w io.Writer) *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "Get account details by hash value",
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			hash, err := resolveAccount(cmd.String("account"), configPath, cmd.Args().Slice())
+			if err != nil {
+				return err
+			}
+
+			account, err := c.Account(ctx, hash)
+			if err != nil {
+				return err
+			}
+
+			// Enrich with nickname from user preferences (best-effort).
+			prefs, prefsErr := c.UserPreference(ctx)
+			if prefsErr == nil {
+				enrichAccountWithPreferences(account, prefs)
+			}
+
+			meta := output.TimestampMeta()
+			meta["account"] = hash
+
+			return output.WriteSuccess(w, account, meta)
+		},
+	}
+}
+
+// accountNumbersCommand returns the CLI command for listing account numbers and hash values.
+func accountNumbersCommand(c *client.Client, w io.Writer) *cli.Command {
+	return &cli.Command{
+		Name:  "numbers",
+		Usage: "List account numbers and hash values",
+		Action: func(ctx context.Context, _ *cli.Command) error {
+			numbers, err := c.AccountNumbers(ctx)
+			if err != nil {
+				return err
+			}
+
+			data := map[string]any{"accounts": numbers}
+
+			return output.WriteSuccess(w, data, output.TimestampMeta())
+		},
+	}
+}
+
+// resolveAccount determines the account hash from multiple sources.
+// Priority: flag > positional args (if provided) > config default > error.
+// Pass nil for positionalArgs when the command doesn't accept positional account arguments.
+func resolveAccount(accountFlag, configPath string, positionalArgs []string) (string, error) {
+	if strings.TrimSpace(accountFlag) != "" {
+		return strings.TrimSpace(accountFlag), nil
+	}
+
+	if len(positionalArgs) > 0 && strings.TrimSpace(positionalArgs[0]) != "" {
+		return strings.TrimSpace(positionalArgs[0]), nil
+	}
+
+	if configPath != "" {
+		cfg, err := auth.LoadConfig(configPath)
+		if err == nil && strings.TrimSpace(cfg.DefaultAccount) != "" {
+			return strings.TrimSpace(cfg.DefaultAccount), nil
+		}
+	}
+
+	return "", schwabErrors.NewAccountNotFoundError(
+		"no account specified: use --account flag or set default_account in config",
+		nil,
+	)
+}
+
+// enrichAccountWithPreferences adds nickname and primary account flag from
+// user preferences to a single account. Matches by account number.
+func enrichAccountWithPreferences(account *models.Account, prefs *models.UserPreference) {
+	if prefs == nil || account.SecuritiesAccount == nil || account.SecuritiesAccount.AccountNumber == nil {
+		return
+	}
+
+	for i := range prefs.Accounts {
+		if prefs.Accounts[i].AccountNumber != nil && *prefs.Accounts[i].AccountNumber == *account.SecuritiesAccount.AccountNumber {
+			account.NickName = prefs.Accounts[i].NickName
+			account.PrimaryAccount = prefs.Accounts[i].PrimaryAccount
+
+			return
+		}
+	}
+}
+
+// enrichAccountsWithPreferences adds nickname and primary account flag from
+// user preferences to each account in the slice. Builds a lookup map for O(n) matching.
+func enrichAccountsWithPreferences(accounts []models.Account, prefs *models.UserPreference) {
+	if prefs == nil {
+		return
+	}
+
+	prefMap := make(map[string]*models.UserPreferenceAccount, len(prefs.Accounts))
+	for i := range prefs.Accounts {
+		if prefs.Accounts[i].AccountNumber != nil {
+			prefMap[*prefs.Accounts[i].AccountNumber] = &prefs.Accounts[i]
+		}
+	}
+
+	for i := range accounts {
+		if accounts[i].SecuritiesAccount == nil || accounts[i].SecuritiesAccount.AccountNumber == nil {
+			continue
+		}
+
+		if pref, ok := prefMap[*accounts[i].SecuritiesAccount.AccountNumber]; ok {
+			accounts[i].NickName = pref.NickName
+			accounts[i].PrimaryAccount = pref.PrimaryAccount
+		}
+	}
+}
+
+// accountTransactionCommand returns the CLI subcommand for transaction queries.
+// Transactions are account-scoped, so they live under the account parent command
+// and inherit the --account flag.
+func accountTransactionCommand(c *client.Client, configPath string, w io.Writer) *cli.Command {
+	return &cli.Command{
+		Name:  "transaction",
+		Usage: "List and look up account transactions",
+		Commands: []*cli.Command{
+			{
+				Name:  "list",
+				Usage: "List transactions for an account",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "types", Usage: "Transaction type filter (TRADE, DIVIDEND, etc.)"},
+					&cli.StringFlag{Name: "from", Usage: "Start date (YYYY-MM-DDTHH:MM:SSZ)"},
+					&cli.StringFlag{Name: "to", Usage: "End date (YYYY-MM-DDTHH:MM:SSZ)"},
+					&cli.StringFlag{Name: "symbol", Usage: "Filter by symbol"},
+				},
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					account, err := resolveAccount(cmd.String("account"), configPath, nil)
+					if err != nil {
+						return err
+					}
+
+					params := client.TransactionParams{
+						Types:     cmd.String("types"),
+						StartDate: cmd.String("from"),
+						EndDate:   cmd.String("to"),
+						Symbol:    cmd.String("symbol"),
+					}
+
+					result, err := c.Transactions(ctx, account, params)
+					if err != nil {
+						return err
+					}
+
+					return output.WriteSuccess(w, map[string]any{"transactions": result}, output.TimestampMeta())
+				},
+			},
+			{
+				Name:  "get",
+				Usage: "Get a specific transaction by ID",
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					txnIDStr := cmd.Args().First()
+					if err := requireArg(txnIDStr, "transaction ID"); err != nil {
+						return err
+					}
+
+					txnID, err := strconv.ParseInt(txnIDStr, 10, 64)
+					if err != nil {
+						return schwabErrors.NewValidationError("transaction ID must be a number", nil)
+					}
+
+					account, err := resolveAccount(cmd.String("account"), configPath, nil)
+					if err != nil {
+						return err
+					}
+
+					result, err := c.Transaction(ctx, account, txnID)
+					if err != nil {
+						return err
+					}
+
+					return output.WriteSuccess(w, map[string]any{"transaction": result}, output.TimestampMeta())
+				},
+			},
+		},
+	}
+}
+
+

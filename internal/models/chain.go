@@ -1,0 +1,116 @@
+package models
+
+// OptionChain represents an option chain for a symbol.
+type OptionChain struct {
+	Symbol              *string                                `json:"symbol,omitempty"`
+	Status              *string                                `json:"status,omitempty"`
+	Underlying          *Underlying                            `json:"underlying,omitempty"`
+	Strategy            *string                                `json:"strategy,omitempty"`
+	Interval            *float64                               `json:"interval,omitempty"`
+	IsDelayed           *bool                                  `json:"isDelayed,omitempty"`
+	IsIndex             *bool                                  `json:"isIndex,omitempty"`
+	InterestRate        *float64                               `json:"interestRate,omitempty"`
+	UnderlyingPrice     *float64                               `json:"underlyingPrice,omitempty"`
+	Volatility          *float64                               `json:"volatility,omitempty"`
+	DaysToExpiration    *float64                               `json:"daysToExpiration,omitempty"`
+	DividendYield       *float64                               `json:"dividendYield,omitempty"`
+	NumberOfContracts   *int                                   `json:"numberOfContracts,omitempty"`
+	AssetMainType       *string                                `json:"assetMainType,omitempty"`
+	AssetSubType        *string                                `json:"assetSubType,omitempty"`
+	IsChainTruncated    *bool                                  `json:"isChainTruncated,omitempty"`
+	// Each expiration date maps to a set of strike prices, each containing
+	// a slice of contracts (typically one, but the API returns an array).
+	CallExpDateMap      map[string]map[string][]*OptionContract `json:"callExpDateMap,omitempty"`
+	PutExpDateMap       map[string]map[string][]*OptionContract `json:"putExpDateMap,omitempty"`
+}
+
+// Underlying represents the underlying instrument for an option.
+type Underlying struct {
+	Ask                 *float64 `json:"ask,omitempty"`
+	AskSize             *int     `json:"askSize,omitempty"`
+	Bid                 *float64 `json:"bid,omitempty"`
+	BidSize             *int     `json:"bidSize,omitempty"`
+	Change              *float64 `json:"change,omitempty"`
+	Close               *float64 `json:"close,omitempty"`
+	Description         *string  `json:"description,omitempty"`
+	ExchangeName        *string  `json:"exchangeName,omitempty"`
+	ExpirationDate      *int64   `json:"expirationDate,omitempty"`
+	HighPrice           *float64 `json:"highPrice,omitempty"`
+	Last                *float64 `json:"last,omitempty"`
+	LowPrice            *float64 `json:"lowPrice,omitempty"`
+	Mark                *float64 `json:"mark,omitempty"`
+	MarkChange          *float64 `json:"markChange,omitempty"`
+	MarkPercentChange   *float64 `json:"markPercentChange,omitempty"`
+	OpenPrice           *float64 `json:"openPrice,omitempty"`
+	PercentChange       *float64 `json:"percentChange,omitempty"`
+	QuoteTime           *int64   `json:"quoteTime,omitempty"`
+	Symbol              *string  `json:"symbol,omitempty"`
+	TotalVolume         *int64   `json:"totalVolume,omitempty"`
+	TradeTime           *int64   `json:"tradeTime,omitempty"`
+}
+
+// OptionContract represents a single option contract.
+// Field names match the Schwab API response (e.g. "bid" not "bidPrice").
+type OptionContract struct {
+	PutCall                  *string              `json:"putCall,omitempty"`
+	Symbol                   *string              `json:"symbol,omitempty"`
+	Description              *string              `json:"description,omitempty"`
+	ExchangeName             *string              `json:"exchangeName,omitempty"`
+	Bid                      *float64             `json:"bid,omitempty"`
+	Ask                      *float64             `json:"ask,omitempty"`
+	Last                     *float64             `json:"last,omitempty"`
+	Mark                     *float64             `json:"mark,omitempty"`
+	BidSize                  *int                 `json:"bidSize,omitempty"`
+	AskSize                  *int                 `json:"askSize,omitempty"`
+	BidAskSize               *string              `json:"bidAskSize,omitempty"`
+	LastSize                 *int                 `json:"lastSize,omitempty"`
+	OpenPrice                *float64             `json:"openPrice,omitempty"`
+	HighPrice                *float64             `json:"highPrice,omitempty"`
+	LowPrice                 *float64             `json:"lowPrice,omitempty"`
+	ClosePrice               *float64             `json:"closePrice,omitempty"`
+	TotalVolume              *int64               `json:"totalVolume,omitempty"`
+	OpenInterest             *int64               `json:"openInterest,omitempty"`
+	MarkChange               *float64             `json:"markChange,omitempty"`
+	MarkPercentChange        *float64             `json:"markPercentChange,omitempty"`
+	StrikePrice              *float64             `json:"strikePrice,omitempty"`
+	ExpirationDate           *string              `json:"expirationDate,omitempty"`
+	DaysToExpiration         *int                 `json:"daysToExpiration,omitempty"`
+	ExpirationType           *ExpirationType      `json:"expirationType,omitempty"`
+	LastTradingDay           *int64               `json:"lastTradingDay,omitempty"`
+	QuoteTimeInLong          *int64               `json:"quoteTimeInLong,omitempty"`
+	TradeTimeInLong          *int64               `json:"tradeTimeInLong,omitempty"`
+	NetChange                *float64             `json:"netChange,omitempty"`
+	PercentChange            *float64             `json:"percentChange,omitempty"`
+	Delta                    *float64             `json:"delta,omitempty"`
+	Gamma                    *float64             `json:"gamma,omitempty"`
+	Theta                    *float64             `json:"theta,omitempty"`
+	Vega                     *float64             `json:"vega,omitempty"`
+	Rho                      *float64             `json:"rho,omitempty"`
+	TimeValue                *float64             `json:"timeValue,omitempty"`
+	TheoreticalOptionValue   *float64             `json:"theoreticalOptionValue,omitempty"`
+	TheoreticalVolatility    *float64             `json:"theoreticalVolatility,omitempty"`
+	OptionDeliverablesList   []OptionDeliverables `json:"optionDeliverablesList,omitempty"`
+	InTheMoney               *bool                `json:"inTheMoney,omitempty"`
+	Mini                     *bool                `json:"mini,omitempty"`
+	NonStandard              *bool                `json:"nonStandard,omitempty"`
+	PennyPilot               *bool                `json:"pennyPilot,omitempty"`
+	OptionRoot               *string              `json:"optionRoot,omitempty"`
+	Multiplier               *float64             `json:"multiplier,omitempty"`
+	SettlementType           *SettlementType      `json:"settlementType,omitempty"`
+	DeliverableNote          *string              `json:"deliverableNote,omitempty"`
+	IntrinsicValue           *float64             `json:"intrinsicValue,omitempty"`
+	ExtrinsicValue           *float64             `json:"extrinsicValue,omitempty"`
+	ExerciseType             *string              `json:"exerciseType,omitempty"`
+	High52Week               *float64             `json:"high52Week,omitempty"`
+	Low52Week                *float64             `json:"low52Week,omitempty"`
+	Volatility               *float64             `json:"volatility,omitempty"`
+}
+
+// OptionDeliverables represents deliverables for an option contract.
+type OptionDeliverables struct {
+	Symbol           *string  `json:"symbol,omitempty"`
+	DeliverableUnits *float64 `json:"deliverableUnits,omitempty"`
+	CurrencyType     *string  `json:"currencyType,omitempty"`
+	AssetType        *string  `json:"assetType,omitempty"`
+	Position         *int     `json:"position,omitempty"`
+}
