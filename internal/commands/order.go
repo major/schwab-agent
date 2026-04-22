@@ -737,6 +737,10 @@ func parseRequiredOrderID(cmd *cli.Command) (int64, error) {
 		return 0, newValidationError("order-id must be a valid integer")
 	}
 
+	if orderID <= 0 {
+		return 0, newValidationError("order-id must be a positive integer")
+	}
+
 	return orderID, nil
 }
 

@@ -564,6 +564,253 @@ func TestValidateCoveredCallOrderAcceptsValidParams(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestValidateOptionOrderRequiresUnderlying verifies underlying symbol validation.
+func TestValidateOptionOrderRequiresUnderlying(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOptionOrder(&OptionParams{
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Strike:     150,
+		Quantity:   1,
+	})
+
+	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+}
+
+// TestValidateOptionOrderRejectsZeroQuantity verifies quantity validation.
+func TestValidateOptionOrderRejectsZeroQuantity(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOptionOrder(&OptionParams{
+		Underlying: "AAPL",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Strike:     150,
+		Quantity:   0,
+	})
+
+	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
+}
+
+// TestValidateOptionOrderRejectsZeroStrike verifies strike price validation.
+func TestValidateOptionOrderRejectsZeroStrike(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOptionOrder(&OptionParams{
+		Underlying: "AAPL",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Quantity:   5,
+	})
+
+	assertValidationError(t, err, "option strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+}
+
+// TestValidateOptionOrderRejectsNegativeStrike verifies negative strike is rejected.
+func TestValidateOptionOrderRejectsNegativeStrike(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOptionOrder(&OptionParams{
+		Underlying: "AAPL",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Strike:     -10,
+		Quantity:   5,
+	})
+
+	assertValidationError(t, err, "option strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+}
+
+// TestValidateOptionOrderAcceptsValidParams verifies valid option order passes.
+func TestValidateOptionOrderAcceptsValidParams(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOptionOrder(&OptionParams{
+		Underlying: "AAPL",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		Strike:     185,
+		Quantity:   5,
+		Action:     models.InstructionBuyToOpen,
+		OrderType:  models.OrderTypeLimit,
+		Price:      3.50,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateBracketBuyTakeProfitBelowEntry verifies BUY bracket rejects
+// take-profit at or below the entry price.
+func TestValidateBracketBuyTakeProfitBelowEntry(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		takeProfit float64
+	}{
+		{name: "below entry", takeProfit: 180},
+		{name: "equal to entry", takeProfit: 185},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateBracketOrder(&BracketParams{
+				Symbol:     "AAPL",
+				Action:     models.InstructionBuy,
+				Quantity:   10,
+				OrderType:  models.OrderTypeLimit,
+				Price:      185,
+				TakeProfit: tc.takeProfit,
+				StopLoss:   175,
+			})
+
+			assertValidationError(t, err,
+				"take-profit price must be above the entry price for a BUY bracket",
+				"Increase `--take-profit` so it is above the entry price",
+			)
+		})
+	}
+}
+
+// TestValidateBracketBuyStopLossAboveEntry verifies BUY bracket rejects
+// stop-loss at or above the entry price.
+func TestValidateBracketBuyStopLossAboveEntry(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		stopLoss float64
+	}{
+		{name: "above entry", stopLoss: 190},
+		{name: "equal to entry", stopLoss: 185},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateBracketOrder(&BracketParams{
+				Symbol:     "AAPL",
+				Action:     models.InstructionBuy,
+				Quantity:   10,
+				OrderType:  models.OrderTypeLimit,
+				Price:      185,
+				TakeProfit: 195,
+				StopLoss:   tc.stopLoss,
+			})
+
+			assertValidationError(t, err,
+				"stop-loss price must be below the entry price for a BUY bracket",
+				"Lower `--stop-loss` so it is below the entry price",
+			)
+		})
+	}
+}
+
+// TestValidateBracketBuyAcceptsValidPrices verifies BUY bracket with
+// take-profit > entry > stop-loss passes.
+func TestValidateBracketBuyAcceptsValidPrices(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateBracketOrder(&BracketParams{
+		Symbol:     "AAPL",
+		Action:     models.InstructionBuy,
+		Quantity:   10,
+		OrderType:  models.OrderTypeLimit,
+		Price:      185,
+		TakeProfit: 195,
+		StopLoss:   175,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateBracketSellTakeProfitAboveEntry verifies SELL bracket rejects
+// take-profit at or above the entry price.
+func TestValidateBracketSellTakeProfitAboveEntry(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		takeProfit float64
+	}{
+		{name: "above entry", takeProfit: 190},
+		{name: "equal to entry", takeProfit: 185},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateBracketOrder(&BracketParams{
+				Symbol:     "AAPL",
+				Action:     models.InstructionSellShort,
+				Quantity:   10,
+				OrderType:  models.OrderTypeLimit,
+				Price:      185,
+				TakeProfit: tc.takeProfit,
+				StopLoss:   195,
+			})
+
+			assertValidationError(t, err,
+				"take-profit price must be below the entry price for a SELL bracket",
+				"Lower `--take-profit` so it is below the entry price",
+			)
+		})
+	}
+}
+
+// TestValidateBracketSellStopLossBelowEntry verifies SELL bracket rejects
+// stop-loss at or below the entry price.
+func TestValidateBracketSellStopLossBelowEntry(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		stopLoss float64
+	}{
+		{name: "below entry", stopLoss: 180},
+		{name: "equal to entry", stopLoss: 185},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateBracketOrder(&BracketParams{
+				Symbol:     "AAPL",
+				Action:     models.InstructionSellShort,
+				Quantity:   10,
+				OrderType:  models.OrderTypeLimit,
+				Price:      185,
+				TakeProfit: 175,
+				StopLoss:   tc.stopLoss,
+			})
+
+			assertValidationError(t, err,
+				"stop-loss price must be above the entry price for a SELL bracket",
+				"Raise `--stop-loss` so it is above the entry price",
+			)
+		})
+	}
+}
+
+// TestValidateBracketSellAcceptsValidPrices verifies SELL bracket with
+// stop-loss > entry > take-profit passes.
+func TestValidateBracketSellAcceptsValidPrices(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateBracketOrder(&BracketParams{
+		Symbol:     "AAPL",
+		Action:     models.InstructionSellShort,
+		Quantity:   10,
+		OrderType:  models.OrderTypeLimit,
+		Price:      185,
+		TakeProfit: 175,
+		StopLoss:   195,
+	})
+
+	require.NoError(t, err)
+}
+
 // assertValidationError verifies message and fix suggestion for validation failures.
 func assertValidationError(t *testing.T, err error, expectedMessage, expectedDetails string) {
 	t.Helper()

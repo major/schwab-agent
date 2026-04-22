@@ -1,5 +1,3 @@
-//go:build task16
-
 package commands
 
 import (
@@ -253,6 +251,168 @@ func decodeAuthEnvelope(t *testing.T, raw []byte) testEnvelope {
 	require.NoError(t, json.Unmarshal(raw, &envelope))
 	require.NotNil(t, envelope.Data)
 	return envelope
+}
+
+func TestUnixSecondsToRFC3339(t *testing.T) {
+	tests := []struct {
+		name     string
+		seconds  float64
+		expected string
+	}{
+		{"positive timestamp", 1_700_000_000, "2023-11-14T22:13:20Z"},
+		{"zero returns empty", 0, ""},
+		{"negative returns empty", -1, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, unixSecondsToRFC3339(tt.seconds))
+		})
+	}
+}
+
+func TestRefreshExpiryRFC3339(t *testing.T) {
+	tests := []struct {
+		name     string
+		tf       *auth.TokenFile
+		expected string
+	}{
+		{"nil token file", nil, ""},
+		{"zero creation timestamp", &auth.TokenFile{CreationTimestamp: 0}, ""},
+		{"negative creation timestamp", &auth.TokenFile{CreationTimestamp: -1}, ""},
+		{
+			"valid timestamp adds 561600 seconds",
+			&auth.TokenFile{CreationTimestamp: 1_700_000_000},
+			time.Unix(1_700_000_000+561_600, 0).UTC().Format(time.RFC3339),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, refreshExpiryRFC3339(tt.tf))
+		})
+	}
+}
+
+func TestRedactClientID(t *testing.T) {
+	tests := []struct {
+		name     string
+		clientID string
+		expected string
+	}{
+		{"empty string", "", ""},
+		{"whitespace only", "   ", ""},
+		{"short ID (4 chars)", "abcd", "abcd..."},
+		{"normal ID", "abcd1234-efgh", "abcd..."},
+		{"very short ID (2 chars)", "ab", "ab..."},
+		{"leading/trailing spaces trimmed", "  abcd1234  ", "abcd..."},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, redactClientID(tt.clientID))
+		})
+	}
+}
+
+func TestConfigDefaultAccount(t *testing.T) {
+	tests := []struct {
+		name     string
+		cfg      *auth.Config
+		expected string
+	}{
+		{"nil config", nil, ""},
+		{"empty default account", &auth.Config{}, ""},
+		{"whitespace only", &auth.Config{DefaultAccount: "  "}, ""},
+		{"valid account", &auth.Config{DefaultAccount: "hash-abc"}, "hash-abc"},
+		{"trims whitespace", &auth.Config{DefaultAccount: "  hash-abc  "}, "hash-abc"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, configDefaultAccount(tt.cfg))
+		})
+	}
+}
+
+func TestRequireAuthConfig_UsesProvidedConfig(t *testing.T) {
+	// When config already has client credentials, it returns the same config.
+	cfg := &auth.Config{ClientID: "id", ClientSecret: "secret"}
+	got, err := requireAuthConfig(cfg, func() string { return "/nonexistent" })
+	require.NoError(t, err)
+	assert.Equal(t, cfg, got)
+}
+
+func TestRequireAuthConfig_LoadsFromDisk(t *testing.T) {
+	// Clear env vars so LoadConfig only sees disk state.
+	t.Setenv("SCHWAB_CLIENT_ID", "")
+	t.Setenv("SCHWAB_CLIENT_SECRET", "")
+	t.Setenv("SCHWAB_CALLBACK_URL", "")
+
+	// When config is missing credentials, it falls back to disk.
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
+		ClientID:     "disk-id",
+		ClientSecret: "disk-secret",
+	}))
+
+	got, err := requireAuthConfig(&auth.Config{}, func() string { return configPath })
+	require.NoError(t, err)
+	assert.Equal(t, "disk-id", got.ClientID)
+}
+
+func TestRequireAuthConfig_ErrorOnMissingFile(t *testing.T) {
+	// Clear env vars so LoadConfig can't succeed from env alone.
+	t.Setenv("SCHWAB_CLIENT_ID", "")
+	t.Setenv("SCHWAB_CLIENT_SECRET", "")
+	t.Setenv("SCHWAB_CALLBACK_URL", "")
+
+	_, err := requireAuthConfig(&auth.Config{}, func() string { return "/nonexistent/config.json" })
+	assert.Error(t, err)
+}
+
+func TestOptionalAuthConfig_UsesProvided(t *testing.T) {
+	cfg := &auth.Config{ClientID: "provided"}
+	got := optionalAuthConfig(cfg, func() string { return "/nonexistent" })
+	assert.Equal(t, cfg, got)
+}
+
+func TestOptionalAuthConfig_NilFallsBackToFile(t *testing.T) {
+	// Clear env vars so LoadConfig only sees disk state.
+	t.Setenv("SCHWAB_CLIENT_ID", "")
+	t.Setenv("SCHWAB_CLIENT_SECRET", "")
+	t.Setenv("SCHWAB_CALLBACK_URL", "")
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	// LoadConfig requires both client_id and client_secret to be non-empty.
+	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
+		ClientID:     "from-disk",
+		ClientSecret: "secret",
+	}))
+
+	got := optionalAuthConfig(nil, func() string { return configPath })
+	assert.Equal(t, "from-disk", got.ClientID)
+}
+
+func TestOptionalAuthConfig_NilWithMissingFileReturnsEmpty(t *testing.T) {
+	// Clear env vars so LoadConfig can't succeed from env alone.
+	t.Setenv("SCHWAB_CLIENT_ID", "")
+	t.Setenv("SCHWAB_CLIENT_SECRET", "")
+	t.Setenv("SCHWAB_CALLBACK_URL", "")
+
+	got := optionalAuthConfig(nil, func() string { return "/nonexistent/config.json" })
+	assert.NotNil(t, got)
+	assert.Empty(t, got.ClientID)
+}
+
+func TestDefaultAuthConfigPath_ReturnsConfigPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	path := defaultAuthConfigPath()
+	assert.Equal(t, filepath.Join(tmpDir, "schwab-agent", "config.json"), path)
 }
 
 
