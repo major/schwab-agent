@@ -5,12 +5,25 @@ import (
 	"errors"
 )
 
+// ErrorOption configures optional fields on SchwabError during construction.
+type ErrorOption func(*SchwabError)
+
+// WithDetails sets a human-readable hint or remediation message on the error.
+func WithDetails(d string) ErrorOption {
+	return func(e *SchwabError) { e.details = d }
+}
+
 // SchwabError is the base error type for all schwab-agent errors.
 // It wraps an underlying error to preserve the error chain.
 type SchwabError struct {
 	Message string
 	Cause   error
-	Details string
+	details string
+}
+
+// Details returns the human-readable hint or remediation message, if any.
+func (e *SchwabError) Details() string {
+	return e.details
 }
 
 // Error implements the error interface.
@@ -34,13 +47,17 @@ type AuthRequiredError struct {
 }
 
 // NewAuthRequiredError creates a new AuthRequiredError wrapping the given cause.
-func NewAuthRequiredError(message string, cause error) *AuthRequiredError {
-	return &AuthRequiredError{
+func NewAuthRequiredError(message string, cause error, opts ...ErrorOption) *AuthRequiredError {
+	e := &AuthRequiredError{
 		SchwabError: SchwabError{
 			Message: message,
 			Cause:   cause,
 		},
 	}
+	for _, o := range opts {
+		o(&e.SchwabError)
+	}
+	return e
 }
 
 // ExitCode returns the process exit code for this error type.
@@ -54,13 +71,17 @@ type AuthExpiredError struct {
 }
 
 // NewAuthExpiredError creates a new AuthExpiredError wrapping the given cause.
-func NewAuthExpiredError(message string, cause error) *AuthExpiredError {
-	return &AuthExpiredError{
+func NewAuthExpiredError(message string, cause error, opts ...ErrorOption) *AuthExpiredError {
+	e := &AuthExpiredError{
 		SchwabError: SchwabError{
 			Message: message,
 			Cause:   cause,
 		},
 	}
+	for _, o := range opts {
+		o(&e.SchwabError)
+	}
+	return e
 }
 
 // ExitCode returns the process exit code for this error type.
@@ -74,13 +95,17 @@ type AuthCallbackError struct {
 }
 
 // NewAuthCallbackError creates a new AuthCallbackError wrapping the given cause.
-func NewAuthCallbackError(message string, cause error) *AuthCallbackError {
-	return &AuthCallbackError{
+func NewAuthCallbackError(message string, cause error, opts ...ErrorOption) *AuthCallbackError {
+	e := &AuthCallbackError{
 		SchwabError: SchwabError{
 			Message: message,
 			Cause:   cause,
 		},
 	}
+	for _, o := range opts {
+		o(&e.SchwabError)
+	}
+	return e
 }
 
 // ExitCode returns the process exit code for this error type.
@@ -94,13 +119,17 @@ type OrderRejectedError struct {
 }
 
 // NewOrderRejectedError creates a new OrderRejectedError wrapping the given cause.
-func NewOrderRejectedError(message string, cause error) *OrderRejectedError {
-	return &OrderRejectedError{
+func NewOrderRejectedError(message string, cause error, opts ...ErrorOption) *OrderRejectedError {
+	e := &OrderRejectedError{
 		SchwabError: SchwabError{
 			Message: message,
 			Cause:   cause,
 		},
 	}
+	for _, o := range opts {
+		o(&e.SchwabError)
+	}
+	return e
 }
 
 // ExitCode returns the process exit code for this error type.
@@ -114,13 +143,17 @@ type SymbolNotFoundError struct {
 }
 
 // NewSymbolNotFoundError creates a new SymbolNotFoundError wrapping the given cause.
-func NewSymbolNotFoundError(message string, cause error) *SymbolNotFoundError {
-	return &SymbolNotFoundError{
+func NewSymbolNotFoundError(message string, cause error, opts ...ErrorOption) *SymbolNotFoundError {
+	e := &SymbolNotFoundError{
 		SchwabError: SchwabError{
 			Message: message,
 			Cause:   cause,
 		},
 	}
+	for _, o := range opts {
+		o(&e.SchwabError)
+	}
+	return e
 }
 
 // ExitCode returns the process exit code for this error type.
@@ -134,13 +167,17 @@ type AccountNotFoundError struct {
 }
 
 // NewAccountNotFoundError creates a new AccountNotFoundError wrapping the given cause.
-func NewAccountNotFoundError(message string, cause error) *AccountNotFoundError {
-	return &AccountNotFoundError{
+func NewAccountNotFoundError(message string, cause error, opts ...ErrorOption) *AccountNotFoundError {
+	e := &AccountNotFoundError{
 		SchwabError: SchwabError{
 			Message: message,
 			Cause:   cause,
 		},
 	}
+	for _, o := range opts {
+		o(&e.SchwabError)
+	}
+	return e
 }
 
 // ExitCode returns the process exit code for this error type.
@@ -156,8 +193,8 @@ type HTTPError struct {
 }
 
 // NewHTTPError creates a new HTTPError wrapping the given cause.
-func NewHTTPError(message string, statusCode int, body string, cause error) *HTTPError {
-	return &HTTPError{
+func NewHTTPError(message string, statusCode int, body string, cause error, opts ...ErrorOption) *HTTPError {
+	e := &HTTPError{
 		SchwabError: SchwabError{
 			Message: message,
 			Cause:   cause,
@@ -165,6 +202,10 @@ func NewHTTPError(message string, statusCode int, body string, cause error) *HTT
 		StatusCode: statusCode,
 		Body:       body,
 	}
+	for _, o := range opts {
+		o(&e.SchwabError)
+	}
+	return e
 }
 
 // ExitCode returns the process exit code for this error type.
@@ -178,13 +219,17 @@ type ValidationError struct {
 }
 
 // NewValidationError creates a new ValidationError wrapping the given cause.
-func NewValidationError(message string, cause error) *ValidationError {
-	return &ValidationError{
+func NewValidationError(message string, cause error, opts ...ErrorOption) *ValidationError {
+	e := &ValidationError{
 		SchwabError: SchwabError{
 			Message: message,
 			Cause:   cause,
 		},
 	}
+	for _, o := range opts {
+		o(&e.SchwabError)
+	}
+	return e
 }
 
 // ExitCode returns the process exit code for this error type.
@@ -198,13 +243,17 @@ type OrderBuildError struct {
 }
 
 // NewOrderBuildError creates a new OrderBuildError wrapping the given cause.
-func NewOrderBuildError(message string, cause error) *OrderBuildError {
-	return &OrderBuildError{
+func NewOrderBuildError(message string, cause error, opts ...ErrorOption) *OrderBuildError {
+	e := &OrderBuildError{
 		SchwabError: SchwabError{
 			Message: message,
 			Cause:   cause,
 		},
 	}
+	for _, o := range opts {
+		o(&e.SchwabError)
+	}
+	return e
 }
 
 // ExitCode returns the process exit code for this error type.
@@ -213,11 +262,15 @@ func (e *OrderBuildError) ExitCode() int {
 }
 
 // NewSchwabError creates a new SchwabError wrapping the given cause.
-func NewSchwabError(message string, cause error) *SchwabError {
-	return &SchwabError{
+func NewSchwabError(message string, cause error, opts ...ErrorOption) *SchwabError {
+	e := &SchwabError{
 		Message: message,
 		Cause:   cause,
 	}
+	for _, o := range opts {
+		o(e)
+	}
+	return e
 }
 
 // exitCoder is an interface for types that can provide an exit code.

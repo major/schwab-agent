@@ -68,7 +68,7 @@ func WriteError(w io.Writer, err error) error {
 	var details string
 	var schwabErr *apperr.SchwabError
 	if errors.As(err, &schwabErr) {
-		details = schwabErr.Details
+		details = schwabErr.Details()
 	}
 
 	// Include the upstream response body when available so API errors from

@@ -115,7 +115,7 @@ func TestBeforeHook_ReturnsAuthErrorForAPICommand(t *testing.T) {
 	require.ErrorAs(t, err, &authErr)
 	assert.Equal(t, "AUTH_REQUIRED", apperr.ErrorCode(err))
 	assert.Equal(t, "No authentication token found", authErr.Message)
-	assert.Equal(t, "Run `schwab-agent auth login` to authenticate", authErr.Details)
+	assert.Equal(t, "Run `schwab-agent auth login` to authenticate", authErr.Details())
 	assert.Equal(t, 3, apperr.ExitCodeFor(err))
 }
 
@@ -132,7 +132,7 @@ func TestBeforeHook_ReturnsAuthRequiredErrorForMissingConfig(t *testing.T) {
 	require.ErrorAs(t, err, &authErr)
 	assert.Equal(t, "AUTH_REQUIRED", apperr.ErrorCode(err))
 	assert.Equal(t, "Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file", authErr.Message)
-	assert.Equal(t, "Run `schwab-agent auth login` to authenticate", authErr.Details)
+	assert.Equal(t, "Run `schwab-agent auth login` to authenticate", authErr.Details())
 	assert.Equal(t, 3, apperr.ExitCodeFor(err))
 }
 
@@ -158,7 +158,7 @@ func TestBeforeHook_ReturnsAuthExpiredErrorForStaleRefreshToken(t *testing.T) {
 
 	var authErr *apperr.AuthExpiredError
 	require.ErrorAs(t, err, &authErr)
-	assert.Equal(t, "Run `schwab-agent auth login` to re-authenticate", authErr.Details)
+	assert.Equal(t, "Run `schwab-agent auth login` to re-authenticate", authErr.Details())
 	assert.Equal(t, 3, apperr.ExitCodeFor(err))
 }
 

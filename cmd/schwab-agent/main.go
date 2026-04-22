@@ -118,22 +118,28 @@ func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 
 			cfg, err := auth.LoadConfig(resolvedConfigPath)
 			if err != nil {
-			authErr := apperr.NewAuthRequiredError("Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file", err)
-			authErr.Details = "Run `schwab-agent auth login` to authenticate"
-				return ctx, authErr
+				return ctx, apperr.NewAuthRequiredError(
+					"Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file",
+					err,
+					apperr.WithDetails("Run `schwab-agent auth login` to authenticate"),
+				)
 			}
 
 			token, err := auth.LoadToken(resolvedTokenPath)
 			if err != nil {
-				authErr := apperr.NewAuthRequiredError("No authentication token found", err)
-				authErr.Details = "Run `schwab-agent auth login` to authenticate"
-				return ctx, authErr
+				return ctx, apperr.NewAuthRequiredError(
+					"No authentication token found",
+					err,
+					apperr.WithDetails("Run `schwab-agent auth login` to authenticate"),
+				)
 			}
 
 			if auth.IsRefreshTokenStale(token) {
-				authErr := apperr.NewAuthExpiredError("refresh token expired", nil)
-				authErr.Details = "Run `schwab-agent auth login` to re-authenticate"
-				return ctx, authErr
+				return ctx, apperr.NewAuthExpiredError(
+					"refresh token expired",
+					nil,
+					apperr.WithDetails("Run `schwab-agent auth login` to re-authenticate"),
+				)
 			}
 
 			if auth.IsAccessTokenExpired(token) {

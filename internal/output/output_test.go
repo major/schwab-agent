@@ -223,8 +223,7 @@ func TestWriteErrorGenericError(t *testing.T) {
 
 func TestWriteErrorWithDetails(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := apperr.NewSchwabError("custom error", errors.New("cause"))
-	err.Details = "additional context"
+	err := apperr.NewSchwabError("custom error", errors.New("cause"), apperr.WithDetails("additional context"))
 
 	writeErr := WriteError(buf, err)
 	require.NoError(t, writeErr)

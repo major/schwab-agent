@@ -355,7 +355,5 @@ func validateSpreadPrice(price float64, strategy string) error {
 
 // validationError creates a ValidationError with a fix-suggesting details message.
 func validationError(message, details string) error {
-	err := apperr.NewValidationError(message, nil)
-	err.Details = details
-	return err
+	return apperr.NewValidationError(message, nil, apperr.WithDetails(details))
 }
