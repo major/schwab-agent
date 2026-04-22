@@ -37,6 +37,7 @@ func TACommand(c *client.Client, w io.Writer) *cli.Command {
 			taBBandsCommand(c, w),
 			taStochCommand(c, w),
 			taADXCommand(c, w),
+			taVWAPCommand(c, w),
 		},
 	}
 }
@@ -464,6 +465,59 @@ func taADXCommand(c *client.Client, w io.Writer) *cli.Command {
 				"values":    out,
 			}
 			return output.WriteSuccess(w, data, output.TimestampMeta())
+		},
+	}
+}
+
+func taVWAPCommand(c *client.Client, w io.Writer) *cli.Command {
+	return &cli.Command{
+		Name:  "vwap",
+		Usage: "Volume Weighted Average Price",
+		// VWAP is cumulative - no --period flag. Only --interval and --points.
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
+			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 0},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			symbol := cmd.Args().First()
+			if err := requireArg(symbol, "symbol"); err != nil {
+				return err
+			}
+
+			interval := cmd.String("interval")
+			points := cmd.Int("points")
+
+			// Use 20 as minimum candle count - VWAP works with any count >= 1
+			// but 20 gives meaningful output for typical use cases.
+			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, 20, "vwap")
+			if err != nil {
+				return err
+			}
+
+			highs, err := ta.ExtractHigh(candles)
+			if err != nil {
+				return err
+			}
+			lows, err := ta.ExtractLow(candles)
+			if err != nil {
+				return err
+			}
+			closes, err := ta.ExtractClose(candles)
+			if err != nil {
+				return err
+			}
+			volumes, err := ta.ExtractVolume(candles)
+			if err != nil {
+				return err
+			}
+
+			values, err := ta.VWAP(highs, lows, closes, volumes)
+			if err != nil {
+				return err
+			}
+
+			// period=0 because VWAP is cumulative (no windowed period)
+			return writeTAOutput(w, "vwap", symbol, interval, 0, points, timestamps, values)
 		},
 	}
 }

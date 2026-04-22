@@ -540,3 +540,79 @@ func TestTAADX_MissingSymbol(t *testing.T) {
 	var valErr *schwabErrors.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
+
+func TestTAVWAP_ValidEnvelope(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 80))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	require.NoError(t, runTestCommand(t, cmd, "ta", "vwap", "AAPL"))
+
+	// Assert
+	envelope, data := decodeTAEnvelope(t, &buf)
+	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.Equal(t, "vwap", data["indicator"])
+	assert.Equal(t, "AAPL", data["symbol"])
+	assert.Equal(t, "daily", data["interval"])
+	// VWAP has no period - period=0 in output
+	assert.InDelta(t, 0, data["period"], 0.1)
+	values, ok := data["values"].([]any)
+	require.True(t, ok)
+	assert.NotEmpty(t, values)
+	// Each value entry has "datetime" and "vwap" keys
+	first := values[0].(map[string]any)
+	assert.Contains(t, first, "datetime")
+	assert.Contains(t, first, "vwap")
+}
+
+func TestTAVWAP_WithInterval(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 80))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	require.NoError(t, runTestCommand(t, cmd, "ta", "vwap", "AAPL", "--interval", "5min"))
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	assert.Equal(t, "5min", data["interval"])
+}
+
+func TestTAVWAP_MissingSymbol(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 80))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	err := runTestCommand(t, cmd, "ta", "vwap")
+
+	// Assert
+	require.Error(t, err)
+	var valErr *schwabErrors.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.Contains(t, valErr.Error(), "symbol")
+}
+
+func TestTAVWAP_NoPointsFlag(t *testing.T) {
+	// Arrange - use 80 candles, request only 5 points
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 80))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	require.NoError(t, runTestCommand(t, cmd, "ta", "vwap", "AAPL", "--points", "5"))
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	values, ok := data["values"].([]any)
+	require.True(t, ok)
+	assert.Len(t, values, 5)
+}
