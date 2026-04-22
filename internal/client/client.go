@@ -104,11 +104,6 @@ func WithUserAgent(ua string) Option {
 	}
 }
 
-// SetToken updates the Bearer token (used by Before hook after refresh).
-func (c *Client) SetToken(token string) {
-	c.token = token
-}
-
 // doRequest is the core request method that handles authentication, serialization,
 // and error mapping for all HTTP methods.
 func (c *Client) doRequest(ctx context.Context, method, path string, body, result any) error {
