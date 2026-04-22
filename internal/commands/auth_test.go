@@ -415,4 +415,87 @@ func TestDefaultAuthConfigPath_ReturnsConfigPath(t *testing.T) {
 	assert.Equal(t, filepath.Join(tmpDir, "schwab-agent", "config.json"), path)
 }
 
+func TestDefaultAuthConfigPath_FallsBackToHomeDir(t *testing.T) {
+	// When XDG_CONFIG_HOME is unset, defaultAuthConfigPath falls back to
+	// os.UserHomeDir() + .config/schwab-agent/config.json.
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	path := defaultAuthConfigPath()
+	// The path should end with .config/schwab-agent/config.json regardless
+	// of the home directory prefix.
+	assert.Contains(t, path, filepath.Join(".config", "schwab-agent", "config.json"))
+}
+
+func TestAuthRefreshCommand_MissingConfig(t *testing.T) {
+	// When no config is provided and the config file doesn't exist, refresh should fail.
+	// Clear env vars so LoadConfig can't succeed from environment alone.
+	t.Setenv("SCHWAB_CLIENT_ID", "")
+	t.Setenv("SCHWAB_CLIENT_SECRET", "")
+	t.Setenv("SCHWAB_CALLBACK_URL", "")
+
+	var stdout bytes.Buffer
+	deps := defaultAuthDeps()
+	deps.configPath = func() string { return "/nonexistent/config.json" }
+
+	cmd := newAuthCommand(nil, "/nonexistent/token.json", &stdout, deps)
+	err := runTestCommand(t, cmd, "auth", "refresh")
+
+	require.Error(t, err)
+}
+
+func TestAuthRefreshCommand_MissingToken(t *testing.T) {
+	var stdout bytes.Buffer
+	deps := defaultAuthDeps()
+
+	cmd := newAuthCommand(
+		&auth.Config{ClientID: "id", ClientSecret: "secret"},
+		"/nonexistent/token.json",
+		&stdout,
+		deps,
+	)
+	err := runTestCommand(t, cmd, "auth", "refresh")
+
+	require.Error(t, err)
+}
+
+func TestAuthRefreshCommand_RefreshFails(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "token.json")
+	require.NoError(t, auth.SaveToken(tokenPath, &auth.TokenFile{
+		CreationTimestamp: time.Now().Unix(),
+		Token: auth.TokenData{
+			AccessToken:  "old-token",
+			RefreshToken: "refresh-token",
+			ExpiresAt:    float64(time.Now().Unix() - 100),
+		},
+	}))
+
+	deps := defaultAuthDeps()
+	deps.refreshAccessToken = func(_ *auth.Config, _ *auth.TokenFile, _ string) (*auth.TokenFile, error) {
+		return nil, fmt.Errorf("refresh failed: server error")
+	}
+
+	var stdout bytes.Buffer
+	cmd := newAuthCommand(
+		&auth.Config{ClientID: "id", ClientSecret: "secret"},
+		tokenPath,
+		&stdout,
+		deps,
+	)
+	err := runTestCommand(t, cmd, "auth", "refresh")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refresh failed")
+}
+
+func TestAccountSetDefaultCommand_MissingHash(t *testing.T) {
+	var stdout bytes.Buffer
+	cmd := AccountSetDefaultCommand("/whatever/config.json", &stdout)
+
+	err := runTestCommand(t, cmd, "set-default")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "account hash is required")
+}
+
 

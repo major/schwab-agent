@@ -1756,3 +1756,126 @@ func TestOrderBuildBracketOutputsRequestJSON(t *testing.T) {
 	require.NotNil(t, stopLoss.StopPrice)
 	assert.Equal(t, 175.0, *stopLoss.StopPrice)
 }
+
+func TestParseInstruction_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		wantErr string
+	}{
+		{"empty string", "", "action is required"},
+		{"whitespace only", "   ", "action is required"},
+		{"invalid action", "INVALID", "action is invalid"},
+		{"partial match", "BU", "action is invalid"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := parseInstruction(tt.input)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+
+			var validationErr *apperr.ValidationError
+			require.ErrorAs(t, err, &validationErr)
+		})
+	}
+}
+
+func TestOrderPreview_EmptySpec(t *testing.T) {
+	// Arrange / Act
+	stdout, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "preview")
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	assert.Contains(t, err.Error(), "spec is required")
+}
+
+func TestOrderPreview_APIError(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"server error"}`))
+	}))
+	defer srv.Close()
+
+	spec := `{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderLegCollection":[{"instruction":"BUY","quantity":1,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}`
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, writeTestConfig(t, "hash123"), "",
+		"order", "preview", "--spec", spec)
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+}
+
+func TestOrderPlace_MissingSpec(t *testing.T) {
+	// order place (no subcommand) requires --spec
+	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
+		"order", "place")
+
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	assert.Contains(t, err.Error(), "spec is required")
+}
+
+func TestOrderPlace_InvalidSpec_NonJSONPrefix(t *testing.T) {
+	// Spec that doesn't start with { or [ should return the "inline JSON" error.
+	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
+		"order", "place", "--spec", "hello world", "--confirm")
+
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	assert.Contains(t, err.Error(), "spec must be inline JSON, @file, or -")
+}
+
+func TestOrderPlace_InvalidSpec_BadJSON(t *testing.T) {
+	// Spec starts with { but isn't valid JSON.
+	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
+		"order", "place", "--spec", "{not valid json}", "--confirm")
+
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	assert.Contains(t, err.Error(), "spec must contain valid JSON")
+}
+
+func TestOrderPreview_SpecFileNotFound(t *testing.T) {
+	stdout, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "preview", "--spec", "@/nonexistent/file.json")
+
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	assert.Contains(t, err.Error(), "read spec file")
+}
+
+func TestOrderReplace_MissingOrderID(t *testing.T) {
+	// Replace requires a positional order-id argument.
+	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
+		"order", "replace", "--confirm",
+		"--symbol", "AAPL", "--action", "BUY", "--quantity", "10")
+
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	assert.Contains(t, err.Error(), "order-id is required")
+}
+
+func TestOrderReplace_InvalidAction(t *testing.T) {
+	// Replace parses equity params; invalid --action triggers parseInstruction error.
+	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
+		"order", "replace", "12345", "--confirm",
+		"--symbol", "AAPL", "--action", "INVALID", "--quantity", "10")
+
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	assert.Contains(t, err.Error(), "action is invalid")
+}
