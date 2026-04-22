@@ -8,8 +8,14 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/client"
+	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
+
+// priceHistoryData wraps the price history response.
+type priceHistoryData struct {
+	PriceHistory *models.CandleList `json:"priceHistory"`
+}
 
 // HistoryCommand returns the CLI command for price history lookups.
 func HistoryCommand(c *client.Ref, w io.Writer) *cli.Command {
@@ -48,7 +54,7 @@ func HistoryCommand(c *client.Ref, w io.Writer) *cli.Command {
 						return err
 					}
 
-					return output.WriteSuccess(w, map[string]any{"priceHistory": result}, output.TimestampMeta())
+					return output.WriteSuccess(w, priceHistoryData{PriceHistory: result}, output.NewMetadata())
 				},
 			},
 		},

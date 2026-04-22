@@ -62,7 +62,7 @@ func TestSymbolBuild(t *testing.T) {
 			assert.Equal(t, tt.wantSymbol, data["symbol"])
 			assert.Equal(t, tt.wantPutCall, data["put_call"])
 			assert.Equal(t, tt.wantStrike, data["strike"])
-			assert.Contains(t, env.Metadata, "timestamp")
+			assert.NotEmpty(t, env.Metadata.Timestamp)
 		})
 	}
 }
@@ -162,7 +162,7 @@ func TestSymbolParse(t *testing.T) {
 			assert.Equal(t, tt.wantExpiration, data["expiration"])
 			assert.Equal(t, tt.wantPutCall, data["put_call"])
 			assert.Equal(t, tt.wantStrike, data["strike"])
-			assert.Contains(t, env.Metadata, "timestamp")
+			assert.NotEmpty(t, env.Metadata.Timestamp)
 		})
 	}
 }

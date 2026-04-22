@@ -16,6 +16,26 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
+// accountListData wraps the account list response.
+type accountListData struct {
+	Accounts []models.Account `json:"accounts"`
+}
+
+// accountNumbersData wraps the account numbers response.
+type accountNumbersData struct {
+	Accounts []models.AccountNumber `json:"accounts"`
+}
+
+// transactionListData wraps the transaction list response.
+type transactionListData struct {
+	Transactions []models.Transaction `json:"transactions"`
+}
+
+// transactionGetData wraps a single transaction response.
+type transactionGetData struct {
+	Transaction *models.Transaction `json:"transaction"`
+}
+
 // AccountCommand returns the parent CLI command for account operations.
 // Subcommands: list, get, numbers, set-default, transaction.
 // The --account flag overrides the default account hash for all subcommands.
@@ -57,9 +77,7 @@ func accountListCommand(c *client.Ref, w io.Writer) *cli.Command {
 				enrichAccountsWithPreferences(accounts, prefs)
 			}
 
-			data := map[string]any{"accounts": accounts}
-
-			return output.WriteSuccess(w, data, output.TimestampMeta())
+			return output.WriteSuccess(w, accountListData{Accounts: accounts}, output.NewMetadata())
 		},
 	}
 }
@@ -86,8 +104,8 @@ func accountGetCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comma
 				enrichAccountWithPreferences(account, prefs)
 			}
 
-			meta := output.TimestampMeta()
-			meta["account"] = hash
+			meta := output.NewMetadata()
+			meta.Account = hash
 
 			return output.WriteSuccess(w, account, meta)
 		},
@@ -105,9 +123,7 @@ func accountNumbersCommand(c *client.Ref, w io.Writer) *cli.Command {
 				return err
 			}
 
-			data := map[string]any{"accounts": numbers}
-
-			return output.WriteSuccess(w, data, output.TimestampMeta())
+			return output.WriteSuccess(w, accountNumbersData{Accounts: numbers}, output.NewMetadata())
 		},
 	}
 }
@@ -215,7 +231,7 @@ func accountTransactionCommand(c *client.Ref, configPath string, w io.Writer) *c
 						return err
 					}
 
-					return output.WriteSuccess(w, map[string]any{"transactions": result}, output.TimestampMeta())
+					return output.WriteSuccess(w, transactionListData{Transactions: result}, output.NewMetadata())
 				},
 			},
 			{
@@ -242,7 +258,7 @@ func accountTransactionCommand(c *client.Ref, configPath string, w io.Writer) *c
 						return err
 					}
 
-					return output.WriteSuccess(w, map[string]any{"transaction": result}, output.TimestampMeta())
+					return output.WriteSuccess(w, transactionGetData{Transaction: result}, output.NewMetadata())
 				},
 			},
 		},

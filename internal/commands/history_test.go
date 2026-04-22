@@ -32,7 +32,7 @@ func TestHistoryCommand_Get_Success(t *testing.T) {
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 func TestHistoryCommand_Get_WithFlags(t *testing.T) {

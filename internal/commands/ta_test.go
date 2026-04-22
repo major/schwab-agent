@@ -185,7 +185,7 @@ func TestTASMA_ValidEnvelope(t *testing.T) {
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Equal(t, "sma", data["indicator"])
 	assert.Equal(t, "AAPL", data["symbol"])
 	assert.Equal(t, "daily", data["interval"])
@@ -269,7 +269,7 @@ func TestTAEMA_ValidEnvelope(t *testing.T) {
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Equal(t, "ema", data["indicator"])
 	assert.Equal(t, "MSFT", data["symbol"])
 	assert.Equal(t, "daily", data["interval"])
@@ -297,7 +297,7 @@ func TestTARSI_ValidEnvelope(t *testing.T) {
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Equal(t, "rsi", data["indicator"])
 	assert.Equal(t, "TSLA", data["symbol"])
 
@@ -347,7 +347,7 @@ func TestTAMACD_ValidEnvelope(t *testing.T) {
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Equal(t, "macd", data["indicator"])
 	assert.Equal(t, "AAPL", data["symbol"])
 	assert.Equal(t, "daily", data["interval"])
@@ -420,7 +420,7 @@ func TestTAATR_ValidEnvelope(t *testing.T) {
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Equal(t, "atr", data["indicator"])
 	assert.Equal(t, "GOOG", data["symbol"])
 	assert.Equal(t, "daily", data["interval"])
@@ -468,7 +468,7 @@ func TestTABBands_ValidEnvelope(t *testing.T) {
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Equal(t, "bbands", data["indicator"])
 	assert.Equal(t, "AMZN", data["symbol"])
 	assert.Equal(t, "daily", data["interval"])
@@ -522,7 +522,7 @@ func TestTAStochastic_ValidEnvelope(t *testing.T) {
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Equal(t, "stoch", data["indicator"])
 	assert.Equal(t, "AAPL", data["symbol"])
 	assert.Equal(t, "daily", data["interval"])
@@ -601,7 +601,7 @@ func TestTAADX_ValidEnvelope(t *testing.T) {
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Equal(t, "adx", data["indicator"])
 	assert.Equal(t, "GOOG", data["symbol"])
 	assert.Equal(t, "daily", data["interval"])
@@ -647,7 +647,7 @@ func TestTAVWAP_ValidEnvelope(t *testing.T) {
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Equal(t, "vwap", data["indicator"])
 	assert.Equal(t, "AAPL", data["symbol"])
 	assert.Equal(t, "daily", data["interval"])
@@ -724,7 +724,7 @@ func TestTAHV_ValidEnvelope(t *testing.T) {
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Equal(t, "hv", data["indicator"])
 	assert.Equal(t, "AAPL", data["symbol"])
 	assert.Equal(t, "daily", data["interval"])
@@ -810,7 +810,7 @@ func TestTAExpectedMove_ValidEnvelope(t *testing.T) {
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Equal(t, "expected-move", data["indicator"])
 	assert.Equal(t, "AAPL", data["symbol"])
 	assert.Contains(t, data, "underlying_price")

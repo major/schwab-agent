@@ -7,12 +7,18 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/client"
+	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
 
 // allMarkets is the full list of Schwab market types, used as the default
 // when no specific markets are requested.
 var allMarkets = []string{"equity", "option", "bond", "future", "forex"}
+
+// moversData wraps the movers response.
+type moversData struct {
+	Movers *models.ScreenerResponse `json:"movers"`
+}
 
 // MarketCommand returns the CLI command for market hours and movers lookups.
 func MarketCommand(c *client.Ref, w io.Writer) *cli.Command {
@@ -37,14 +43,14 @@ func MarketCommand(c *client.Ref, w io.Writer) *cli.Command {
 						if err != nil {
 							return err
 						}
-						return output.WriteSuccess(w, result, output.TimestampMeta())
-					}
+					return output.WriteSuccess(w, result, output.NewMetadata())
+				}
 
-					result, err := c.Markets(ctx, markets)
-					if err != nil {
-						return err
-					}
-					return output.WriteSuccess(w, result, output.TimestampMeta())
+				result, err := c.Markets(ctx, markets)
+				if err != nil {
+					return err
+				}
+				return output.WriteSuccess(w, result, output.NewMetadata())
 				},
 			},
 			{
@@ -70,7 +76,7 @@ func MarketCommand(c *client.Ref, w io.Writer) *cli.Command {
 						return err
 					}
 
-					return output.WriteSuccess(w, map[string]any{"movers": result}, output.TimestampMeta())
+					return output.WriteSuccess(w, moversData{Movers: result}, output.NewMetadata())
 				},
 			},
 		},

@@ -301,7 +301,7 @@ func TestOrderPlaceEquityPipeline(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(67890), data["orderId"])
-	assert.NotEmpty(t, envelope.Metadata["timestamp"])
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 func TestOrderPlaceSpecFromFile(t *testing.T) {

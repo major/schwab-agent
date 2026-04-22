@@ -72,6 +72,11 @@ type authRefreshData struct {
 	ExpiresAt string `json:"expires_at"`
 }
 
+// authDefaultAccountData is the success payload for set-default responses.
+type authDefaultAccountData struct {
+	DefaultAccount string `json:"default_account"`
+}
+
 // AuthCommand returns the parent auth command with setup, login, status, and refresh subcommands.
 func AuthCommand(cfg *auth.Config, tokenPath string, w io.Writer) *cli.Command {
 	return newAuthCommand(cfg, tokenPath, w, defaultAuthDeps())
@@ -107,9 +112,9 @@ func AccountSetDefaultCommand(configPath string, w io.Writer) *cli.Command {
 				return err
 			}
 
-			return output.WriteSuccess(w, map[string]any{
-				"default_account": hash,
-			}, output.TimestampMeta())
+		return output.WriteSuccess(w, authDefaultAccountData{
+			DefaultAccount: hash,
+		}, output.NewMetadata())
 		},
 	}
 }
@@ -166,7 +171,7 @@ func authLoginCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps auth
 				AutoSetDefault:   autoSetDefault,
 			}
 
-			return output.WriteSuccess(w, data, output.TimestampMeta())
+			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
 }
@@ -191,7 +196,7 @@ func authStatusCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps aut
 				ClientID:         redactClientID(statusConfig.ClientID),
 			}
 
-			return output.WriteSuccess(w, data, output.TimestampMeta())
+			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
 }
@@ -223,7 +228,7 @@ func authRefreshCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps au
 
 			return output.WriteSuccess(w, authRefreshData{
 				ExpiresAt: unixSecondsToRFC3339(refreshedToken.Token.ExpiresAt),
-			}, output.TimestampMeta())
+			}, output.NewMetadata())
 		},
 	}
 }

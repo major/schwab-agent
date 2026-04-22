@@ -33,7 +33,7 @@ func TestQuoteGetSingleSymbol(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "AAPL", data["symbol"])
-	assert.NotNil(t, envelope.Metadata["timestamp"])
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Empty(t, envelope.Errors)
 }
 
@@ -59,7 +59,7 @@ func TestQuoteGetMultipleSymbols(t *testing.T) {
 	assert.Contains(t, data, "AAPL")
 	assert.Contains(t, data, "MSFT")
 	assert.Empty(t, envelope.Errors)
-	assert.NotNil(t, envelope.Metadata["timestamp"])
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 func TestQuoteGetPartialSuccess(t *testing.T) {
@@ -88,9 +88,9 @@ func TestQuoteGetPartialSuccess(t *testing.T) {
 	require.Len(t, envelope.Errors, 1)
 	assert.Contains(t, envelope.Errors[0], "INVALID")
 
-	assert.Equal(t, float64(2), envelope.Metadata["requested"])
-	assert.Equal(t, float64(1), envelope.Metadata["returned"])
-	assert.NotNil(t, envelope.Metadata["timestamp"])
+	assert.Equal(t, 2, envelope.Metadata.Requested)
+	assert.Equal(t, 1, envelope.Metadata.Returned)
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 func TestQuoteGetSingleNotFound(t *testing.T) {

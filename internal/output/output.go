@@ -11,11 +11,26 @@ import (
 	schwabErrors "github.com/major/schwab-agent/internal/errors"
 )
 
+// Metadata holds the standard metadata fields for response envelopes.
+type Metadata struct {
+	Timestamp string `json:"timestamp"`
+	Account   string `json:"account,omitempty"`
+	Requested int    `json:"requested,omitempty"`
+	Returned  int    `json:"returned,omitempty"`
+}
+
+// NewMetadata returns metadata pre-populated with the current UTC timestamp.
+func NewMetadata() Metadata {
+	return Metadata{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+}
+
 // Envelope is the standard JSON response wrapper for successful operations.
 type Envelope struct {
-	Data     any            `json:"data"`
-	Errors   []string       `json:"errors,omitempty"`
-	Metadata map[string]any `json:"metadata"`
+	Data     any      `json:"data"`
+	Errors   []string `json:"errors,omitempty"`
+	Metadata Metadata `json:"metadata"`
 }
 
 // ErrorEnvelope is the standard JSON response wrapper for error responses.
@@ -32,7 +47,7 @@ type ErrorDetail struct {
 
 // WriteSuccess writes a successful response with data and metadata to the writer.
 // The response is formatted as a JSON envelope with data and metadata fields.
-func WriteSuccess(w io.Writer, data any, metadata map[string]any) error {
+func WriteSuccess(w io.Writer, data any, metadata Metadata) error {
 	envelope := Envelope{
 		Data:     data,
 		Metadata: metadata,
@@ -81,7 +96,7 @@ func WriteError(w io.Writer, err error) error {
 
 // WritePartial writes a response with both data and errors (partial success).
 // The response is formatted as a JSON envelope with data, errors, and metadata fields.
-func WritePartial(w io.Writer, data any, errs []string, metadata map[string]any) error {
+func WritePartial(w io.Writer, data any, errs []string, metadata Metadata) error {
 	envelope := Envelope{
 		Data:     data,
 		Errors:   errs,
@@ -92,9 +107,4 @@ func WritePartial(w io.Writer, data any, errs []string, metadata map[string]any)
 	return encoder.Encode(envelope)
 }
 
-// TimestampMeta returns metadata map with current UTC timestamp in RFC3339 format.
-func TimestampMeta() map[string]any {
-	return map[string]any{
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
-	}
-}
+

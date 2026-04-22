@@ -116,7 +116,7 @@ func chainGetCommand(c *client.Ref, w io.Writer) *cli.Command {
 			if err != nil {
 				return err
 			}
-			return output.WriteSuccess(w, chain, output.TimestampMeta())
+			return output.WriteSuccess(w, chain, output.NewMetadata())
 		},
 	}
 }
@@ -137,7 +137,7 @@ func chainExpirationCommand(c *client.Ref, w io.Writer) *cli.Command {
 			if err != nil {
 				return err
 			}
-			return output.WriteSuccess(w, chain, output.TimestampMeta())
+			return output.WriteSuccess(w, chain, output.NewMetadata())
 		},
 	}
 }

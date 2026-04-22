@@ -71,7 +71,7 @@ func symbolBuildCommand(w io.Writer) *cli.Command {
 				Strike:     strike,
 			}
 
-			return output.WriteSuccess(w, result, output.TimestampMeta())
+			return output.WriteSuccess(w, result, output.NewMetadata())
 		},
 	}
 }
@@ -109,7 +109,7 @@ func symbolParseCommand(w io.Writer) *cli.Command {
 				Strike:     components.Strike,
 			}
 
-			return output.WriteSuccess(w, result, output.TimestampMeta())
+			return output.WriteSuccess(w, result, output.NewMetadata())
 		},
 	}
 }

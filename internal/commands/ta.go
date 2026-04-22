@@ -17,6 +17,115 @@ import (
 	"github.com/major/schwab-agent/internal/ta"
 )
 
+// Multi-value point types for indicators that return more than a single value per timestamp.
+
+type macdPoint struct {
+	Datetime  string  `json:"datetime"`
+	MACD      float64 `json:"macd"`
+	Signal    float64 `json:"signal"`
+	Histogram float64 `json:"histogram"`
+}
+
+type bbandsPoint struct {
+	Datetime string  `json:"datetime"`
+	Upper    float64 `json:"upper"`
+	Middle   float64 `json:"middle"`
+	Lower    float64 `json:"lower"`
+}
+
+type stochPoint struct {
+	Datetime string  `json:"datetime"`
+	SlowK    float64 `json:"slowk"`
+	SlowD    float64 `json:"slowd"`
+}
+
+type adxPoint struct {
+	Datetime string  `json:"datetime"`
+	ADX      float64 `json:"adx"`
+	PlusDI   float64 `json:"plus_di"`
+	MinusDI  float64 `json:"minus_di"`
+}
+
+// Indicator output types wrap values with their parameters for JSON serialization.
+
+type macdOutput struct {
+	Indicator string      `json:"indicator"`
+	Symbol    string      `json:"symbol"`
+	Interval  string      `json:"interval"`
+	Fast      int         `json:"fast"`
+	Slow      int         `json:"slow"`
+	Signal    int         `json:"signal"`
+	Values    []macdPoint `json:"values"`
+}
+
+type bbandsOutput struct {
+	Indicator string        `json:"indicator"`
+	Symbol    string        `json:"symbol"`
+	Interval  string        `json:"interval"`
+	Period    int           `json:"period"`
+	StdDev    float64       `json:"std_dev"`
+	Values    []bbandsPoint `json:"values"`
+}
+
+type stochOutput struct {
+	Indicator string       `json:"indicator"`
+	Symbol    string       `json:"symbol"`
+	Interval  string       `json:"interval"`
+	KPeriod   int          `json:"k_period"`
+	SmoothK   int          `json:"smooth_k"`
+	DPeriod   int          `json:"d_period"`
+	Values    []stochPoint `json:"values"`
+}
+
+type adxOutput struct {
+	Indicator string     `json:"indicator"`
+	Symbol    string     `json:"symbol"`
+	Interval  string     `json:"interval"`
+	Period    int        `json:"period"`
+	Values    []adxPoint `json:"values"`
+}
+
+type hvOutput struct {
+	Indicator      string  `json:"indicator"`
+	Symbol         string  `json:"symbol"`
+	Interval       string  `json:"interval"`
+	Period         int     `json:"period"`
+	DailyVol       float64 `json:"daily_vol"`
+	WeeklyVol      float64 `json:"weekly_vol"`
+	MonthlyVol     float64 `json:"monthly_vol"`
+	AnnualizedVol  float64 `json:"annualized_vol"`
+	PercentileRank float64 `json:"percentile_rank"`
+	Regime         string  `json:"regime"`
+	MinVol         float64 `json:"min_vol"`
+	MaxVol         float64 `json:"max_vol"`
+	MeanVol        float64 `json:"mean_vol"`
+}
+
+type expectedMoveOutput struct {
+	Indicator       string  `json:"indicator"`
+	Symbol          string  `json:"symbol"`
+	UnderlyingPrice float64 `json:"underlying_price"`
+	Expiration      string  `json:"expiration"`
+	DTE             int     `json:"dte"`
+	StraddlePrice   float64 `json:"straddle_price"`
+	ExpectedMove    float64 `json:"expected_move"`
+	AdjustedMove    float64 `json:"adjusted_move"`
+	Upper1x         float64 `json:"upper_1x"`
+	Lower1x         float64 `json:"lower_1x"`
+	Upper2x         float64 `json:"upper_2x"`
+	Lower2x         float64 `json:"lower_2x"`
+}
+
+// taOutput is the common envelope for single-value time series indicators (SMA, EMA, RSI, etc.).
+// Values use map[string]any because the value key name is the indicator name itself (dynamic).
+type taOutput struct {
+	Indicator string           `json:"indicator"`
+	Symbol    string           `json:"symbol"`
+	Interval  string           `json:"interval"`
+	Period    int              `json:"period"`
+	Values    []map[string]any `json:"values"`
+}
+
 // taIndicatorFlags returns the shared flags for all TA indicator subcommands.
 // RSI defaults to period 14; SMA/EMA default to 20.
 func taIndicatorFlags(defaultPeriod int) []cli.Flag {
@@ -195,13 +304,13 @@ func taMACDCommand(c *client.Ref, w io.Writer) *cli.Command {
 			// Align timestamps to MACD output length (shorter due to lookback)
 			timestamps = timestamps[len(timestamps)-len(macdVals):]
 
-			out := make([]map[string]any, len(macdVals))
+			out := make([]macdPoint, len(macdVals))
 			for i := range macdVals {
-				out[i] = map[string]any{
-					"datetime":  timestamps[i],
-					"macd":      macdVals[i],
-					"signal":    signalVals[i],
-					"histogram": histVals[i],
+				out[i] = macdPoint{
+					Datetime:  timestamps[i],
+					MACD:      macdVals[i],
+					Signal:    signalVals[i],
+					Histogram: histVals[i],
 				}
 			}
 
@@ -209,16 +318,16 @@ func taMACDCommand(c *client.Ref, w io.Writer) *cli.Command {
 				out = out[len(out)-points:]
 			}
 
-			data := map[string]any{
-				"indicator": "macd",
-				"symbol":    symbol,
-				"interval":  interval,
-				"fast":      fast,
-				"slow":      slow,
-				"signal":    signal,
-				"values":    out,
+			data := macdOutput{
+				Indicator: "macd",
+				Symbol:    symbol,
+				Interval:  interval,
+				Fast:      fast,
+				Slow:      slow,
+				Signal:    signal,
+				Values:    out,
 			}
-			return output.WriteSuccess(w, data, output.TimestampMeta())
+			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
 }
@@ -305,13 +414,13 @@ func taBBandsCommand(c *client.Ref, w io.Writer) *cli.Command {
 			// Align timestamps to BBands output length (shorter due to lookback)
 			timestamps = timestamps[len(timestamps)-len(upper):]
 
-			out := make([]map[string]any, len(upper))
+			out := make([]bbandsPoint, len(upper))
 			for i := range upper {
-				out[i] = map[string]any{
-					"datetime": timestamps[i],
-					"upper":    upper[i],
-					"middle":   middle[i],
-					"lower":    lower[i],
+				out[i] = bbandsPoint{
+					Datetime: timestamps[i],
+					Upper:    upper[i],
+					Middle:   middle[i],
+					Lower:    lower[i],
 				}
 			}
 
@@ -319,15 +428,15 @@ func taBBandsCommand(c *client.Ref, w io.Writer) *cli.Command {
 				out = out[len(out)-points:]
 			}
 
-			data := map[string]any{
-				"indicator": "bbands",
-				"symbol":    symbol,
-				"interval":  interval,
-				"period":    period,
-				"std_dev":   stdDev,
-				"values":    out,
+			data := bbandsOutput{
+				Indicator: "bbands",
+				Symbol:    symbol,
+				Interval:  interval,
+				Period:    period,
+				StdDev:    stdDev,
+				Values:    out,
 			}
-			return output.WriteSuccess(w, data, output.TimestampMeta())
+			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
 }
@@ -381,12 +490,12 @@ func taStochCommand(c *client.Ref, w io.Writer) *cli.Command {
 			// Align timestamps to stochastic output length (shorter due to lookback)
 			timestamps = timestamps[len(timestamps)-len(slowK):]
 
-			out := make([]map[string]any, len(slowK))
+			out := make([]stochPoint, len(slowK))
 			for i := range slowK {
-				out[i] = map[string]any{
-					"datetime": timestamps[i],
-					"slowk":    slowK[i],
-					"slowd":    slowD[i],
+				out[i] = stochPoint{
+					Datetime: timestamps[i],
+					SlowK:    slowK[i],
+					SlowD:    slowD[i],
 				}
 			}
 
@@ -394,16 +503,16 @@ func taStochCommand(c *client.Ref, w io.Writer) *cli.Command {
 				out = out[len(out)-points:]
 			}
 
-			data := map[string]any{
-				"indicator": "stoch",
-				"symbol":    symbol,
-				"interval":  interval,
-				"k_period":  kPeriod,
-				"smooth_k":  smoothK,
-				"d_period":  dPeriod,
-				"values":    out,
+			data := stochOutput{
+				Indicator: "stoch",
+				Symbol:    symbol,
+				Interval:  interval,
+				KPeriod:   kPeriod,
+				SmoothK:   smoothK,
+				DPeriod:   dPeriod,
+				Values:    out,
 			}
-			return output.WriteSuccess(w, data, output.TimestampMeta())
+			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
 }
@@ -449,13 +558,13 @@ func taADXCommand(c *client.Ref, w io.Writer) *cli.Command {
 			// Align timestamps to ADX output length (shorter due to lookback)
 			timestamps = timestamps[len(timestamps)-len(adxVals):]
 
-			out := make([]map[string]any, len(adxVals))
+			out := make([]adxPoint, len(adxVals))
 			for i := range adxVals {
-				out[i] = map[string]any{
-					"datetime": timestamps[i],
-					"adx":      adxVals[i],
-					"plus_di":  plusDI[i],
-					"minus_di": minusDI[i],
+				out[i] = adxPoint{
+					Datetime: timestamps[i],
+					ADX:      adxVals[i],
+					PlusDI:   plusDI[i],
+					MinusDI:  minusDI[i],
 				}
 			}
 
@@ -463,14 +572,14 @@ func taADXCommand(c *client.Ref, w io.Writer) *cli.Command {
 				out = out[len(out)-points:]
 			}
 
-			data := map[string]any{
-				"indicator": "adx",
-				"symbol":    symbol,
-				"interval":  interval,
-				"period":    period,
-				"values":    out,
+			data := adxOutput{
+				Indicator: "adx",
+				Symbol:    symbol,
+				Interval:  interval,
+				Period:    period,
+				Values:    out,
 			}
-			return output.WriteSuccess(w, data, output.TimestampMeta())
+			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
 }
@@ -561,22 +670,22 @@ func taHVCommand(c *client.Ref, w io.Writer) *cli.Command {
 
 			// HV returns a scalar summary, not a time series.
 			// Do NOT use writeTAOutput (which is for time series).
-			data := map[string]any{
-				"indicator":       "hv",
-				"symbol":          symbol,
-				"interval":        interval,
-				"period":          period,
-				"daily_vol":       result.DailyVol,
-				"weekly_vol":      result.WeeklyVol,
-				"monthly_vol":     result.MonthlyVol,
-				"annualized_vol":  result.AnnualizedVol,
-				"percentile_rank": result.PercentileRank,
-				"regime":          result.Regime,
-				"min_vol":         result.MinVol,
-				"max_vol":         result.MaxVol,
-				"mean_vol":        result.MeanVol,
+			data := hvOutput{
+				Indicator:      "hv",
+				Symbol:         symbol,
+				Interval:       interval,
+				Period:         period,
+				DailyVol:       result.DailyVol,
+				WeeklyVol:      result.WeeklyVol,
+				MonthlyVol:     result.MonthlyVol,
+				AnnualizedVol:  result.AnnualizedVol,
+				PercentileRank: result.PercentileRank,
+				Regime:         result.Regime,
+				MinVol:         result.MinVol,
+				MaxVol:         result.MaxVol,
+				MeanVol:        result.MeanVol,
 			}
-			return output.WriteSuccess(w, data, output.TimestampMeta())
+			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
 }
@@ -701,21 +810,21 @@ func taExpectedMoveCommand(c *client.Ref, w io.Writer) *cli.Command {
 			}
 
 			actualDTE, _ := strconv.Atoi(expParts[1])
-			data := map[string]any{
-				"indicator":        "expected-move",
-				"symbol":           symbol,
-				"underlying_price": underlyingPrice,
-				"expiration":       expDate,
-				"dte":              actualDTE,
-				"straddle_price":   result.StraddlePrice,
-				"expected_move":    result.ExpectedMove,
-				"adjusted_move":    result.AdjustedMove,
-				"upper_1x":         result.Upper1x,
-				"lower_1x":         result.Lower1x,
-				"upper_2x":         result.Upper2x,
-				"lower_2x":         result.Lower2x,
+			data := expectedMoveOutput{
+				Indicator:       "expected-move",
+				Symbol:          symbol,
+				UnderlyingPrice: underlyingPrice,
+				Expiration:      expDate,
+				DTE:             actualDTE,
+				StraddlePrice:   result.StraddlePrice,
+				ExpectedMove:    result.ExpectedMove,
+				AdjustedMove:    result.AdjustedMove,
+				Upper1x:         result.Upper1x,
+				Lower1x:         result.Lower1x,
+				Upper2x:         result.Upper2x,
+				Lower2x:         result.Lower2x,
 			}
-			return output.WriteSuccess(w, data, output.TimestampMeta())
+			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
 }
@@ -803,12 +912,12 @@ func writeTAOutput(
 		out = out[len(out)-points:]
 	}
 
-	data := map[string]any{
-		"indicator": indicator,
-		"symbol":    symbol,
-		"interval":  interval,
-		"period":    period,
-		"values":    out,
+	data := taOutput{
+		Indicator: indicator,
+		Symbol:    symbol,
+		Interval:  interval,
+		Period:    period,
+		Values:    out,
 	}
-	return output.WriteSuccess(w, data, output.TimestampMeta())
+	return output.WriteSuccess(w, data, output.NewMetadata())
 }

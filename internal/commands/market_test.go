@@ -34,7 +34,7 @@ func TestMarketCommand_Hours_AllMarkets(t *testing.T) {
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 func TestMarketCommand_Hours_SpecificMarket(t *testing.T) {
@@ -56,7 +56,7 @@ func TestMarketCommand_Hours_SpecificMarket(t *testing.T) {
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 func TestMarketCommand_Hours_APIError(t *testing.T) {
@@ -103,7 +103,7 @@ func TestMarketCommand_Movers_Success(t *testing.T) {
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 func TestMarketCommand_Movers_WithFlags(t *testing.T) {

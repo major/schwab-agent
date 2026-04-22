@@ -15,9 +15,9 @@ import (
 func TestWriteSuccess(t *testing.T) {
 	buf := &bytes.Buffer{}
 	data := map[string]any{"symbol": "AAPL", "price": "150.00"}
-	metadata := map[string]any{"timestamp": "2026-04-21T10:00:00Z"}
+	meta := Metadata{Timestamp: "2026-04-21T10:00:00Z"}
 
-	err := WriteSuccess(buf, data, metadata)
+	err := WriteSuccess(buf, data, meta)
 	require.NoError(t, err)
 
 	var envelope Envelope
@@ -25,15 +25,15 @@ func TestWriteSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, data, envelope.Data)
-	assert.Equal(t, metadata, envelope.Metadata)
+	assert.Equal(t, "2026-04-21T10:00:00Z", envelope.Metadata.Timestamp)
 	assert.Nil(t, envelope.Errors)
 }
 
-func TestWriteSuccessWithNilMetadata(t *testing.T) {
+func TestWriteSuccessWithZeroMetadata(t *testing.T) {
 	buf := &bytes.Buffer{}
 	data := map[string]any{"test": "value"}
 
-	err := WriteSuccess(buf, data, nil)
+	err := WriteSuccess(buf, data, Metadata{})
 	require.NoError(t, err)
 
 	var envelope Envelope
@@ -52,9 +52,9 @@ func TestWriteSuccessWithComplexData(t *testing.T) {
 			{"id": "456", "balance": 25000.75},
 		},
 	}
-	metadata := map[string]any{"count": 2}
+	meta := Metadata{Timestamp: "2026-04-21T10:00:00Z"}
 
-	err := WriteSuccess(buf, data, metadata)
+	err := WriteSuccess(buf, data, meta)
 	require.NoError(t, err)
 
 	var envelope Envelope
@@ -66,8 +66,8 @@ func TestWriteSuccessWithComplexData(t *testing.T) {
 	dataMap := envelope.Data.(map[string]any)
 	assert.Contains(t, dataMap, "accounts")
 
-	// Verify metadata exists
-	assert.NotNil(t, envelope.Metadata)
+	// Verify metadata timestamp
+	assert.Equal(t, "2026-04-21T10:00:00Z", envelope.Metadata.Timestamp)
 }
 
 func TestWriteErrorAuthRequired(t *testing.T) {
@@ -240,9 +240,9 @@ func TestWritePartial(t *testing.T) {
 	buf := &bytes.Buffer{}
 	data := map[string]any{"partial": "data"}
 	errs := []string{"error 1", "error 2"}
-	metadata := map[string]any{"timestamp": "2026-04-21T10:00:00Z"}
+	meta := Metadata{Timestamp: "2026-04-21T10:00:00Z"}
 
-	writeErr := WritePartial(buf, data, errs, metadata)
+	writeErr := WritePartial(buf, data, errs, meta)
 	require.NoError(t, writeErr)
 
 	var envelope Envelope
@@ -251,15 +251,15 @@ func TestWritePartial(t *testing.T) {
 
 	assert.Equal(t, data, envelope.Data)
 	assert.Equal(t, errs, envelope.Errors)
-	assert.Equal(t, metadata, envelope.Metadata)
+	assert.Equal(t, "2026-04-21T10:00:00Z", envelope.Metadata.Timestamp)
 }
 
 func TestWritePartialWithEmptyErrors(t *testing.T) {
 	buf := &bytes.Buffer{}
 	data := map[string]any{"test": "data"}
-	metadata := map[string]any{"timestamp": "2026-04-21T10:00:00Z"}
+	meta := Metadata{Timestamp: "2026-04-21T10:00:00Z"}
 
-	writeErr := WritePartial(buf, data, []string{}, metadata)
+	writeErr := WritePartial(buf, data, []string{}, meta)
 	require.NoError(t, writeErr)
 
 	var envelope Envelope
@@ -268,15 +268,15 @@ func TestWritePartialWithEmptyErrors(t *testing.T) {
 
 	assert.Equal(t, data, envelope.Data)
 	assert.Nil(t, envelope.Errors)
-	assert.Equal(t, metadata, envelope.Metadata)
+	assert.Equal(t, "2026-04-21T10:00:00Z", envelope.Metadata.Timestamp)
 }
 
 func TestWritePartialWithNilData(t *testing.T) {
 	buf := &bytes.Buffer{}
 	errs := []string{"error 1"}
-	metadata := map[string]any{"timestamp": "2026-04-21T10:00:00Z"}
+	meta := Metadata{Timestamp: "2026-04-21T10:00:00Z"}
 
-	writeErr := WritePartial(buf, nil, errs, metadata)
+	writeErr := WritePartial(buf, nil, errs, meta)
 	require.NoError(t, writeErr)
 
 	var envelope Envelope
@@ -285,15 +285,14 @@ func TestWritePartialWithNilData(t *testing.T) {
 
 	assert.Nil(t, envelope.Data)
 	assert.Equal(t, errs, envelope.Errors)
-	assert.Equal(t, metadata, envelope.Metadata)
+	assert.Equal(t, "2026-04-21T10:00:00Z", envelope.Metadata.Timestamp)
 }
 
 func TestJSONEscapeHTMLDisabled(t *testing.T) {
 	buf := &bytes.Buffer{}
 	data := map[string]string{"url": "https://example.com?foo=bar&baz=qux"}
-	metadata := map[string]any{}
 
-	err := WriteSuccess(buf, data, metadata)
+	err := WriteSuccess(buf, data, Metadata{})
 	require.NoError(t, err)
 
 	// Check that & is not escaped to \u0026
@@ -301,35 +300,29 @@ func TestJSONEscapeHTMLDisabled(t *testing.T) {
 	assert.Contains(t, buf.String(), "&")
 }
 
-func TestTimestampMeta(t *testing.T) {
-	meta := TimestampMeta()
-
-	assert.NotNil(t, meta["timestamp"])
+func TestNewMetadata(t *testing.T) {
+	meta := NewMetadata()
 
 	// Verify timestamp is a valid RFC3339 string
-	timestamp, ok := meta["timestamp"].(string)
-	assert.True(t, ok)
-	assert.NotEmpty(t, timestamp)
+	assert.NotEmpty(t, meta.Timestamp)
 
-	// Verify it can be parsed as RFC3339
-	_, err := time.Parse(time.RFC3339, timestamp)
+	_, err := time.Parse(time.RFC3339, meta.Timestamp)
 	assert.NoError(t, err)
 }
 
-func TestTimestampMetaIsUTC(t *testing.T) {
-	meta := TimestampMeta()
-	timestamp := meta["timestamp"].(string)
+func TestNewMetadataIsUTC(t *testing.T) {
+	meta := NewMetadata()
 
 	// RFC3339 with Z suffix indicates UTC
-	assert.Contains(t, timestamp, "Z")
+	assert.Contains(t, meta.Timestamp, "Z")
 }
 
 func TestEnvelopeJSONStructure(t *testing.T) {
 	buf := &bytes.Buffer{}
 	data := map[string]any{"key": "value"}
-	metadata := map[string]any{"meta": "data"}
+	meta := Metadata{Timestamp: "2026-04-21T10:00:00Z"}
 
-	err := WriteSuccess(buf, data, metadata)
+	err := WriteSuccess(buf, data, meta)
 	require.NoError(t, err)
 
 	// Verify JSON structure
@@ -362,9 +355,8 @@ func TestErrorEnvelopeJSONStructure(t *testing.T) {
 func TestWriteSuccessWithEmptyMetadata(t *testing.T) {
 	buf := &bytes.Buffer{}
 	data := map[string]any{"test": "data"}
-	metadata := map[string]any{}
 
-	err := WriteSuccess(buf, data, metadata)
+	err := WriteSuccess(buf, data, Metadata{})
 	require.NoError(t, err)
 
 	var envelope Envelope
@@ -372,16 +364,16 @@ func TestWriteSuccessWithEmptyMetadata(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, data, envelope.Data)
-	assert.Equal(t, metadata, envelope.Metadata)
+	assert.Empty(t, envelope.Metadata.Timestamp)
 }
 
 func TestWritePartialMultipleErrors(t *testing.T) {
 	buf := &bytes.Buffer{}
 	data := map[string]any{"partial": "result"}
 	errs := []string{"error 1", "error 2", "error 3"}
-	metadata := map[string]any{"count": 3}
+	meta := Metadata{Timestamp: "2026-04-21T10:00:00Z"}
 
-	writeErr := WritePartial(buf, data, errs, metadata)
+	writeErr := WritePartial(buf, data, errs, meta)
 	require.NoError(t, writeErr)
 
 	var envelope Envelope

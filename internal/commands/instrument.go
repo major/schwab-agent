@@ -7,8 +7,19 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/client"
+	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
+
+// instrumentSearchData wraps the instrument search response.
+type instrumentSearchData struct {
+	Instruments []models.Instrument `json:"instruments"`
+}
+
+// instrumentGetData wraps a single instrument response.
+type instrumentGetData struct {
+	Instrument *models.Instrument `json:"instrument"`
+}
 
 // InstrumentCommand returns the CLI command for instrument search and lookup.
 func InstrumentCommand(c *client.Ref, w io.Writer) *cli.Command {
@@ -38,7 +49,7 @@ func InstrumentCommand(c *client.Ref, w io.Writer) *cli.Command {
 						return err
 					}
 
-					return output.WriteSuccess(w, map[string]any{"instruments": result}, output.TimestampMeta())
+					return output.WriteSuccess(w, instrumentSearchData{Instruments: result}, output.NewMetadata())
 				},
 			},
 			{
@@ -55,7 +66,7 @@ func InstrumentCommand(c *client.Ref, w io.Writer) *cli.Command {
 						return err
 					}
 
-					return output.WriteSuccess(w, map[string]any{"instrument": result}, output.TimestampMeta())
+					return output.WriteSuccess(w, instrumentGetData{Instrument: result}, output.NewMetadata())
 				},
 			},
 		},

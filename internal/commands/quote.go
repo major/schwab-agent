@@ -50,7 +50,7 @@ func quoteSingle(ctx context.Context, c *client.Ref, w io.Writer, symbol string)
 	if err != nil {
 		return err
 	}
-	return output.WriteSuccess(w, quote, output.TimestampMeta())
+	return output.WriteSuccess(w, quote, output.NewMetadata())
 }
 
 // quoteMulti fetches quotes for multiple symbols, using WritePartial when some are missing.
@@ -69,11 +69,11 @@ func quoteMulti(ctx context.Context, c *client.Ref, w io.Writer, symbols []strin
 	}
 
 	if len(missing) == 0 {
-		return output.WriteSuccess(w, quotes, output.TimestampMeta())
+		return output.WriteSuccess(w, quotes, output.NewMetadata())
 	}
 
-	meta := output.TimestampMeta()
-	meta["requested"] = len(symbols)
-	meta["returned"] = len(quotes)
+	meta := output.NewMetadata()
+	meta.Requested = len(symbols)
+	meta.Returned = len(quotes)
 	return output.WritePartial(w, quotes, missing, meta)
 }

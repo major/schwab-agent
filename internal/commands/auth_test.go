@@ -19,12 +19,13 @@ import (
 
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
+	"github.com/major/schwab-agent/internal/output"
 )
 
 // testEnvelope mirrors the standard JSON success envelope for assertions.
 type testEnvelope struct {
 	Data     json.RawMessage `json:"data"`
-	Metadata map[string]any  `json:"metadata"`
+	Metadata output.Metadata `json:"metadata"`
 }
 
 // testStatusPayload represents the auth status response body.
@@ -79,7 +80,7 @@ func TestAuthStatusCommand_WritesExpectedEnvelope(t *testing.T) {
 	require.NoError(t, err)
 
 	envelope := decodeAuthEnvelope(t, stdout.Bytes())
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 
 	var payload testStatusPayload
 	require.NoError(t, json.Unmarshal(envelope.Data, &payload))
@@ -241,7 +242,7 @@ func TestAuthAccountSetDefaultCommand_WritesSuccess(t *testing.T) {
 	assert.Equal(t, "hash-xyz", savedConfig.DefaultAccount)
 
 	envelope := decodeAuthEnvelope(t, stdout.Bytes())
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 // decodeAuthEnvelope parses a success envelope from auth command output.

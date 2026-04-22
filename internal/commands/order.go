@@ -20,6 +20,39 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
+// orderListData wraps the order list response.
+type orderListData struct {
+	Orders []models.Order `json:"orders"`
+}
+
+// orderGetData wraps a single order response.
+type orderGetData struct {
+	Order *models.Order `json:"order"`
+}
+
+// orderPlaceData wraps a successful order placement response.
+type orderPlaceData struct {
+	OrderID int64 `json:"orderId"`
+}
+
+// orderPreviewData wraps an order preview response.
+type orderPreviewData struct {
+	Preview *models.PreviewOrder `json:"preview"`
+	OrderID *int64               `json:"orderId,omitempty"`
+}
+
+// orderCancelData wraps a successful order cancellation response.
+type orderCancelData struct {
+	OrderID  int64 `json:"orderId"`
+	Canceled bool  `json:"canceled"`
+}
+
+// orderReplaceData wraps a successful order replacement response.
+type orderReplaceData struct {
+	OrderID  int64 `json:"orderId"`
+	Replaced bool  `json:"replaced"`
+}
+
 const confirmOrderMessage = "Add --confirm to execute this order"
 
 const mutableDisabledMessage = `Mutable operations are disabled by default. ` +
@@ -67,7 +100,7 @@ func orderListCommand(c *client.Ref, _ string, w io.Writer) *cli.Command {
 					return err
 				}
 
-				return output.WriteSuccess(w, map[string]any{"orders": orders}, output.TimestampMeta())
+				return output.WriteSuccess(w, orderListData{Orders: orders}, output.NewMetadata())
 			}
 
 			orders, err := c.ListOrders(ctx, account, params)
@@ -75,7 +108,7 @@ func orderListCommand(c *client.Ref, _ string, w io.Writer) *cli.Command {
 				return err
 			}
 
-			return output.WriteSuccess(w, map[string]any{"orders": orders}, output.TimestampMeta())
+			return output.WriteSuccess(w, orderListData{Orders: orders}, output.NewMetadata())
 		},
 	}
 }
@@ -105,7 +138,7 @@ func orderGetCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command
 				return err
 			}
 
-			return output.WriteSuccess(w, map[string]any{"order": order}, output.TimestampMeta())
+			return output.WriteSuccess(w, orderGetData{Order: order}, output.NewMetadata())
 		},
 	}
 }
@@ -148,7 +181,7 @@ func orderPlaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comma
 				return err
 			}
 
-			return output.WriteSuccess(w, map[string]any{"orderId": response.OrderID}, output.TimestampMeta())
+			return output.WriteSuccess(w, orderPlaceData{OrderID: response.OrderID}, output.NewMetadata())
 		},
 		Commands: []*cli.Command{
 			makePlaceOrderCommand(c, configPath, w, "equity", "Place an equity order",
@@ -221,7 +254,7 @@ func makePlaceOrderCommand[P any](
 				return err
 			}
 
-			return output.WriteSuccess(w, map[string]any{"orderId": response.OrderID}, output.TimestampMeta())
+			return output.WriteSuccess(w, orderPlaceData{OrderID: response.OrderID}, output.NewMetadata())
 		},
 	}
 }
@@ -255,12 +288,10 @@ func orderPreviewCommand(c *client.Ref, configPath string, w io.Writer) *cli.Com
 				return err
 			}
 
-			data := map[string]any{"preview": preview}
-			if preview.OrderID != nil {
-				data["orderId"] = *preview.OrderID
-			}
-
-			return output.WriteSuccess(w, data, output.TimestampMeta())
+			return output.WriteSuccess(w, orderPreviewData{
+				Preview: preview,
+				OrderID: preview.OrderID,
+			}, output.NewMetadata())
 		},
 	}
 }
@@ -298,7 +329,7 @@ func orderCancelCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comm
 				return err
 			}
 
-			return output.WriteSuccess(w, map[string]any{"orderId": orderID, "canceled": true}, output.TimestampMeta())
+			return output.WriteSuccess(w, orderCancelData{OrderID: orderID, Canceled: true}, output.NewMetadata())
 		},
 	}
 }
@@ -350,7 +381,7 @@ func orderReplaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Com
 				return err
 			}
 
-			return output.WriteSuccess(w, map[string]any{"orderId": orderID, "replaced": true}, output.TimestampMeta())
+			return output.WriteSuccess(w, orderReplaceData{OrderID: orderID, Replaced: true}, output.NewMetadata())
 		},
 	}
 }

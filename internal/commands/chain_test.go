@@ -34,7 +34,7 @@ func TestChainGet(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "AAPL", data["symbol"])
-	assert.NotNil(t, envelope.Metadata["timestamp"])
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 func TestChainGetWithFlags(t *testing.T) {
@@ -69,7 +69,7 @@ func TestChainGetWithFlags(t *testing.T) {
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
-	assert.NotNil(t, envelope.Metadata["timestamp"])
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 func TestChainGetAdvancedFlags(t *testing.T) {
@@ -137,7 +137,7 @@ func TestChainExpiration(t *testing.T) {
 	expList, ok := data["expirationList"].([]any)
 	require.True(t, ok)
 	assert.Len(t, expList, 2)
-	assert.NotNil(t, envelope.Metadata["timestamp"])
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 func TestChainGetNoArgs(t *testing.T) {

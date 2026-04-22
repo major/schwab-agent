@@ -33,7 +33,7 @@ func TestInstrumentCommand_Search_Success(t *testing.T) {
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 func TestInstrumentCommand_Search_WithProjection(t *testing.T) {
@@ -89,7 +89,7 @@ func TestInstrumentCommand_Get_Success(t *testing.T) {
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
-	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
 func TestInstrumentCommand_Get_MissingCUSIP(t *testing.T) {
