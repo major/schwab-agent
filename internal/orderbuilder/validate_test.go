@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -570,7 +570,7 @@ func assertValidationError(t *testing.T, err error, expectedMessage, expectedDet
 
 	require.Error(t, err)
 
-	var validationErr *schwabErrors.ValidationError
+	var validationErr *apperr.ValidationError
 	require.True(t, errors.As(err, &validationErr))
 	assert.Equal(t, expectedMessage, validationErr.Message)
 	assert.Equal(t, expectedDetails, validationErr.Details)

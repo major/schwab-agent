@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 func TestATR_ValidValues(t *testing.T) {
@@ -38,7 +38,7 @@ func TestATR_MismatchedLengths(t *testing.T) {
 	closes := make([]float64, 10)
 	_, err := ATR(highs, lows, closes, 14)
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "length")
 }
@@ -49,7 +49,7 @@ func TestATR_InvalidPeriod(t *testing.T) {
 	closes := make([]float64, 20)
 	_, err := ATR(highs, lows, closes, 0)
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -103,7 +103,7 @@ func TestBBands_InvalidStdDev(t *testing.T) {
 	}
 	_, _, _, err := BBands(closes, 20, 0.0)
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -111,6 +111,6 @@ func TestBBands_InvalidPeriod(t *testing.T) {
 	closes := make([]float64, 30)
 	_, _, _, err := BBands(closes, 0, 2.0)
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }

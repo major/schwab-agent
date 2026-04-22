@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 // testResponse is a simple struct used for JSON round-trip tests.
@@ -248,7 +248,7 @@ func TestDoRequest_401_ReturnsAuthExpiredError(t *testing.T) {
 
 	require.Error(t, err)
 
-	var authErr *schwabErrors.AuthExpiredError
+	var authErr *apperr.AuthExpiredError
 	require.ErrorAs(t, err, &authErr)
 	assert.Contains(t, authErr.Error(), "authentication expired")
 }
@@ -266,7 +266,7 @@ func TestDoRequest_404_ReturnsHTTPError(t *testing.T) {
 
 	require.Error(t, err)
 
-	var httpErr *schwabErrors.HTTPError
+	var httpErr *apperr.HTTPError
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, 404, httpErr.StatusCode)
 	assert.Contains(t, httpErr.Body, "not found")
@@ -285,7 +285,7 @@ func TestDoRequest_500_ReturnsHTTPError(t *testing.T) {
 
 	require.Error(t, err)
 
-	var httpErr *schwabErrors.HTTPError
+	var httpErr *apperr.HTTPError
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, 500, httpErr.StatusCode)
 	assert.Contains(t, httpErr.Body, "internal server error")
@@ -304,7 +304,7 @@ func TestDoRequest_403_ReturnsHTTPError(t *testing.T) {
 
 	require.Error(t, err)
 
-	var httpErr *schwabErrors.HTTPError
+	var httpErr *apperr.HTTPError
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, 403, httpErr.StatusCode)
 }
@@ -322,7 +322,7 @@ func TestDoRequest_429_ReturnsHTTPError(t *testing.T) {
 
 	require.Error(t, err)
 
-	var httpErr *schwabErrors.HTTPError
+	var httpErr *apperr.HTTPError
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, 429, httpErr.StatusCode)
 	assert.Contains(t, httpErr.Body, "rate limited")

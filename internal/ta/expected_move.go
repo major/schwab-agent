@@ -3,7 +3,7 @@ package ta
 import (
 	"fmt"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 // DefaultMultiplier is the straddle price adjustment factor used by schwab-mcp.
@@ -25,7 +25,7 @@ type ExpectedMoveResult struct {
 func ExpectedMove(underlyingPrice, callPrice, putPrice, multiplier float64) (*ExpectedMoveResult, error) {
 	// Validate underlyingPrice
 	if underlyingPrice <= 0 {
-		return nil, schwabErrors.NewValidationError(
+		return nil, apperr.NewValidationError(
 			fmt.Sprintf("underlyingPrice must be > 0, got %.4f", underlyingPrice),
 			nil,
 		)
@@ -33,7 +33,7 @@ func ExpectedMove(underlyingPrice, callPrice, putPrice, multiplier float64) (*Ex
 
 	// Validate callPrice
 	if callPrice < 0 {
-		return nil, schwabErrors.NewValidationError(
+		return nil, apperr.NewValidationError(
 			fmt.Sprintf("callPrice must be >= 0, got %.4f", callPrice),
 			nil,
 		)
@@ -41,7 +41,7 @@ func ExpectedMove(underlyingPrice, callPrice, putPrice, multiplier float64) (*Ex
 
 	// Validate putPrice
 	if putPrice < 0 {
-		return nil, schwabErrors.NewValidationError(
+		return nil, apperr.NewValidationError(
 			fmt.Sprintf("putPrice must be >= 0, got %.4f", putPrice),
 			nil,
 		)
@@ -49,14 +49,14 @@ func ExpectedMove(underlyingPrice, callPrice, putPrice, multiplier float64) (*Ex
 
 	// Validate multiplier
 	if multiplier <= 0 {
-		return nil, schwabErrors.NewValidationError(
+		return nil, apperr.NewValidationError(
 			fmt.Sprintf("multiplier must be > 0, got %.4f", multiplier),
 			nil,
 		)
 	}
 
 	if multiplier > 1.0 {
-		return nil, schwabErrors.NewValidationError(
+		return nil, apperr.NewValidationError(
 			fmt.Sprintf("multiplier must be <= 1.0, got %.4f", multiplier),
 			nil,
 		)

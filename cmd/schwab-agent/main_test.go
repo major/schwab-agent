@@ -18,7 +18,7 @@ import (
 
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 // runApp builds and executes the root command without allowing urfave/cli to call os.Exit.
@@ -85,10 +85,10 @@ func TestBeforeHook_SkipsAuthForAuthCommand(t *testing.T) {
 	_, err := runApp(t, "schwab-agent", "auth", "status")
 	require.Error(t, err)
 
-	var authErr *schwabErrors.AuthRequiredError
+	var authErr *apperr.AuthRequiredError
 	require.ErrorAs(t, err, &authErr)
 
-	var validationErr *schwabErrors.ValidationError
+	var validationErr *apperr.ValidationError
 	assert.False(t, stderrors.As(err, &validationErr))
 }
 
@@ -111,12 +111,12 @@ func TestBeforeHook_ReturnsAuthErrorForAPICommand(t *testing.T) {
 	_, err := runApp(t, "schwab-agent", "--config", configPath, "account")
 	require.Error(t, err)
 
-	var authErr *schwabErrors.AuthRequiredError
+	var authErr *apperr.AuthRequiredError
 	require.ErrorAs(t, err, &authErr)
-	assert.Equal(t, "AUTH_REQUIRED", schwabErrors.ErrorCode(err))
+	assert.Equal(t, "AUTH_REQUIRED", apperr.ErrorCode(err))
 	assert.Equal(t, "No authentication token found", authErr.Message)
 	assert.Equal(t, "Run `schwab-agent auth login` to authenticate", authErr.Details)
-	assert.Equal(t, 3, schwabErrors.ExitCodeFor(err))
+	assert.Equal(t, 3, apperr.ExitCodeFor(err))
 }
 
 func TestBeforeHook_ReturnsAuthRequiredErrorForMissingConfig(t *testing.T) {
@@ -128,12 +128,12 @@ func TestBeforeHook_ReturnsAuthRequiredErrorForMissingConfig(t *testing.T) {
 	_, err := runApp(t, "schwab-agent", "--config", missingConfigPath, "account")
 	require.Error(t, err)
 
-	var authErr *schwabErrors.AuthRequiredError
+	var authErr *apperr.AuthRequiredError
 	require.ErrorAs(t, err, &authErr)
-	assert.Equal(t, "AUTH_REQUIRED", schwabErrors.ErrorCode(err))
+	assert.Equal(t, "AUTH_REQUIRED", apperr.ErrorCode(err))
 	assert.Equal(t, "Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file", authErr.Message)
 	assert.Equal(t, "Run `schwab-agent auth login` to authenticate", authErr.Details)
-	assert.Equal(t, 3, schwabErrors.ExitCodeFor(err))
+	assert.Equal(t, 3, apperr.ExitCodeFor(err))
 }
 
 func TestBeforeHook_ReturnsAuthExpiredErrorForStaleRefreshToken(t *testing.T) {
@@ -156,10 +156,10 @@ func TestBeforeHook_ReturnsAuthExpiredErrorForStaleRefreshToken(t *testing.T) {
 	_, err := runApp(t, "schwab-agent", "--config", configPath, "--token", tokenPath, "account")
 	require.Error(t, err)
 
-	var authErr *schwabErrors.AuthExpiredError
+	var authErr *apperr.AuthExpiredError
 	require.ErrorAs(t, err, &authErr)
 	assert.Equal(t, "Run `schwab-agent auth login` to re-authenticate", authErr.Details)
-	assert.Equal(t, 3, schwabErrors.ExitCodeFor(err))
+	assert.Equal(t, 3, apperr.ExitCodeFor(err))
 }
 
 func TestBeforeHook_RefreshesExpiredToken(t *testing.T) {

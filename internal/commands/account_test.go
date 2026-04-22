@@ -19,7 +19,7 @@ import (
 
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -168,7 +168,7 @@ func TestAccountList_APIError(t *testing.T) {
 	err := cmd.Run(context.Background(), []string{"account", "list"})
 	require.Error(t, err)
 
-	var httpErr *schwabErrors.HTTPError
+	var httpErr *apperr.HTTPError
 	assert.True(t, errors.As(err, &httpErr))
 }
 
@@ -291,7 +291,7 @@ func TestAccountGet_NoAccount_Error(t *testing.T) {
 	err := cmd.Run(context.Background(), []string{"account", "get"})
 	require.Error(t, err)
 
-	var notFoundErr *schwabErrors.AccountNotFoundError
+	var notFoundErr *apperr.AccountNotFoundError
 	require.True(t, errors.As(err, &notFoundErr))
 	assert.Contains(t, notFoundErr.Message, "no account specified")
 	assert.Contains(t, notFoundErr.Details, "schwab-agent account numbers")
@@ -338,7 +338,7 @@ func TestAccountGet_APIError(t *testing.T) {
 	err := cmd.Run(context.Background(), []string{"account", "get", "BAD_HASH"})
 	require.Error(t, err)
 
-	var notFoundErr *schwabErrors.AccountNotFoundError
+	var notFoundErr *apperr.AccountNotFoundError
 	assert.True(t, errors.As(err, &notFoundErr))
 }
 
@@ -503,7 +503,7 @@ func TestAccountTransaction_List_NoAccount(t *testing.T) {
 	err := runTestCommand(t, cmd, "account", "transaction", "list")
 	require.Error(t, err)
 
-	var accountErr *schwabErrors.AccountNotFoundError
+	var accountErr *apperr.AccountNotFoundError
 	assert.ErrorAs(t, err, &accountErr)
 }
 
@@ -538,7 +538,7 @@ func TestAccountTransaction_Get_MissingTxnID(t *testing.T) {
 	err := runTestCommand(t, cmd, "account", "transaction", "get", "--account", "abc123")
 	require.Error(t, err)
 
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -551,7 +551,7 @@ func TestAccountTransaction_Get_InvalidTxnID(t *testing.T) {
 	err := runTestCommand(t, cmd, "account", "transaction", "get", "--account", "abc123", "not-a-number")
 	require.Error(t, err)
 
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -564,7 +564,7 @@ func TestAccountTransaction_Get_NoAccount(t *testing.T) {
 	err := runTestCommand(t, cmd, "account", "transaction", "get", "1001")
 	require.Error(t, err)
 
-	var accountErr *schwabErrors.AccountNotFoundError
+	var accountErr *apperr.AccountNotFoundError
 	assert.ErrorAs(t, err, &accountErr)
 }
 
@@ -602,7 +602,7 @@ func TestResolveAccount_NoAccountError(t *testing.T) {
 	require.Error(t, err)
 	assert.Empty(t, account)
 
-	var accountErr *schwabErrors.AccountNotFoundError
+	var accountErr *apperr.AccountNotFoundError
 	assert.ErrorAs(t, err, &accountErr)
 }
 

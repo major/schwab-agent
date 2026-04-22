@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,7 +72,7 @@ func TestWriteSuccessWithComplexData(t *testing.T) {
 
 func TestWriteErrorAuthRequired(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := schwabErrors.NewAuthRequiredError("authentication required", errors.New("no token"))
+	err := apperr.NewAuthRequiredError("authentication required", errors.New("no token"))
 
 	writeErr := WriteError(buf, err)
 	require.NoError(t, writeErr)
@@ -87,7 +87,7 @@ func TestWriteErrorAuthRequired(t *testing.T) {
 
 func TestWriteErrorAuthExpired(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := schwabErrors.NewAuthExpiredError("auth expired", errors.New("401 response"))
+	err := apperr.NewAuthExpiredError("auth expired", errors.New("401 response"))
 
 	writeErr := WriteError(buf, err)
 	require.NoError(t, writeErr)
@@ -102,7 +102,7 @@ func TestWriteErrorAuthExpired(t *testing.T) {
 
 func TestWriteErrorAuthCallback(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := schwabErrors.NewAuthCallbackError("callback failed", errors.New("invalid state"))
+	err := apperr.NewAuthCallbackError("callback failed", errors.New("invalid state"))
 
 	writeErr := WriteError(buf, err)
 	require.NoError(t, writeErr)
@@ -117,7 +117,7 @@ func TestWriteErrorAuthCallback(t *testing.T) {
 
 func TestWriteErrorOrderRejected(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := schwabErrors.NewOrderRejectedError("order rejected", errors.New("insufficient funds"))
+	err := apperr.NewOrderRejectedError("order rejected", errors.New("insufficient funds"))
 
 	writeErr := WriteError(buf, err)
 	require.NoError(t, writeErr)
@@ -132,7 +132,7 @@ func TestWriteErrorOrderRejected(t *testing.T) {
 
 func TestWriteErrorSymbolNotFound(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := schwabErrors.NewSymbolNotFoundError("symbol not found", errors.New("api returned empty"))
+	err := apperr.NewSymbolNotFoundError("symbol not found", errors.New("api returned empty"))
 
 	writeErr := WriteError(buf, err)
 	require.NoError(t, writeErr)
@@ -147,7 +147,7 @@ func TestWriteErrorSymbolNotFound(t *testing.T) {
 
 func TestWriteErrorAccountNotFound(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := schwabErrors.NewAccountNotFoundError("account not found", errors.New("invalid account id"))
+	err := apperr.NewAccountNotFoundError("account not found", errors.New("invalid account id"))
 
 	writeErr := WriteError(buf, err)
 	require.NoError(t, writeErr)
@@ -162,7 +162,7 @@ func TestWriteErrorAccountNotFound(t *testing.T) {
 
 func TestWriteErrorHTTPError(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := schwabErrors.NewHTTPError("http error", 500, "Internal Server Error", errors.New("server error"))
+	err := apperr.NewHTTPError("http error", 500, "Internal Server Error", errors.New("server error"))
 
 	writeErr := WriteError(buf, err)
 	require.NoError(t, writeErr)
@@ -178,7 +178,7 @@ func TestWriteErrorHTTPError(t *testing.T) {
 
 func TestWriteErrorValidationError(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := schwabErrors.NewValidationError("validation failed", errors.New("invalid input"))
+	err := apperr.NewValidationError("validation failed", errors.New("invalid input"))
 
 	writeErr := WriteError(buf, err)
 	require.NoError(t, writeErr)
@@ -193,7 +193,7 @@ func TestWriteErrorValidationError(t *testing.T) {
 
 func TestWriteErrorOrderBuildError(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := schwabErrors.NewOrderBuildError("order build failed", errors.New("invalid order params"))
+	err := apperr.NewOrderBuildError("order build failed", errors.New("invalid order params"))
 
 	writeErr := WriteError(buf, err)
 	require.NoError(t, writeErr)
@@ -223,7 +223,7 @@ func TestWriteErrorGenericError(t *testing.T) {
 
 func TestWriteErrorWithDetails(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := schwabErrors.NewSchwabError("custom error", errors.New("cause"))
+	err := apperr.NewSchwabError("custom error", errors.New("cause"))
 	err.Details = "additional context"
 
 	writeErr := WriteError(buf, err)
@@ -336,7 +336,7 @@ func TestEnvelopeJSONStructure(t *testing.T) {
 
 func TestErrorEnvelopeJSONStructure(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := schwabErrors.NewAuthRequiredError("auth required", errors.New("no token"))
+	err := apperr.NewAuthRequiredError("auth required", errors.New("no token"))
 
 	writeErr := WriteError(buf, err)
 	require.NoError(t, writeErr)

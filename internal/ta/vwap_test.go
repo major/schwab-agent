@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 func TestVWAP_Correct(t *testing.T) {
@@ -70,7 +70,7 @@ func TestVWAP_AllZeroVolume(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -116,7 +116,7 @@ func TestVWAP_MismatchedLengths(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -132,6 +132,6 @@ func TestVWAP_EmptySlices(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }

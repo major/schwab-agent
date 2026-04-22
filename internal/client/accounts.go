@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -17,9 +17,9 @@ func (c *Client) AccountNumbers(ctx context.Context) ([]models.AccountNumber, er
 	err := c.doGet(ctx, "/trader/v1/accounts/accountNumbers", nil, &result)
 	if err != nil {
 		// Convert 404 HTTPError to AccountNotFoundError
-		var httpErr *schwabErrors.HTTPError
+		var httpErr *apperr.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
-			return nil, schwabErrors.NewAccountNotFoundError("account numbers not found", err)
+			return nil, apperr.NewAccountNotFoundError("account numbers not found", err)
 		}
 		return nil, err
 	}
@@ -33,9 +33,9 @@ func (c *Client) Accounts(ctx context.Context) ([]models.Account, error) {
 	err := c.doGet(ctx, "/trader/v1/accounts", nil, &result)
 	if err != nil {
 		// Convert 404 HTTPError to AccountNotFoundError
-		var httpErr *schwabErrors.HTTPError
+		var httpErr *apperr.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
-			return nil, schwabErrors.NewAccountNotFoundError("accounts not found", err)
+			return nil, apperr.NewAccountNotFoundError("accounts not found", err)
 		}
 		return nil, err
 	}
@@ -50,9 +50,9 @@ func (c *Client) Account(ctx context.Context, hashValue string) (*models.Account
 	err := c.doGet(ctx, path, nil, &result)
 	if err != nil {
 		// Convert 404 HTTPError to AccountNotFoundError
-		var httpErr *schwabErrors.HTTPError
+		var httpErr *apperr.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
-			return nil, schwabErrors.NewAccountNotFoundError(fmt.Sprintf("account %s not found", hashValue), err)
+			return nil, apperr.NewAccountNotFoundError(fmt.Sprintf("account %s not found", hashValue), err)
 		}
 		return nil, err
 	}

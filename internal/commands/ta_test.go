@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 )
 
@@ -253,7 +253,7 @@ func TestTASMA_MissingSymbol(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -331,7 +331,7 @@ func TestTARSI_MissingSymbol(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -404,7 +404,7 @@ func TestTAMACD_MissingSymbol(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -452,7 +452,7 @@ func TestTAATR_MissingSymbol(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -506,7 +506,7 @@ func TestTABBands_MissingSymbol(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -578,7 +578,7 @@ func TestTAStochastic_MissingSymbol(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -631,7 +631,7 @@ func TestTAADX_MissingSymbol(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -689,7 +689,7 @@ func TestTAVWAP_MissingSymbol(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, valErr.Error(), "symbol")
 }
@@ -777,7 +777,7 @@ func TestTAHV_MissingSymbol(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, valErr.Error(), "symbol")
 }
@@ -794,7 +794,7 @@ func TestTAHV_InvalidPeriod(t *testing.T) {
 
 	// Assert - period=0 should produce a ValidationError from ta.HistoricalVolatility
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	require.ErrorAs(t, err, &valErr)
 }
 
@@ -855,7 +855,7 @@ func TestTAExpectedMove_MissingSymbol(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, valErr.Error(), "symbol")
 }

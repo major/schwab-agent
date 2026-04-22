@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 // synchronizedBuffer is a concurrency-safe writer for login flow tests.
@@ -151,7 +151,7 @@ func TestExchangeCode_Failure_ReturnsAuthCallbackError(t *testing.T) {
 	// Assert
 	assert.Nil(t, tokenFile)
 	require.Error(t, err)
-	var callbackErr *schwabErrors.AuthCallbackError
+	var callbackErr *apperr.AuthCallbackError
 	assert.ErrorAs(t, err, &callbackErr)
 	assert.Contains(t, err.Error(), "token exchange failed")
 }
@@ -194,7 +194,7 @@ func TestStartCallbackServer_StateMismatch_ReturnsAuthCallbackError(t *testing.T
 	// Assert
 	assert.Empty(t, result.code)
 	require.Error(t, result.err)
-	var callbackErr *schwabErrors.AuthCallbackError
+	var callbackErr *apperr.AuthCallbackError
 	assert.ErrorAs(t, result.err, &callbackErr)
 	assert.Equal(t, http.StatusBadRequest, statusCode)
 	assert.Contains(t, responseBody, "state mismatch")

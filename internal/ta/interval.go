@@ -1,7 +1,7 @@
 package ta
 
 import (
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 // IntervalToHistoryParams maps a human interval string to PriceHistory query params.
@@ -30,7 +30,7 @@ func IntervalToHistoryParams(interval string) (periodType, period, freqType, fre
 	case "30min":
 		return "day", "10", "minute", "30", nil
 	default:
-		return "", "", "", "", schwabErrors.NewValidationError(
+		return "", "", "", "", apperr.NewValidationError(
 			"unsupported interval: "+interval,
 			nil,
 		)

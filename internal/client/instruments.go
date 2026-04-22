@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -33,7 +33,7 @@ func (c *Client) GetInstrument(ctx context.Context, cusip string) (*models.Instr
 		return nil, err
 	}
 	if len(result.Instruments) == 0 {
-		return nil, schwabErrors.NewSymbolNotFoundError(
+		return nil, apperr.NewSymbolNotFoundError(
 			fmt.Sprintf("instrument not found for CUSIP %s", cusip), nil,
 		)
 	}

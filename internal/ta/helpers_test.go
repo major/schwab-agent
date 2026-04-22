@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -33,7 +33,7 @@ func TestExtractClose_NilField(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	require.True(t, assert.ErrorAs(t, err, &valErr), "error should be ValidationError")
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "nil close")
@@ -63,7 +63,7 @@ func TestExtractHigh_NilField(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	require.True(t, assert.ErrorAs(t, err, &valErr), "error should be ValidationError")
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "nil high")
@@ -92,7 +92,7 @@ func TestExtractLow_NilField(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	require.True(t, assert.ErrorAs(t, err, &valErr), "error should be ValidationError")
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "nil low")
@@ -121,7 +121,7 @@ func TestExtractOpen_NilField(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	require.True(t, assert.ErrorAs(t, err, &valErr), "error should be ValidationError")
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "nil open")
@@ -150,7 +150,7 @@ func TestExtractVolume_NilField(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	require.True(t, assert.ErrorAs(t, err, &valErr), "error should be ValidationError")
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "nil volume")
@@ -211,7 +211,7 @@ func TestValidateMinCandles_Insufficient(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	require.True(t, assert.ErrorAs(t, err, &valErr), "error should be ValidationError")
 	assert.Equal(t, "sma requires at least 20 candles, got 5", err.Error())
 }

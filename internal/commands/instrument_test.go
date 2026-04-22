@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 )
 
@@ -67,7 +67,7 @@ func TestInstrumentCommand_Search_MissingQuery(t *testing.T) {
 	err := runTestCommand(t, cmd, "instrument", "search")
 	require.Error(t, err)
 
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -101,7 +101,7 @@ func TestInstrumentCommand_Get_MissingCUSIP(t *testing.T) {
 	err := runTestCommand(t, cmd, "instrument", "get")
 	require.Error(t, err)
 
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 

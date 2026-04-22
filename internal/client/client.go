@@ -16,7 +16,7 @@ import (
 	"net/url"
 	"time"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 const (
@@ -154,10 +154,10 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 
 	// Map non-2xx status codes to typed errors.
 	if resp.StatusCode == http.StatusUnauthorized {
-		return schwabErrors.NewAuthExpiredError("authentication expired", nil)
+		return apperr.NewAuthExpiredError("authentication expired", nil)
 	}
 	if resp.StatusCode >= 400 {
-		return schwabErrors.NewHTTPError(
+		return apperr.NewHTTPError(
 			fmt.Sprintf("HTTP %d", resp.StatusCode),
 			resp.StatusCode,
 			string(respBody),

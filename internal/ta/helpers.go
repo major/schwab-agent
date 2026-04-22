@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -13,7 +13,7 @@ func ExtractClose(candles []models.Candle) ([]float64, error) {
 	result := make([]float64, len(candles))
 	for i, c := range candles {
 		if c.Close == nil {
-			return nil, schwabErrors.NewValidationError(
+			return nil, apperr.NewValidationError(
 				fmt.Sprintf("nil close at index %d", i),
 				nil,
 			)
@@ -28,7 +28,7 @@ func ExtractHigh(candles []models.Candle) ([]float64, error) {
 	result := make([]float64, len(candles))
 	for i, c := range candles {
 		if c.High == nil {
-			return nil, schwabErrors.NewValidationError(
+			return nil, apperr.NewValidationError(
 				fmt.Sprintf("nil high at index %d", i),
 				nil,
 			)
@@ -43,7 +43,7 @@ func ExtractLow(candles []models.Candle) ([]float64, error) {
 	result := make([]float64, len(candles))
 	for i, c := range candles {
 		if c.Low == nil {
-			return nil, schwabErrors.NewValidationError(
+			return nil, apperr.NewValidationError(
 				fmt.Sprintf("nil low at index %d", i),
 				nil,
 			)
@@ -58,7 +58,7 @@ func ExtractOpen(candles []models.Candle) ([]float64, error) {
 	result := make([]float64, len(candles))
 	for i, c := range candles {
 		if c.Open == nil {
-			return nil, schwabErrors.NewValidationError(
+			return nil, apperr.NewValidationError(
 				fmt.Sprintf("nil open at index %d", i),
 				nil,
 			)
@@ -73,7 +73,7 @@ func ExtractVolume(candles []models.Candle) ([]float64, error) {
 	result := make([]float64, len(candles))
 	for i, c := range candles {
 		if c.Volume == nil {
-			return nil, schwabErrors.NewValidationError(
+			return nil, apperr.NewValidationError(
 				fmt.Sprintf("nil volume at index %d", i),
 				nil,
 			)
@@ -103,7 +103,7 @@ func ExtractTimestamps(candles []models.Candle) []string {
 // Error message format: "sma requires at least 20 candles, got 5"
 func ValidateMinCandles(candles []models.Candle, required int, indicator string) error {
 	if len(candles) < required {
-		return schwabErrors.NewValidationError(
+		return apperr.NewValidationError(
 			fmt.Sprintf("%s requires at least %d candles, got %d", indicator, required, len(candles)),
 			nil,
 		)

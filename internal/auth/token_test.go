@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 // makeTokenFile creates a TokenFile with sensible defaults for testing.
@@ -48,7 +48,7 @@ func TestLoadToken_MissingFile_ReturnsAuthRequiredError(t *testing.T) {
 	assert.Nil(t, tf)
 	require.Error(t, err)
 
-	var authReqErr *schwabErrors.AuthRequiredError
+	var authReqErr *apperr.AuthRequiredError
 	assert.ErrorAs(t, err, &authReqErr)
 	assert.Contains(t, err.Error(), "token file not found")
 }
@@ -110,7 +110,7 @@ func TestLoadToken_PermissionDenied_ReturnsError(t *testing.T) {
 	assert.Nil(t, tf)
 	require.Error(t, err)
 	// Should NOT be AuthRequiredError (file exists but can't be read)
-	var authReqErr *schwabErrors.AuthRequiredError
+	var authReqErr *apperr.AuthRequiredError
 	assert.False(t, errors.As(err, &authReqErr))
 }
 
@@ -410,7 +410,7 @@ func TestRefreshAccessToken_InvalidGrant_ReturnsAuthExpiredError(t *testing.T) {
 	assert.Nil(t, newTF)
 	require.Error(t, err)
 
-	var authExpErr *schwabErrors.AuthExpiredError
+	var authExpErr *apperr.AuthExpiredError
 	assert.ErrorAs(t, err, &authExpErr)
 	assert.Contains(t, err.Error(), "refresh token expired")
 }
@@ -490,7 +490,7 @@ func TestRefreshAccessToken_OtherHTTPError_ReturnsGenericError(t *testing.T) {
 	require.Error(t, err)
 
 	// Should NOT be AuthExpiredError for non-invalid_grant errors
-	var authExpErr *schwabErrors.AuthExpiredError
+	var authExpErr *apperr.AuthExpiredError
 	assert.False(t, errors.As(err, &authExpErr))
 }
 

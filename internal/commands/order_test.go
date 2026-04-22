@@ -16,7 +16,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/client"
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/orderbuilder"
 	"github.com/major/schwab-agent/internal/output"
@@ -140,7 +140,7 @@ func TestOrderConfirmGate(t *testing.T) {
 			require.Error(t, err)
 			assert.Empty(t, stdout)
 
-			var validationErr *schwabErrors.ValidationError
+			var validationErr *apperr.ValidationError
 			require.ErrorAs(t, err, &validationErr)
 			assert.Equal(t, "Add --confirm to execute this order", validationErr.Error())
 		})
@@ -381,7 +381,7 @@ func TestOrderMutableGuard(t *testing.T) {
 			require.Error(t, err)
 			assert.Empty(t, stdout)
 
-			var validationErr *schwabErrors.ValidationError
+			var validationErr *apperr.ValidationError
 			require.ErrorAs(t, err, &validationErr)
 			assert.Contains(t, validationErr.Error(), "i-also-like-to-live-dangerously")
 		})
@@ -402,7 +402,7 @@ func TestOrderMutableGuardTakesPriorityOverConfirm(t *testing.T) {
 	require.Error(t, err)
 	assert.Empty(t, stdout)
 
-	var validationErr *schwabErrors.ValidationError
+	var validationErr *apperr.ValidationError
 	require.ErrorAs(t, err, &validationErr)
 	assert.Contains(t, validationErr.Error(), "i-also-like-to-live-dangerously")
 }
@@ -1078,7 +1078,7 @@ func TestOrderBuildSpreadParseErrors(t *testing.T) {
 			require.Error(t, err)
 			assert.Empty(t, stdout)
 
-			var validationErr *schwabErrors.ValidationError
+			var validationErr *apperr.ValidationError
 			require.ErrorAs(t, err, &validationErr)
 			assert.Equal(t, tc.wantMsg, validationErr.Error())
 		})

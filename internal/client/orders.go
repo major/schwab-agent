@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -125,16 +125,16 @@ func (c *Client) PlaceOrder(ctx context.Context, hashValue string, order *models
 	// Map status codes to typed errors, checking order-rejection codes before
 	// the generic 4xx fallback so callers get OrderRejectedError specifically.
 	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, schwabErrors.NewAuthExpiredError("authentication expired", nil)
+		return nil, apperr.NewAuthExpiredError("authentication expired", nil)
 	}
 	if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusUnprocessableEntity {
-		return nil, schwabErrors.NewOrderRejectedError(
+		return nil, apperr.NewOrderRejectedError(
 			fmt.Sprintf("order rejected: %s", string(respBody)),
 			nil,
 		)
 	}
 	if resp.StatusCode >= 400 {
-		return nil, schwabErrors.NewHTTPError(
+		return nil, apperr.NewHTTPError(
 			fmt.Sprintf("HTTP %d", resp.StatusCode),
 			resp.StatusCode,
 			string(respBody),
