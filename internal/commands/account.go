@@ -150,6 +150,7 @@ func resolveAccount(accountFlag, configPath string, positionalArgs []string) (st
 	return "", apperr.NewAccountNotFoundError(
 		"no account specified: use --account flag or set default_account in config",
 		nil,
+		apperr.WithDetails("Run `schwab-agent account numbers` to list accounts, then `schwab-agent account set-default` to set one"),
 	)
 }
 

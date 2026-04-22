@@ -265,13 +265,12 @@ func TestHTTPErrorAttributes(t *testing.T) {
 	}
 }
 
-// TestDetailsFieldPreservation verifies Details field is preserved.
+// TestDetailsFieldPreservation verifies Details is set through constructor option.
 func TestDetailsFieldPreservation(t *testing.T) {
 	details := "Try checking your credentials"
-	err := NewAuthRequiredError("auth required", nil)
-	err.Details = details
-	if err.Details != details {
-		t.Errorf("Details = %q, want %q", err.Details, details)
+	err := NewAuthRequiredError("auth required", nil, WithDetails(details))
+	if err.Details() != details {
+		t.Errorf("Details() = %q, want %q", err.Details(), details)
 	}
 }
 

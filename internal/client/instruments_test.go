@@ -25,11 +25,11 @@ func TestSearchInstruments_Success(t *testing.T) {
 		response := models.InstrumentResponse{
 			Instruments: []models.Instrument{
 				{
-					Cusip:       strPtr("037833100"),
-					Symbol:      strPtr("AAPL"),
-					Description: strPtr("Apple Inc"),
-					Exchange:    strPtr("NASDAQ"),
-					AssetType:   strPtr("EQUITY"),
+					Cusip:       ptr("037833100"),
+					Symbol:      ptr("AAPL"),
+					Description: ptr("Apple Inc"),
+					Exchange:    ptr("NASDAQ"),
+					AssetType:   ptr("EQUITY"),
 				},
 			},
 		}
@@ -55,9 +55,9 @@ func TestSearchInstruments_MultipleResults(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.InstrumentResponse{
 			Instruments: []models.Instrument{
-				{Symbol: strPtr("AAPL"), Description: strPtr("Apple Inc")},
-				{Symbol: strPtr("AAL"), Description: strPtr("American Airlines")},
-				{Symbol: strPtr("AAXJ"), Description: strPtr("iShares MSCI All Country Asia")},
+				{Symbol: ptr("AAPL"), Description: ptr("Apple Inc")},
+				{Symbol: ptr("AAL"), Description: ptr("American Airlines")},
+				{Symbol: ptr("AAXJ"), Description: ptr("iShares MSCI All Country Asia")},
 			},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
@@ -96,11 +96,11 @@ func TestGetInstrument_Success(t *testing.T) {
 		response := models.InstrumentResponse{
 			Instruments: []models.Instrument{
 				{
-					Cusip:       strPtr("037833100"),
-					Symbol:      strPtr("AAPL"),
-					Description: strPtr("Apple Inc"),
-					Exchange:    strPtr("NASDAQ"),
-					AssetType:   strPtr("EQUITY"),
+					Cusip:       ptr("037833100"),
+					Symbol:      ptr("AAPL"),
+					Description: ptr("Apple Inc"),
+					Exchange:    ptr("NASDAQ"),
+					AssetType:   ptr("EQUITY"),
 				},
 			},
 		}

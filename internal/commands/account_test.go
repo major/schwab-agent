@@ -96,7 +96,7 @@ func TestAccountList_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
-	assert.Contains(t, env.Metadata, "timestamp")
+	assert.NotEmpty(t, env.Metadata.Timestamp)
 
 	dataMap, ok := env.Data.(map[string]any)
 	require.True(t, ok)
@@ -192,7 +192,7 @@ func TestAccountNumbers_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
-	assert.Contains(t, env.Metadata, "timestamp")
+	assert.NotEmpty(t, env.Metadata.Timestamp)
 
 	dataMap, ok := env.Data.(map[string]any)
 	require.True(t, ok)
@@ -230,7 +230,7 @@ func TestAccountGet_FlagOverridesAll(t *testing.T) {
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
-	assert.Equal(t, "FLAG_HASH", env.Metadata["account"])
+	assert.Equal(t, "FLAG_HASH", env.Metadata.Account)
 }
 
 func TestAccountGet_PositionalArg(t *testing.T) {
@@ -252,7 +252,7 @@ func TestAccountGet_PositionalArg(t *testing.T) {
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
-	assert.Equal(t, "ARG_HASH", env.Metadata["account"])
+	assert.Equal(t, "ARG_HASH", env.Metadata.Account)
 }
 
 func TestAccountGet_ConfigDefault(t *testing.T) {
@@ -275,7 +275,7 @@ func TestAccountGet_ConfigDefault(t *testing.T) {
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
-	assert.Equal(t, "CONFIG_HASH", env.Metadata["account"])
+	assert.Equal(t, "CONFIG_HASH", env.Metadata.Account)
 }
 
 func TestAccountGet_NoAccount_Error(t *testing.T) {
@@ -294,8 +294,8 @@ func TestAccountGet_NoAccount_Error(t *testing.T) {
 	var notFoundErr *apperr.AccountNotFoundError
 	require.True(t, errors.As(err, &notFoundErr))
 	assert.Contains(t, notFoundErr.Message, "no account specified")
-	assert.Contains(t, notFoundErr.Details, "schwab-agent account numbers")
-	assert.Contains(t, notFoundErr.Details, "schwab-agent account set-default")
+	assert.Contains(t, notFoundErr.Details(), "schwab-agent account numbers")
+	assert.Contains(t, notFoundErr.Details(), "schwab-agent account set-default")
 }
 
 func TestAccountGet_MetadataContainsHash(t *testing.T) {
@@ -317,8 +317,8 @@ func TestAccountGet_MetadataContainsHash(t *testing.T) {
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
-	assert.Equal(t, "MY_HASH", env.Metadata["account"])
-	assert.Contains(t, env.Metadata, "timestamp")
+	assert.Equal(t, "MY_HASH", env.Metadata.Account)
+	assert.NotEmpty(t, env.Metadata.Timestamp)
 }
 
 func TestAccountGet_APIError(t *testing.T) {
@@ -589,7 +589,9 @@ func TestResolveAccount_FlagBeforePositionalArg(t *testing.T) {
 func TestResolveAccount_FallbackToConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
-	configData := []byte(`{"default_account":"config-account"}`)
+	// LoadConfig validates client_id/client_secret, so we must include them
+	// for the config to load successfully and expose default_account.
+	configData := []byte(`{"client_id":"test","client_secret":"test","default_account":"config-account"}`)
 	require.NoError(t, os.WriteFile(configPath, configData, 0o600))
 
 	account, err := resolveAccount("", configPath, nil)

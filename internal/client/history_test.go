@@ -22,24 +22,24 @@ func TestPriceHistory_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		response := models.CandleList{
-			Symbol: strPtr("AAPL"),
-			Empty:  boolPtr(false),
+			Symbol: ptr("AAPL"),
+			Empty:  ptr(false),
 			Candles: []models.Candle{
 				{
-					Open:     floatPtr(148.00),
-					High:     floatPtr(152.00),
-					Low:      floatPtr(147.50),
-					Close:    floatPtr(150.25),
-					Volume:   int64Ptr(45000000),
-					Datetime: int64Ptr(1700000000000),
+					Open:     ptr(148.00),
+					High:     ptr(152.00),
+					Low:      ptr(147.50),
+					Close:    ptr(150.25),
+				Volume:   ptr(int64(45000000)),
+				Datetime: ptr(int64(1700000000000)),
 				},
 				{
-					Open:     floatPtr(150.50),
-					High:     floatPtr(153.00),
-					Low:      floatPtr(149.00),
-					Close:    floatPtr(151.75),
-					Volume:   int64Ptr(42000000),
-					Datetime: int64Ptr(1700086400000),
+					Open:     ptr(150.50),
+					High:     ptr(153.00),
+					Low:      ptr(149.00),
+					Close:    ptr(151.75),
+				Volume:   ptr(int64(42000000)),
+				Datetime: ptr(int64(1700086400000)),
 				},
 			},
 		}
@@ -72,7 +72,7 @@ func TestPriceHistory_AllParams(t *testing.T) {
 		assert.Equal(t, "1700100000000", q.Get("endDate"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.CandleList{Symbol: strPtr("AAPL")}))
+		require.NoError(t, json.NewEncoder(w).Encode(models.CandleList{Symbol: ptr("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -101,7 +101,7 @@ func TestPriceHistory_DateParams(t *testing.T) {
 		assert.Empty(t, q.Get("period"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.CandleList{Symbol: strPtr("AAPL")}))
+		require.NoError(t, json.NewEncoder(w).Encode(models.CandleList{Symbol: ptr("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -119,8 +119,8 @@ func TestPriceHistory_EmptyCandles(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.CandleList{
-			Symbol:  strPtr("AAPL"),
-			Empty:   boolPtr(true),
+			Symbol:  ptr("AAPL"),
+			Empty:   ptr(true),
 			Candles: []models.Candle{},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))

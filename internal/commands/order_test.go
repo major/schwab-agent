@@ -150,7 +150,7 @@ func TestOrderConfirmGate(t *testing.T) {
 func TestOrderPreviewSpecModes(t *testing.T) {
 	t.Parallel()
 
-	previewResponse := models.PreviewOrder{OrderID: int64Ptr(4242)}
+	previewResponse := models.PreviewOrder{OrderID: ptr(int64(4242))}
 	var requestBodies []string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -410,7 +410,7 @@ func TestOrderMutableGuardTakesPriorityOverConfirm(t *testing.T) {
 func TestOrderPreviewNotBlockedByMutableGuard(t *testing.T) {
 	t.Parallel()
 
-	previewResponse := models.PreviewOrder{OrderID: int64Ptr(9999)}
+	previewResponse := models.PreviewOrder{OrderID: ptr(int64(9999))}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
@@ -532,9 +532,9 @@ func TestOrderPlaceOCOPipeline(t *testing.T) {
 	assert.Equal(t, float64(55555), data["orderId"])
 }
 
-// int64Ptr returns a test pointer for preview fixtures.
-func int64Ptr(value int64) *int64 {
-	return &value
+// ptr returns a pointer to the provided value (generic test helper).
+func ptr[T any](v T) *T {
+	return &v
 }
 
 // --- Spread build tests (iron condor, vertical, strangle, straddle, covered call) ---

@@ -62,14 +62,6 @@ func TestNewClient_WithLogger(t *testing.T) {
 	assert.Equal(t, logger, c.logger)
 }
 
-func TestSetToken(t *testing.T) {
-	c := NewClient("old-token")
-	assert.Equal(t, "old-token", c.token)
-
-	c.SetToken("new-token")
-	assert.Equal(t, "new-token", c.token)
-}
-
 func TestDoGet_BearerTokenInHeader(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "Bearer my-secret-token", r.Header.Get("Authorization"))
@@ -391,7 +383,7 @@ func TestDoRequest_EmptyResponseBody_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestDoRequest_TokenUpdatedAfterSetToken(t *testing.T) {
+func TestDoRequest_TokenUpdatedDirectly(t *testing.T) {
 	var capturedAuth string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedAuth = r.Header.Get("Authorization")
@@ -408,8 +400,8 @@ func TestDoRequest_TokenUpdatedAfterSetToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Bearer first-token", capturedAuth)
 
-	// Update token and verify next request uses it.
-	c.SetToken("refreshed-token")
+	// Update token directly and verify next request uses it.
+	c.token = "refreshed-token"
 	err = c.doGet(context.Background(), "/test", nil, &result)
 	require.NoError(t, err)
 	assert.Equal(t, "Bearer refreshed-token", capturedAuth)

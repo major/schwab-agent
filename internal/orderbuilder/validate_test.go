@@ -573,5 +573,5 @@ func assertValidationError(t *testing.T, err error, expectedMessage, expectedDet
 	var validationErr *apperr.ValidationError
 	require.True(t, errors.As(err, &validationErr))
 	assert.Equal(t, expectedMessage, validationErr.Message)
-	assert.Equal(t, expectedDetails, validationErr.Details)
+	assert.Equal(t, expectedDetails, validationErr.Details())
 }

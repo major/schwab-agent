@@ -22,10 +22,10 @@ func TestOptionChain_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		response := models.OptionChain{
-			Symbol:          strPtr("AAPL"),
-			Status:          strPtr("SUCCESS"),
-			UnderlyingPrice: floatPtr(150.25),
-			IsDelayed:       boolPtr(false),
+			Symbol:          ptr("AAPL"),
+			Status:          ptr("SUCCESS"),
+			UnderlyingPrice: ptr(150.25),
+			IsDelayed:       ptr(false),
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
@@ -52,7 +52,7 @@ func TestOptionChain_AllParams(t *testing.T) {
 		assert.Equal(t, "2025-06-30", q.Get("toDate"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: strPtr("AAPL")}))
+		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: ptr("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -84,7 +84,7 @@ func TestOptionChain_AdvancedParams(t *testing.T) {
 		assert.Equal(t, "45", q.Get("daysToExpiration"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: strPtr("AAPL")}))
+		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: ptr("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -125,7 +125,7 @@ func TestOptionChain_EmptyParams(t *testing.T) {
 		assert.Empty(t, q.Get("daysToExpiration"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: strPtr("AAPL")}))
+		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: ptr("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -140,15 +140,15 @@ func TestOptionChain_WithCallExpDateMap(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.OptionChain{
-			Symbol: strPtr("AAPL"),
+			Symbol: ptr("AAPL"),
 			CallExpDateMap: map[string]map[string][]*models.OptionContract{
 				"2025-06-20:30": {
 					"150.0": {
 						{
-							Symbol:      strPtr("AAPL_062025C150"),
-							StrikePrice: floatPtr(150.0),
-							Bid:         floatPtr(5.50),
-							Ask:         floatPtr(5.80),
+							Symbol:      ptr("AAPL_062025C150"),
+							StrikePrice: ptr(150.0),
+							Bid:         ptr(5.50),
+							Ask:         ptr(5.80),
 						},
 					},
 				},

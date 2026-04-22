@@ -1,7 +1,11 @@
 // Package orderbuilder constructs Schwab order payloads.
 package orderbuilder
 
-import "github.com/major/schwab-agent/internal/models"
+import (
+	"cmp"
+
+	"github.com/major/schwab-agent/internal/models"
+)
 
 // OCOParams holds parameters for building a standalone one-cancels-other order.
 // Unlike bracket orders, OCO orders have no entry leg - they attach exit
@@ -55,11 +59,11 @@ func BuildBracketOrder(params *BracketParams) (*models.OrderRequest, error) {
 	}
 
 	if params.OrderType == models.OrderTypeLimit || params.OrderType == models.OrderTypeStopLimit {
-		order.Price = float64Ptr(params.Price)
+		order.Price = ptr(params.Price)
 	}
 
 	if params.OrderType == models.OrderTypeStop || params.OrderType == models.OrderTypeStopLimit {
-		order.StopPrice = float64Ptr(params.Price)
+		order.StopPrice = ptr(params.Price)
 	}
 
 	return order, nil
@@ -113,7 +117,7 @@ func buildOCOLimitExit(params *OCOParams) models.OrderRequest {
 		Duration:          params.Duration,
 		OrderType:         models.OrderTypeLimit,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		Price:             float64Ptr(params.TakeProfit),
+		Price:             ptr(params.TakeProfit),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Symbol, params.Action, params.Quantity),
 		},
@@ -127,7 +131,7 @@ func buildOCOStopExit(params *OCOParams) models.OrderRequest {
 		Duration:          params.Duration,
 		OrderType:         models.OrderTypeStop,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		StopPrice:         float64Ptr(params.StopLoss),
+		StopPrice:         ptr(params.StopLoss),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Symbol, params.Action, params.Quantity),
 		},
@@ -136,8 +140,8 @@ func buildOCOStopExit(params *OCOParams) models.OrderRequest {
 
 // applyOCODefaults fills in Schwab's standard session and duration defaults.
 func applyOCODefaults(params *OCOParams) {
-	params.Duration = defaultDuration(params.Duration)
-	params.Session = defaultSession(params.Session)
+	params.Duration = cmp.Or(params.Duration, models.DurationDay)
+	params.Session = cmp.Or(params.Session, models.SessionNormal)
 }
 
 // buildExitStrategies constructs the child order strategies based on which exit
@@ -176,7 +180,7 @@ func buildTakeProfitOrder(params *BracketParams, exitInstruction models.Instruct
 		Duration:          params.Duration,
 		OrderType:         models.OrderTypeLimit,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		Price:             float64Ptr(params.TakeProfit),
+		Price:             ptr(params.TakeProfit),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Symbol, exitInstruction, params.Quantity),
 		},
@@ -190,7 +194,7 @@ func buildStopLossOrder(params *BracketParams, exitInstruction models.Instructio
 		Duration:          params.Duration,
 		OrderType:         models.OrderTypeStop,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		StopPrice:         float64Ptr(params.StopLoss),
+		StopPrice:         ptr(params.StopLoss),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Symbol, exitInstruction, params.Quantity),
 		},
@@ -199,8 +203,8 @@ func buildStopLossOrder(params *BracketParams, exitInstruction models.Instructio
 
 // applyBracketDefaults fills in Schwab's standard session and duration defaults.
 func applyBracketDefaults(params *BracketParams) {
-	params.Duration = defaultDuration(params.Duration)
-	params.Session = defaultSession(params.Session)
+	params.Duration = cmp.Or(params.Duration, models.DurationDay)
+	params.Session = cmp.Or(params.Session, models.SessionNormal)
 }
 
 // bracketExitInstruction returns the closing instruction for the bracket exit legs.
