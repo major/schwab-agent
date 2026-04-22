@@ -616,3 +616,90 @@ func TestTAVWAP_NoPointsFlag(t *testing.T) {
 	require.True(t, ok)
 	assert.Len(t, values, 5)
 }
+
+func TestTAHV_ValidEnvelope(t *testing.T) {
+	// Arrange - period+21 passed to fetchAndValidateCandles, which applies max(p*3, p+20).
+	// For default period=20: 41*3=123 candles required. Use 200 for headroom.
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 200))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	require.NoError(t, runTestCommand(t, cmd, "ta", "hv", "AAPL"))
+
+	// Assert
+	envelope, data := decodeTAEnvelope(t, &buf)
+	assert.Contains(t, envelope.Metadata, "timestamp")
+	assert.Equal(t, "hv", data["indicator"])
+	assert.Equal(t, "AAPL", data["symbol"])
+	assert.Equal(t, "daily", data["interval"])
+	assert.InDelta(t, 20, data["period"], 0.1)
+	// All scalar vol fields must be present
+	assert.Contains(t, data, "daily_vol")
+	assert.Contains(t, data, "weekly_vol")
+	assert.Contains(t, data, "monthly_vol")
+	assert.Contains(t, data, "annualized_vol")
+	assert.Contains(t, data, "percentile_rank")
+	assert.Contains(t, data, "regime")
+	assert.Contains(t, data, "min_vol")
+	assert.Contains(t, data, "max_vol")
+	assert.Contains(t, data, "mean_vol")
+	// Percentile rank must be in [0, 100]
+	rank, ok := data["percentile_rank"].(float64)
+	require.True(t, ok)
+	assert.GreaterOrEqual(t, rank, 0.0)
+	assert.LessOrEqual(t, rank, 100.0)
+	// Regime must be a valid string
+	regime, ok := data["regime"].(string)
+	require.True(t, ok)
+	assert.NotEmpty(t, regime)
+}
+
+func TestTAHV_WithPeriod(t *testing.T) {
+	// Arrange - period=30, so 51 passed to fetchAndValidateCandles -> max(153, 71)=153 required.
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 200))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	require.NoError(t, runTestCommand(t, cmd, "ta", "hv", "AAPL", "--period", "30"))
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	assert.InDelta(t, 30, data["period"], 0.1)
+}
+
+func TestTAHV_MissingSymbol(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 100))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	err := runTestCommand(t, cmd, "ta", "hv")
+
+	// Assert
+	require.Error(t, err)
+	var valErr *schwabErrors.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.Contains(t, valErr.Error(), "symbol")
+}
+
+func TestTAHV_InvalidPeriod(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 100))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	err := runTestCommand(t, cmd, "ta", "hv", "AAPL", "--period", "0")
+
+	// Assert - period=0 should produce a ValidationError from ta.HistoricalVolatility
+	require.Error(t, err)
+	var valErr *schwabErrors.ValidationError
+	require.ErrorAs(t, err, &valErr)
+}

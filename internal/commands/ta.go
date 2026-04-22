@@ -38,6 +38,7 @@ func TACommand(c *client.Client, w io.Writer) *cli.Command {
 			taStochCommand(c, w),
 			taADXCommand(c, w),
 			taVWAPCommand(c, w),
+			taHVCommand(c, w),
 		},
 	}
 }
@@ -518,6 +519,59 @@ func taVWAPCommand(c *client.Client, w io.Writer) *cli.Command {
 
 			// period=0 because VWAP is cumulative (no windowed period)
 			return writeTAOutput(w, "vwap", symbol, interval, 0, points, timestamps, values)
+		},
+	}
+}
+
+func taHVCommand(c *client.Client, w io.Writer) *cli.Command {
+	return &cli.Command{
+		Name:  "hv",
+		Usage: "Historical Volatility with regime classification",
+		Flags: taIndicatorFlags(20),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			symbol := cmd.Args().First()
+			if err := requireArg(symbol, "symbol"); err != nil {
+				return err
+			}
+
+			period := cmd.Int("period")
+			interval := cmd.String("interval")
+
+			// Need period+1 closes for N returns, plus extra for rolling window warmup.
+			// period+21 provides a safety margin for the rolling window.
+			candles, _, err := fetchAndValidateCandles(ctx, c, symbol, interval, period+21, "hv")
+			if err != nil {
+				return err
+			}
+
+			closes, err := ta.ExtractClose(candles)
+			if err != nil {
+				return err
+			}
+
+			result, err := ta.HistoricalVolatility(closes, period)
+			if err != nil {
+				return err
+			}
+
+			// HV returns a scalar summary, not a time series.
+			// Do NOT use writeTAOutput (which is for time series).
+			data := map[string]any{
+				"indicator":       "hv",
+				"symbol":          symbol,
+				"interval":        interval,
+				"period":          period,
+				"daily_vol":       result.DailyVol,
+				"weekly_vol":      result.WeeklyVol,
+				"monthly_vol":     result.MonthlyVol,
+				"annualized_vol":  result.AnnualizedVol,
+				"percentile_rank": result.PercentileRank,
+				"regime":          result.Regime,
+				"min_vol":         result.MinVol,
+				"max_vol":         result.MaxVol,
+				"mean_vol":        result.MeanVol,
+			}
+			return output.WriteSuccess(w, data, output.TimestampMeta())
 		},
 	}
 }
