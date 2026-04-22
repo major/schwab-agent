@@ -3,6 +3,10 @@ package models
 import (
 	"encoding/json"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestQuoteEquityJSONRoundTrip verifies that QuoteEquity can be marshaled and unmarshaled correctly.
@@ -182,4 +186,1080 @@ func TestPositionJSONRoundTrip(t *testing.T) {
 	if unmarshaled.AveragePrice == nil || *unmarshaled.AveragePrice != averagePrice {
 		t.Errorf("averagePrice mismatch: expected %f, got %v", averagePrice, unmarshaled.AveragePrice)
 	}
+}
+
+// --- SchwabTime tests ---
+
+// TestSchwabTimeUnmarshalJSON verifies that SchwabTime handles both RFC3339
+// and the Schwab API's non-standard timestamp format (no colon in timezone offset).
+func TestSchwabTimeUnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+		check   func(t *testing.T, st SchwabTime)
+	}{
+		{
+			name:  "RFC3339 UTC",
+			input: `"2026-04-21T17:25:35Z"`,
+			check: func(t *testing.T, st SchwabTime) {
+				assert.Equal(t, 2026, st.Year())
+				assert.Equal(t, time.April, st.Month())
+				assert.Equal(t, 21, st.Day())
+				assert.Equal(t, 17, st.Hour())
+				assert.Equal(t, 25, st.Minute())
+				assert.Equal(t, 35, st.Second())
+			},
+		},
+		{
+			name:  "RFC3339 positive offset",
+			input: `"2026-04-21T17:25:35+05:30"`,
+			check: func(t *testing.T, st SchwabTime) {
+				assert.Equal(t, 2026, st.Year())
+				_, offset := st.Zone()
+				assert.Equal(t, 5*3600+30*60, offset)
+			},
+		},
+		{
+			name:  "Schwab API format positive offset",
+			input: `"2026-04-21T17:25:35+0000"`,
+			check: func(t *testing.T, st SchwabTime) {
+				assert.Equal(t, 2026, st.Year())
+				assert.Equal(t, time.April, st.Month())
+				assert.Equal(t, 21, st.Day())
+				assert.Equal(t, 17, st.Hour())
+			},
+		},
+		{
+			name:  "Schwab API format negative offset",
+			input: `"2026-04-21T12:25:35-0500"`,
+			check: func(t *testing.T, st SchwabTime) {
+				assert.Equal(t, 12, st.Hour())
+				_, offset := st.Zone()
+				assert.Equal(t, -5*3600, offset)
+			},
+		},
+		{
+			name:  "empty string returns zero time",
+			input: `""`,
+			check: func(t *testing.T, st SchwabTime) {
+				assert.True(t, st.IsZero())
+			},
+		},
+		{
+			name:    "invalid timestamp format",
+			input:   `"not-a-timestamp"`,
+			wantErr: true,
+		},
+		{
+			name:    "non-string JSON value",
+			input:   `12345`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var st SchwabTime
+			err := json.Unmarshal([]byte(tt.input), &st)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			if tt.check != nil {
+				tt.check(t, st)
+			}
+		})
+	}
+}
+
+// TestSchwabTimeMarshalJSON verifies MarshalJSON output for zero and populated values.
+func TestSchwabTimeMarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	t.Run("zero value marshals to null", func(t *testing.T) {
+		t.Parallel()
+		st := SchwabTime{}
+		data, err := json.Marshal(st)
+		require.NoError(t, err)
+		assert.Equal(t, "null", string(data))
+	})
+
+	t.Run("populated value marshals to RFC3339", func(t *testing.T) {
+		t.Parallel()
+		ts := time.Date(2026, 4, 21, 17, 25, 35, 0, time.UTC)
+		st := SchwabTime{Time: ts}
+		data, err := json.Marshal(st)
+		require.NoError(t, err)
+		assert.Equal(t, `"2026-04-21T17:25:35Z"`, string(data))
+	})
+
+	t.Run("non-UTC offset preserved in RFC3339", func(t *testing.T) {
+		t.Parallel()
+		loc := time.FixedZone("EST", -5*3600)
+		ts := time.Date(2026, 4, 21, 12, 0, 0, 0, loc)
+		st := SchwabTime{Time: ts}
+		data, err := json.Marshal(st)
+		require.NoError(t, err)
+		assert.Equal(t, `"2026-04-21T12:00:00-05:00"`, string(data))
+	})
+}
+
+// TestSchwabTimeRoundTrip verifies that Schwab API timestamps survive
+// the unmarshal-marshal-unmarshal cycle without data loss.
+func TestSchwabTimeRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Schwab format survives round-trip through RFC3339", func(t *testing.T) {
+		t.Parallel()
+		// Unmarshal from Schwab API format.
+		var st SchwabTime
+		err := json.Unmarshal([]byte(`"2026-04-21T17:25:35+0000"`), &st)
+		require.NoError(t, err)
+
+		// Marshal back (outputs RFC3339 with colon in offset).
+		data, err := json.Marshal(st)
+		require.NoError(t, err)
+		assert.Equal(t, `"2026-04-21T17:25:35Z"`, string(data))
+
+		// Unmarshal the RFC3339 output.
+		var st2 SchwabTime
+		err = json.Unmarshal(data, &st2)
+		require.NoError(t, err)
+		assert.True(t, st.Equal(st2.Time))
+	})
+
+	t.Run("non-UTC offset round-trips correctly", func(t *testing.T) {
+		t.Parallel()
+
+		var st SchwabTime
+		err := json.Unmarshal([]byte(`"2026-04-21T12:25:35-0500"`), &st)
+		require.NoError(t, err)
+
+		data, err := json.Marshal(st)
+		require.NoError(t, err)
+
+		var st2 SchwabTime
+		err = json.Unmarshal(data, &st2)
+		require.NoError(t, err)
+		assert.True(t, st.Equal(st2.Time))
+	})
+}
+
+// TestSchwabTimeInStructField verifies SchwabTime works when embedded in an
+// API response struct (ExecutionLeg uses it for its Time field).
+func TestSchwabTimeInStructField(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"legId": 1,
+		"price": 150.25,
+		"quantity": 10,
+		"mismarkedQuantity": 0,
+		"instrumentId": 12345,
+		"time": "2026-04-21T17:25:35+0000"
+	}`
+
+	var leg ExecutionLeg
+	err := json.Unmarshal([]byte(input), &leg)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), leg.LegID)
+	assert.InDelta(t, 150.25, leg.Price, 0.001)
+	assert.Equal(t, 2026, leg.Time.Year())
+	assert.Equal(t, time.April, leg.Time.Month())
+}
+
+// --- Wire type round-trip tests ---
+// These verify that types used in API requests/responses can be correctly
+// deserialized from JSON (simulating API responses) and survive round-trips.
+
+// TestOrderJSONRoundTrip verifies a full order response with SchwabTime fields,
+// nested legs, and execution activities.
+func TestOrderJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"session": "NORMAL",
+		"duration": "DAY",
+		"orderType": "LIMIT",
+		"price": 150.50,
+		"quantity": 10,
+		"filledQuantity": 5,
+		"remainingQuantity": 5,
+		"orderStrategyType": "SINGLE",
+		"orderId": 123456789,
+		"cancelable": true,
+		"editable": false,
+		"status": "WORKING",
+		"enteredTime": "2026-04-21T09:30:00+0000",
+		"closeTime": "2026-04-21T16:00:00+0000",
+		"tag": "API_TOS:schwab-agent",
+		"accountNumber": 12345678,
+		"orderLegCollection": [
+			{
+				"orderLegType": "EQUITY",
+				"legId": 1,
+				"instrument": {
+					"assetType": "EQUITY",
+					"symbol": "AAPL"
+				},
+				"instruction": "BUY",
+				"positionEffect": "OPENING",
+				"quantity": 10
+			}
+		],
+		"orderActivityCollection": [
+			{
+				"activityType": "EXECUTION",
+				"executionType": "FILL",
+				"quantity": 5,
+				"orderRemainingQuantity": 5,
+				"executionLegs": [
+					{
+						"legId": 1,
+						"price": 150.25,
+						"quantity": 5,
+						"mismarkedQuantity": 0,
+						"instrumentId": 12345,
+						"time": "2026-04-21T10:15:30+0000"
+					}
+				]
+			}
+		]
+	}`
+
+	// Arrange: Unmarshal from API-style JSON.
+	var order Order
+	err := json.Unmarshal([]byte(input), &order)
+	require.NoError(t, err)
+
+	// Assert: Top-level fields.
+	assert.Equal(t, SessionNormal, order.Session)
+	assert.Equal(t, DurationDay, order.Duration)
+	assert.Equal(t, OrderTypeLimit, order.OrderType)
+	assert.Equal(t, 150.50, *order.Price)
+	assert.Equal(t, OrderStatusWorking, *order.Status)
+	assert.Equal(t, int64(123456789), *order.OrderID)
+
+	// Assert: SchwabTime fields parsed correctly.
+	require.NotNil(t, order.EnteredTime)
+	assert.Equal(t, 2026, order.EnteredTime.Year())
+	assert.Equal(t, 9, order.EnteredTime.Hour())
+	require.NotNil(t, order.CloseTime)
+	assert.Equal(t, 16, order.CloseTime.Hour())
+
+	// Assert: Nested order leg.
+	require.Len(t, order.OrderLegCollection, 1)
+	leg := order.OrderLegCollection[0]
+	assert.Equal(t, AssetTypeEquity, leg.Instrument.AssetType)
+	assert.Equal(t, "AAPL", leg.Instrument.Symbol)
+	assert.Equal(t, InstructionBuy, leg.Instruction)
+
+	// Assert: Nested activity with execution leg containing SchwabTime.
+	require.Len(t, order.OrderActivityCollection, 1)
+	activity := order.OrderActivityCollection[0]
+	assert.Equal(t, ActivityTypeExecution, activity.ActivityType)
+	require.Len(t, activity.ExecutionLegs, 1)
+	assert.InDelta(t, 150.25, activity.ExecutionLegs[0].Price, 0.001)
+	assert.Equal(t, 2026, activity.ExecutionLegs[0].Time.Year())
+
+	// Act: Round-trip marshal/unmarshal.
+	data, err := json.Marshal(order)
+	require.NoError(t, err)
+
+	var order2 Order
+	err = json.Unmarshal(data, &order2)
+	require.NoError(t, err)
+	assert.Equal(t, order.Session, order2.Session)
+	assert.Equal(t, *order.OrderID, *order2.OrderID)
+	assert.True(t, order.EnteredTime.Equal(order2.EnteredTime.Time))
+}
+
+// TestOrderRequestJSONRoundTrip verifies the outgoing order submission type.
+func TestOrderRequestJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"session": "NORMAL",
+		"duration": "DAY",
+		"orderType": "LIMIT",
+		"price": 150.50,
+		"orderStrategyType": "SINGLE",
+		"orderLegCollection": [
+			{
+				"instrument": {
+					"assetType": "EQUITY",
+					"symbol": "AAPL"
+				},
+				"instruction": "BUY",
+				"quantity": 10
+			}
+		]
+	}`
+
+	var req OrderRequest
+	err := json.Unmarshal([]byte(input), &req)
+	require.NoError(t, err)
+
+	assert.Equal(t, SessionNormal, req.Session)
+	assert.Equal(t, DurationDay, req.Duration)
+	assert.Equal(t, OrderTypeLimit, req.OrderType)
+	assert.Equal(t, 150.50, *req.Price)
+	assert.Equal(t, OrderStrategyTypeSingle, req.OrderStrategyType)
+	require.Len(t, req.OrderLegCollection, 1)
+	assert.Equal(t, "AAPL", req.OrderLegCollection[0].Instrument.Symbol)
+	assert.Equal(t, InstructionBuy, req.OrderLegCollection[0].Instruction)
+
+	// Round-trip.
+	data, err := json.Marshal(req)
+	require.NoError(t, err)
+	var req2 OrderRequest
+	err = json.Unmarshal(data, &req2)
+	require.NoError(t, err)
+	assert.Equal(t, req.OrderType, req2.OrderType)
+	assert.Equal(t, *req.Price, *req2.Price)
+}
+
+// TestOrderRequestWithChildStrategies verifies recursive child order nesting (OTO/OCO).
+func TestOrderRequestWithChildStrategies(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"session": "NORMAL",
+		"duration": "DAY",
+		"orderType": "LIMIT",
+		"price": 150.00,
+		"orderStrategyType": "TRIGGER",
+		"orderLegCollection": [
+			{
+				"instrument": {"assetType": "EQUITY", "symbol": "AAPL"},
+				"instruction": "BUY",
+				"quantity": 100
+			}
+		],
+		"childOrderStrategies": [
+			{
+				"session": "NORMAL",
+				"duration": "GOOD_TILL_CANCEL",
+				"orderType": "LIMIT",
+				"price": 160.00,
+				"orderStrategyType": "OCO",
+				"orderLegCollection": [
+					{
+						"instrument": {"assetType": "EQUITY", "symbol": "AAPL"},
+						"instruction": "SELL",
+						"quantity": 100
+					}
+				],
+				"childOrderStrategies": [
+					{
+						"session": "NORMAL",
+						"duration": "GOOD_TILL_CANCEL",
+						"orderType": "STOP",
+						"stopPrice": 140.00,
+						"orderStrategyType": "SINGLE",
+						"orderLegCollection": [
+							{
+								"instrument": {"assetType": "EQUITY", "symbol": "AAPL"},
+								"instruction": "SELL",
+								"quantity": 100
+							}
+						]
+					}
+				]
+			}
+		]
+	}`
+
+	var req OrderRequest
+	err := json.Unmarshal([]byte(input), &req)
+	require.NoError(t, err)
+
+	assert.Equal(t, OrderStrategyTypeTrigger, req.OrderStrategyType)
+	require.Len(t, req.ChildOrderStrategies, 1)
+
+	child := req.ChildOrderStrategies[0]
+	assert.Equal(t, OrderStrategyTypeOCO, child.OrderStrategyType)
+	assert.Equal(t, DurationGoodTillCancel, child.Duration)
+	assert.Equal(t, 160.0, *child.Price)
+
+	// Verify grandchild (stop-loss leg of OCO).
+	require.Len(t, child.ChildOrderStrategies, 1)
+	grandchild := child.ChildOrderStrategies[0]
+	assert.Equal(t, OrderStrategyTypeSingle, grandchild.OrderStrategyType)
+	assert.Equal(t, OrderTypeStop, grandchild.OrderType)
+	assert.Equal(t, 140.0, *grandchild.StopPrice)
+}
+
+// TestOptionChainJSONRoundTrip verifies the nested map[string]map[string][]*OptionContract structure.
+func TestOptionChainJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"symbol": "AAPL",
+		"status": "SUCCESS",
+		"isDelayed": false,
+		"isIndex": false,
+		"interestRate": 4.5,
+		"underlyingPrice": 175.50,
+		"volatility": 25.5,
+		"numberOfContracts": 2,
+		"underlying": {
+			"symbol": "AAPL",
+			"last": 175.50,
+			"totalVolume": 50000000
+		},
+		"callExpDateMap": {
+			"2026-05-16:30": {
+				"175.0": [
+					{
+						"putCall": "CALL",
+						"symbol": "AAPL  260516C00175000",
+						"bid": 5.10,
+						"ask": 5.30,
+						"last": 5.20,
+						"strikePrice": 175.0,
+						"delta": 0.52,
+						"gamma": 0.03,
+						"theta": -0.08,
+						"vega": 0.25,
+						"inTheMoney": true,
+						"openInterest": 15000
+					}
+				]
+			}
+		},
+		"putExpDateMap": {
+			"2026-05-16:30": {
+				"175.0": [
+					{
+						"putCall": "PUT",
+						"symbol": "AAPL  260516P00175000",
+						"bid": 4.80,
+						"ask": 5.00,
+						"strikePrice": 175.0,
+						"delta": -0.48,
+						"inTheMoney": false
+					}
+				]
+			}
+		}
+	}`
+
+	var chain OptionChain
+	err := json.Unmarshal([]byte(input), &chain)
+	require.NoError(t, err)
+
+	// Top-level fields.
+	assert.Equal(t, "AAPL", *chain.Symbol)
+	assert.Equal(t, 175.50, *chain.UnderlyingPrice)
+
+	// Underlying.
+	require.NotNil(t, chain.Underlying)
+	assert.Equal(t, "AAPL", *chain.Underlying.Symbol)
+
+	// Call map nesting: expiration -> strike -> contracts.
+	require.Contains(t, chain.CallExpDateMap, "2026-05-16:30")
+	strikes := chain.CallExpDateMap["2026-05-16:30"]
+	require.Contains(t, strikes, "175.0")
+	calls := strikes["175.0"]
+	require.Len(t, calls, 1)
+	assert.Equal(t, "CALL", *calls[0].PutCall)
+	assert.Equal(t, 175.0, *calls[0].StrikePrice)
+	assert.Equal(t, 0.52, *calls[0].Delta)
+	assert.True(t, *calls[0].InTheMoney)
+
+	// Put map.
+	require.Contains(t, chain.PutExpDateMap, "2026-05-16:30")
+	puts := chain.PutExpDateMap["2026-05-16:30"]["175.0"]
+	require.Len(t, puts, 1)
+	assert.Equal(t, "PUT", *puts[0].PutCall)
+	assert.False(t, *puts[0].InTheMoney)
+
+	// Round-trip.
+	data, err := json.Marshal(chain)
+	require.NoError(t, err)
+	var chain2 OptionChain
+	err = json.Unmarshal(data, &chain2)
+	require.NoError(t, err)
+	assert.Equal(t, *chain.Symbol, *chain2.Symbol)
+	assert.Len(t, chain2.CallExpDateMap["2026-05-16:30"]["175.0"], 1)
+}
+
+// TestAccountJSONRoundTrip verifies the Account -> SecuritiesAccount -> Position hierarchy.
+func TestAccountJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"securitiesAccount": {
+			"type": "MARGIN",
+			"accountNumber": "12345678",
+			"roundTrips": 2,
+			"isForeign": false,
+			"currentBalances": {
+				"cashBalance": 10000.50,
+				"buyingPower": 20000.00,
+				"equity": 50000.00,
+				"dayTradingBuyingPower": 80000.00
+			},
+			"positions": [
+				{
+					"longQuantity": 100,
+					"averagePrice": 150.00,
+					"marketValue": 17550.00,
+					"currentDayProfitLoss": 50.00,
+					"instrument": {
+						"assetType": "EQUITY",
+						"symbol": "AAPL",
+						"cusip": "037833100",
+						"description": "APPLE INC"
+					}
+				}
+			]
+		},
+		"nickName": "Trading Account",
+		"primaryAccount": true
+	}`
+
+	var acct Account
+	err := json.Unmarshal([]byte(input), &acct)
+	require.NoError(t, err)
+
+	assert.Equal(t, "Trading Account", *acct.NickName)
+	assert.True(t, *acct.PrimaryAccount)
+
+	require.NotNil(t, acct.SecuritiesAccount)
+	assert.Equal(t, "MARGIN", *acct.SecuritiesAccount.Type)
+	assert.Equal(t, "12345678", *acct.SecuritiesAccount.AccountNumber)
+
+	require.NotNil(t, acct.SecuritiesAccount.CurrentBalances)
+	assert.Equal(t, 10000.50, *acct.SecuritiesAccount.CurrentBalances.CashBalance)
+	assert.Equal(t, 20000.00, *acct.SecuritiesAccount.CurrentBalances.BuyingPower)
+
+	require.Len(t, acct.SecuritiesAccount.Positions, 1)
+	pos := acct.SecuritiesAccount.Positions[0]
+	assert.Equal(t, 100.0, *pos.LongQuantity)
+	assert.Equal(t, 150.0, *pos.AveragePrice)
+	require.NotNil(t, pos.Instrument)
+	assert.Equal(t, "AAPL", *pos.Instrument.Symbol)
+
+	// Round-trip.
+	data, err := json.Marshal(acct)
+	require.NoError(t, err)
+	var acct2 Account
+	err = json.Unmarshal(data, &acct2)
+	require.NoError(t, err)
+	assert.Equal(t, *acct.NickName, *acct2.NickName)
+	assert.Equal(t, *acct.SecuritiesAccount.CurrentBalances.CashBalance,
+		*acct2.SecuritiesAccount.CurrentBalances.CashBalance)
+}
+
+// TestTransactionJSONRoundTrip verifies nested transfer items and user details.
+func TestTransactionJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"activityId": 98765,
+		"time": "2026-04-21T10:30:00+0000",
+		"type": "TRADE",
+		"status": "VALID",
+		"description": "BUY TRADE",
+		"netAmount": -15050.00,
+		"accountNumber": "12345678",
+		"orderId": 123456,
+		"tradeDate": "2026-04-21",
+		"settlementDate": "2026-04-23",
+		"transferItems": [
+			{
+				"instrument": {
+					"assetType": "EQUITY",
+					"symbol": "AAPL",
+					"cusip": "037833100",
+					"description": "APPLE INC"
+				},
+				"positionEffect": "OPENING",
+				"positionQuantity": 100
+			}
+		],
+		"user": {
+			"userId": "user123",
+			"name": "Test User"
+		}
+	}`
+
+	var tx Transaction
+	err := json.Unmarshal([]byte(input), &tx)
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(98765), *tx.ActivityID)
+	assert.Equal(t, TransactionTypeTrade, *tx.Type)
+	assert.Equal(t, -15050.00, *tx.NetAmount)
+
+	require.Len(t, tx.TransferItems, 1)
+	item := tx.TransferItems[0]
+	require.NotNil(t, item.Instrument)
+	assert.Equal(t, "AAPL", *item.Instrument.Symbol)
+	assert.Equal(t, 100.0, *item.PositionQuantity)
+
+	require.NotNil(t, tx.User)
+	assert.Equal(t, "Test User", *tx.User.Name)
+
+	// Round-trip.
+	data, err := json.Marshal(tx)
+	require.NoError(t, err)
+	var tx2 Transaction
+	err = json.Unmarshal(data, &tx2)
+	require.NoError(t, err)
+	assert.Equal(t, *tx.ActivityID, *tx2.ActivityID)
+}
+
+// TestQuoteOptionJSONRoundTrip verifies option quote with Greeks.
+func TestQuoteOptionJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"symbol": "AAPL  260516C00175000",
+		"description": "AAPL May 16 2026 175 Call",
+		"bidPrice": 5.10,
+		"askPrice": 5.30,
+		"lastPrice": 5.20,
+		"totalVolume": 12000,
+		"openInterest": 15000,
+		"strikePrice": 175.0,
+		"expirationDate": "2026-05-16",
+		"daysToExpiration": 25,
+		"delta": 0.52,
+		"gamma": 0.03,
+		"theta": -0.08,
+		"vega": 0.25,
+		"rho": 0.04,
+		"theoreticalOptionValue": 5.15,
+		"theoreticalVolatility": 0.28,
+		"inTheMoney": true,
+		"putCall": "CALL"
+	}`
+
+	var q QuoteOption
+	err := json.Unmarshal([]byte(input), &q)
+	require.NoError(t, err)
+
+	assert.Equal(t, 175.0, *q.StrikePrice)
+	assert.Equal(t, 0.52, *q.Delta)
+	assert.Equal(t, -0.08, *q.Theta)
+	assert.Equal(t, 0.25, *q.Vega)
+	assert.True(t, *q.InTheMoney)
+	assert.Equal(t, "CALL", *q.PutCall)
+	assert.Equal(t, int64(15000), *q.OpenInterest)
+
+	// Round-trip.
+	data, err := json.Marshal(q)
+	require.NoError(t, err)
+	var q2 QuoteOption
+	err = json.Unmarshal(data, &q2)
+	require.NoError(t, err)
+	assert.Equal(t, *q.Delta, *q2.Delta)
+	assert.Equal(t, *q.StrikePrice, *q2.StrikePrice)
+}
+
+// TestMarketHoursJSONRoundTrip verifies nested session hours arrays.
+func TestMarketHoursJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"marketType": "EQUITY",
+		"product": "equity",
+		"productName": "equity",
+		"isOpen": true,
+		"exchange": "NYSE",
+		"date": "2026-04-21",
+		"sessionHours": {
+			"preMarket": [
+				{"start": "2026-04-21T07:00:00-04:00", "end": "2026-04-21T09:30:00-04:00"}
+			],
+			"regularMarket": [
+				{"start": "2026-04-21T09:30:00-04:00", "end": "2026-04-21T16:00:00-04:00"}
+			],
+			"postMarket": [
+				{"start": "2026-04-21T16:00:00-04:00", "end": "2026-04-21T20:00:00-04:00"}
+			]
+		}
+	}`
+
+	var mh MarketHours
+	err := json.Unmarshal([]byte(input), &mh)
+	require.NoError(t, err)
+
+	assert.Equal(t, "EQUITY", *mh.MarketType)
+	assert.True(t, *mh.IsOpen)
+
+	require.NotNil(t, mh.SessionHours)
+	require.Len(t, mh.SessionHours.PreMarket, 1)
+	require.Len(t, mh.SessionHours.RegularMarket, 1)
+	require.Len(t, mh.SessionHours.PostMarket, 1)
+	assert.Contains(t, *mh.SessionHours.RegularMarket[0].Start, "09:30:00")
+	assert.Contains(t, *mh.SessionHours.RegularMarket[0].End, "16:00:00")
+
+	// Round-trip.
+	data, err := json.Marshal(mh)
+	require.NoError(t, err)
+	var mh2 MarketHours
+	err = json.Unmarshal(data, &mh2)
+	require.NoError(t, err)
+	assert.Equal(t, *mh.MarketType, *mh2.MarketType)
+}
+
+// TestPreviewOrderJSONRoundTrip verifies deeply nested commission/fee structures.
+func TestPreviewOrderJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"orderId": 999,
+		"orderStrategy": {
+			"accountNumber": "12345678",
+			"advancedOrderType": "NONE",
+			"orderType": "LIMIT",
+			"status": "ACCEPTED",
+			"duration": "DAY",
+			"session": "NORMAL",
+			"price": 150.50,
+			"quantity": 10,
+			"orderStrategyType": "SINGLE",
+			"orderLegs": [
+				{
+					"instrument": {"assetType": "EQUITY", "symbol": "AAPL"},
+					"instruction": "BUY",
+					"quantity": 10
+				}
+			],
+			"orderBalance": {
+				"orderValue": 1505.00,
+				"projectedAvailableFund": 8495.00,
+				"projectedBuyingPower": 16990.00,
+				"projectedCommission": 0.00
+			},
+			"commissionAndFee": {
+				"commission": {
+					"commissionLegs": [
+						{
+							"commissionValues": [
+								{"value": 0.00, "type": "COMMISSION"}
+							]
+						}
+					]
+				},
+				"fee": {
+					"feeLegs": [
+						{
+							"feeValues": [
+								{"value": 0.02, "type": "SEC_FEE"},
+								{"value": 0.01, "type": "TAF_FEE"}
+							]
+						}
+					]
+				}
+			}
+		},
+		"orderValidationResult": {
+			"alerts": [
+				{
+					"validationRuleName": "MarketVolatility",
+					"message": "Market is experiencing high volatility"
+				}
+			],
+			"accepts": [
+				{
+					"validationRuleName": "BuyingPower",
+					"message": "Sufficient buying power"
+				}
+			]
+		}
+	}`
+
+	var preview PreviewOrder
+	err := json.Unmarshal([]byte(input), &preview)
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(999), *preview.OrderID)
+
+	// Nested strategy.
+	require.NotNil(t, preview.OrderStrategy)
+	assert.Equal(t, OrderTypeLimit, preview.OrderStrategy.OrderType)
+	assert.Equal(t, 150.50, *preview.OrderStrategy.Price)
+
+	// Nested balance.
+	require.NotNil(t, preview.OrderStrategy.OrderBalance)
+	assert.Equal(t, 1505.00, *preview.OrderStrategy.OrderBalance.OrderValue)
+
+	// Nested commission/fee.
+	require.NotNil(t, preview.OrderStrategy.CommissionAndFee)
+	require.NotNil(t, preview.OrderStrategy.CommissionAndFee.Fee)
+	require.Len(t, preview.OrderStrategy.CommissionAndFee.Fee.FeeLegs, 1)
+	require.Len(t, preview.OrderStrategy.CommissionAndFee.Fee.FeeLegs[0].FeeValues, 2)
+	assert.Equal(t, "SEC_FEE", preview.OrderStrategy.CommissionAndFee.Fee.FeeLegs[0].FeeValues[0].Type)
+
+	// Validation results.
+	require.NotNil(t, preview.OrderValidationResult)
+	require.Len(t, preview.OrderValidationResult.Alerts, 1)
+	require.Len(t, preview.OrderValidationResult.Accepts, 1)
+
+	// Round-trip.
+	data, err := json.Marshal(preview)
+	require.NoError(t, err)
+	var preview2 PreviewOrder
+	err = json.Unmarshal(data, &preview2)
+	require.NoError(t, err)
+	assert.Equal(t, *preview.OrderID, *preview2.OrderID)
+}
+
+// TestScreenerResponseJSONRoundTrip verifies the movers/screener response.
+func TestScreenerResponseJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"screeners": [
+			{
+				"symbol": "AAPL",
+				"description": "Apple Inc",
+				"lastPrice": 175.50,
+				"netChange": 2.50,
+				"netPercentChange": 1.44,
+				"volume": 45000000,
+				"totalVolume": 45000000,
+				"trades": 500000,
+				"marketShare": 12.5
+			}
+		]
+	}`
+
+	var sr ScreenerResponse
+	err := json.Unmarshal([]byte(input), &sr)
+	require.NoError(t, err)
+
+	require.Len(t, sr.Screeners, 1)
+	assert.Equal(t, "AAPL", *sr.Screeners[0].Symbol)
+	assert.Equal(t, 175.50, *sr.Screeners[0].LastPrice)
+	assert.Equal(t, int64(45000000), *sr.Screeners[0].Volume)
+
+	// Round-trip.
+	data, err := json.Marshal(sr)
+	require.NoError(t, err)
+	var sr2 ScreenerResponse
+	err = json.Unmarshal(data, &sr2)
+	require.NoError(t, err)
+	assert.Equal(t, *sr.Screeners[0].Symbol, *sr2.Screeners[0].Symbol)
+}
+
+// TestInstrumentResponseJSONRoundTrip verifies instrument with fundamental data.
+func TestInstrumentResponseJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"instruments": [
+			{
+				"cusip": "037833100",
+				"symbol": "AAPL",
+				"description": "Apple Inc",
+				"exchange": "NASDAQ",
+				"assetType": "EQUITY",
+				"fundamental": {
+					"symbol": "AAPL",
+					"high52": 200.00,
+					"low52": 130.00,
+					"dividendAmount": 0.96,
+					"dividendYield": 0.55,
+					"peRatio": 28.5,
+					"eps": 6.15,
+					"marketCap": 2750000000000,
+					"sharesOutstanding": 15700000000,
+					"beta": 1.21
+				}
+			}
+		]
+	}`
+
+	var ir InstrumentResponse
+	err := json.Unmarshal([]byte(input), &ir)
+	require.NoError(t, err)
+
+	require.Len(t, ir.Instruments, 1)
+	inst := ir.Instruments[0]
+	assert.Equal(t, "AAPL", *inst.Symbol)
+	assert.Equal(t, "NASDAQ", *inst.Exchange)
+
+	require.NotNil(t, inst.Fundamental)
+	assert.Equal(t, 200.0, *inst.Fundamental.High52)
+	assert.Equal(t, 28.5, *inst.Fundamental.PeRatio)
+	assert.Equal(t, 1.21, *inst.Fundamental.Beta)
+
+	// Round-trip.
+	data, err := json.Marshal(ir)
+	require.NoError(t, err)
+	var ir2 InstrumentResponse
+	err = json.Unmarshal(data, &ir2)
+	require.NoError(t, err)
+	assert.Equal(t, *ir.Instruments[0].Symbol, *ir2.Instruments[0].Symbol)
+}
+
+// TestUserPreferenceJSONRoundTrip verifies preferences with nested arrays.
+func TestUserPreferenceJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"accounts": [
+			{
+				"accountNumber": "12345678",
+				"primaryAccount": true,
+				"type": "MARGIN",
+				"nickName": "My Trading Account",
+				"accountColor": "Blue",
+				"displayAcctId": "...5678",
+				"autoPositionEffect": true
+			}
+		],
+		"offers": [
+			{
+				"id": "offer1",
+				"name": "Premium Trading",
+				"description": "Advanced trading features",
+				"status": "ACTIVE"
+			}
+		],
+		"streamerInfo": [
+			{
+				"streamerUrl": "wss://streamer.schwab.com",
+				"token": "abc123",
+				"tokenExpTime": 1745280000000,
+				"appId": "app123",
+				"acl": "acl-value"
+			}
+		]
+	}`
+
+	var pref UserPreference
+	err := json.Unmarshal([]byte(input), &pref)
+	require.NoError(t, err)
+
+	require.Len(t, pref.Accounts, 1)
+	assert.Equal(t, "12345678", *pref.Accounts[0].AccountNumber)
+	assert.True(t, *pref.Accounts[0].PrimaryAccount)
+	assert.Equal(t, "My Trading Account", *pref.Accounts[0].NickName)
+
+	require.Len(t, pref.Offers, 1)
+	assert.Equal(t, "Premium Trading", *pref.Offers[0].Name)
+
+	require.Len(t, pref.StreamerInfo, 1)
+	assert.Equal(t, "wss://streamer.schwab.com", *pref.StreamerInfo[0].StreamerURL)
+
+	// Round-trip.
+	data, err := json.Marshal(pref)
+	require.NoError(t, err)
+	var pref2 UserPreference
+	err = json.Unmarshal(data, &pref2)
+	require.NoError(t, err)
+	assert.Equal(t, *pref.Accounts[0].NickName, *pref2.Accounts[0].NickName)
+}
+
+// --- Edge case tests ---
+
+// TestQuoteDataSpecialJSONTags verifies that the numeric-prefix json tags
+// "52WeekHigh" and "52WeekLow" work correctly.
+func TestQuoteDataSpecialJSONTags(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"52WeekHigh": 200.00,
+		"52WeekLow": 130.00,
+		"lastPrice": 175.50,
+		"totalVolume": 45000000
+	}`
+
+	var qd QuoteData
+	err := json.Unmarshal([]byte(input), &qd)
+	require.NoError(t, err)
+
+	require.NotNil(t, qd.WeekHigh52)
+	assert.Equal(t, 200.0, *qd.WeekHigh52)
+	require.NotNil(t, qd.WeekLow52)
+	assert.Equal(t, 130.0, *qd.WeekLow52)
+
+	// Round-trip preserves the numeric-prefix tags.
+	data, err := json.Marshal(qd)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"52WeekHigh"`)
+	assert.Contains(t, string(data), `"52WeekLow"`)
+}
+
+// TestNilFieldsOmittedInJSON verifies that nil pointer fields with omitempty
+// produce clean JSON without null entries.
+func TestNilFieldsOmittedInJSON(t *testing.T) {
+	t.Parallel()
+
+	// Position with all nil pointer fields should marshal to empty JSON.
+	pos := Position{}
+	data, err := json.Marshal(pos)
+	require.NoError(t, err)
+	assert.Equal(t, "{}", string(data))
+
+	// OptionChain with only symbol set should omit all other fields.
+	symbol := "AAPL"
+	chain := OptionChain{Symbol: &symbol}
+	data, err = json.Marshal(chain)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"symbol":"AAPL"`)
+	assert.NotContains(t, string(data), "null")
+}
+
+// TestCandleListJSONRoundTrip verifies the CandleList wrapper (existing Candle
+// test only covers the inner struct).
+func TestCandleListJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"symbol": "AAPL",
+		"empty": false,
+		"previousClose": 174.50,
+		"previousCloseDate": 1745193600000,
+		"candles": [
+			{
+				"open": 175.00,
+				"high": 176.50,
+				"low": 174.75,
+				"close": 176.00,
+				"volume": 12000000,
+				"datetime": 1745280000000
+			},
+			{
+				"open": 176.00,
+				"high": 177.25,
+				"low": 175.50,
+				"close": 175.80,
+				"volume": 10000000,
+				"datetime": 1745366400000
+			}
+		]
+	}`
+
+	var cl CandleList
+	err := json.Unmarshal([]byte(input), &cl)
+	require.NoError(t, err)
+
+	assert.Equal(t, "AAPL", *cl.Symbol)
+	assert.Equal(t, 174.50, *cl.PreviousClose)
+	assert.False(t, *cl.Empty)
+	require.Len(t, cl.Candles, 2)
+	assert.Equal(t, 175.0, *cl.Candles[0].Open)
+	assert.Equal(t, 176.0, *cl.Candles[1].Open)
+
+	// Round-trip.
+	data, err := json.Marshal(cl)
+	require.NoError(t, err)
+	var cl2 CandleList
+	err = json.Unmarshal(data, &cl2)
+	require.NoError(t, err)
+	assert.Equal(t, *cl.Symbol, *cl2.Symbol)
+	assert.Len(t, cl2.Candles, 2)
 }
