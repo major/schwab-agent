@@ -1,0 +1,7 @@
+go test fuzz v1
+string("0")
+int(2098)
+int(6)
+int(20)
+float64(200)
+bool(true)

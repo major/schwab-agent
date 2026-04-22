@@ -1,0 +1,7 @@
+go test fuzz v1
+string(" A")
+int(2025)
+int(1)
+int(17)
+float64(181)
+bool(false)

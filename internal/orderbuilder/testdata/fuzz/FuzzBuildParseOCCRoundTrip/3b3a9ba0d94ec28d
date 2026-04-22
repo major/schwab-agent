@@ -1,0 +1,7 @@
+go test fuzz v1
+string("Γ0")
+int(2025)
+int(1)
+int(1)
+float64(0.001)
+bool(false)
