@@ -1,4 +1,8 @@
 // schwab-agent is a CLI tool for AI agents to trade via Charles Schwab's APIs.
+//
+// This project is not affiliated with, endorsed by, or sponsored by
+// Charles Schwab & Co., Inc. or any of its subsidiaries.
+// "Schwab" and "thinkorswim" are trademarks of Charles Schwab & Co., Inc.
 package main
 
 import (

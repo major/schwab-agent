@@ -2,6 +2,8 @@
 
 CLI tool for AI agents to trade via Charles Schwab APIs. Single binary, JSON output.
 
+> **Disclaimer:** This project is not affiliated with, endorsed by, or sponsored by Charles Schwab & Co., Inc. or any of its subsidiaries. "Schwab" and "thinkorswim" are trademarks of Charles Schwab & Co., Inc.
+
 ## Install
 
 ```bash
