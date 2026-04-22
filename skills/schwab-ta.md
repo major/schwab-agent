@@ -1,6 +1,6 @@
 # Technical Analysis Indicators
 
-Ten indicators computed locally from Schwab price history. Pattern: `schwab-agent ta <indicator> SYMBOL [flags]`.
+Eleven indicators computed locally from Schwab price history. Pattern: `schwab-agent ta <indicator> SYMBOL [flags]`.
 
 ## Shared Flags
 
@@ -133,6 +133,17 @@ schwab-agent ta hv AAPL --period 20 --interval daily
 
 `--period` default: 20. Output fields: `daily_vol`, `weekly_vol`, `monthly_vol`, `annualized_vol`, `percentile_rank`, `regime` (low/normal/high/extreme), `min_vol`, `max_vol`, `mean_vol`.
 
+### Expected Move - ATM Straddle Pricing
+
+Returns a scalar summary (not a time series). Fetches ATM options from the chain and computes the expected price range.
+
+```bash
+schwab-agent ta expected-move AAPL
+schwab-agent ta expected-move AAPL --dte 45
+```
+
+`--dte` default: 30 (target days to expiration for option selection). Output fields: `underlying_price`, `expiration`, `dte`, `straddle_price`, `expected_move`, `adjusted_move`, `upper_1x`, `lower_1x`, `upper_2x`, `lower_2x`.
+
 ## Output Format
 
 All indicators return the same envelope. The `values` array contains objects with `datetime` plus indicator-specific fields.
@@ -164,6 +175,48 @@ Multi-value examples - value keys by indicator:
 | BBands | `upper`, `middle`, `lower` |
 | Stoch | `slowk`, `slowd` |
 
+Scalar output examples (HV, Expected Move):
+
+```json
+{
+  "data": {
+    "indicator": "hv",
+    "symbol": "AAPL",
+    "period": 20,
+    "daily_vol": 1.23,
+    "weekly_vol": 2.75,
+    "monthly_vol": 5.62,
+    "annualized_vol": 19.54,
+    "percentile_rank": 42.0,
+    "regime": "normal",
+    "min_vol": 12.10,
+    "max_vol": 38.90,
+    "mean_vol": 21.30
+  },
+  "metadata": {"timestamp": "2026-04-22T10:00:00Z"}
+}
+```
+
+```json
+{
+  "data": {
+    "indicator": "expected-move",
+    "symbol": "AAPL",
+    "underlying_price": 195.50,
+    "expiration": "2026-05-16",
+    "dte": 24,
+    "straddle_price": 9.80,
+    "expected_move": 9.80,
+    "adjusted_move": 8.33,
+    "upper_1x": 203.83,
+    "lower_1x": 187.17,
+    "upper_2x": 212.16,
+    "lower_2x": 178.84
+  },
+  "metadata": {"timestamp": "2026-04-22T10:00:00Z"}
+}
+```
+
 ## Recipes
 
 | Intent | Command |
@@ -180,3 +233,7 @@ Multi-value examples - value keys by indicator:
 | "Intraday RSI on 5-minute bars" | `schwab-agent ta rsi AAPL --interval 5min --points 20` |
 | "Weekly MACD for NVDA" | `schwab-agent ta macd NVDA --interval weekly --points 10` |
 | "Tighten Bollinger Bands to 1.5 std dev" | `schwab-agent ta bbands AAPL --std-dev 1.5 --points 10` |
+| "VWAP for AAPL intraday" | `schwab-agent ta vwap AAPL --interval 5min --points 20` |
+| "Historical volatility regime for AAPL" | `schwab-agent ta hv AAPL` |
+| "Expected move for AAPL next 30 days" | `schwab-agent ta expected-move AAPL` |
+| "Expected move for AAPL next 45 days" | `schwab-agent ta expected-move AAPL --dte 45` |
