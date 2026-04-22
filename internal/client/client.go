@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	schwabErrors "github.com/major/schwab-agent/internal/errors"
@@ -144,17 +145,14 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 }
 
 // doGet performs a GET request with optional query parameters.
+// Values are percent-encoded via url.Values to handle special characters safely.
 func (c *Client) doGet(ctx context.Context, path string, params map[string]string, result any) error {
 	if len(params) > 0 {
-		path += "?"
-		first := true
+		q := url.Values{}
 		for k, v := range params {
-			if !first {
-				path += "&"
-			}
-			path += k + "=" + v
-			first = false
+			q.Set(k, v)
 		}
+		path += "?" + q.Encode()
 	}
 	return c.doRequest(ctx, http.MethodGet, path, nil, result)
 }

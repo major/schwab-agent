@@ -111,6 +111,32 @@ func TestDoGet_WithQueryParams(t *testing.T) {
 	assert.Equal(t, 150, result.Value)
 }
 
+func TestDoGet_SpecialCharsInQueryParams(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify that special characters are properly percent-encoded and
+		// decoded by the server. Prior to the url.Values fix, raw string
+		// concatenation would pass these through unencoded, breaking the request.
+		assert.Equal(t, "BRK B", r.URL.Query().Get("symbol"))
+		assert.Equal(t, "quote,fundamental", r.URL.Query().Get("fields"))
+		assert.Equal(t, "a&b=c", r.URL.Query().Get("tricky"))
+
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "BRK B", Value: 300}))
+	}))
+	defer srv.Close()
+
+	c := NewClient("tok", WithBaseURL(srv.URL))
+	var result testResponse
+	err := c.doGet(context.Background(), "/quotes", map[string]string{
+		"symbol": "BRK B",
+		"fields": "quote,fundamental",
+		"tricky": "a&b=c",
+	}, &result)
+
+	require.NoError(t, err)
+	assert.Equal(t, "BRK B", result.Name)
+}
+
 func TestDoGet_NilResult(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
