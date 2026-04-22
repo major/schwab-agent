@@ -255,6 +255,17 @@ func TestSchemaCommand_NestedCommandPath(t *testing.T) {
 	assert.True(t, equityCmd.Flags["--symbol"].Required)
 }
 
+func TestClassifyFlag_UnknownType_FallsBackToString(t *testing.T) {
+	// The default branch handles any flag type not explicitly matched
+	// (String, Int, Float64, Bool). UintFlag triggers this path.
+	t.Run("with name", func(t *testing.T) {
+		f := &cli.UintFlag{Name: "retries", Usage: "retry count"}
+		name, schema := classifyFlag(f)
+		assert.Equal(t, "retries", name)
+		assert.Equal(t, "string", schema.Type, "unknown flag types fall back to string")
+	})
+}
+
 func TestSchemaCommand_RawJSONOutput(t *testing.T) {
 	// Verify schema outputs raw JSON, not wrapped in the standard envelope.
 	app := testApp()

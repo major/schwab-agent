@@ -889,3 +889,23 @@ func TestTAExpectedMove_EmptyChain(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no options available")
 }
+
+func TestMustParseFloat(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want float64
+	}{
+		{"valid integer", "100", 100.0},
+		{"valid decimal", "3.14", 3.14},
+		{"empty string", "", 0},
+		{"invalid string", "notanumber", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mustParseFloat(tt.in)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

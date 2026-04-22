@@ -205,6 +205,35 @@ func TestSaveToken_OverwritesExistingFile(t *testing.T) {
 	assert.Equal(t, "updated-access-token", loaded.Token.AccessToken)
 }
 
+func TestSaveToken_MkdirAllFailure(t *testing.T) {
+	// Arrange: use a path under /dev/null which cannot be a directory parent.
+	badPath := "/dev/null/impossible/token.json"
+	tf := makeTokenFile(1713700000, 1713701800.0)
+
+	// Act
+	err := SaveToken(badPath, tf)
+
+	// Assert
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create token directory")
+}
+
+func TestSaveToken_WriteFileFailure(t *testing.T) {
+	// Arrange: create a read-only directory so WriteFile fails.
+	tmpDir := t.TempDir()
+	readOnlyDir := filepath.Join(tmpDir, "readonly")
+	require.NoError(t, os.MkdirAll(readOnlyDir, 0o500))
+	tokenPath := filepath.Join(readOnlyDir, "token.json")
+	tf := makeTokenFile(1713700000, 1713701800.0)
+
+	// Act
+	err := SaveToken(tokenPath, tf)
+
+	// Assert
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to write token file")
+}
+
 // --- IsAccessTokenExpired tests ---
 
 func TestIsAccessTokenExpired_FutureExpiry_ReturnsFalse(t *testing.T) {
