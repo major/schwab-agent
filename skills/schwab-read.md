@@ -161,8 +161,9 @@ Available markets: equity, option, bond, future, forex
 ### Movers
 
 ```bash
-schwab-agent market movers $SPX.X
-schwab-agent market movers $DJI --sort PERCENT_CHANGE_UP
+schwab-agent market movers '$SPX'
+schwab-agent market movers '$DJI' --sort PERCENT_CHANGE_UP
+schwab-agent market movers EQUITY_ALL --sort VOLUME
 ```
 
 Flags: `--sort` (VOLUME/TRADES/PERCENT_CHANGE_UP/PERCENT_CHANGE_DOWN), `--frequency` (0/1/5/10/30/60)

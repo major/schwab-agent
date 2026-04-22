@@ -98,7 +98,7 @@ func TestMarketCommand_Movers_Success(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := MarketCommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "market", "movers", "$SPX.X"))
+	require.NoError(t, runTestCommand(t, cmd, "market", "movers", "$SPX"))
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
@@ -153,6 +153,6 @@ func TestMarketCommand_Movers_APIError(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := MarketCommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "market", "movers", "$SPX.X")
+	err := runTestCommand(t, cmd, "market", "movers", "$SPX")
 	require.Error(t, err)
 }
