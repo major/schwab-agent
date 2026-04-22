@@ -36,18 +36,7 @@ schwab-agent order place bracket --symbol NVDA --action BUY --quantity 10 --type
 schwab-agent order place bracket --symbol NVDA --action BUY --quantity 10 --type LIMIT --price 130 --take-profit 150 --confirm
 ```
 
-### Bracket Internals
-
-Bracket orders use Schwab's TRIGGER order strategy. The structure depends on how many exit conditions are provided:
-
-- **Both exits**: TRIGGER (entry) → OCO → 2 SINGLE (take-profit LIMIT + stop-loss STOP)
-- **One exit**: TRIGGER (entry) → SINGLE (stop-loss STOP or take-profit LIMIT)
-
-At least one of `--take-profit` or `--stop-loss` is required. The exit order instruction is automatically inverted (BUY entry → SELL exit, SELL entry → BUY exit).
-
-Canceling a bracket order cascades to all child orders.
-
-Replace is not supported for bracket orders. Cancel and re-place instead.
+At least one of `--take-profit` or `--stop-loss` is required. Exit instructions are auto-inverted (BUY entry becomes SELL exit). Canceling cascades to all child orders. Replace is not supported for brackets - cancel and re-place instead.
 
 ## OCO Orders (One-Cancels-Other)
 
@@ -86,10 +75,6 @@ schwab-agent order place oco --symbol TSLA --action BUY --quantity 25 --take-pro
 | Entry leg | Yes (buys/sells first) | No (you already own the position) |
 | Use case | New position + automatic exits | Protect existing position |
 | Structure | TRIGGER -> OCO/SINGLE | OCO (two SINGLE children) or standalone SINGLE |
-
-### OCO Internals
-
-When both exits are provided, OCO creates an OCO node with two SINGLE children (take-profit LIMIT + stop-loss STOP). When only one exit is provided, it creates a plain SINGLE order (no OCO wrapper needed).
 
 At least one of `--take-profit` or `--stop-loss` is required. Price validation ensures take-profit and stop-loss are on the correct side (SELL: TP > SL; BUY: TP < SL).
 
@@ -210,4 +195,4 @@ schwab-agent order build vertical ... | schwab-agent order preview --spec -
 | `--confirm` | Actually execute (omit to preview) | all mutable |
 | `--account` | Account hash (uses default if set) | all |
 | `--session` | NORMAL, AM, PM, SEAMLESS | all |
-| `--duration` | DAY, GTC, FOK | all |
+| `--duration` | DAY, GOOD_TILL_CANCEL, FILL_OR_KILL, IMMEDIATE_OR_CANCEL, END_OF_WEEK, END_OF_MONTH, NEXT_END_OF_MONTH | all |

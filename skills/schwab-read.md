@@ -91,7 +91,7 @@ schwab-agent chain expiration AAPL
 ```bash
 schwab-agent history get AAPL
 schwab-agent history get AAPL --period-type month --period 3 --frequency-type daily --frequency 1
-schwab-agent history get AAPL --start-date 2026-01-01 --end-date 2026-04-21
+schwab-agent history get AAPL --from 1704067200000 --to 1713657600000
 ```
 
 | Flag | Description |
@@ -100,8 +100,10 @@ schwab-agent history get AAPL --start-date 2026-01-01 --end-date 2026-04-21
 | `--period` | Number of periods (e.g., 3 for 3 months) |
 | `--frequency-type` | minute, daily, weekly, monthly |
 | `--frequency` | Frequency interval (e.g., 1 for every day) |
-| `--start-date` | Start date (YYYY-MM-DD), use with --end-date |
-| `--end-date` | End date (YYYY-MM-DD), use with --start-date |
+| `--from` | Start time in milliseconds since epoch |
+| `--to` | End time in milliseconds since epoch |
+
+Tip: Convert dates to epoch ms with `date -d "2026-01-01" +%s000` (Linux) or `date -j -f "%Y-%m-%d" "2026-01-01" +%s000` (macOS).
 
 ## Accounts
 
@@ -129,6 +131,7 @@ schwab-agent instrument get 037833100
 | `symbol-regex` | Search using regex pattern |
 | `desc-search` | Search by description substring |
 | `desc-regex` | Search by description regex |
+| `search` | General search across instruments |
 | `fundamental` | Return fundamental data (PE, dividend, etc.) |
 
 ## Transactions

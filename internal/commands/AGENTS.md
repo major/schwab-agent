@@ -104,14 +104,14 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 
 | File | Command | Subcommands |
 |---|---|---|
-| auth.go | auth | setup, login, status |
+| auth.go | auth | login, status, refresh |
 | account.go | account | list, get, numbers, set-default, transaction (list, get) |
 | quote.go | quote | get |
 | order.go | order | list, get, place (equity/option/bracket/oco), preview, cancel, replace |
-| order_build.go | order build | equity, option, bracket, oco |
-| chain.go | chain | (direct) |
-| history.go | history | (direct) |
-| instrument.go | instrument | (direct) |
+| order_build.go | order build | equity, option, bracket, oco, vertical, iron-condor, straddle, strangle, covered-call |
+| chain.go | chain | get, expiration |
+| history.go | history | get |
+| instrument.go | instrument | search, get |
 | market.go | market | hours, movers |
 
 | symbol.go | symbol | build, parse |

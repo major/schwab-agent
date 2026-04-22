@@ -16,10 +16,11 @@ Pre-built binaries for Linux and macOS (amd64/arm64) are on the [releases page](
 
 | File | Covers |
 |------|--------|
-| schwab-config-auth.md | Setup, authentication, configuration, environment variables |
+| schwab-config-auth.md | Authentication, configuration, environment variables |
 | schwab-read.md | Quotes, option chains, price history, accounts, instruments, transactions, movers, market hours, option symbol build/parse |
-| schwab-trade.md | Order placement, preview, build, cancel, replace, safety workflow |
-| schwab-ta.md | Technical analysis indicators: SMA, EMA, RSI, MACD, ATR, Bollinger Bands, Stochastic, ADX |
+| schwab-trade.md | Order placement, preview, cancel, replace, safety workflow |
+| schwab-order-builder.md | Order construction: equity, option, bracket, OCO, vertical, iron condor, straddle, strangle, covered call |
+| schwab-ta.md | Technical analysis indicators: SMA, EMA, RSI, MACD, ATR, Bollinger Bands, Stochastic, ADX, VWAP, HV |
 
 ## Output Format
 
@@ -40,11 +41,11 @@ All commands return JSON.
 
 ## Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Validation or order build error |
-| 2 | Symbol or account not found |
-| 3 | Auth required, expired, or failed |
-| 4 | HTTP error from Schwab API |
-| 5 | Order rejected |
+| Code | Meaning | Recovery |
+|------|---------|----------|
+| 0 | Success | - |
+| 1 | Validation or order build error | Fix input flags/values and retry |
+| 2 | Symbol or account not found | Verify symbol or run `account numbers` to get valid hashes |
+| 3 | Auth required, expired, or failed | Run `auth refresh` or `auth login` |
+| 4 | HTTP error from Schwab API | Check `error.details` in response for Schwab's error message |
+| 5 | Order rejected | Check `error.details` for rejection reason, adjust order params |

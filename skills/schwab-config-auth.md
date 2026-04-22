@@ -2,16 +2,6 @@
 
 schwab-agent uses OAuth2 to authenticate with the Schwab API. Credentials are stored in a local config file and tokens are refreshed automatically.
 
-## Setup
-
-Run the interactive setup to store your Schwab app credentials:
-
-```bash
-schwab-agent auth setup
-```
-
-This creates `~/.config/schwab-agent/config.json` with your client ID, client secret, and callback URL.
-
 ## Login
 
 Start the OAuth2 flow. Opens a browser for Schwab authentication, receives the callback, and stores tokens locally. Tokens are refreshed automatically before expiration.
@@ -26,6 +16,14 @@ Check current token expiration and refresh token staleness:
 
 ```bash
 schwab-agent auth status
+```
+
+## Refresh
+
+Force a token refresh without re-authenticating:
+
+```bash
+schwab-agent auth refresh
 ```
 
 ## Configuration
@@ -65,4 +63,4 @@ Environment variables take priority over config file values.
 | "auth required" error | Run `schwab-agent auth login` to get new tokens |
 | "auth expired" error | Refresh token is stale (>6.5 days old), run `schwab-agent auth login` again |
 | "callback error" | Check callback URL matches Schwab app settings (default: https://127.0.0.1:8182) |
-| Missing credentials | Run `schwab-agent auth setup` or set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars |
+| Missing credentials | Set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add them to config.json |
