@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/major/schwab-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/major/schwab-agent/actions/workflows/ci.yml)
 [![Go](https://img.shields.io/github/go-mod/go-version/major/schwab-agent)](https://go.dev/)
+[![codecov](https://codecov.io/gh/major/schwab-agent/branch/main/graph/badge.svg)](https://codecov.io/gh/major/schwab-agent)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/major/schwab-agent/badge)](https://scorecard.dev/viewer/?uri=github.com/major/schwab-agent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 CLI tool for AI agents to trade via the Charles Schwab API. Single binary, JSON-first output, built-in safety guards.

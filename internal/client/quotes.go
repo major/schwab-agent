@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -36,15 +36,15 @@ func (c *Client) Quote(ctx context.Context, symbol string) (*models.QuoteEquity,
 	err := c.doGet(ctx, path, nil, &result)
 	if err != nil {
 		// Convert 404 HTTPError to SymbolNotFoundError
-		var httpErr *schwabErrors.HTTPError
+		var httpErr *apperr.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
-			return nil, schwabErrors.NewSymbolNotFoundError(fmt.Sprintf("symbol %s not found", symbol), err)
+			return nil, apperr.NewSymbolNotFoundError(fmt.Sprintf("symbol %s not found", symbol), err)
 		}
 		return nil, err
 	}
 	q, ok := result[symbol]
 	if !ok {
-		return nil, schwabErrors.NewSymbolNotFoundError(fmt.Sprintf("symbol %s not found", symbol), nil)
+		return nil, apperr.NewSymbolNotFoundError(fmt.Sprintf("symbol %s not found", symbol), nil)
 	}
 	return q, nil
 }

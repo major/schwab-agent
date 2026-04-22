@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,7 +106,7 @@ func TestQuoteGetSingleNotFound(t *testing.T) {
 	err := runTestCommand(t, cmd, "quote", "get", "INVALID")
 	require.Error(t, err)
 
-	var symErr *schwabErrors.SymbolNotFoundError
+	var symErr *apperr.SymbolNotFoundError
 	assert.ErrorAs(t, err, &symErr)
 	assert.Empty(t, buf.String())
 }
@@ -120,7 +120,7 @@ func TestQuoteGetNoArgs(t *testing.T) {
 	err := runTestCommand(t, cmd, "quote", "get")
 	require.Error(t, err)
 
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 	assert.Empty(t, buf.String())
 }

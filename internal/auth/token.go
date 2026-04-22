@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 const (
 	// tokenEndpoint is the Schwab OAuth token endpoint.
-	tokenEndpoint = "https://api.schwabapi.com/v1/oauth/token"
+	tokenEndpoint = "https://api.schwabapi.com/v1/oauth/token" //nolint:gosec // G101: API endpoint URL, not a credential
 
 	// refreshTokenMaxAge is 6.5 days in seconds, matching schwab-py's default.
 	refreshTokenMaxAge = 561600
@@ -47,7 +47,7 @@ func LoadToken(tokenPath string) (*TokenFile, error) {
 	data, err := os.ReadFile(tokenPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, schwabErrors.NewAuthRequiredError(
+			return nil, apperr.NewAuthRequiredError(
 				"token file not found: run `schwab-agent auth login` to authenticate",
 				err,
 			)
@@ -138,7 +138,7 @@ func RefreshAccessToken(cfg *Config, tf *TokenFile, endpoint string) (*TokenFile
 	if resp.StatusCode != http.StatusOK {
 		var errResp tokenErrorResponse
 		if json.Unmarshal(body, &errResp) == nil && errResp.Error == "invalid_grant" {
-			return nil, schwabErrors.NewAuthExpiredError(
+			return nil, apperr.NewAuthExpiredError(
 				"refresh token expired: run `schwab-agent auth login` to re-authenticate",
 				nil,
 			)

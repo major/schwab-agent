@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 const (
@@ -34,14 +34,14 @@ type HistoricalVolatilityResult struct {
 // It uses simple returns, sample standard deviation, and reports volatility in percentage terms.
 func HistoricalVolatility(closes []float64, period int) (*HistoricalVolatilityResult, error) {
 	if period <= 0 {
-		return nil, schwabErrors.NewValidationError(
+		return nil, apperr.NewValidationError(
 			fmt.Sprintf("historical volatility period must be > 0, got %d", period),
 			nil,
 		)
 	}
 
 	if len(closes) < period+1 {
-		return nil, schwabErrors.NewValidationError(
+		return nil, apperr.NewValidationError(
 			fmt.Sprintf(
 				"historical volatility requires at least %d closing prices, got %d",
 				period+1,

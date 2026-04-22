@@ -37,7 +37,7 @@ func QuoteCommand(c *client.Ref, w io.Writer) *cli.Command {
 All command output goes through `internal/output` envelopes:
 
 - `output.WriteSuccess(w, data, output.TimestampMeta())` for success
-- Return typed errors from `internal/errors` for failures (the Before hook handles formatting)
+- Return typed errors from `internal/apperr` for failures (the Before hook handles formatting)
 - `output.WritePartial(w, data, missing, meta)` when some results succeed and some fail (e.g., multi-symbol quote)
 
 Exception: `schema` and `order build` commands write raw JSON (not envelope-wrapped).

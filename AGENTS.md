@@ -23,7 +23,7 @@ internal/
   auth/                 OAuth2 flow, token lifecycle, config (JSON + env vars)
   client/               Schwab API HTTP client (see internal/client/AGENTS.md)
   commands/             CLI command handlers (see internal/commands/AGENTS.md)
-  errors/               Typed error hierarchy with exit codes
+  apperr/               Typed error hierarchy with exit codes
   models/               Data structures/schemas for API payloads
   orderbuilder/         Order construction/validation (equity, option, bracket, OCO) + OCC symbol build/parse
   output/               JSON envelope writers (success, error, partial)
@@ -48,7 +48,7 @@ golangci-lint v2 config (`.golangci.yml`). Active linters: bodyclose, errorlint,
 
 ## Error Hierarchy
 
-All errors in `internal/errors/errors.go`. Base type `SchwabError` with typed subtypes:
+All errors in `internal/apperr/errors.go`. Base type `SchwabError` with typed subtypes:
 
 | Error Type | Exit Code | When |
 |---|---|---|

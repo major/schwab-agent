@@ -24,7 +24,7 @@ import (
 
 	"github.com/pkg/browser"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 const (
@@ -32,7 +32,7 @@ const (
 	authorizeEndpoint = "https://api.schwabapi.com/v1/oauth/authorize"
 
 	// oauthTokenEndpoint is Schwab's OAuth token endpoint.
-	oauthTokenEndpoint = "https://api.schwabapi.com/v1/oauth/token"
+	oauthTokenEndpoint = "https://api.schwabapi.com/v1/oauth/token" //nolint:gosec // G101: API endpoint URL, not a credential
 
 	// defaultCallbackAddr limits the local callback server to loopback.
 	defaultCallbackAddr = "127.0.0.1:8182"
@@ -63,7 +63,7 @@ var oauthHTTPClient = &http.Client{
 func AuthorizeURL(cfg *Config) (authURL, state string, err error) {
 	state, err = randomOAuthState()
 	if err != nil {
-		return "", "", schwabErrors.NewAuthCallbackError("failed to generate OAuth state", err)
+		return "", "", apperr.NewAuthCallbackError("failed to generate OAuth state", err)
 	}
 
 	query := url.Values{}
@@ -91,7 +91,7 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*Toke
 
 	req, err := http.NewRequest(http.MethodPost, tokenEndpoint, strings.NewReader(formData.Encode()))
 	if err != nil {
-		return nil, schwabErrors.NewAuthCallbackError("failed to build token exchange request", err)
+		return nil, apperr.NewAuthCallbackError("failed to build token exchange request", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -99,17 +99,17 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*Toke
 
 	resp, err := oauthHTTPClient.Do(req)
 	if err != nil {
-		return nil, schwabErrors.NewAuthCallbackError("token exchange request failed", err)
+		return nil, apperr.NewAuthCallbackError("token exchange request failed", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, schwabErrors.NewAuthCallbackError("failed to read token exchange response", err)
+		return nil, apperr.NewAuthCallbackError("failed to read token exchange response", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, schwabErrors.NewAuthCallbackError(
+		return nil, apperr.NewAuthCallbackError(
 			fmt.Sprintf("token exchange failed with status %d", resp.StatusCode),
 			fmt.Errorf("response body: %s", strings.TrimSpace(string(body))),
 		)
@@ -117,7 +117,7 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*Toke
 
 	var token TokenData
 	if err := json.Unmarshal(body, &token); err != nil {
-		return nil, schwabErrors.NewAuthCallbackError("failed to parse token exchange response", err)
+		return nil, apperr.NewAuthCallbackError("failed to parse token exchange response", err)
 	}
 
 	nowUnix := now.Unix()
@@ -161,7 +161,7 @@ func RunLogin(cfg *Config, tokenPath, tokenEndpoint string, openBrowser bool, w 
 	if openBrowser {
 		logger.Info("Opening browser for Schwab login")
 		if err := browser.OpenURL(authURL); err != nil {
-			return schwabErrors.NewAuthCallbackError("failed to open browser", err)
+			return apperr.NewAuthCallbackError("failed to open browser", err)
 		}
 	} else {
 		logger.Info("Open this URL to authenticate", "url", authURL)
@@ -212,12 +212,12 @@ func randomOAuthState() (string, error) {
 func callbackAddress(cfg *Config) (string, error) {
 	parsedURL, err := url.Parse(cfg.CallbackURL)
 	if err != nil {
-		return "", schwabErrors.NewAuthCallbackError("invalid callback URL", err)
+		return "", apperr.NewAuthCallbackError("invalid callback URL", err)
 	}
 
 	host := parsedURL.Host
 	if host == "" {
-		return "", schwabErrors.NewAuthCallbackError("callback URL must include a host and port", nil)
+		return "", apperr.NewAuthCallbackError("callback URL must include a host and port", nil)
 	}
 
 	validatedAddr, err := validateCallbackAddr(host)
@@ -243,7 +243,7 @@ func startCallbackServer(addr, expectedState string, readyCh chan<- struct{}) (s
 		if readyCh != nil {
 			close(readyCh)
 		}
-		return "", schwabErrors.NewAuthCallbackError("failed to generate callback TLS certificate", err)
+		return "", apperr.NewAuthCallbackError("failed to generate callback TLS certificate", err)
 	}
 
 	listener, err := net.Listen("tcp", validatedAddr)
@@ -251,7 +251,7 @@ func startCallbackServer(addr, expectedState string, readyCh chan<- struct{}) (s
 		if readyCh != nil {
 			close(readyCh)
 		}
-		return "", schwabErrors.NewAuthCallbackError("failed to listen for OAuth callback", err)
+		return "", apperr.NewAuthCallbackError("failed to listen for OAuth callback", err)
 	}
 
 	tlsListener := tls.NewListener(listener, &tls.Config{Certificates: []tls.Certificate{certificate}})
@@ -260,14 +260,17 @@ func startCallbackServer(addr, expectedState string, readyCh chan<- struct{}) (s
 	resultCh := make(chan callbackResult, 1)
 	var once sync.Once
 
-	server := &http.Server{Handler: callbackHandler(expectedState, resultCh, &once)}
+	server := &http.Server{
+		Handler:           callbackHandler(expectedState, resultCh, &once),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 
 	go func() {
 		serveErr := server.Serve(tlsListener)
 		if serveErr != nil && serveErr != http.ErrServerClosed {
 			once.Do(func() {
 				resultCh <- callbackResult{
-					err: schwabErrors.NewAuthCallbackError("OAuth callback server failed", serveErr),
+					err: apperr.NewAuthCallbackError("OAuth callback server failed", serveErr),
 				}
 			})
 		}
@@ -290,7 +293,7 @@ func startCallbackServer(addr, expectedState string, readyCh chan<- struct{}) (s
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = server.Shutdown(shutdownCtx)
-		return "", schwabErrors.NewAuthCallbackError("timed out waiting for OAuth callback after 300 seconds", nil)
+		return "", apperr.NewAuthCallbackError("timed out waiting for OAuth callback after 300 seconds", nil)
 	}
 }
 
@@ -304,7 +307,7 @@ func callbackHandler(expectedState string, resultCh chan<- callbackResult, once 
 			http.Error(w, "state mismatch", http.StatusBadRequest)
 			once.Do(func() {
 				resultCh <- callbackResult{
-					err: schwabErrors.NewAuthCallbackError(
+					err: apperr.NewAuthCallbackError(
 						"OAuth callback state mismatch",
 						fmt.Errorf("expected state %q, got %q", expectedState, state),
 					),
@@ -317,7 +320,7 @@ func callbackHandler(expectedState string, resultCh chan<- callbackResult, once 
 			http.Error(w, "missing code", http.StatusBadRequest)
 			once.Do(func() {
 				resultCh <- callbackResult{
-					err: schwabErrors.NewAuthCallbackError("OAuth callback missing code", nil),
+					err: apperr.NewAuthCallbackError("OAuth callback missing code", nil),
 				}
 			})
 			return
@@ -340,11 +343,11 @@ func validateCallbackAddr(addr string) (string, error) {
 
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
-		return "", schwabErrors.NewAuthCallbackError("callback address must include host and port", err)
+		return "", apperr.NewAuthCallbackError("callback address must include host and port", err)
 	}
 
 	if host != "127.0.0.1" {
-		return "", schwabErrors.NewAuthCallbackError("callback server must bind to 127.0.0.1 only", nil)
+		return "", apperr.NewAuthCallbackError("callback server must bind to 127.0.0.1 only", nil)
 	}
 
 	return addr, nil

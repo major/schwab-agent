@@ -1,5 +1,5 @@
-// Package errors defines the error hierarchy and exit code mapping for schwab-agent.
-package errors
+// Package apperr defines the error hierarchy and exit code mapping for schwab-agent.
+package apperr
 
 import (
 	"errors"

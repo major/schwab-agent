@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/client"
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 )
 
@@ -33,7 +33,7 @@ func quoteGetCommand(c *client.Ref, w io.Writer) *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			args := cmd.Args().Slice()
 			if len(args) == 0 {
-				return schwabErrors.NewValidationError("at least one symbol is required", nil)
+				return apperr.NewValidationError("at least one symbol is required", nil)
 			}
 
 			if len(args) == 1 {

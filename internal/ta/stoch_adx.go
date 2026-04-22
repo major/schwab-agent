@@ -5,7 +5,7 @@ import (
 
 	"github.com/markcheno/go-talib"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 // Stochastic computes the Stochastic Oscillator (%K and %D lines).
@@ -19,13 +19,13 @@ import (
 // Returns (slowK, slowD []float64, err error). Both slices are zero-stripped and aligned.
 func Stochastic(highs, lows, closes []float64, kPeriod, smoothK, dPeriod int) (slowK, slowD []float64, err error) {
 	if kPeriod <= 0 || smoothK <= 0 || dPeriod <= 0 {
-		return nil, nil, schwabErrors.NewValidationError(
+		return nil, nil, apperr.NewValidationError(
 			"stochastic: all periods must be > 0",
 			nil,
 		)
 	}
 	if len(highs) != len(lows) || len(highs) != len(closes) {
-		return nil, nil, schwabErrors.NewValidationError(
+		return nil, nil, apperr.NewValidationError(
 			fmt.Sprintf("stochastic: mismatched slice lengths: highs=%d, lows=%d, closes=%d", len(highs), len(lows), len(closes)),
 			nil,
 		)
@@ -59,13 +59,13 @@ func Stochastic(highs, lows, closes []float64, kPeriod, smoothK, dPeriod int) (s
 // Returns (adx, plusDI, minusDI []float64, err error). All slices stripped and aligned.
 func ADX(highs, lows, closes []float64, period int) (adx, plusDI, minusDI []float64, err error) {
 	if period <= 0 {
-		return nil, nil, nil, schwabErrors.NewValidationError(
+		return nil, nil, nil, apperr.NewValidationError(
 			fmt.Sprintf("adx period must be > 0, got %d", period),
 			nil,
 		)
 	}
 	if len(highs) != len(lows) || len(highs) != len(closes) {
-		return nil, nil, nil, schwabErrors.NewValidationError(
+		return nil, nil, nil, apperr.NewValidationError(
 			fmt.Sprintf("adx: mismatched slice lengths: highs=%d, lows=%d, closes=%d", len(highs), len(lows), len(closes)),
 			nil,
 		)

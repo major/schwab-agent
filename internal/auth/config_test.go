@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 func TestLoadConfig_MissingFile_ReturnsValidationError(t *testing.T) {
@@ -23,7 +23,7 @@ func TestLoadConfig_MissingFile_ReturnsValidationError(t *testing.T) {
 	assert.Nil(t, cfg)
 	require.Error(t, err)
 
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "SCHWAB_CLIENT_ID")
 	assert.Contains(t, err.Error(), "SCHWAB_CLIENT_SECRET")
@@ -173,7 +173,7 @@ func TestLoadConfig_MissingClientID_ReturnsValidationError(t *testing.T) {
 	assert.Nil(t, cfg)
 	require.Error(t, err)
 
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "SCHWAB_CLIENT_ID")
 	assert.Contains(t, err.Error(), "config file")
@@ -199,7 +199,7 @@ func TestLoadConfig_MissingClientSecret_ReturnsValidationError(t *testing.T) {
 	assert.Nil(t, cfg)
 	require.Error(t, err)
 
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "SCHWAB_CLIENT_SECRET")
 	assert.Contains(t, err.Error(), "config file")
@@ -223,7 +223,7 @@ func TestLoadConfig_BothMissing_ReturnsValidationError(t *testing.T) {
 	assert.Nil(t, cfg)
 	require.Error(t, err)
 
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -445,7 +445,7 @@ func TestLoadConfig_EmptyFile_ReturnsValidationError(t *testing.T) {
 	assert.Nil(t, cfg)
 	require.Error(t, err)
 
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -199,7 +199,7 @@ func TestPlaceOrder_400_ReturnsOrderRejectedError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, result)
 
-	var orderErr *schwabErrors.OrderRejectedError
+	var orderErr *apperr.OrderRejectedError
 	require.ErrorAs(t, err, &orderErr)
 	assert.Contains(t, orderErr.Error(), "order rejected")
 }
@@ -217,7 +217,7 @@ func TestPlaceOrder_422_ReturnsOrderRejectedError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, result)
 
-	var orderErr *schwabErrors.OrderRejectedError
+	var orderErr *apperr.OrderRejectedError
 	require.ErrorAs(t, err, &orderErr)
 	assert.Contains(t, orderErr.Error(), "order rejected")
 }

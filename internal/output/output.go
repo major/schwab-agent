@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 // Metadata holds the standard metadata fields for response envelopes.
@@ -58,22 +58,22 @@ func WriteSuccess(w io.Writer, data any, metadata Metadata) error {
 }
 
 // WriteError writes an error response to the writer.
-// It maps the error type to an appropriate error code string using schwabErrors.ErrorCode().
+// It maps the error type to an appropriate error code string using apperr.ErrorCode().
 // The response is formatted as a JSON envelope with error details.
 func WriteError(w io.Writer, err error) error {
-	code := schwabErrors.ErrorCode(err)
+	code := apperr.ErrorCode(err)
 	message := err.Error()
 
 	// Extract details from specific error types
 	var details string
-	var schwabErr *schwabErrors.SchwabError
+	var schwabErr *apperr.SchwabError
 	if errors.As(err, &schwabErr) {
 		details = schwabErr.Details
 	}
 
 	// Include the upstream response body when available so API errors from
 	// Schwab are visible in the CLI output instead of just "status: NNN".
-	var httpErr *schwabErrors.HTTPError
+	var httpErr *apperr.HTTPError
 	if errors.As(err, &httpErr) {
 		if httpErr.Body != "" {
 			details = fmt.Sprintf("status: %d, body: %s", httpErr.StatusCode, httpErr.Body)

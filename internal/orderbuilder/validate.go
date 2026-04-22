@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -355,7 +355,7 @@ func validateSpreadPrice(price float64, strategy string) error {
 
 // validationError creates a ValidationError with a fix-suggesting details message.
 func validationError(message, details string) error {
-	err := schwabErrors.NewValidationError(message, nil)
+	err := apperr.NewValidationError(message, nil)
 	err.Details = details
 	return err
 }

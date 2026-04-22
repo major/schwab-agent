@@ -11,7 +11,7 @@ import (
 
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -147,7 +147,7 @@ func resolveAccount(accountFlag, configPath string, positionalArgs []string) (st
 		}
 	}
 
-	return "", schwabErrors.NewAccountNotFoundError(
+	return "", apperr.NewAccountNotFoundError(
 		"no account specified: use --account flag or set default_account in config",
 		nil,
 	)
@@ -245,7 +245,7 @@ func accountTransactionCommand(c *client.Ref, configPath string, w io.Writer) *c
 
 					txnID, err := strconv.ParseInt(txnIDStr, 10, 64)
 					if err != nil {
-						return schwabErrors.NewValidationError("transaction ID must be a number", nil)
+						return apperr.NewValidationError("transaction ID must be a number", nil)
 					}
 
 					account, err := resolveAccount(cmd.String("account"), configPath, nil)

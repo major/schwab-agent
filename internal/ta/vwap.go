@@ -4,7 +4,7 @@ package ta
 import (
 	"fmt"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 // VWAP computes Volume Weighted Average Price.
@@ -13,14 +13,14 @@ import (
 func VWAP(highs, lows, closes, volumes []float64) ([]float64, error) {
 	// Validate input lengths
 	if len(highs) == 0 || len(lows) == 0 || len(closes) == 0 || len(volumes) == 0 {
-		return nil, schwabErrors.NewValidationError(
+		return nil, apperr.NewValidationError(
 			"VWAP requires non-empty slices",
 			nil,
 		)
 	}
 
 	if len(highs) != len(lows) || len(highs) != len(closes) || len(highs) != len(volumes) {
-		return nil, schwabErrors.NewValidationError(
+		return nil, apperr.NewValidationError(
 			fmt.Sprintf("VWAP requires equal-length slices: got highs=%d, lows=%d, closes=%d, volumes=%d",
 				len(highs), len(lows), len(closes), len(volumes)),
 			nil,
@@ -41,7 +41,7 @@ func VWAP(highs, lows, closes, volumes []float64) ([]float64, error) {
 
 		// Check if cumulative volume is zero (all volumes so far are zero)
 		if cumulativeVol == 0 {
-			return nil, schwabErrors.NewValidationError(
+			return nil, apperr.NewValidationError(
 				"VWAP requires non-zero volume data",
 				nil,
 			)

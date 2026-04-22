@@ -14,7 +14,7 @@ import (
 
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/orderbuilder"
 	"github.com/major/schwab-agent/internal/output"
@@ -706,11 +706,11 @@ func readSpecSource(cmd *cli.Command, spec string) ([]byte, error) {
 func requireMutableEnabled(configPath string) error {
 	cfg, err := auth.LoadConfig(configPath)
 	if err != nil {
-		return schwabErrors.NewValidationError(mutableDisabledMessage, nil)
+		return apperr.NewValidationError(mutableDisabledMessage, nil)
 	}
 
 	if !cfg.IAlsoLikeToLiveDangerously {
-		return schwabErrors.NewValidationError(mutableDisabledMessage, nil)
+		return apperr.NewValidationError(mutableDisabledMessage, nil)
 	}
 
 	return nil
@@ -722,7 +722,7 @@ func requireConfirm(confirmed bool) error {
 		return nil
 	}
 
-	return schwabErrors.NewValidationError(confirmOrderMessage, nil)
+	return apperr.NewValidationError(confirmOrderMessage, nil)
 }
 
 // parseRequiredOrderID parses the first positional argument as an order ID.
@@ -1058,5 +1058,5 @@ func parsePutCall(call, put bool) (models.PutCall, error) {
 
 // newValidationError creates a consistent validation error for command parsing.
 func newValidationError(message string) error {
-	return schwabErrors.NewValidationError(message, nil)
+	return apperr.NewValidationError(message, nil)
 }

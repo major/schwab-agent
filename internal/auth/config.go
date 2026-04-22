@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 // Config holds Schwab API credentials and settings.
@@ -62,7 +62,7 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	// Validate required fields
 	if cfg.ClientID == "" || cfg.ClientSecret == "" {
-		return nil, schwabErrors.NewValidationError(
+		return nil, apperr.NewValidationError(
 			"Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file",
 			nil,
 		)
@@ -81,7 +81,7 @@ func SaveConfig(configPath string, cfg *Config) error {
 	}
 
 	// Marshal config to JSON
-	data, err := json.MarshalIndent(cfg, "", "  ")
+	data, err := json.MarshalIndent(cfg, "", "  ") //nolint:gosec // G117: config file intentionally stores client_secret with 0600 perms
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
@@ -100,7 +100,7 @@ func SetDefaultAccount(configPath, hash string) error {
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
 		// If validation error (missing credentials) or file doesn't exist, create a minimal config
-		var valErr *schwabErrors.ValidationError
+		var valErr *apperr.ValidationError
 		if errors.As(err, &valErr) || os.IsNotExist(err) {
 			// For validation errors or missing file, create empty config
 			cfg = &Config{}

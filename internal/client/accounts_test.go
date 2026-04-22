@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -53,7 +53,7 @@ func TestAccountNumbers_404_ReturnsAccountNotFoundError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, result)
 
-	var accountErr *schwabErrors.AccountNotFoundError
+	var accountErr *apperr.AccountNotFoundError
 	require.ErrorAs(t, err, &accountErr)
 	assert.Contains(t, accountErr.Error(), "account numbers not found")
 }
@@ -121,7 +121,7 @@ func TestAccounts_404_ReturnsAccountNotFoundError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, result)
 
-	var accountErr *schwabErrors.AccountNotFoundError
+	var accountErr *apperr.AccountNotFoundError
 	require.ErrorAs(t, err, &accountErr)
 	assert.Contains(t, accountErr.Error(), "accounts not found")
 }
@@ -179,7 +179,7 @@ func TestAccount_404_ReturnsAccountNotFoundError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, result)
 
-	var accountErr *schwabErrors.AccountNotFoundError
+	var accountErr *apperr.AccountNotFoundError
 	require.ErrorAs(t, err, &accountErr)
 	assert.Contains(t, accountErr.Error(), "account invalid-hash not found")
 }
@@ -242,7 +242,7 @@ func TestAccount_401_ReturnsAuthExpiredError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, result)
 
-	var authErr *schwabErrors.AuthExpiredError
+	var authErr *apperr.AuthExpiredError
 	require.ErrorAs(t, err, &authErr)
 }
 

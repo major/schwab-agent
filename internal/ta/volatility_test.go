@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 func TestHistoricalVolatility_Correct(t *testing.T) {
@@ -58,7 +58,7 @@ func TestHistoricalVolatility_InvalidPeriod(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -68,7 +68,7 @@ func TestHistoricalVolatility_InsufficientData(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 

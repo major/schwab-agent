@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 func TestSMA_Correct(t *testing.T) {
@@ -26,7 +26,7 @@ func TestSMA_InvalidPeriod(t *testing.T) {
 	_, err := SMA([]float64{1, 2, 3}, 0)
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -35,7 +35,7 @@ func TestSMA_InsufficientData(t *testing.T) {
 	_, err := SMA([]float64{1, 2, 3}, 5)
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -61,7 +61,7 @@ func TestEMA_InvalidPeriod(t *testing.T) {
 	_, err := EMA([]float64{1, 2, 3}, 0)
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -70,7 +70,7 @@ func TestEMA_InsufficientData(t *testing.T) {
 	_, err := EMA([]float64{1, 2, 3}, 5)
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -102,7 +102,7 @@ func TestRSI_InvalidPeriod(t *testing.T) {
 	_, err := RSI(closes, 1)
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -111,7 +111,7 @@ func TestRSI_InsufficientData(t *testing.T) {
 	_, err := RSI([]float64{1, 2, 3}, 5)
 	// Assert
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 

@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -149,7 +149,7 @@ func TestChainGetNoArgs(t *testing.T) {
 	err := runTestCommand(t, cmd, "chain", "get")
 	require.Error(t, err)
 
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 	assert.Empty(t, buf.String())
 }
@@ -163,7 +163,7 @@ func TestChainExpirationNoArgs(t *testing.T) {
 	err := runTestCommand(t, cmd, "chain", "expiration")
 	require.Error(t, err)
 
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 	assert.Empty(t, buf.String())
 }

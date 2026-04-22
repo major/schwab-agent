@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 func TestMACD_ThreeAlignedSlices(t *testing.T) {
@@ -60,7 +60,7 @@ func TestMACD_RejectsFastGeSlow(t *testing.T) {
 	// fast >= slow should fail
 	_, _, _, err := MACD(closes, 26, 12, 9)
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "fast period")
 }
@@ -69,7 +69,7 @@ func TestMACD_RejectsZeroPeriod(t *testing.T) {
 	closes := make([]float64, 50)
 	_, _, _, err := MACD(closes, 0, 26, 9)
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
@@ -78,6 +78,6 @@ func TestMACD_InsufficientData(t *testing.T) {
 	closes := make([]float64, 10)
 	_, _, _, err := MACD(closes, 12, 26, 9)
 	require.Error(t, err)
-	var valErr *schwabErrors.ValidationError
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }

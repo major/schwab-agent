@@ -78,9 +78,9 @@ Some methods convert generic errors to domain-specific ones:
 
 ```go
 // quotes.go: 404 HTTPError -> SymbolNotFoundError
-var httpErr *schwabErrors.HTTPError
+var httpErr *apperr.HTTPError
 if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
-    return nil, schwabErrors.NewSymbolNotFoundError(...)
+    return nil, apperr.NewSymbolNotFoundError(...)
 }
 ```
 

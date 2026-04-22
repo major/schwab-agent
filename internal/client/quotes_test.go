@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	schwabErrors "github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -138,7 +138,7 @@ func TestQuote_404_ReturnsSymbolNotFoundError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, result)
 
-	var symbolErr *schwabErrors.SymbolNotFoundError
+	var symbolErr *apperr.SymbolNotFoundError
 	require.ErrorAs(t, err, &symbolErr)
 	assert.Contains(t, symbolErr.Error(), "symbol INVALID not found")
 }
@@ -157,7 +157,7 @@ func TestQuote_MissingSymbolInResponse(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, result)
 
-	var symbolErr *schwabErrors.SymbolNotFoundError
+	var symbolErr *apperr.SymbolNotFoundError
 	require.ErrorAs(t, err, &symbolErr)
 	assert.Contains(t, symbolErr.Error(), "symbol MISSING not found")
 }
@@ -175,7 +175,7 @@ func TestQuote_401_ReturnsAuthExpiredError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, result)
 
-	var authErr *schwabErrors.AuthExpiredError
+	var authErr *apperr.AuthExpiredError
 	require.ErrorAs(t, err, &authErr)
 }
 

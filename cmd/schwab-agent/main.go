@@ -17,7 +17,7 @@ import (
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/commands"
-	"github.com/major/schwab-agent/internal/errors"
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 )
 
@@ -44,7 +44,7 @@ func main() {
 
 	if err := app.Run(ctx, os.Args); err != nil {
 		_ = output.WriteError(os.Stdout, err)
-		os.Exit(errors.ExitCodeFor(err))
+		os.Exit(apperr.ExitCodeFor(err))
 	}
 }
 
@@ -118,20 +118,20 @@ func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 
 			cfg, err := auth.LoadConfig(resolvedConfigPath)
 			if err != nil {
-			authErr := errors.NewAuthRequiredError("Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file", err)
+			authErr := apperr.NewAuthRequiredError("Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file", err)
 			authErr.Details = "Run `schwab-agent auth login` to authenticate"
 				return ctx, authErr
 			}
 
 			token, err := auth.LoadToken(resolvedTokenPath)
 			if err != nil {
-				authErr := errors.NewAuthRequiredError("No authentication token found", err)
+				authErr := apperr.NewAuthRequiredError("No authentication token found", err)
 				authErr.Details = "Run `schwab-agent auth login` to authenticate"
 				return ctx, authErr
 			}
 
 			if auth.IsRefreshTokenStale(token) {
-				authErr := errors.NewAuthExpiredError("refresh token expired", nil)
+				authErr := apperr.NewAuthExpiredError("refresh token expired", nil)
 				authErr.Details = "Run `schwab-agent auth login` to re-authenticate"
 				return ctx, authErr
 			}
