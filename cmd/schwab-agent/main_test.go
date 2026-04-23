@@ -31,17 +31,23 @@ func TestMain(m *testing.M) {
 		"SCHWAB_BASE_URL_INSECURE",
 	}
 
-	original := make(map[string]string, len(envVars))
+	type envState struct {
+		value string
+		set   bool
+	}
+
+	original := make(map[string]envState, len(envVars))
 	for _, key := range envVars {
-		original[key] = os.Getenv(key)
+		value, ok := os.LookupEnv(key)
+		original[key] = envState{value: value, set: ok}
 		_ = os.Unsetenv(key)
 	}
 
 	exitCode := m.Run()
 
 	for _, key := range envVars {
-		if value, ok := original[key]; ok && value != "" {
-			_ = os.Setenv(key, value)
+		if state := original[key]; state.set {
+			_ = os.Setenv(key, state.value)
 		} else {
 			_ = os.Unsetenv(key)
 		}
@@ -170,12 +176,6 @@ func TestBeforeHook_ReturnsValidationErrorForInvalidBaseURLConfig(t *testing.T) 
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	configPath := filepath.Join(tmpDir, "invalid-config.json")
-	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
-		ClientID:     "test-client",
-		ClientSecret: "test-secret",
-		CallbackURL:  "https://127.0.0.1:8182",
-		BaseURL:      "https://api.schwabapi.com",
-	}))
 	require.NoError(t, os.WriteFile(configPath, []byte(`{"client_id":"test-client","client_secret":"test-secret","base_url":"://bad"}`), 0o600))
 
 	_, err := runApp(t, "schwab-agent", "--config", configPath, "account")
@@ -297,13 +297,6 @@ func TestBeforeHook_UsesConfiguredProxyForRefreshAndAPIRequests(t *testing.T) {
 
 	configPath := filepath.Join(tmpDir, "schwab-agent", "config.json")
 	tokenPath := filepath.Join(tmpDir, "schwab-agent", "token.json")
-	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
-		ClientID:        "test-client",
-		ClientSecret:    "test-secret",
-		CallbackURL:     "https://127.0.0.1:8182",
-		BaseURL:         "https://placeholder.invalid",
-		BaseURLInsecure: true,
-	}))
 	writeTestToken(t, tokenPath, &auth.TokenFile{
 		CreationTimestamp: time.Now().Add(-time.Hour).Unix(),
 		Token: auth.TokenData{
