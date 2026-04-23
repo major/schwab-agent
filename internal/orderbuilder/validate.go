@@ -490,6 +490,31 @@ func ValidateCoveredCallOrder(params *CoveredCallParams) error {
 	return nil
 }
 
+// ValidateCollarOrder validates collar-with-stock parameters.
+func ValidateCollarOrder(params *CollarParams) error {
+	if err := validateUnderlying(params.Underlying); err != nil {
+		return err
+	}
+
+	if err := validateQuantity(params.Quantity); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.Expiration); err != nil {
+		return err
+	}
+
+	if params.PutStrike <= 0 {
+		return validationError("put strike price must be greater than zero", "Add `--put-strike <price>` with a positive value")
+	}
+
+	if params.CallStrike <= 0 {
+		return validationError("call strike price must be greater than zero", "Add `--call-strike <price>` with a positive value")
+	}
+
+	return validateSpreadPrice(params.Price, "collars")
+}
+
 // validateUnderlying checks that the underlying symbol is not empty.
 func validateUnderlying(underlying string) error {
 	if strings.TrimSpace(underlying) == "" {

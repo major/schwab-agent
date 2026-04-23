@@ -447,6 +447,77 @@ func BuildDiagonalOrder(params *DiagonalParams) (*models.OrderRequest, error) {
 	return order, nil
 }
 
+// CollarParams holds parameters for building a collar-with-stock order.
+// A collar combines buying shares, buying a protective put, and selling a
+// covered call at the same expiration. The equity quantity is derived from
+// the option quantity (contracts * 100), just like a covered call.
+type CollarParams struct {
+	Underlying string
+	PutStrike  float64   // Strike price of the protective put
+	CallStrike float64   // Strike price of the covered call
+	Expiration time.Time // Shared expiration for both option legs
+	Quantity   float64   // Number of option contracts (equity shares = quantity * 100)
+	Open       bool      // true = opening position, false = closing
+	Price      float64   // Net debit amount
+	Duration   models.Duration
+	Session    models.Session
+}
+
+// BuildCollarOrder constructs an OrderRequest for a collar-with-stock.
+//
+// A collar is a covered call with downside protection: buy shares, sell a call
+// for income, and buy a put for protection. All three legs use the same
+// underlying and the same expiration.
+//
+// Opening:
+//
+//	Leg 1: BUY equity shares (quantity * 100)
+//	Leg 2: BUY_TO_OPEN put option (protective put)
+//	Leg 3: SELL_TO_OPEN call option (covered call)
+//
+// Closing reverses all instructions:
+//
+//	Leg 1: SELL equity shares
+//	Leg 2: SELL_TO_CLOSE put option
+//	Leg 3: BUY_TO_CLOSE call option
+func BuildCollarOrder(params *CollarParams) (*models.OrderRequest, error) {
+	longInstruction, shortInstruction := spreadInstructions(params.Open)
+	complexType := models.ComplexOrderStrategyTypeCollarWithStock
+
+	// Equity instruction: BUY when opening, SELL when closing.
+	equityInstruction := models.InstructionBuy
+	if !params.Open {
+		equityInstruction = models.InstructionSell
+	}
+
+	order := &models.OrderRequest{
+		Session:                  cmp.Or(params.Session, models.SessionNormal),
+		Duration:                 cmp.Or(params.Duration, models.DurationDay),
+		OrderType:                models.OrderTypeNetDebit,
+		ComplexOrderStrategyType: &complexType,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		Price:                    ptr(params.Price),
+		OrderLegCollection: []models.OrderLegCollection{
+			// Leg 1: Equity shares.
+			buildEquityLeg(params.Underlying, equityInstruction, params.Quantity*optionContractMultiplier),
+			// Leg 2: Protective put (same direction as equity when opening).
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.PutStrike, PutCall: models.PutCallPut,
+				Instruction: longInstruction, Quantity: params.Quantity,
+			}),
+			// Leg 3: Covered call (opposite direction when opening).
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.CallStrike, PutCall: models.PutCallCall,
+				Instruction: shortInstruction, Quantity: params.Quantity,
+			}),
+		},
+	}
+
+	return order, nil
+}
+
 // optionLegParams holds the parameters for constructing a single option leg.
 // Using a struct instead of positional args prevents accidental swaps between
 // the two float64 fields (Strike and Quantity).

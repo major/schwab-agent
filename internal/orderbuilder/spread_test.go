@@ -814,6 +814,141 @@ func TestBuildDiagonalOrderClose(t *testing.T) {
 	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[1].Instruction)
 }
 
+// TestBuildCollarOrderOpen verifies an opening collar (buy shares + buy put + sell call).
+// 1 contract = 100 shares equity + 1 protective put + 1 covered call.
+func TestBuildCollarOrderOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 19, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildCollarOrder(&CollarParams{
+		Underlying: "AAPL",
+		PutStrike:  140,
+		CallStrike: 160,
+		Expiration: expiration,
+		Quantity:   1,
+		Open:       true,
+		Price:      150.00,
+	})
+
+	// Assert order-level fields.
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeCollarWithStock, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 150.00, *order.Price)
+	assert.Equal(t, models.DurationDay, order.Duration)
+	assert.Equal(t, models.SessionNormal, order.Session)
+
+	// Assert three legs: equity + put + call.
+	require.Len(t, order.OrderLegCollection, 3)
+
+	// Leg 1: BUY equity shares (1 contract = 100 shares).
+	equityLeg := order.OrderLegCollection[0]
+	assert.Equal(t, models.InstructionBuy, equityLeg.Instruction)
+	assert.Equal(t, 100.0, equityLeg.Quantity, "1 contract = 100 shares")
+	assert.Equal(t, models.AssetTypeEquity, equityLeg.Instrument.AssetType)
+	assert.Equal(t, "AAPL", equityLeg.Instrument.Symbol)
+
+	// Leg 2: BUY_TO_OPEN put (protective put).
+	putLeg := order.OrderLegCollection[1]
+	assert.Equal(t, models.InstructionBuyToOpen, putLeg.Instruction)
+	assert.Equal(t, 1.0, putLeg.Quantity)
+	assert.Equal(t, models.AssetTypeOption, putLeg.Instrument.AssetType)
+	require.NotNil(t, putLeg.Instrument.PutCall)
+	assert.Equal(t, models.PutCallPut, *putLeg.Instrument.PutCall)
+	require.NotNil(t, putLeg.Instrument.OptionStrikePrice)
+	assert.Equal(t, 140.0, *putLeg.Instrument.OptionStrikePrice)
+	assert.Contains(t, putLeg.Instrument.Symbol, "260619")
+	assert.Contains(t, putLeg.Instrument.Symbol, "P00140000")
+
+	// Leg 3: SELL_TO_OPEN call (covered call).
+	callLeg := order.OrderLegCollection[2]
+	assert.Equal(t, models.InstructionSellToOpen, callLeg.Instruction)
+	assert.Equal(t, 1.0, callLeg.Quantity)
+	assert.Equal(t, models.AssetTypeOption, callLeg.Instrument.AssetType)
+	require.NotNil(t, callLeg.Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *callLeg.Instrument.PutCall)
+	require.NotNil(t, callLeg.Instrument.OptionStrikePrice)
+	assert.Equal(t, 160.0, *callLeg.Instrument.OptionStrikePrice)
+	assert.Contains(t, callLeg.Instrument.Symbol, "260619")
+	assert.Contains(t, callLeg.Instrument.Symbol, "C00160000")
+}
+
+// TestBuildCollarOrderClose verifies a closing collar reverses all instructions.
+func TestBuildCollarOrderClose(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 19, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildCollarOrder(&CollarParams{
+		Underlying: "AAPL",
+		PutStrike:  140,
+		CallStrike: 160,
+		Expiration: expiration,
+		Quantity:   1,
+		Open:       false,
+		Price:      150.00,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, order.OrderLegCollection, 3)
+
+	// Closing: equity SELL, put SELL_TO_CLOSE, call BUY_TO_CLOSE.
+	assert.Equal(t, models.InstructionSell, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[1].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[2].Instruction)
+}
+
+// TestBuildCollarOrderQuantityScaling verifies equity quantity = option quantity * 100.
+func TestBuildCollarOrderQuantityScaling(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 19, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildCollarOrder(&CollarParams{
+		Underlying: "AAPL",
+		PutStrike:  140,
+		CallStrike: 160,
+		Expiration: expiration,
+		Quantity:   5,
+		Open:       true,
+		Price:      750.00,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, order.OrderLegCollection, 3)
+	assert.Equal(t, 500.0, order.OrderLegCollection[0].Quantity, "5 contracts = 500 shares")
+	assert.Equal(t, 5.0, order.OrderLegCollection[1].Quantity)
+	assert.Equal(t, 5.0, order.OrderLegCollection[2].Quantity)
+}
+
+// TestBuildCollarOrderCustomDurationSession verifies non-default overrides.
+func TestBuildCollarOrderCustomDurationSession(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 19, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildCollarOrder(&CollarParams{
+		Underlying: "AAPL",
+		PutStrike:  140,
+		CallStrike: 160,
+		Expiration: expiration,
+		Quantity:   1,
+		Open:       true,
+		Price:      150.00,
+		Duration:   models.DurationGoodTillCancel,
+		Session:    models.SessionPM,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.DurationGoodTillCancel, order.Duration)
+	assert.Equal(t, models.SessionPM, order.Session)
+}
+
 // TestBuildDiagonalOrderCustomDurationSession verifies non-default overrides.
 func TestBuildDiagonalOrderCustomDurationSession(t *testing.T) {
 	t.Parallel()

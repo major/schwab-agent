@@ -564,6 +564,97 @@ func TestValidateCoveredCallOrderAcceptsValidParams(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestValidateCollarOrderRequiresUnderlying verifies underlying is mandatory.
+func TestValidateCollarOrderRequiresUnderlying(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCollarOrder(&CollarParams{
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		PutStrike:  140,
+		CallStrike: 160,
+		Quantity:   1,
+		Price:      150.00,
+	})
+
+	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+}
+
+// TestValidateCollarOrderRequiresPutStrike verifies put strike is mandatory.
+func TestValidateCollarOrderRequiresPutStrike(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCollarOrder(&CollarParams{
+		Underlying: "AAPL",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		CallStrike: 160,
+		Quantity:   1,
+		Price:      150.00,
+	})
+
+	assertValidationError(t, err, "put strike price must be greater than zero", "Add `--put-strike <price>` with a positive value")
+}
+
+// TestValidateCollarOrderRequiresCallStrike verifies call strike is mandatory.
+func TestValidateCollarOrderRequiresCallStrike(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCollarOrder(&CollarParams{
+		Underlying: "AAPL",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		PutStrike:  140,
+		Quantity:   1,
+		Price:      150.00,
+	})
+
+	assertValidationError(t, err, "call strike price must be greater than zero", "Add `--call-strike <price>` with a positive value")
+}
+
+// TestValidateCollarOrderRequiresExpiration verifies expiration is mandatory.
+func TestValidateCollarOrderRequiresExpiration(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCollarOrder(&CollarParams{
+		Underlying: "AAPL",
+		PutStrike:  140,
+		CallStrike: 160,
+		Quantity:   1,
+		Price:      150.00,
+	})
+
+	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+}
+
+// TestValidateCollarOrderRequiresQuantity verifies quantity must be positive.
+func TestValidateCollarOrderRequiresQuantity(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCollarOrder(&CollarParams{
+		Underlying: "AAPL",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		PutStrike:  140,
+		CallStrike: 160,
+		Price:      150.00,
+	})
+
+	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
+}
+
+// TestValidateCollarOrderAcceptsValidParams verifies a valid collar passes.
+func TestValidateCollarOrderAcceptsValidParams(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCollarOrder(&CollarParams{
+		Underlying: "AAPL",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		PutStrike:  140,
+		CallStrike: 160,
+		Quantity:   1,
+		Price:      150.00,
+	})
+
+	require.NoError(t, err)
+}
+
 // TestValidateCalendarOrderRequiresUnderlying verifies underlying is mandatory.
 func TestValidateCalendarOrderRequiresUnderlying(t *testing.T) {
 	t.Parallel()

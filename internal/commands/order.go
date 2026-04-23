@@ -1202,6 +1202,52 @@ func parseCoveredCallParams(cmd *cli.Command) (orderbuilder.CoveredCallParams, e
 	}, nil
 }
 
+// collarOrderFlags returns the CLI flags for the collar-with-stock build command.
+func collarOrderFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
+		&cli.Float64Flag{Name: "put-strike", Usage: "Protective put strike price"},
+		&cli.Float64Flag{Name: "call-strike", Usage: "Covered call strike price"},
+		&cli.StringFlag{Name: "expiration", Usage: "Expiration date for both options (YYYY-MM-DD)"},
+		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts (1 contract = 100 shares)"},
+		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
+		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
+		&cli.Float64Flag{Name: "price", Usage: "Net debit amount"},
+		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
+		&cli.StringFlag{Name: "session", Usage: "Trading session"},
+	}
+}
+
+// parseCollarParams converts command flags into collar-with-stock builder params.
+func parseCollarParams(cmd *cli.Command) (orderbuilder.CollarParams, error) {
+	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+	if err != nil {
+		return orderbuilder.CollarParams{}, err
+	}
+
+	expiration, err := parseExpiration(cmd)
+	if err != nil {
+		return orderbuilder.CollarParams{}, err
+	}
+
+	duration, session, err := parseDurationSession(cmd)
+	if err != nil {
+		return orderbuilder.CollarParams{}, err
+	}
+
+	return orderbuilder.CollarParams{
+		Underlying: strings.TrimSpace(cmd.String("underlying")),
+		PutStrike:  cmd.Float64("put-strike"),
+		CallStrike: cmd.Float64("call-strike"),
+		Expiration: expiration,
+		Quantity:   cmd.Float64("quantity"),
+		Open:       isOpen,
+		Price:      cmd.Float64("price"),
+		Duration:   duration,
+		Session:    session,
+	}, nil
+}
+
 // calendarOrderFlags returns the CLI flags for the calendar spread build command.
 func calendarOrderFlags() []cli.Flag {
 	return []cli.Flag{
