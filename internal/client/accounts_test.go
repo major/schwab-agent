@@ -12,6 +12,7 @@ import (
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
+	"github.com/major/schwab-agent/internal/ptr"
 )
 
 func TestAccountNumbers_Success(t *testing.T) {
@@ -82,14 +83,14 @@ func TestAccounts_Success(t *testing.T) {
 		response := []models.Account{
 			{
 				SecuritiesAccount: &models.SecuritiesAccount{
-					Type:          ptr("MARGIN"),
-					AccountNumber: ptr("123456789"),
+					Type:          ptr.To("MARGIN"),
+					AccountNumber: ptr.To("123456789"),
 				},
 			},
 			{
 				SecuritiesAccount: &models.SecuritiesAccount{
-					Type:          ptr("CASH"),
-					AccountNumber: ptr("987654321"),
+					Type:          ptr.To("CASH"),
+					AccountNumber: ptr.To("987654321"),
 				},
 			},
 		}
@@ -149,8 +150,8 @@ func TestAccount_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.Account{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				Type:          ptr("MARGIN"),
-				AccountNumber: ptr("123456789"),
+				Type:          ptr.To("MARGIN"),
+				AccountNumber: ptr.To("123456789"),
 			},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
@@ -193,15 +194,15 @@ func TestAccounts_WithPositionsField(t *testing.T) {
 		response := []models.Account{
 			{
 				SecuritiesAccount: &models.SecuritiesAccount{
-					Type:          ptr("MARGIN"),
-					AccountNumber: ptr("123456789"),
+					Type:          ptr.To("MARGIN"),
+					AccountNumber: ptr.To("123456789"),
 					Positions: []models.Position{
 						{
-							LongQuantity: ptr(float64(100)),
-							MarketValue:  ptr(15000.00),
+							LongQuantity: ptr.To(float64(100)),
+							MarketValue:  ptr.To(15000.00),
 							Instrument: &models.AccountsInstrument{
-								Symbol:    ptr("AAPL"),
-								AssetType: ptr("EQUITY"),
+								Symbol:    ptr.To("AAPL"),
+								AssetType: ptr.To("EQUITY"),
 							},
 						},
 					},
@@ -246,16 +247,16 @@ func TestAccount_WithPositionsField(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.Account{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				Type:          ptr("MARGIN"),
-				AccountNumber: ptr("123456789"),
+				Type:          ptr.To("MARGIN"),
+				AccountNumber: ptr.To("123456789"),
 				Positions: []models.Position{
 					{
-						LongQuantity:  ptr(float64(50)),
-						ShortQuantity: ptr(float64(0)),
-						MarketValue:   ptr(8500.00),
+						LongQuantity:  ptr.To(float64(50)),
+						ShortQuantity: ptr.To(float64(0)),
+						MarketValue:   ptr.To(8500.00),
 						Instrument: &models.AccountsInstrument{
-							Symbol:    ptr("MSFT"),
-							AssetType: ptr("EQUITY"),
+							Symbol:    ptr.To("MSFT"),
+							AssetType: ptr.To("EQUITY"),
 						},
 					},
 				},
@@ -280,22 +281,22 @@ func TestAccount_WithComplexData(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.Account{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				Type:          ptr("MARGIN"),
-				AccountNumber: ptr("123456789"),
-				RoundTrips:    ptr(5),
-				IsForeign:     ptr(false),
+				Type:          ptr.To("MARGIN"),
+				AccountNumber: ptr.To("123456789"),
+				RoundTrips:    ptr.To(5),
+				IsForeign:     ptr.To(false),
 				CurrentBalances: &models.MarginBalance{
-					CashBalance:    ptr(50000.00),
-					BuyingPower:    ptr(100000.00),
-					EquityPercentage: ptr(0.75),
+					CashBalance:    ptr.To(50000.00),
+					BuyingPower:    ptr.To(100000.00),
+					EquityPercentage: ptr.To(0.75),
 				},
 				Positions: []models.Position{
 					{
-						LongQuantity: ptr(float64(100)),
-						MarketValue:  ptr(15000.00),
+						LongQuantity: ptr.To(float64(100)),
+						MarketValue:  ptr.To(15000.00),
 						Instrument: &models.AccountsInstrument{
-							Symbol:    ptr("AAPL"),
-							AssetType: ptr("EQUITY"),
+							Symbol:    ptr.To("AAPL"),
+							AssetType: ptr.To("EQUITY"),
 						},
 					},
 				},
@@ -379,7 +380,3 @@ func TestAccount_BearerTokenAuth(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// ptr returns a pointer to the provided value (generic test helper).
-func ptr[T any](v T) *T {
-	return &v
-}

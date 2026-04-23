@@ -22,6 +22,7 @@ import (
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/orderbuilder"
 	"github.com/major/schwab-agent/internal/output"
+	"github.com/major/schwab-agent/internal/ptr"
 )
 
 // testFutureExpTime is a future expiration date for option tests. Computed once
@@ -160,7 +161,7 @@ func TestOrderConfirmGate(t *testing.T) {
 func TestOrderPreviewSpecModes(t *testing.T) {
 	t.Parallel()
 
-	previewResponse := models.PreviewOrder{OrderID: ptr(int64(4242))}
+	previewResponse := models.PreviewOrder{OrderID: ptr.To(int64(4242))}
 	var requestBodies []string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -420,7 +421,7 @@ func TestOrderMutableGuardTakesPriorityOverConfirm(t *testing.T) {
 func TestOrderPreviewNotBlockedByMutableGuard(t *testing.T) {
 	t.Parallel()
 
-	previewResponse := models.PreviewOrder{OrderID: ptr(int64(9999))}
+	previewResponse := models.PreviewOrder{OrderID: ptr.To(int64(9999))}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
@@ -542,10 +543,6 @@ func TestOrderPlaceOCOPipeline(t *testing.T) {
 	assert.Equal(t, float64(55555), data["orderId"])
 }
 
-// ptr returns a pointer to the provided value (generic test helper).
-func ptr[T any](v T) *T {
-	return &v
-}
 
 // --- Spread build tests (iron condor, vertical, strangle, straddle, covered call) ---
 //

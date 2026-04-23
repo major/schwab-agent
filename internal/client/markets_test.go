@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/major/schwab-agent/internal/models"
+	"github.com/major/schwab-agent/internal/ptr"
 )
 
 func TestMarkets_Success(t *testing.T) {
@@ -28,16 +29,16 @@ func TestMarkets_Success(t *testing.T) {
 		response := map[string]map[string]models.MarketHours{
 			"equity": {
 				"EQ": {
-					MarketType: ptr("EQUITY"),
-					IsOpen:     ptr(true),
-					Date:       ptr("2025-04-21"),
+					MarketType: ptr.To("EQUITY"),
+					IsOpen:     ptr.To(true),
+					Date:       ptr.To("2025-04-21"),
 				},
 			},
 			"option": {
 				"EQO": {
-					MarketType: ptr("OPTION"),
-					IsOpen:     ptr(true),
-					Date:       ptr("2025-04-21"),
+					MarketType: ptr.To("OPTION"),
+					IsOpen:     ptr.To(true),
+					Date:       ptr.To("2025-04-21"),
 				},
 			},
 		}
@@ -83,15 +84,15 @@ func TestMarket_Success(t *testing.T) {
 		response := map[string]map[string]models.MarketHours{
 			"equity": {
 				"EQ": {
-					MarketType:  ptr("EQUITY"),
-					ProductName: ptr("equity"),
-					IsOpen:      ptr(true),
-					Date:        ptr("2025-04-21"),
+					MarketType:  ptr.To("EQUITY"),
+					ProductName: ptr.To("equity"),
+					IsOpen:      ptr.To(true),
+					Date:        ptr.To("2025-04-21"),
 					SessionHours: &models.SessionHours{
 						RegularMarket: []models.MarketSession{
 							{
-								Start: ptr("2025-04-21T09:30:00-04:00"),
-								End:   ptr("2025-04-21T16:00:00-04:00"),
+								Start: ptr.To("2025-04-21T09:30:00-04:00"),
+								End:   ptr.To("2025-04-21T16:00:00-04:00"),
 							},
 						},
 					},

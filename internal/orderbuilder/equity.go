@@ -5,6 +5,7 @@ import (
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
+	"github.com/major/schwab-agent/internal/ptr"
 )
 
 // EquityParams holds parameters for building an equity order.
@@ -56,11 +57,11 @@ func BuildEquityOrder(params *EquityParams) (*models.OrderRequest, error) {
 	applyEquityPriceFields(order, params)
 
 	if params.SpecialInstruction != "" {
-		order.SpecialInstruction = ptr(params.SpecialInstruction)
+		order.SpecialInstruction = ptr.To(params.SpecialInstruction)
 	}
 
 	if params.Destination != "" {
-		order.RequestedDestination = ptr(params.Destination)
+		order.RequestedDestination = ptr.To(params.Destination)
 	}
 
 	// Market-style orders have no price to link against, so reject price-link fields early.
@@ -77,11 +78,11 @@ func BuildEquityOrder(params *EquityParams) (*models.OrderRequest, error) {
 	// the stop price link values in applyEquityPriceFields - these explicit
 	// fields are set afterwards and will override those derived values.
 	if params.PriceLinkBasis != "" {
-		order.PriceLinkBasis = ptr(params.PriceLinkBasis)
+		order.PriceLinkBasis = ptr.To(params.PriceLinkBasis)
 	}
 
 	if params.PriceLinkType != "" {
-		order.PriceLinkType = ptr(params.PriceLinkType)
+		order.PriceLinkType = ptr.To(params.PriceLinkType)
 	}
 
 	return order, nil
@@ -91,12 +92,12 @@ func BuildEquityOrder(params *EquityParams) (*models.OrderRequest, error) {
 func applyEquityPriceFields(order *models.OrderRequest, params *EquityParams) {
 	switch params.OrderType {
 	case models.OrderTypeLimit:
-		order.Price = ptr(params.Price)
+		order.Price = ptr.To(params.Price)
 	case models.OrderTypeStop:
-		order.StopPrice = ptr(params.StopPrice)
+		order.StopPrice = ptr.To(params.StopPrice)
 	case models.OrderTypeStopLimit:
-		order.Price = ptr(params.Price)
-		order.StopPrice = ptr(params.StopPrice)
+		order.Price = ptr.To(params.Price)
+		order.StopPrice = ptr.To(params.StopPrice)
 	case models.OrderTypeTrailingStop:
 		applyTrailingStopFields(order, params)
 	case models.OrderTypeTrailingStopLimit:
@@ -105,12 +106,12 @@ func applyEquityPriceFields(order *models.OrderRequest, params *EquityParams) {
 		// Schwab API uses priceOffset (not price) for trailing stop limit orders.
 		// The offset defines the limit price distance from the triggered stop.
 		// priceLinkBasis/priceLinkType default to the stop price link values.
-		order.PriceOffset = ptr(params.Price)
-		order.PriceLinkBasis = ptr(models.PriceLinkBasis(params.StopPriceLinkBasis))
-		order.PriceLinkType = ptr(models.PriceLinkType(params.StopPriceLinkType))
+		order.PriceOffset = ptr.To(params.Price)
+		order.PriceLinkBasis = ptr.To(models.PriceLinkBasis(params.StopPriceLinkBasis))
+		order.PriceLinkType = ptr.To(models.PriceLinkType(params.StopPriceLinkType))
 	case models.OrderTypeLimitOnClose:
 		// LOC orders require a limit price, similar to LIMIT orders
-		order.Price = ptr(params.Price)
+		order.Price = ptr.To(params.Price)
 		// MOC (MARKET_ON_CLOSE) orders don't require any price fields
 	}
 }
@@ -118,17 +119,13 @@ func applyEquityPriceFields(order *models.OrderRequest, params *EquityParams) {
 // applyTrailingStopFields sets the trailing stop-specific fields shared by
 // TRAILING_STOP and TRAILING_STOP_LIMIT order types.
 func applyTrailingStopFields(order *models.OrderRequest, params *EquityParams) {
-	order.StopPriceOffset = ptr(params.StopPriceOffset)
-	order.StopPriceLinkBasis = ptr(params.StopPriceLinkBasis)
-	order.StopPriceLinkType = ptr(params.StopPriceLinkType)
-	order.StopType = ptr(params.StopType)
+	order.StopPriceOffset = ptr.To(params.StopPriceOffset)
+	order.StopPriceLinkBasis = ptr.To(params.StopPriceLinkBasis)
+	order.StopPriceLinkType = ptr.To(params.StopPriceLinkType)
+	order.StopType = ptr.To(params.StopType)
 
 	if params.ActivationPrice > 0 {
-		order.ActivationPrice = ptr(params.ActivationPrice)
+		order.ActivationPrice = ptr.To(params.ActivationPrice)
 	}
 }
 
-// ptr returns a pointer to the provided value.
-func ptr[T any](v T) *T {
-	return &v
-}
