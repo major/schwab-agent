@@ -189,3 +189,36 @@ func TestBuildEquityOrderSetsTrailingStopLimitFields(t *testing.T) {
 	require.NotNil(t, order.PriceLinkType)
 	assert.Equal(t, models.PriceLinkType(models.StopPriceLinkTypeTick), *order.PriceLinkType)
 }
+
+// TestBuildEquityOrderSetsSpecialInstruction verifies the special instruction
+// field is set on the order when provided.
+func TestBuildEquityOrderSetsSpecialInstruction(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:             "AAPL",
+		Action:             models.InstructionBuy,
+		Quantity:           100,
+		OrderType:          models.OrderTypeLimit,
+		Price:              200.00,
+		SpecialInstruction: models.SpecialInstructionAllOrNone,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	require.NotNil(t, order.SpecialInstruction)
+	assert.Equal(t, models.SpecialInstructionAllOrNone, *order.SpecialInstruction)
+}
+
+// TestBuildEquityOrderOmitsSpecialInstructionWhenEmpty verifies the field is
+// nil when no special instruction is provided.
+func TestBuildEquityOrderOmitsSpecialInstructionWhenEmpty(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:    "AAPL",
+		Action:    models.InstructionBuy,
+		Quantity:  100,
+		OrderType: models.OrderTypeMarket,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Nil(t, order.SpecialInstruction)
+}

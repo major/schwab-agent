@@ -17,6 +17,8 @@ type EquityParams struct {
 	Duration  models.Duration
 	Session   models.Session
 
+	SpecialInstruction models.SpecialInstruction
+
 	// Trailing stop fields. The stop adjusts dynamically via offset
 	// rather than using a fixed StopPrice.
 	StopPriceOffset   float64
@@ -46,6 +48,10 @@ func BuildEquityOrder(params *EquityParams) (*models.OrderRequest, error) {
 	}
 
 	applyEquityPriceFields(order, params)
+
+	if params.SpecialInstruction != "" {
+		order.SpecialInstruction = ptr(params.SpecialInstruction)
+	}
 
 	return order, nil
 }

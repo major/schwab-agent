@@ -23,8 +23,9 @@ type OptionParams struct {
 	Quantity   float64
 	OrderType  models.OrderType
 	Price      float64
-	Duration   models.Duration
-	Session    models.Session
+	Duration           models.Duration
+	Session            models.Session
+	SpecialInstruction models.SpecialInstruction
 }
 
 // BuildOptionOrder constructs an OrderRequest for an option order.
@@ -59,6 +60,10 @@ func BuildOptionOrder(params *OptionParams) (*models.OrderRequest, error) {
 
 	if params.OrderType == models.OrderTypeLimit {
 		order.Price = ptr(params.Price)
+	}
+
+	if params.SpecialInstruction != "" {
+		order.SpecialInstruction = ptr(params.SpecialInstruction)
 	}
 
 	return order, nil

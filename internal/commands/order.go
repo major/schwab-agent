@@ -402,6 +402,7 @@ func equityOrderFlags() []cli.Flag {
 		&cli.Float64Flag{Name: "activation-price", Usage: "Price that activates the trailing stop"},
 		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
 		&cli.StringFlag{Name: "session", Usage: "Trading session"},
+		&cli.StringFlag{Name: "special-instruction", Usage: "Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"},
 	}
 }
 
@@ -419,6 +420,7 @@ func optionOrderFlags() []cli.Flag {
 		&cli.Float64Flag{Name: "price", Usage: "Limit price"},
 		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
 		&cli.StringFlag{Name: "session", Usage: "Trading session"},
+		&cli.StringFlag{Name: "special-instruction", Usage: "Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"},
 	}
 }
 
@@ -573,6 +575,11 @@ func parseEquityParams(cmd *cli.Command) (orderbuilder.EquityParams, error) {
 		return orderbuilder.EquityParams{}, err
 	}
 
+	specialInstruction, err := parseSpecialInstruction(cmd.String("special-instruction"))
+	if err != nil {
+		return orderbuilder.EquityParams{}, err
+	}
+
 	return orderbuilder.EquityParams{
 		Symbol:             strings.TrimSpace(cmd.String("symbol")),
 		Action:             action,
@@ -585,6 +592,7 @@ func parseEquityParams(cmd *cli.Command) (orderbuilder.EquityParams, error) {
 		StopPriceLinkType:  stopLinkType,
 		StopType:           stopType,
 		ActivationPrice:    cmd.Float64("activation-price"),
+		SpecialInstruction: specialInstruction,
 		Duration:           duration,
 		Session:            session,
 	}, nil
@@ -617,6 +625,11 @@ func parseOptionParams(cmd *cli.Command) (orderbuilder.OptionParams, error) {
 		return orderbuilder.OptionParams{}, err
 	}
 
+	specialInstruction, err := parseSpecialInstruction(cmd.String("special-instruction"))
+	if err != nil {
+		return orderbuilder.OptionParams{}, err
+	}
+
 	return orderbuilder.OptionParams{
 		Underlying: strings.TrimSpace(cmd.String("underlying")),
 		Expiration: expiration,
@@ -625,9 +638,10 @@ func parseOptionParams(cmd *cli.Command) (orderbuilder.OptionParams, error) {
 		Action:     action,
 		Quantity:   cmd.Float64("quantity"),
 		OrderType:  orderType,
-		Price:      cmd.Float64("price"),
-		Duration:   duration,
-		Session:    session,
+		Price:              cmd.Float64("price"),
+		SpecialInstruction: specialInstruction,
+		Duration:           duration,
+		Session:            session,
 	}, nil
 }
 
@@ -1146,6 +1160,24 @@ func parseStopType(raw string) (models.StopType, error) {
 		return value, nil
 	default:
 		return "", newValidationError("stop-type is invalid")
+	}
+}
+
+// parseSpecialInstruction converts a CLI flag value into a SpecialInstruction constant.
+// Returns an empty value when the flag is not set.
+func parseSpecialInstruction(raw string) (models.SpecialInstruction, error) {
+	if raw == "" {
+		return "", nil
+	}
+
+	value := models.SpecialInstruction(strings.ToUpper(raw))
+	switch value {
+	case models.SpecialInstructionAllOrNone,
+		models.SpecialInstructionDoNotReduce,
+		models.SpecialInstructionAllOrNoneDoNotReduce:
+		return value, nil
+	default:
+		return "", newValidationError("special-instruction is invalid")
 	}
 }
 
