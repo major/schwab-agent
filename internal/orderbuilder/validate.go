@@ -62,6 +62,10 @@ func ValidateEquityOrder(params *EquityParams) error {
 		}
 	}
 
+	if err := validatePriceLinkPair(params.PriceLinkBasis, params.PriceLinkType); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -89,6 +93,10 @@ func ValidateOptionOrder(params *OptionParams) error {
 
 	if params.Strike <= 0 {
 		return validationError("option strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+	}
+
+	if err := validatePriceLinkPair(params.PriceLinkBasis, params.PriceLinkType); err != nil {
+		return err
 	}
 
 	return nil
@@ -363,6 +371,106 @@ func ValidateStraddleOrder(params *StraddleParams) error {
 	return validateSpreadPrice(params.Price, "straddles")
 }
 
+// ValidateCalendarOrder validates calendar spread parameters.
+// Calendar spreads require different expirations and the near expiration must
+// be before the far expiration. Both legs share the same strike.
+func ValidateCalendarOrder(params *CalendarParams) error {
+	if err := validateUnderlying(params.Underlying); err != nil {
+		return err
+	}
+
+	if err := validateQuantity(params.Quantity); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.NearExpiration); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.FarExpiration); err != nil {
+		return err
+	}
+
+	if params.NearExpiration.Equal(params.FarExpiration) {
+		return validationError(
+			"near and far expirations must be different for calendar spreads",
+			"Use different dates for `--near-expiration` and `--far-expiration`",
+		)
+	}
+
+	if params.NearExpiration.After(params.FarExpiration) {
+		return validationError(
+			"near expiration must be before far expiration",
+			"Swap `--near-expiration` and `--far-expiration` so the near date comes first",
+		)
+	}
+
+	if params.Strike <= 0 {
+		return validationError("strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+	}
+
+	if params.PutCall == "" {
+		return validationError("option type (call or put) is required", "Add `--call` or `--put`")
+	}
+
+	return validateSpreadPrice(params.Price, "calendar spreads")
+}
+
+// ValidateDiagonalOrder validates diagonal spread parameters.
+// Diagonal spreads require different expirations AND different strikes.
+func ValidateDiagonalOrder(params *DiagonalParams) error {
+	if err := validateUnderlying(params.Underlying); err != nil {
+		return err
+	}
+
+	if err := validateQuantity(params.Quantity); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.NearExpiration); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.FarExpiration); err != nil {
+		return err
+	}
+
+	if params.NearExpiration.Equal(params.FarExpiration) {
+		return validationError(
+			"near and far expirations must be different for diagonal spreads",
+			"Use different dates for `--near-expiration` and `--far-expiration`",
+		)
+	}
+
+	if params.NearExpiration.After(params.FarExpiration) {
+		return validationError(
+			"near expiration must be before far expiration",
+			"Swap `--near-expiration` and `--far-expiration` so the near date comes first",
+		)
+	}
+
+	if params.NearStrike <= 0 {
+		return validationError("near strike price must be greater than zero", "Add `--near-strike <price>` with a positive value")
+	}
+
+	if params.FarStrike <= 0 {
+		return validationError("far strike price must be greater than zero", "Add `--far-strike <price>` with a positive value")
+	}
+
+	if params.NearStrike == params.FarStrike {
+		return validationError(
+			"near and far strikes must be different for diagonal spreads",
+			"Use different values for `--near-strike` and `--far-strike` (use calendar for same strike)",
+		)
+	}
+
+	if params.PutCall == "" {
+		return validationError("option type (call or put) is required", "Add `--call` or `--put`")
+	}
+
+	return validateSpreadPrice(params.Price, "diagonal spreads")
+}
+
 // ValidateCoveredCallOrder validates covered call parameters.
 func ValidateCoveredCallOrder(params *CoveredCallParams) error {
 	if err := validateUnderlying(params.Underlying); err != nil {
@@ -388,6 +496,38 @@ func ValidateCoveredCallOrder(params *CoveredCallParams) error {
 	}
 
 	return nil
+}
+
+// ValidateCollarOrder validates collar-with-stock parameters.
+func ValidateCollarOrder(params *CollarParams) error {
+	if err := validateUnderlying(params.Underlying); err != nil {
+		return err
+	}
+
+	if err := validateQuantity(params.Quantity); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.Expiration); err != nil {
+		return err
+	}
+
+	if params.PutStrike <= 0 {
+		return validationError("put strike price must be greater than zero", "Add `--put-strike <price>` with a positive value")
+	}
+
+	if params.CallStrike <= 0 {
+		return validationError("call strike price must be greater than zero", "Add `--call-strike <price>` with a positive value")
+	}
+
+	if params.PutStrike >= params.CallStrike {
+		return validationError(
+			"put strike must be below call strike for a collar",
+			"Use `--put-strike` below `--call-strike` (protective put sits below the covered call)",
+		)
+	}
+
+	return validateSpreadPrice(params.Price, "collars")
 }
 
 // validateUnderlying checks that the underlying symbol is not empty.
@@ -421,6 +561,22 @@ func validateExpiration(expiration time.Time) error {
 func validateSpreadPrice(price float64, strategy string) error {
 	if price <= 0 {
 		return validationError("price is required for "+strategy, "Add `--price <amount>` to specify the net debit or credit")
+	}
+
+	return nil
+}
+
+// validatePriceLinkPair checks that price-link-basis and price-link-type are
+// either both set or both unset. Setting one without the other is an error.
+func validatePriceLinkPair(basis models.PriceLinkBasis, linkType models.PriceLinkType) error {
+	basisSet := basis != ""
+	typeSet := linkType != ""
+
+	if basisSet != typeSet {
+		return validationError(
+			"price-link-basis and price-link-type must be specified together",
+			"Add both `--price-link-basis <value>` and `--price-link-type <value>`, or omit both",
+		)
 	}
 
 	return nil

@@ -337,6 +337,206 @@ func BuildCoveredCallOrder(params *CoveredCallParams) (*models.OrderRequest, err
 	return order, nil
 }
 
+// CalendarParams holds parameters for building a calendar spread order.
+// A calendar spread buys and sells the same option at the same strike but with
+// different expirations. The far-dated option is bought and the near-dated
+// option is sold when opening (long calendar).
+type CalendarParams struct {
+	Underlying     string
+	NearExpiration time.Time // Near-term expiration (sold leg when opening)
+	FarExpiration  time.Time // Far-term expiration (bought leg when opening)
+	Strike         float64   // Strike price shared by both legs
+	PutCall        models.PutCall
+	Open           bool // true = opening position, false = closing
+	Quantity       float64
+	Price          float64 // Net debit (open) or credit (close) amount (always positive)
+	Duration       models.Duration
+	Session        models.Session
+}
+
+// BuildCalendarOrder constructs an OrderRequest for a two-leg calendar spread.
+//
+// A long calendar spread profits from time decay: the near-term option decays
+// faster than the far-term option. Opening is NET_DEBIT because the
+// far-dated option costs more than the near-dated one. Closing is NET_CREDIT
+// because the position is being unwound.
+//
+//	Open:  BUY_TO_OPEN far + SELL_TO_OPEN near (NET_DEBIT)
+//	Close: SELL_TO_CLOSE far + BUY_TO_CLOSE near (NET_CREDIT)
+func BuildCalendarOrder(params *CalendarParams) (*models.OrderRequest, error) {
+	longInstruction, shortInstruction := spreadInstructions(params.Open)
+	complexType := models.ComplexOrderStrategyTypeCalendar
+
+	orderType := models.OrderTypeNetDebit
+	if !params.Open {
+		orderType = models.OrderTypeNetCredit
+	}
+
+	order := &models.OrderRequest{
+		Session:                  cmp.Or(params.Session, models.SessionNormal),
+		Duration:                 cmp.Or(params.Duration, models.DurationDay),
+		OrderType:                orderType,
+		ComplexOrderStrategyType: &complexType,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		Price:                    ptr(params.Price),
+		OrderLegCollection: []models.OrderLegCollection{
+			// Far leg (bought when opening) listed first for consistency
+			// with how Schwab displays calendar spreads.
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.FarExpiration,
+				Strike: params.Strike, PutCall: params.PutCall,
+				Instruction: longInstruction, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.NearExpiration,
+				Strike: params.Strike, PutCall: params.PutCall,
+				Instruction: shortInstruction, Quantity: params.Quantity,
+			}),
+		},
+	}
+
+	return order, nil
+}
+
+// DiagonalParams holds parameters for building a diagonal spread order.
+// A diagonal spread combines different strikes AND different expirations.
+// Like a calendar, the far-dated option is bought and the near-dated is sold
+// when opening, but the strikes differ between legs.
+type DiagonalParams struct {
+	Underlying     string
+	NearExpiration time.Time // Near-term expiration (sold leg when opening)
+	FarExpiration  time.Time // Far-term expiration (bought leg when opening)
+	NearStrike     float64   // Strike price for the near-term (sold) leg
+	FarStrike      float64   // Strike price for the far-term (bought) leg
+	PutCall        models.PutCall
+	Open           bool // true = opening position, false = closing
+	Quantity       float64
+	Price          float64 // Net debit (open) or credit (close) amount (always positive)
+	Duration       models.Duration
+	Session        models.Session
+}
+
+// BuildDiagonalOrder constructs an OrderRequest for a two-leg diagonal spread.
+//
+// A diagonal combines the time spread of a calendar with the strike spread of
+// a vertical. Opening is NET_DEBIT because the far-dated option costs
+// more than the near-dated one (like a calendar). Closing is NET_CREDIT
+// because the position is being unwound.
+//
+//	Open:  BUY_TO_OPEN far (FarStrike) + SELL_TO_OPEN near (NearStrike) (NET_DEBIT)
+//	Close: SELL_TO_CLOSE far (FarStrike) + BUY_TO_CLOSE near (NearStrike) (NET_CREDIT)
+func BuildDiagonalOrder(params *DiagonalParams) (*models.OrderRequest, error) {
+	longInstruction, shortInstruction := spreadInstructions(params.Open)
+	complexType := models.ComplexOrderStrategyTypeDiagonal
+
+	orderType := models.OrderTypeNetDebit
+	if !params.Open {
+		orderType = models.OrderTypeNetCredit
+	}
+
+	order := &models.OrderRequest{
+		Session:                  cmp.Or(params.Session, models.SessionNormal),
+		Duration:                 cmp.Or(params.Duration, models.DurationDay),
+		OrderType:                orderType,
+		ComplexOrderStrategyType: &complexType,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		Price:                    ptr(params.Price),
+		OrderLegCollection: []models.OrderLegCollection{
+			// Far leg (bought when opening) listed first.
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.FarExpiration,
+				Strike: params.FarStrike, PutCall: params.PutCall,
+				Instruction: longInstruction, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.NearExpiration,
+				Strike: params.NearStrike, PutCall: params.PutCall,
+				Instruction: shortInstruction, Quantity: params.Quantity,
+			}),
+		},
+	}
+
+	return order, nil
+}
+
+// CollarParams holds parameters for building a collar-with-stock order.
+// A collar combines buying shares, buying a protective put, and selling a
+// covered call at the same expiration. The equity quantity is derived from
+// the option quantity (contracts * 100), just like a covered call.
+type CollarParams struct {
+	Underlying string
+	PutStrike  float64   // Strike price of the protective put
+	CallStrike float64   // Strike price of the covered call
+	Expiration time.Time // Shared expiration for both option legs
+	Quantity   float64   // Number of option contracts (equity shares = quantity * 100)
+	Open       bool      // true = opening position, false = closing
+	Price      float64   // Net debit (open) or credit (close) amount
+	Duration   models.Duration
+	Session    models.Session
+}
+
+// BuildCollarOrder constructs an OrderRequest for a collar-with-stock.
+//
+// A collar is a covered call with downside protection: buy shares, sell a call
+// for income, and buy a put for protection. All three legs use the same
+// underlying and the same expiration. Opening is NET_DEBIT, closing is NET_CREDIT.
+//
+// Opening:
+//
+//	Leg 1: BUY equity shares (quantity * 100)
+//	Leg 2: BUY_TO_OPEN put option (protective put)
+//	Leg 3: SELL_TO_OPEN call option (covered call)
+//	Order type: NET_DEBIT
+//
+// Closing reverses all instructions:
+//
+//	Leg 1: SELL equity shares
+//	Leg 2: SELL_TO_CLOSE put option
+//	Leg 3: BUY_TO_CLOSE call option
+//	Order type: NET_CREDIT
+func BuildCollarOrder(params *CollarParams) (*models.OrderRequest, error) {
+	longInstruction, shortInstruction := spreadInstructions(params.Open)
+	complexType := models.ComplexOrderStrategyTypeCollarWithStock
+
+	// Equity instruction: BUY when opening, SELL when closing.
+	equityInstruction := models.InstructionBuy
+	if !params.Open {
+		equityInstruction = models.InstructionSell
+	}
+
+	orderType := models.OrderTypeNetDebit
+	if !params.Open {
+		orderType = models.OrderTypeNetCredit
+	}
+
+	order := &models.OrderRequest{
+		Session:                  cmp.Or(params.Session, models.SessionNormal),
+		Duration:                 cmp.Or(params.Duration, models.DurationDay),
+		OrderType:                orderType,
+		ComplexOrderStrategyType: &complexType,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		Price:                    ptr(params.Price),
+		OrderLegCollection: []models.OrderLegCollection{
+			// Leg 1: Equity shares.
+			buildEquityLeg(params.Underlying, equityInstruction, params.Quantity*optionContractMultiplier),
+			// Leg 2: Protective put (same direction as equity when opening).
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.PutStrike, PutCall: models.PutCallPut,
+				Instruction: longInstruction, Quantity: params.Quantity,
+			}),
+			// Leg 3: Covered call (opposite direction when opening).
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.CallStrike, PutCall: models.PutCallCall,
+				Instruction: shortInstruction, Quantity: params.Quantity,
+			}),
+		},
+	}
+
+	return order, nil
+}
+
 // optionLegParams holds the parameters for constructing a single option leg.
 // Using a struct instead of positional args prevents accidental swaps between
 // the two float64 fields (Strike and Quantity).

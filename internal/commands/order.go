@@ -507,6 +507,9 @@ func equityOrderFlags() []cli.Flag {
 		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
 		&cli.StringFlag{Name: "session", Usage: "Trading session"},
 		&cli.StringFlag{Name: "special-instruction", Usage: "Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"},
+		&cli.StringFlag{Name: "destination", Usage: "Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)"},
+		&cli.StringFlag{Name: "price-link-basis", Usage: "Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)"},
+		&cli.StringFlag{Name: "price-link-type", Usage: "Price link offset type (VALUE, PERCENT, TICK)"},
 	}
 }
 
@@ -525,6 +528,9 @@ func optionOrderFlags() []cli.Flag {
 		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
 		&cli.StringFlag{Name: "session", Usage: "Trading session"},
 		&cli.StringFlag{Name: "special-instruction", Usage: "Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"},
+		&cli.StringFlag{Name: "destination", Usage: "Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)"},
+		&cli.StringFlag{Name: "price-link-basis", Usage: "Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)"},
+		&cli.StringFlag{Name: "price-link-type", Usage: "Price link offset type (VALUE, PERCENT, TICK)"},
 	}
 }
 
@@ -684,6 +690,21 @@ func parseEquityParams(cmd *cli.Command) (orderbuilder.EquityParams, error) {
 		return orderbuilder.EquityParams{}, err
 	}
 
+	destination, err := parseDestination(cmd.String("destination"))
+	if err != nil {
+		return orderbuilder.EquityParams{}, err
+	}
+
+	priceLinkBasis, err := parsePriceLinkBasis(cmd.String("price-link-basis"))
+	if err != nil {
+		return orderbuilder.EquityParams{}, err
+	}
+
+	priceLinkType, err := parsePriceLinkType(cmd.String("price-link-type"))
+	if err != nil {
+		return orderbuilder.EquityParams{}, err
+	}
+
 	return orderbuilder.EquityParams{
 		Symbol:             strings.TrimSpace(cmd.String("symbol")),
 		Action:             action,
@@ -697,6 +718,9 @@ func parseEquityParams(cmd *cli.Command) (orderbuilder.EquityParams, error) {
 		StopType:           stopType,
 		ActivationPrice:    cmd.Float64("activation-price"),
 		SpecialInstruction: specialInstruction,
+		Destination:        destination,
+		PriceLinkBasis:     priceLinkBasis,
+		PriceLinkType:      priceLinkType,
 		Duration:           duration,
 		Session:            session,
 	}, nil
@@ -734,6 +758,21 @@ func parseOptionParams(cmd *cli.Command) (orderbuilder.OptionParams, error) {
 		return orderbuilder.OptionParams{}, err
 	}
 
+	destination, err := parseDestination(cmd.String("destination"))
+	if err != nil {
+		return orderbuilder.OptionParams{}, err
+	}
+
+	priceLinkBasis, err := parsePriceLinkBasis(cmd.String("price-link-basis"))
+	if err != nil {
+		return orderbuilder.OptionParams{}, err
+	}
+
+	priceLinkType, err := parsePriceLinkType(cmd.String("price-link-type"))
+	if err != nil {
+		return orderbuilder.OptionParams{}, err
+	}
+
 	return orderbuilder.OptionParams{
 		Underlying: strings.TrimSpace(cmd.String("underlying")),
 		Expiration: expiration,
@@ -744,6 +783,9 @@ func parseOptionParams(cmd *cli.Command) (orderbuilder.OptionParams, error) {
 		OrderType:  orderType,
 		Price:              cmd.Float64("price"),
 		SpecialInstruction: specialInstruction,
+		Destination:        destination,
+		PriceLinkBasis:     priceLinkBasis,
+		PriceLinkType:      priceLinkType,
 		Duration:           duration,
 		Session:            session,
 	}, nil
@@ -1160,6 +1202,184 @@ func parseCoveredCallParams(cmd *cli.Command) (orderbuilder.CoveredCallParams, e
 	}, nil
 }
 
+// collarOrderFlags returns the CLI flags for the collar-with-stock build command.
+func collarOrderFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
+		&cli.Float64Flag{Name: "put-strike", Usage: "Protective put strike price"},
+		&cli.Float64Flag{Name: "call-strike", Usage: "Covered call strike price"},
+		&cli.StringFlag{Name: "expiration", Usage: "Expiration date for both options (YYYY-MM-DD)"},
+		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts (1 contract = 100 shares)"},
+		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
+		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
+		&cli.Float64Flag{Name: "price", Usage: "Net debit amount"},
+		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
+		&cli.StringFlag{Name: "session", Usage: "Trading session"},
+	}
+}
+
+// parseCollarParams converts command flags into collar-with-stock builder params.
+func parseCollarParams(cmd *cli.Command) (orderbuilder.CollarParams, error) {
+	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+	if err != nil {
+		return orderbuilder.CollarParams{}, err
+	}
+
+	expiration, err := parseExpiration(cmd)
+	if err != nil {
+		return orderbuilder.CollarParams{}, err
+	}
+
+	duration, session, err := parseDurationSession(cmd)
+	if err != nil {
+		return orderbuilder.CollarParams{}, err
+	}
+
+	return orderbuilder.CollarParams{
+		Underlying: strings.TrimSpace(cmd.String("underlying")),
+		PutStrike:  cmd.Float64("put-strike"),
+		CallStrike: cmd.Float64("call-strike"),
+		Expiration: expiration,
+		Quantity:   cmd.Float64("quantity"),
+		Open:       isOpen,
+		Price:      cmd.Float64("price"),
+		Duration:   duration,
+		Session:    session,
+	}, nil
+}
+
+// calendarOrderFlags returns the CLI flags for the calendar spread build command.
+func calendarOrderFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
+		&cli.StringFlag{Name: "near-expiration", Usage: "Near-term expiration date (YYYY-MM-DD)"},
+		&cli.StringFlag{Name: "far-expiration", Usage: "Far-term expiration date (YYYY-MM-DD)"},
+		&cli.Float64Flag{Name: "strike", Usage: "Strike price (shared by both legs)"},
+		&cli.BoolFlag{Name: "call", Usage: "Call calendar spread"},
+		&cli.BoolFlag{Name: "put", Usage: "Put calendar spread"},
+		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
+		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
+		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts"},
+		&cli.Float64Flag{Name: "price", Usage: "Net debit amount"},
+		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
+		&cli.StringFlag{Name: "session", Usage: "Trading session"},
+	}
+}
+
+// parseCalendarParams converts command flags into calendar spread builder params.
+func parseCalendarParams(cmd *cli.Command) (orderbuilder.CalendarParams, error) {
+	putCall, err := parsePutCall(cmd.Bool("call"), cmd.Bool("put"))
+	if err != nil {
+		return orderbuilder.CalendarParams{}, err
+	}
+
+	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+	if err != nil {
+		return orderbuilder.CalendarParams{}, err
+	}
+
+	nearExpiration, err := parseDateFlag(cmd.String("near-expiration"), "near-expiration")
+	if err != nil {
+		return orderbuilder.CalendarParams{}, err
+	}
+
+	farExpiration, err := parseDateFlag(cmd.String("far-expiration"), "far-expiration")
+	if err != nil {
+		return orderbuilder.CalendarParams{}, err
+	}
+
+	duration, session, err := parseDurationSession(cmd)
+	if err != nil {
+		return orderbuilder.CalendarParams{}, err
+	}
+
+	return orderbuilder.CalendarParams{
+		Underlying:     strings.TrimSpace(cmd.String("underlying")),
+		NearExpiration: nearExpiration,
+		FarExpiration:  farExpiration,
+		Strike:         cmd.Float64("strike"),
+		PutCall:        putCall,
+		Open:           isOpen,
+		Quantity:       cmd.Float64("quantity"),
+		Price:          cmd.Float64("price"),
+		Duration:       duration,
+		Session:        session,
+	}, nil
+}
+
+// diagonalOrderFlags returns the CLI flags for the diagonal spread build command.
+func diagonalOrderFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
+		&cli.StringFlag{Name: "near-expiration", Usage: "Near-term expiration date (YYYY-MM-DD)"},
+		&cli.StringFlag{Name: "far-expiration", Usage: "Far-term expiration date (YYYY-MM-DD)"},
+		&cli.Float64Flag{Name: "near-strike", Usage: "Strike price for the near-term (sold) leg"},
+		&cli.Float64Flag{Name: "far-strike", Usage: "Strike price for the far-term (bought) leg"},
+		&cli.BoolFlag{Name: "call", Usage: "Call diagonal spread"},
+		&cli.BoolFlag{Name: "put", Usage: "Put diagonal spread"},
+		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
+		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
+		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts"},
+		&cli.Float64Flag{Name: "price", Usage: "Net debit amount"},
+		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
+		&cli.StringFlag{Name: "session", Usage: "Trading session"},
+	}
+}
+
+// parseDiagonalParams converts command flags into diagonal spread builder params.
+func parseDiagonalParams(cmd *cli.Command) (orderbuilder.DiagonalParams, error) {
+	putCall, err := parsePutCall(cmd.Bool("call"), cmd.Bool("put"))
+	if err != nil {
+		return orderbuilder.DiagonalParams{}, err
+	}
+
+	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+	if err != nil {
+		return orderbuilder.DiagonalParams{}, err
+	}
+
+	nearExpiration, err := parseDateFlag(cmd.String("near-expiration"), "near-expiration")
+	if err != nil {
+		return orderbuilder.DiagonalParams{}, err
+	}
+
+	farExpiration, err := parseDateFlag(cmd.String("far-expiration"), "far-expiration")
+	if err != nil {
+		return orderbuilder.DiagonalParams{}, err
+	}
+
+	duration, session, err := parseDurationSession(cmd)
+	if err != nil {
+		return orderbuilder.DiagonalParams{}, err
+	}
+
+	return orderbuilder.DiagonalParams{
+		Underlying:     strings.TrimSpace(cmd.String("underlying")),
+		NearExpiration: nearExpiration,
+		FarExpiration:  farExpiration,
+		NearStrike:     cmd.Float64("near-strike"),
+		FarStrike:      cmd.Float64("far-strike"),
+		PutCall:        putCall,
+		Open:           isOpen,
+		Quantity:       cmd.Float64("quantity"),
+		Price:          cmd.Float64("price"),
+		Duration:       duration,
+		Session:        session,
+	}, nil
+}
+
+// parseDateFlag parses a named YYYY-MM-DD flag value into a time.Time.
+// Used by calendar/diagonal spreads which have two expiration flags instead
+// of the single --expiration flag used by other spread types.
+func parseDateFlag(raw, flagName string) (time.Time, error) {
+	parsed, err := time.Parse("2006-01-02", strings.TrimSpace(raw))
+	if err != nil {
+		return time.Time{}, newValidationError(flagName + " must use YYYY-MM-DD format")
+	}
+
+	return parsed, nil
+}
+
 // parseExpiration parses the --expiration flag as a YYYY-MM-DD date.
 func parseExpiration(cmd *cli.Command) (time.Time, error) {
 	expiration, err := time.Parse("2006-01-02", strings.TrimSpace(cmd.String("expiration")))
@@ -1294,6 +1514,75 @@ func parseSpecialInstruction(raw string) (models.SpecialInstruction, error) {
 		return value, nil
 	default:
 		return "", newValidationError("special-instruction is invalid")
+	}
+}
+
+// parseDestination converts CLI input to a requested destination enum.
+// Returns empty when not set (optional field).
+func parseDestination(raw string) (models.RequestedDestination, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+
+	value := models.RequestedDestination(strings.ToUpper(strings.TrimSpace(raw)))
+	switch value {
+	case models.RequestedDestinationINET,
+		models.RequestedDestinationECNArca,
+		models.RequestedDestinationCBOE,
+		models.RequestedDestinationAMEX,
+		models.RequestedDestinationPHLX,
+		models.RequestedDestinationISE,
+		models.RequestedDestinationBOX,
+		models.RequestedDestinationNYSE,
+		models.RequestedDestinationNASDAQ,
+		models.RequestedDestinationBATS,
+		models.RequestedDestinationC2,
+		models.RequestedDestinationAUTO:
+		return value, nil
+	default:
+		return "", newValidationError("destination is invalid")
+	}
+}
+
+// parsePriceLinkBasis converts CLI input to a price link basis enum.
+// Returns empty when not set (optional field).
+func parsePriceLinkBasis(raw string) (models.PriceLinkBasis, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+
+	value := models.PriceLinkBasis(strings.ToUpper(strings.TrimSpace(raw)))
+	switch value {
+	case models.PriceLinkBasisManual,
+		models.PriceLinkBasisBase,
+		models.PriceLinkBasisTrigger,
+		models.PriceLinkBasisLast,
+		models.PriceLinkBasisBid,
+		models.PriceLinkBasisAsk,
+		models.PriceLinkBasisAskBid,
+		models.PriceLinkBasisMark,
+		models.PriceLinkBasisAverage:
+		return value, nil
+	default:
+		return "", newValidationError("price-link-basis is invalid")
+	}
+}
+
+// parsePriceLinkType converts CLI input to a price link type enum.
+// Returns empty when not set (optional field).
+func parsePriceLinkType(raw string) (models.PriceLinkType, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+
+	value := models.PriceLinkType(strings.ToUpper(strings.TrimSpace(raw)))
+	switch value {
+	case models.PriceLinkTypeValue,
+		models.PriceLinkTypePercent,
+		models.PriceLinkTypeTick:
+		return value, nil
+	default:
+		return "", newValidationError("price-link-type is invalid")
 	}
 }
 

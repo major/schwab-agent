@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -26,6 +27,11 @@ type OptionParams struct {
 	Duration           models.Duration
 	Session            models.Session
 	SpecialInstruction models.SpecialInstruction
+
+	// Routing and price link fields (optional, pass-through to Schwab API).
+	Destination    models.RequestedDestination
+	PriceLinkBasis models.PriceLinkBasis
+	PriceLinkType  models.PriceLinkType
 }
 
 // BuildOptionOrder constructs an OrderRequest for an option order.
@@ -64,6 +70,27 @@ func BuildOptionOrder(params *OptionParams) (*models.OrderRequest, error) {
 
 	if params.SpecialInstruction != "" {
 		order.SpecialInstruction = ptr(params.SpecialInstruction)
+	}
+
+	if params.Destination != "" {
+		order.RequestedDestination = ptr(params.Destination)
+	}
+
+	// Market-style orders have no price to link against, so reject price-link fields early.
+	if (params.OrderType == models.OrderTypeMarket || params.OrderType == models.OrderTypeMarketOnClose) &&
+		(params.PriceLinkBasis != "" || params.PriceLinkType != "") {
+		return nil, apperr.NewValidationError(
+			"price-link-basis and price-link-type are not allowed on market orders",
+			nil,
+		)
+	}
+
+	if params.PriceLinkBasis != "" {
+		order.PriceLinkBasis = ptr(params.PriceLinkBasis)
+	}
+
+	if params.PriceLinkType != "" {
+		order.PriceLinkType = ptr(params.PriceLinkType)
 	}
 
 	return order, nil
