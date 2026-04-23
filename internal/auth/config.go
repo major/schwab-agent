@@ -18,6 +18,13 @@ import (
 	"github.com/major/schwab-agent/internal/apperr"
 )
 
+// ErrMissingCredentials is a sentinel error wrapped by the ValidationError
+// returned from LoadConfig when client_id or client_secret are absent. Callers
+// can use errors.Is(err, ErrMissingCredentials) to distinguish missing
+// credentials from other validation failures (e.g., invalid base_url) without
+// matching on error message text.
+var ErrMissingCredentials = errors.New("missing required credentials")
+
 const (
 	defaultBaseURL = "https://api.schwabapi.com"
 )
@@ -197,7 +204,7 @@ func LoadConfig(configPath string) (*Config, error) {
 	if cfg.ClientID == "" || cfg.ClientSecret == "" {
 		return nil, apperr.NewValidationError(
 			"Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file",
-			nil,
+			ErrMissingCredentials,
 		)
 	}
 

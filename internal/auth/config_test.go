@@ -23,17 +23,23 @@ func TestMain(m *testing.M) {
 		"SCHWAB_BASE_URL_INSECURE",
 	}
 
-	original := make(map[string]string, len(envVars))
+	type envState struct {
+		value string
+		set   bool
+	}
+
+	original := make(map[string]envState, len(envVars))
 	for _, key := range envVars {
-		original[key] = os.Getenv(key)
+		value, ok := os.LookupEnv(key)
+		original[key] = envState{value: value, set: ok}
 		_ = os.Unsetenv(key)
 	}
 
 	exitCode := m.Run()
 
 	for _, key := range envVars {
-		if value, ok := original[key]; ok && value != "" {
-			_ = os.Setenv(key, value)
+		if state := original[key]; state.set {
+			_ = os.Setenv(key, state.value)
 		} else {
 			_ = os.Unsetenv(key)
 		}

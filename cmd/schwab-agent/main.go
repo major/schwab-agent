@@ -12,7 +12,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/urfave/cli/v3"
@@ -121,8 +120,10 @@ func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 
 			cfg, err := auth.LoadConfig(resolvedConfigPath)
 			if err != nil {
-				var validationErr *apperr.ValidationError
-				if errors.As(err, &validationErr) && !strings.Contains(validationErr.Message, "Missing required credentials") {
+				// Non-credential validation errors (e.g. invalid base_url) are
+				// returned directly. Missing credentials get wrapped as
+				// AuthRequiredError so the CLI reports exit code 3.
+				if !errors.Is(err, auth.ErrMissingCredentials) {
 					return ctx, err
 				}
 
