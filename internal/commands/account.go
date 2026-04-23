@@ -64,8 +64,19 @@ func accountListCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "list",
 		Usage: "List all accounts with nicknames and settings",
-		Action: func(ctx context.Context, _ *cli.Command) error {
-			accounts, err := c.Accounts(ctx)
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "positions",
+				Usage: "Include current positions for each account",
+			},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			var fields []string
+			if cmd.Bool("positions") {
+				fields = append(fields, "positions")
+			}
+
+			accounts, err := c.Accounts(ctx, fields...)
 			if err != nil {
 				return err
 			}
@@ -87,13 +98,24 @@ func accountGetCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comma
 	return &cli.Command{
 		Name:  "get",
 		Usage: "Get account details by hash value",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "positions",
+				Usage: "Include current positions in the account response",
+			},
+		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			hash, err := resolveAccount(cmd.String("account"), configPath, cmd.Args().Slice())
 			if err != nil {
 				return err
 			}
 
-			account, err := c.Account(ctx, hash)
+			var fields []string
+			if cmd.Bool("positions") {
+				fields = append(fields, "positions")
+			}
+
+			account, err := c.Account(ctx, hash, fields...)
 			if err != nil {
 				return err
 			}

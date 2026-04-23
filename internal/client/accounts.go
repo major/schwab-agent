@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
@@ -27,10 +28,16 @@ func (c *Client) AccountNumbers(ctx context.Context) ([]models.AccountNumber, er
 }
 
 // Accounts retrieves all accounts.
+// Pass field names (e.g. "positions") to include additional data in the response.
+// The Schwab API only returns position data when explicitly requested via ?fields=positions.
 // Returns AccountNotFoundError on 404.
-func (c *Client) Accounts(ctx context.Context) ([]models.Account, error) {
+func (c *Client) Accounts(ctx context.Context, fields ...string) ([]models.Account, error) {
+	var params map[string]string
+	if len(fields) > 0 {
+		params = map[string]string{"fields": strings.Join(fields, ",")}
+	}
 	var result []models.Account
-	err := c.doGet(ctx, "/trader/v1/accounts", nil, &result)
+	err := c.doGet(ctx, "/trader/v1/accounts", params, &result)
 	if err != nil {
 		// Convert 404 HTTPError to AccountNotFoundError
 		var httpErr *apperr.HTTPError
@@ -43,11 +50,17 @@ func (c *Client) Accounts(ctx context.Context) ([]models.Account, error) {
 }
 
 // Account retrieves a specific account by hash value.
+// Pass field names (e.g. "positions") to include additional data in the response.
+// The Schwab API only returns position data when explicitly requested via ?fields=positions.
 // Returns AccountNotFoundError on 404.
-func (c *Client) Account(ctx context.Context, hashValue string) (*models.Account, error) {
+func (c *Client) Account(ctx context.Context, hashValue string, fields ...string) (*models.Account, error) {
 	path := fmt.Sprintf("/trader/v1/accounts/%s", hashValue)
+	var params map[string]string
+	if len(fields) > 0 {
+		params = map[string]string{"fields": strings.Join(fields, ",")}
+	}
 	var result models.Account
-	err := c.doGet(ctx, path, nil, &result)
+	err := c.doGet(ctx, path, params, &result)
 	if err != nil {
 		// Convert 404 HTTPError to AccountNotFoundError
 		var httpErr *apperr.HTTPError

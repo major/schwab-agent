@@ -115,6 +115,76 @@ func TestAccountList_Success(t *testing.T) {
 	assert.Equal(t, false, second["primaryAccount"])
 }
 
+func TestAccountList_WithPositionsFlag(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/trader/v1/accounts" {
+			// Verify the positions field is requested.
+			assert.Equal(t, "positions", r.URL.Query().Get("fields"))
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[{
+				"securitiesAccount": {
+					"type": "MARGIN",
+					"accountNumber": "12345",
+					"positions": [{
+						"longQuantity": 100,
+						"marketValue": 15000.00,
+						"instrument": {"symbol": "AAPL", "assetType": "EQUITY"}
+					}]
+				}
+			}]`))
+
+			return
+		}
+		// Preferences endpoint
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"accounts": []}`))
+	}))
+	defer srv.Close()
+
+	var buf bytes.Buffer
+	cmd := AccountCommand(testClient(t, srv), "", &buf)
+	require.NoError(t, runTestCommand(t, cmd, "account", "list", "--positions"))
+
+	env := decodeAccountEnvelope(t, buf.Bytes())
+	dataMap, ok := env.Data.(map[string]any)
+	require.True(t, ok)
+
+	accountList, ok := dataMap["accounts"].([]any)
+	require.True(t, ok)
+	require.Len(t, accountList, 1)
+
+	// Verify positions came through in the response
+	acct, ok := accountList[0].(map[string]any)
+	require.True(t, ok)
+	sa, ok := acct["securitiesAccount"].(map[string]any)
+	require.True(t, ok)
+	positions, ok := sa["positions"].([]any)
+	require.True(t, ok)
+	assert.Len(t, positions, 1)
+}
+
+func TestAccountList_WithoutPositionsFlag_NoFieldsParam(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/trader/v1/accounts" {
+			// No fields param when --positions is not passed.
+			assert.Empty(t, r.URL.Query().Get("fields"))
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[{"securitiesAccount": {"type": "MARGIN", "accountNumber": "12345"}}]`))
+
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"accounts": []}`))
+	}))
+	defer srv.Close()
+
+	var buf bytes.Buffer
+	cmd := AccountCommand(testClient(t, srv), "", &buf)
+	require.NoError(t, runTestCommand(t, cmd, "account", "list"))
+}
+
 func TestAccountList_PreferencesFailure_StillReturnsAccounts(t *testing.T) {
 	// Preferences endpoint returns 500, but account list should still succeed
 	// without nicknames.
@@ -198,6 +268,47 @@ func TestAccountNumbers_Success(t *testing.T) {
 	accountList, ok := dataMap["accounts"].([]any)
 	require.True(t, ok)
 	assert.Len(t, accountList, 2)
+}
+
+func TestAccountGet_WithPositionsFlag(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/trader/v1/accounts/MY_HASH" {
+			assert.Equal(t, "positions", r.URL.Query().Get("fields"))
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"securitiesAccount": {
+					"type": "MARGIN",
+					"accountNumber": "12345",
+					"positions": [{
+						"longQuantity": 200,
+						"marketValue": 30000.00,
+						"instrument": {"symbol": "MSFT", "assetType": "EQUITY"}
+					}]
+				}
+			}`))
+
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"accounts": []}`))
+	}))
+	defer srv.Close()
+
+	var buf bytes.Buffer
+	cmd := AccountCommand(testClient(t, srv), "", &buf)
+	require.NoError(t, runTestCommand(t, cmd, "account", "get", "--positions", "MY_HASH"))
+
+	env := decodeAccountEnvelope(t, buf.Bytes())
+	assert.Equal(t, "MY_HASH", env.Metadata.Account)
+
+	dataMap, ok := env.Data.(map[string]any)
+	require.True(t, ok)
+	sa, ok := dataMap["securitiesAccount"].(map[string]any)
+	require.True(t, ok)
+	positions, ok := sa["positions"].([]any)
+	require.True(t, ok)
+	assert.Len(t, positions, 1)
 }
 
 func TestAccountGet_FlagOverridesAll(t *testing.T) {
