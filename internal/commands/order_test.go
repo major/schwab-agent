@@ -980,7 +980,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--symbol", "AAPL", "--action", "YOLO",
 				"--quantity", "10",
 			},
-			wantMsg: "action is invalid",
+			wantMsg: "invalid action",
 		},
 		{
 			name: "option invalid action",
@@ -990,7 +990,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--call", "--expiration", "2026-06-19",
 				"--strike", "150", "--quantity", "1",
 			},
-			wantMsg: "action is invalid",
+			wantMsg: "invalid action",
 		},
 		{
 			name: "bracket invalid action",
@@ -999,7 +999,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--symbol", "AAPL", "--action", "YOLO",
 				"--quantity", "10", "--take-profit", "200",
 			},
-			wantMsg: "action is invalid",
+			wantMsg: "invalid action",
 		},
 		{
 			name: "oco invalid action",
@@ -1008,7 +1008,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--symbol", "AAPL", "--action", "YOLO",
 				"--quantity", "10", "--stop-loss", "140",
 			},
-			wantMsg: "action is invalid",
+			wantMsg: "invalid action",
 		},
 		// parseOrderType invalid value (exercises default branch).
 		{
@@ -1018,7 +1018,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--symbol", "AAPL", "--action", "BUY",
 				"--quantity", "10", "--type", "BANANAS",
 			},
-			wantMsg: "type is invalid",
+			wantMsg: "invalid type",
 		},
 		// parseDurationSession error in OCO path.
 		{
@@ -1029,7 +1029,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--quantity", "10", "--stop-loss", "140",
 				"--duration", "ETERNITY",
 			},
-			wantMsg: "duration is invalid",
+			wantMsg: "invalid duration",
 		},
 		{
 			name: "oco invalid session",
@@ -1039,7 +1039,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--quantity", "10", "--stop-loss", "140",
 				"--session", "MIDNIGHT",
 			},
-			wantMsg: "session is invalid",
+			wantMsg: "invalid session",
 		},
 		// parseDurationSession error in equity path.
 		{
@@ -1049,7 +1049,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--symbol", "AAPL", "--action", "BUY",
 				"--quantity", "10", "--duration", "FOREVER",
 			},
-			wantMsg: "duration is invalid",
+			wantMsg: "invalid duration",
 		},
 		// parseDurationSession error in bracket path.
 		{
@@ -1060,7 +1060,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--quantity", "10", "--take-profit", "200",
 				"--duration", "FOREVER",
 			},
-			wantMsg: "duration is invalid",
+			wantMsg: "invalid duration",
 		},
 		// parseExpiration error in option path (put/call valid but expiration bad).
 		{
@@ -1094,7 +1094,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--strike", "150", "--quantity", "1",
 				"--session", "MIDNIGHT",
 			},
-			wantMsg: "session is invalid",
+			wantMsg: "invalid session",
 		},
 		// parseStopPriceLinkBasis invalid value.
 		{
@@ -1105,7 +1105,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--quantity", "10", "--type", "TRAILING_STOP",
 				"--stop-offset", "2.50", "--stop-link-basis", "NOPE",
 			},
-			wantMsg: "stop-link-basis is invalid",
+			wantMsg: "invalid stop-link-basis",
 		},
 		// parseStopPriceLinkType invalid value.
 		{
@@ -1116,7 +1116,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--quantity", "10", "--type", "TRAILING_STOP",
 				"--stop-offset", "2.50", "--stop-link-type", "NOPE",
 			},
-			wantMsg: "stop-link-type is invalid",
+			wantMsg: "invalid stop-link-type",
 		},
 		// parseStopType invalid value.
 		{
@@ -1127,7 +1127,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--quantity", "10", "--type", "TRAILING_STOP",
 				"--stop-offset", "2.50", "--stop-type", "NOPE",
 			},
-			wantMsg: "stop-type is invalid",
+			wantMsg: "invalid stop-type",
 		},
 		// parseSpecialInstruction invalid value.
 		{
@@ -1137,7 +1137,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--symbol", "AAPL", "--action", "BUY",
 				"--quantity", "10", "--special-instruction", "NOPE",
 			},
-			wantMsg: "special-instruction is invalid",
+			wantMsg: "invalid special-instruction",
 		},
 		{
 			name: "option invalid special-instruction",
@@ -1148,7 +1148,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--strike", "150", "--quantity", "1",
 				"--special-instruction", "NOPE",
 			},
-			wantMsg: "special-instruction is invalid",
+			wantMsg: "invalid special-instruction",
 		},
 		// parseDestination invalid value.
 		{
@@ -1159,7 +1159,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--quantity", "10", "--type", "LIMIT",
 				"--price", "150", "--destination", "NOPE",
 			},
-			wantMsg: "destination is invalid",
+			wantMsg: "invalid destination",
 		},
 		{
 			name: "option invalid destination",
@@ -1170,7 +1170,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--strike", "150", "--quantity", "1",
 				"--destination", "NOPE",
 			},
-			wantMsg: "destination is invalid",
+			wantMsg: "invalid destination",
 		},
 		// parsePriceLinkBasis invalid value.
 		{
@@ -1181,7 +1181,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--quantity", "10", "--type", "LIMIT",
 				"--price", "150", "--price-link-basis", "NOPE",
 			},
-			wantMsg: "price-link-basis is invalid",
+			wantMsg: "invalid price-link-basis",
 		},
 		{
 			name: "option invalid price-link-basis",
@@ -1192,7 +1192,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--strike", "150", "--quantity", "1",
 				"--price-link-basis", "NOPE",
 			},
-			wantMsg: "price-link-basis is invalid",
+			wantMsg: "invalid price-link-basis",
 		},
 		// parsePriceLinkType invalid value.
 		{
@@ -1203,7 +1203,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--quantity", "10", "--type", "LIMIT",
 				"--price", "150", "--price-link-type", "NOPE",
 			},
-			wantMsg: "price-link-type is invalid",
+			wantMsg: "invalid price-link-type",
 		},
 		{
 			name: "option invalid price-link-type",
@@ -1214,7 +1214,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 				"--strike", "150", "--quantity", "1",
 				"--price-link-type", "NOPE",
 			},
-			wantMsg: "price-link-type is invalid",
+			wantMsg: "invalid price-link-type",
 		},
 	}
 
@@ -1228,7 +1228,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 
 			var validationErr *apperr.ValidationError
 			require.ErrorAs(t, err, &validationErr)
-			assert.Equal(t, tc.wantMsg, validationErr.Error())
+			assert.Contains(t, validationErr.Error(), tc.wantMsg)
 		})
 	}
 }
@@ -1336,7 +1336,7 @@ func TestOrderBuildSpreadParseErrors(t *testing.T) {
 				"--buy", "--open", "--quantity", "1", "--price", "10.00",
 				"--duration", "FOREVER",
 			},
-			wantMsg: "duration is invalid",
+			wantMsg: "invalid duration",
 		},
 		// Invalid session.
 		{
@@ -1348,7 +1348,7 @@ func TestOrderBuildSpreadParseErrors(t *testing.T) {
 				"--buy", "--open", "--quantity", "1", "--price", "15.00",
 				"--session", "AFTERHOURS",
 			},
-			wantMsg: "session is invalid",
+			wantMsg: "invalid session",
 		},
 	}
 
@@ -1362,7 +1362,7 @@ func TestOrderBuildSpreadParseErrors(t *testing.T) {
 
 			var validationErr *apperr.ValidationError
 			require.ErrorAs(t, err, &validationErr)
-			assert.Equal(t, tc.wantMsg, validationErr.Error())
+			assert.Contains(t, validationErr.Error(), tc.wantMsg)
 		})
 	}
 }
@@ -1888,8 +1888,8 @@ func TestParseInstruction_ErrorPaths(t *testing.T) {
 	}{
 		{"empty string", "", "action is required"},
 		{"whitespace only", "   ", "action is required"},
-		{"invalid action", "INVALID", "action is invalid"},
-		{"partial match", "BU", "action is invalid"},
+		{"invalid action", "INVALID", "invalid action"},
+		{"partial match", "BU", "invalid action"},
 	}
 
 	for _, tt := range tests {
@@ -1998,7 +1998,7 @@ func TestOrderReplace_InvalidAction(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Empty(t, stdout)
-	assert.Contains(t, err.Error(), "action is invalid")
+	assert.Contains(t, err.Error(), "invalid action")
 }
 
 // --- FTS build tests ---

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
@@ -30,25 +29,8 @@ type OrderListParams struct {
 // schwab-py client behavior).
 func (p OrderListParams) toQueryParams() map[string]string {
 	params := make(map[string]string)
-	if p.Status != "" {
-		params["status"] = p.Status
-	}
-
-	now := time.Now().UTC()
-
-	if p.FromEnteredTime != "" {
-		params["fromEnteredTime"] = p.FromEnteredTime
-	} else {
-		// Default to 60 days ago when no start time is provided.
-		params["fromEnteredTime"] = now.AddDate(0, 0, -60).Format(time.RFC3339)
-	}
-
-	if p.ToEnteredTime != "" {
-		params["toEnteredTime"] = p.ToEnteredTime
-	} else {
-		params["toEnteredTime"] = now.Format(time.RFC3339)
-	}
-
+	setParam(params, "status", p.Status)
+	params["fromEnteredTime"], params["toEnteredTime"] = defaultDateRange(p.FromEnteredTime, p.ToEnteredTime)
 	return params
 }
 

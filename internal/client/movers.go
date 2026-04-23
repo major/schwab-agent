@@ -17,18 +17,10 @@ type MoversParams struct {
 func (c *Client) Movers(ctx context.Context, index string, params MoversParams) (*models.ScreenerResponse, error) {
 	path := fmt.Sprintf("/marketdata/v1/movers/%s", index)
 	qp := map[string]string{}
-	if params.Sort != "" {
-		qp["sort"] = params.Sort
-	}
-	if params.Frequency != "" {
-		qp["frequency"] = params.Frequency
-	}
-	var paramMap map[string]string
-	if len(qp) > 0 {
-		paramMap = qp
-	}
+	setParam(qp, "sort", params.Sort)
+	setParam(qp, "frequency", params.Frequency)
 	var result models.ScreenerResponse
-	err := c.doGet(ctx, path, paramMap, &result)
+	err := c.doGet(ctx, path, qp, &result)
 	if err != nil {
 		return nil, err
 	}

@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/major/schwab-agent/internal/models"
 )
@@ -28,30 +27,10 @@ type TransactionParams struct {
 func (c *Client) Transactions(ctx context.Context, hashValue string, params TransactionParams) ([]models.Transaction, error) {
 	path := fmt.Sprintf("/trader/v1/accounts/%s/transactions", hashValue)
 
-	now := time.Now().UTC()
-
 	queryParams := make(map[string]string)
-
-	if params.StartDate != "" {
-		queryParams["startDate"] = params.StartDate
-	} else {
-		// Default to 60 days ago when no start date is provided.
-		queryParams["startDate"] = now.AddDate(0, 0, -60).Format(time.RFC3339)
-	}
-
-	if params.EndDate != "" {
-		queryParams["endDate"] = params.EndDate
-	} else {
-		queryParams["endDate"] = now.Format(time.RFC3339)
-	}
-
-	if params.Types != "" {
-		queryParams["types"] = params.Types
-	}
-
-	if params.Symbol != "" {
-		queryParams["symbol"] = params.Symbol
-	}
+	queryParams["startDate"], queryParams["endDate"] = defaultDateRange(params.StartDate, params.EndDate)
+	setParam(queryParams, "types", params.Types)
+	setParam(queryParams, "symbol", params.Symbol)
 
 	var result []models.Transaction
 	err := c.doGet(ctx, path, queryParams, &result)

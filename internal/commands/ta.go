@@ -126,6 +126,21 @@ type taOutput struct {
 	Values    []map[string]any `json:"values"`
 }
 
+// simpleTAConfig defines a closes-only technical indicator command.
+// SMA, EMA, and RSI share the same pipeline: fetch candles, extract closes,
+// compute indicator, write output. Only the parameters differ.
+type simpleTAConfig struct {
+	name  string
+	usage string
+	// defaultPeriod is the indicator's default --period flag value.
+	defaultPeriod int
+	// multiplier controls how many candles to fetch relative to the requested
+	// period. EMA and RSI need 3x for convergence stability; SMA needs 1x.
+	multiplier int
+	// compute is the indicator function: ta.SMA, ta.EMA, or ta.RSI.
+	compute func(closes []float64, period int) ([]float64, error)
+}
+
 // taIndicatorFlags returns the shared flags for all TA indicator subcommands.
 // RSI defaults to period 14; SMA/EMA default to 20.
 func taIndicatorFlags(defaultPeriod int) []cli.Flag {
@@ -136,15 +151,71 @@ func taIndicatorFlags(defaultPeriod int) []cli.Flag {
 	}
 }
 
+// makeSimpleTACommand builds a CLI command for a closes-only indicator.
+// The returned command fetches candles, extracts close prices, runs the
+// indicator's compute function, and writes the result envelope.
+func makeSimpleTACommand(cfg simpleTAConfig, c *client.Ref, w io.Writer) *cli.Command {
+	return &cli.Command{
+		Name:  cfg.name,
+		Usage: cfg.usage,
+		Flags: taIndicatorFlags(cfg.defaultPeriod),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			symbol := cmd.Args().First()
+			if err := requireArg(symbol, "symbol"); err != nil {
+				return err
+			}
+
+			period := cmd.Int("period")
+			interval := cmd.String("interval")
+			points := cmd.Int("points")
+
+			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period*cfg.multiplier, cfg.name)
+			if err != nil {
+				return err
+			}
+
+			closes, err := ta.ExtractClose(candles)
+			if err != nil {
+				return err
+			}
+
+			values, err := cfg.compute(closes, period)
+			if err != nil {
+				return err
+			}
+
+			return writeTAOutput(w, cfg.name, symbol, interval, period, points, timestamps, values)
+		},
+	}
+}
+
 // TACommand returns the CLI command for technical analysis indicators.
 func TACommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "ta",
 		Usage: "Technical analysis indicators",
 		Commands: []*cli.Command{
-			taSMACommand(c, w),
-			taEMACommand(c, w),
-			taRSICommand(c, w),
+			makeSimpleTACommand(simpleTAConfig{
+				name:          "sma",
+				usage:         "Simple Moving Average",
+				defaultPeriod: 20,
+				multiplier:    1,
+				compute:       ta.SMA,
+			}, c, w),
+			makeSimpleTACommand(simpleTAConfig{
+				name:          "ema",
+				usage:         "Exponential Moving Average",
+				defaultPeriod: 20,
+				multiplier:    3,
+				compute:       ta.EMA,
+			}, c, w),
+			makeSimpleTACommand(simpleTAConfig{
+				name:          "rsi",
+				usage:         "Relative Strength Index",
+				defaultPeriod: 14,
+				multiplier:    3,
+				compute:       ta.RSI,
+			}, c, w),
 			taMACDCommand(c, w),
 			taATRCommand(c, w),
 			taBBandsCommand(c, w),
@@ -153,113 +224,6 @@ func TACommand(c *client.Ref, w io.Writer) *cli.Command {
 			taVWAPCommand(c, w),
 			taHVCommand(c, w),
 			taExpectedMoveCommand(c, w),
-		},
-	}
-}
-
-func taSMACommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "sma",
-		Usage: "Simple Moving Average",
-		Flags: taIndicatorFlags(20),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			symbol := cmd.Args().First()
-			if err := requireArg(symbol, "symbol"); err != nil {
-				return err
-			}
-
-			period := cmd.Int("period")
-			interval := cmd.String("interval")
-			points := cmd.Int("points")
-
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period, "sma")
-			if err != nil {
-				return err
-			}
-
-			closes, err := ta.ExtractClose(candles)
-			if err != nil {
-				return err
-			}
-
-			values, err := ta.SMA(closes, period)
-			if err != nil {
-				return err
-			}
-
-			return writeTAOutput(w, "sma", symbol, interval, period, points, timestamps, values)
-		},
-	}
-}
-
-func taEMACommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "ema",
-		Usage: "Exponential Moving Average",
-		Flags: taIndicatorFlags(20),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			symbol := cmd.Args().First()
-			if err := requireArg(symbol, "symbol"); err != nil {
-				return err
-			}
-
-			period := cmd.Int("period")
-			interval := cmd.String("interval")
-			points := cmd.Int("points")
-
-			// EMA uses exponential smoothing; 3x period provides convergence stability.
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period*3, "ema")
-			if err != nil {
-				return err
-			}
-
-			closes, err := ta.ExtractClose(candles)
-			if err != nil {
-				return err
-			}
-
-			values, err := ta.EMA(closes, period)
-			if err != nil {
-				return err
-			}
-
-			return writeTAOutput(w, "ema", symbol, interval, period, points, timestamps, values)
-		},
-	}
-}
-
-func taRSICommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "rsi",
-		Usage: "Relative Strength Index",
-		Flags: taIndicatorFlags(14),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			symbol := cmd.Args().First()
-			if err := requireArg(symbol, "symbol"); err != nil {
-				return err
-			}
-
-			period := cmd.Int("period")
-			interval := cmd.String("interval")
-			points := cmd.Int("points")
-
-			// RSI uses Wilder smoothing; 3x period provides convergence stability.
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period*3, "rsi")
-			if err != nil {
-				return err
-			}
-
-			closes, err := ta.ExtractClose(candles)
-			if err != nil {
-				return err
-			}
-
-			values, err := ta.RSI(closes, period)
-			if err != nil {
-				return err
-			}
-
-			return writeTAOutput(w, "rsi", symbol, interval, period, points, timestamps, values)
 		},
 	}
 }

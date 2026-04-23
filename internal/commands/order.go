@@ -929,15 +929,12 @@ func parseRequiredOrderID(cmd *cli.Command) (int64, error) {
 	return orderID, nil
 }
 
-// parseInstruction converts CLI input to an instruction enum.
-func parseInstruction(raw string) (models.Instruction, error) {
-	if strings.TrimSpace(raw) == "" {
-		return "", newValidationError("action is required")
-	}
-
-	value := models.Instruction(strings.ToUpper(strings.TrimSpace(raw)))
-	switch value {
-	case models.InstructionBuy,
+// Valid enum values for CLI flag parsing. Each slice corresponds to one enum
+// type in the models package and is used by the generic parseEnum/requireEnum
+// helpers in helpers.go.
+var (
+	validInstructions = []models.Instruction{
+		models.InstructionBuy,
 		models.InstructionSell,
 		models.InstructionBuyToCover,
 		models.InstructionSellShort,
@@ -946,32 +943,11 @@ func parseInstruction(raw string) (models.Instruction, error) {
 		models.InstructionSellToOpen,
 		models.InstructionSellToClose,
 		models.InstructionExchange,
-		models.InstructionSellShortExempt:
-		return value, nil
-	default:
-		return "", newValidationError("action is invalid")
-	}
-}
-
-// parseOrderType converts CLI input to an order type enum.
-func parseOrderType(raw string, fallback models.OrderType) (models.OrderType, error) {
-	if strings.TrimSpace(raw) == "" {
-		return fallback, nil
+		models.InstructionSellShortExempt,
 	}
 
-	upper := strings.ToUpper(strings.TrimSpace(raw))
-	
-	// Handle aliases: MOC -> MARKET_ON_CLOSE, LOC -> LIMIT_ON_CLOSE
-	switch upper {
-	case "MOC":
-		return models.OrderTypeMarketOnClose, nil
-	case "LOC":
-		return models.OrderTypeLimitOnClose, nil
-	}
-
-	value := models.OrderType(upper)
-	switch value {
-	case models.OrderTypeMarket,
+	validOrderTypes = []models.OrderType{
+		models.OrderTypeMarket,
 		models.OrderTypeLimit,
 		models.OrderTypeStop,
 		models.OrderTypeStopLimit,
@@ -981,47 +957,121 @@ func parseOrderType(raw string, fallback models.OrderType) (models.OrderType, er
 		models.OrderTypeLimitOnClose,
 		models.OrderTypeNetDebit,
 		models.OrderTypeNetCredit,
-		models.OrderTypeNetZero:
-		return value, nil
-	default:
-		return "", newValidationError("type is invalid")
-	}
-}
-
-// parseDuration converts CLI input to a duration enum.
-func parseDuration(raw string) (models.Duration, error) {
-	if strings.TrimSpace(raw) == "" {
-		return "", nil
+		models.OrderTypeNetZero,
 	}
 
-	value := models.Duration(strings.ToUpper(strings.TrimSpace(raw)))
-	switch value {
-	case models.DurationDay,
+	validDurations = []models.Duration{
+		models.DurationDay,
 		models.DurationGoodTillCancel,
 		models.DurationFillOrKill,
 		models.DurationImmediateOrCancel,
 		models.DurationEndOfWeek,
 		models.DurationEndOfMonth,
-		models.DurationNextEndOfMonth:
-		return value, nil
-	default:
-		return "", newValidationError("duration is invalid")
+		models.DurationNextEndOfMonth,
 	}
+
+	validSessions = []models.Session{
+		models.SessionNormal,
+		models.SessionAM,
+		models.SessionPM,
+		models.SessionSeamless,
+	}
+
+	validStopPriceLinkBases = []models.StopPriceLinkBasis{
+		models.StopPriceLinkBasisManual,
+		models.StopPriceLinkBasisBase,
+		models.StopPriceLinkBasisTrigger,
+		models.StopPriceLinkBasisLast,
+		models.StopPriceLinkBasisBid,
+		models.StopPriceLinkBasisAsk,
+		models.StopPriceLinkBasisAskBid,
+		models.StopPriceLinkBasisMark,
+		models.StopPriceLinkBasisAverage,
+	}
+
+	validStopPriceLinkTypes = []models.StopPriceLinkType{
+		models.StopPriceLinkTypeValue,
+		models.StopPriceLinkTypePercent,
+		models.StopPriceLinkTypeTick,
+	}
+
+	validStopTypes = []models.StopType{
+		models.StopTypeStandard,
+		models.StopTypeBid,
+		models.StopTypeAsk,
+		models.StopTypeLast,
+		models.StopTypeMark,
+	}
+
+	validSpecialInstructions = []models.SpecialInstruction{
+		models.SpecialInstructionAllOrNone,
+		models.SpecialInstructionDoNotReduce,
+		models.SpecialInstructionAllOrNoneDoNotReduce,
+	}
+
+	validDestinations = []models.RequestedDestination{
+		models.RequestedDestinationINET,
+		models.RequestedDestinationECNArca,
+		models.RequestedDestinationCBOE,
+		models.RequestedDestinationAMEX,
+		models.RequestedDestinationPHLX,
+		models.RequestedDestinationISE,
+		models.RequestedDestinationBOX,
+		models.RequestedDestinationNYSE,
+		models.RequestedDestinationNASDAQ,
+		models.RequestedDestinationBATS,
+		models.RequestedDestinationC2,
+		models.RequestedDestinationAUTO,
+	}
+
+	validPriceLinkBases = []models.PriceLinkBasis{
+		models.PriceLinkBasisManual,
+		models.PriceLinkBasisBase,
+		models.PriceLinkBasisTrigger,
+		models.PriceLinkBasisLast,
+		models.PriceLinkBasisBid,
+		models.PriceLinkBasisAsk,
+		models.PriceLinkBasisAskBid,
+		models.PriceLinkBasisMark,
+		models.PriceLinkBasisAverage,
+	}
+
+	validPriceLinkTypes = []models.PriceLinkType{
+		models.PriceLinkTypeValue,
+		models.PriceLinkTypePercent,
+		models.PriceLinkTypeTick,
+	}
+)
+
+// parseInstruction converts CLI input to an instruction enum.
+func parseInstruction(raw string) (models.Instruction, error) {
+	return requireEnum(raw, validInstructions, "action")
+}
+
+// parseOrderType converts CLI input to an order type enum.
+// Supports aliases MOC (MARKET_ON_CLOSE) and LOC (LIMIT_ON_CLOSE).
+func parseOrderType(raw string, fallback models.OrderType) (models.OrderType, error) {
+	upper := strings.ToUpper(strings.TrimSpace(raw))
+
+	// Resolve aliases before standard enum validation.
+	switch upper {
+	case "MOC":
+		return models.OrderTypeMarketOnClose, nil
+	case "LOC":
+		return models.OrderTypeLimitOnClose, nil
+	}
+
+	return parseEnum(raw, validOrderTypes, fallback, "type")
+}
+
+// parseDuration converts CLI input to a duration enum.
+func parseDuration(raw string) (models.Duration, error) {
+	return parseEnum(raw, validDurations, "", "duration")
 }
 
 // parseSession converts CLI input to a session enum.
 func parseSession(raw string) (models.Session, error) {
-	if strings.TrimSpace(raw) == "" {
-		return "", nil
-	}
-
-	value := models.Session(strings.ToUpper(strings.TrimSpace(raw)))
-	switch value {
-	case models.SessionNormal, models.SessionAM, models.SessionPM, models.SessionSeamless:
-		return value, nil
-	default:
-		return "", newValidationError("session is invalid")
-	}
+	return parseEnum(raw, validSessions, "", "session")
 }
 
 // parseVerticalParams converts command flags into vertical spread builder params.
@@ -1440,153 +1490,43 @@ func parsePutCall(call, put bool) (models.PutCall, error) {
 // parseStopPriceLinkBasis converts CLI input to a stop price link basis enum.
 // Defaults to LAST when empty, which is the most common trailing stop reference.
 func parseStopPriceLinkBasis(raw string) (models.StopPriceLinkBasis, error) {
-	if strings.TrimSpace(raw) == "" {
-		return models.StopPriceLinkBasisLast, nil
-	}
-
-	value := models.StopPriceLinkBasis(strings.ToUpper(strings.TrimSpace(raw)))
-	switch value {
-	case models.StopPriceLinkBasisManual,
-		models.StopPriceLinkBasisBase,
-		models.StopPriceLinkBasisTrigger,
-		models.StopPriceLinkBasisLast,
-		models.StopPriceLinkBasisBid,
-		models.StopPriceLinkBasisAsk,
-		models.StopPriceLinkBasisAskBid,
-		models.StopPriceLinkBasisMark,
-		models.StopPriceLinkBasisAverage:
-		return value, nil
-	default:
-		return "", newValidationError("stop-link-basis is invalid")
-	}
+	return parseEnum(raw, validStopPriceLinkBases, models.StopPriceLinkBasisLast, "stop-link-basis")
 }
 
 // parseStopPriceLinkType converts CLI input to a stop price link type enum.
 // Defaults to VALUE when empty, which means the offset is a dollar amount.
 func parseStopPriceLinkType(raw string) (models.StopPriceLinkType, error) {
-	if strings.TrimSpace(raw) == "" {
-		return models.StopPriceLinkTypeValue, nil
-	}
-
-	value := models.StopPriceLinkType(strings.ToUpper(strings.TrimSpace(raw)))
-	switch value {
-	case models.StopPriceLinkTypeValue,
-		models.StopPriceLinkTypePercent,
-		models.StopPriceLinkTypeTick:
-		return value, nil
-	default:
-		return "", newValidationError("stop-link-type is invalid")
-	}
+	return parseEnum(raw, validStopPriceLinkTypes, models.StopPriceLinkTypeValue, "stop-link-type")
 }
 
 // parseStopType converts CLI input to a stop type enum.
 // Defaults to STANDARD when empty.
 func parseStopType(raw string) (models.StopType, error) {
-	if strings.TrimSpace(raw) == "" {
-		return models.StopTypeStandard, nil
-	}
-
-	value := models.StopType(strings.ToUpper(strings.TrimSpace(raw)))
-	switch value {
-	case models.StopTypeStandard,
-		models.StopTypeBid,
-		models.StopTypeAsk,
-		models.StopTypeLast,
-		models.StopTypeMark:
-		return value, nil
-	default:
-		return "", newValidationError("stop-type is invalid")
-	}
+	return parseEnum(raw, validStopTypes, models.StopTypeStandard, "stop-type")
 }
 
 // parseSpecialInstruction converts a CLI flag value into a SpecialInstruction constant.
 // Returns an empty value when the flag is not set.
 func parseSpecialInstruction(raw string) (models.SpecialInstruction, error) {
-	if raw == "" {
-		return "", nil
-	}
-
-	value := models.SpecialInstruction(strings.ToUpper(raw))
-	switch value {
-	case models.SpecialInstructionAllOrNone,
-		models.SpecialInstructionDoNotReduce,
-		models.SpecialInstructionAllOrNoneDoNotReduce:
-		return value, nil
-	default:
-		return "", newValidationError("special-instruction is invalid")
-	}
+	return parseEnum(raw, validSpecialInstructions, "", "special-instruction")
 }
 
 // parseDestination converts CLI input to a requested destination enum.
 // Returns empty when not set (optional field).
 func parseDestination(raw string) (models.RequestedDestination, error) {
-	if strings.TrimSpace(raw) == "" {
-		return "", nil
-	}
-
-	value := models.RequestedDestination(strings.ToUpper(strings.TrimSpace(raw)))
-	switch value {
-	case models.RequestedDestinationINET,
-		models.RequestedDestinationECNArca,
-		models.RequestedDestinationCBOE,
-		models.RequestedDestinationAMEX,
-		models.RequestedDestinationPHLX,
-		models.RequestedDestinationISE,
-		models.RequestedDestinationBOX,
-		models.RequestedDestinationNYSE,
-		models.RequestedDestinationNASDAQ,
-		models.RequestedDestinationBATS,
-		models.RequestedDestinationC2,
-		models.RequestedDestinationAUTO:
-		return value, nil
-	default:
-		return "", newValidationError("destination is invalid")
-	}
+	return parseEnum(raw, validDestinations, "", "destination")
 }
 
 // parsePriceLinkBasis converts CLI input to a price link basis enum.
 // Returns empty when not set (optional field).
 func parsePriceLinkBasis(raw string) (models.PriceLinkBasis, error) {
-	if strings.TrimSpace(raw) == "" {
-		return "", nil
-	}
-
-	value := models.PriceLinkBasis(strings.ToUpper(strings.TrimSpace(raw)))
-	switch value {
-	case models.PriceLinkBasisManual,
-		models.PriceLinkBasisBase,
-		models.PriceLinkBasisTrigger,
-		models.PriceLinkBasisLast,
-		models.PriceLinkBasisBid,
-		models.PriceLinkBasisAsk,
-		models.PriceLinkBasisAskBid,
-		models.PriceLinkBasisMark,
-		models.PriceLinkBasisAverage:
-		return value, nil
-	default:
-		return "", newValidationError("price-link-basis is invalid")
-	}
+	return parseEnum(raw, validPriceLinkBases, "", "price-link-basis")
 }
 
 // parsePriceLinkType converts CLI input to a price link type enum.
 // Returns empty when not set (optional field).
 func parsePriceLinkType(raw string) (models.PriceLinkType, error) {
-	if strings.TrimSpace(raw) == "" {
-		return "", nil
-	}
-
-	value := models.PriceLinkType(strings.ToUpper(strings.TrimSpace(raw)))
-	switch value {
-	case models.PriceLinkTypeValue,
-		models.PriceLinkTypePercent,
-		models.PriceLinkTypeTick:
-		return value, nil
-	default:
-		return "", newValidationError("price-link-type is invalid")
-	}
+	return parseEnum(raw, validPriceLinkTypes, "", "price-link-type")
 }
 
-// newValidationError creates a consistent validation error for command parsing.
-func newValidationError(message string) error {
-	return apperr.NewValidationError(message, nil)
-}
+
