@@ -38,6 +38,7 @@ make test        # go test -v ./...
 make lint        # golangci-lint run ./...
 make install     # Install to /usr/local/bin
 make clean       # Remove binary
+make release VERSION=vX.Y.Z  # Run test+lint, generate tag message, create GPG-signed tag
 ```
 
 CI runs lint (golangci-lint v2.11) and test (race detector + coverage + build verification) on push to main and PRs. Releases via goreleaser on v* tags (Linux/Darwin, amd64/arm64, CGO disabled).
@@ -111,32 +112,32 @@ Semver versioning. Releases are triggered by pushing a GPG-signed tag matching `
 
 ### Process
 
-1. Verify on `main` with clean working tree
-2. Run `make test` and `make lint` - both must pass
-3. Review commits since the last tag: `git log $(git describe --tags --abbrev=0)..HEAD --oneline`
-4. Determine version bump (semver):
+1. Review commits since the last tag: `git log $(git describe --tags --abbrev=0)..HEAD --oneline`
+2. Determine version bump (semver):
    - `feat:` commits = minor bump
    - Only `fix:`/`chore:`/`test:`/`docs:` = patch bump
    - Breaking changes = major bump
-5. Create a GPG-signed annotated tag: `git tag -s -m "Release vX.Y.Z" vX.Y.Z`
-6. Push the tag: `git push origin vX.Y.Z`
+3. `make release VERSION=vX.Y.Z` (verifies main branch, clean tree, runs test+lint, generates tag message, creates GPG-signed tag)
+4. Push the tag: `git push origin vX.Y.Z`
 
 ### Tag message format
+
+`make release` auto-generates the tag message from conventional commits since the last tag:
 
 ```text
 Release vX.Y.Z
 
 Features:
-- Short description of each feat: commit
+- feat: commit messages grouped here
 
 Fixes:
-- Short description of each fix: commit
+- fix: commit messages grouped here
 
 Other:
-- Anything notable (CI, deps, test coverage, docs)
+- Everything else (chore, docs, test, ci, etc.)
 ```
 
-Omit any empty section. Keep descriptions concise (one line each).
+Empty sections are omitted automatically.
 
 ### What happens after push
 
@@ -145,7 +146,6 @@ Omit any empty section. Keep descriptions concise (one line each).
 3. `ldflags` injects the version into the binary via `-X main.version={{.Version}}`
 4. cosign signs the checksums file using keyless Sigstore/Fulcio OIDC (no private key)
 5. goreleaser auto-generates changelog from conventional commits (all prefixes included)
-
 ## Intentional Design Decisions
 
 1. **Shared client ref**: `client.Ref` (embedding `*Client`) is pre-allocated and shared by all commands; the Before hook populates `ref.Client` after auth
