@@ -6,6 +6,7 @@ import (
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
+	"github.com/major/schwab-agent/internal/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -428,7 +429,7 @@ func TestBuildFTSOrderStructure(t *testing.T) {
 		Session:   models.SessionNormal,
 		Duration:  models.DurationDay,
 		OrderType: models.OrderTypeLimit,
-		Price:     ptr(150.0),
+		Price:     ptr.To(150.0),
 		OrderLegCollection: []models.OrderLegCollection{
 			{
 				Instruction: models.InstructionBuy,
@@ -442,7 +443,7 @@ func TestBuildFTSOrderStructure(t *testing.T) {
 		Session:   models.SessionNormal,
 		Duration:  models.DurationDay,
 		OrderType: models.OrderTypeStop,
-		StopPrice: ptr(140.0),
+		StopPrice: ptr.To(140.0),
 		OrderLegCollection: []models.OrderLegCollection{
 			{
 				Instruction: models.InstructionSell,
@@ -504,7 +505,7 @@ func TestBuildFTSOrderPreservesOriginalFields(t *testing.T) {
 			Session:   models.SessionNormal,
 			Duration:  models.DurationDay,
 			OrderType: models.OrderTypeLimit,
-			Price:     ptr(200.0),
+			Price:     ptr.To(200.0),
 			OrderLegCollection: []models.OrderLegCollection{
 				{Instruction: models.InstructionSell, Quantity: 50},
 			},

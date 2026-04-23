@@ -12,6 +12,7 @@ import (
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
+	"github.com/major/schwab-agent/internal/ptr"
 )
 
 func TestQuotes_Success(t *testing.T) {
@@ -23,19 +24,19 @@ func TestQuotes_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := map[string]*models.QuoteEquity{
 			"AAPL": {
-				Symbol: ptr("AAPL"),
+				Symbol: ptr.To("AAPL"),
 				Quote: &models.QuoteData{
-					LastPrice: ptr(150.25),
-					BidPrice:  ptr(150.20),
-					AskPrice:  ptr(150.30),
+					LastPrice: ptr.To(150.25),
+					BidPrice:  ptr.To(150.20),
+					AskPrice:  ptr.To(150.30),
 				},
 			},
 			"NVDA": {
-				Symbol: ptr("NVDA"),
+				Symbol: ptr.To("NVDA"),
 				Quote: &models.QuoteData{
-					LastPrice: ptr(850.50),
-					BidPrice:  ptr(850.40),
-					AskPrice:  ptr(850.60),
+					LastPrice: ptr.To(850.50),
+					BidPrice:  ptr.To(850.40),
+					AskPrice:  ptr.To(850.60),
 				},
 			},
 		}
@@ -96,15 +97,15 @@ func TestQuote_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := map[string]*models.QuoteEquity{
 			"AAPL": {
-				Symbol: ptr("AAPL"),
+				Symbol: ptr.To("AAPL"),
 				Quote: &models.QuoteData{
-					LastPrice:   ptr(150.25),
-					BidPrice:    ptr(150.20),
-					AskPrice:    ptr(150.30),
-					TotalVolume: ptr(int64(45000000)),
+					LastPrice:   ptr.To(150.25),
+					BidPrice:    ptr.To(150.20),
+					AskPrice:    ptr.To(150.30),
+					TotalVolume: ptr.To(int64(45000000)),
 				},
 				Reference: &models.QuoteReference{
-					Description: ptr("Apple Inc"),
+					Description: ptr.To("Apple Inc"),
 				},
 			},
 		}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/major/schwab-agent/internal/models"
+	"github.com/major/schwab-agent/internal/ptr"
 )
 
 // VerticalParams holds parameters for building a vertical spread order.
@@ -44,7 +45,7 @@ func BuildVerticalOrder(params *VerticalParams) (*models.OrderRequest, error) {
 		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    ptr(params.Price),
+		Price:                    ptr.To(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildOptionLeg(&optionLegParams{
 				Underlying: params.Underlying, Expiration: params.Expiration,
@@ -135,7 +136,7 @@ func BuildIronCondorOrder(params *IronCondorParams) (*models.OrderRequest, error
 		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    ptr(params.Price),
+		Price:                    ptr.To(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildOptionLeg(&optionLegParams{
 				Underlying: params.Underlying, Expiration: params.Expiration,
@@ -195,7 +196,7 @@ func BuildStraddleOrder(params *StraddleParams) (*models.OrderRequest, error) {
 		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    ptr(params.Price),
+		Price:                    ptr.To(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildOptionLeg(&optionLegParams{
 				Underlying: params.Underlying, Expiration: params.Expiration,
@@ -246,7 +247,7 @@ func BuildStrangleOrder(params *StrangleParams) (*models.OrderRequest, error) {
 		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    ptr(params.Price),
+		Price:                    ptr.To(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildOptionLeg(&optionLegParams{
 				Underlying: params.Underlying, Expiration: params.Expiration,
@@ -323,7 +324,7 @@ func BuildCoveredCallOrder(params *CoveredCallParams) (*models.OrderRequest, err
 		OrderType:                models.OrderTypeNetDebit,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    ptr(params.Price),
+		Price:                    ptr.To(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Underlying, models.InstructionBuy, params.Quantity*optionContractMultiplier),
 			buildOptionLeg(&optionLegParams{
@@ -378,7 +379,7 @@ func BuildCalendarOrder(params *CalendarParams) (*models.OrderRequest, error) {
 		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    ptr(params.Price),
+		Price:                    ptr.To(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			// Far leg (bought when opening) listed first for consistency
 			// with how Schwab displays calendar spreads.
@@ -440,7 +441,7 @@ func BuildDiagonalOrder(params *DiagonalParams) (*models.OrderRequest, error) {
 		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    ptr(params.Price),
+		Price:                    ptr.To(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			// Far leg (bought when opening) listed first.
 			buildOptionLeg(&optionLegParams{
@@ -515,7 +516,7 @@ func BuildCollarOrder(params *CollarParams) (*models.OrderRequest, error) {
 		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    ptr(params.Price),
+		Price:                    ptr.To(params.Price),
 		OrderLegCollection: []models.OrderLegCollection{
 			// Leg 1: Equity shares.
 			buildEquityLeg(params.Underlying, equityInstruction, params.Quantity*optionContractMultiplier),
