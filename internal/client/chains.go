@@ -36,46 +36,20 @@ type ExpirationDate struct {
 // chainParams builds the query parameter map from ChainParams, including the symbol.
 func chainParams(symbol string, params *ChainParams) map[string]string {
 	m := map[string]string{"symbol": symbol}
-	if params.ContractType != "" {
-		m["contractType"] = params.ContractType
-	}
-	if params.StrikeCount != "" {
-		m["strikeCount"] = params.StrikeCount
-	}
-	if params.Strategy != "" {
-		m["strategy"] = params.Strategy
-	}
-	if params.FromDate != "" {
-		m["fromDate"] = params.FromDate
-	}
-	if params.ToDate != "" {
-		m["toDate"] = params.ToDate
-	}
-	if params.IncludeUnderlyingQuote != "" {
-		m["includeUnderlyingQuote"] = params.IncludeUnderlyingQuote
-	}
-	if params.Interval != "" {
-		m["interval"] = params.Interval
-	}
-	if params.Strike != "" {
-		m["strike"] = params.Strike
-	}
-	if params.StrikeRange != "" {
-		// The Schwab API uses "range" as the query parameter name.
-		m["range"] = params.StrikeRange
-	}
-	if params.Volatility != "" {
-		m["volatility"] = params.Volatility
-	}
-	if params.UnderlyingPrice != "" {
-		m["underlyingPrice"] = params.UnderlyingPrice
-	}
-	if params.InterestRate != "" {
-		m["interestRate"] = params.InterestRate
-	}
-	if params.DaysToExpiration != "" {
-		m["daysToExpiration"] = params.DaysToExpiration
-	}
+	setParam(m, "contractType", params.ContractType)
+	setParam(m, "strikeCount", params.StrikeCount)
+	setParam(m, "strategy", params.Strategy)
+	setParam(m, "fromDate", params.FromDate)
+	setParam(m, "toDate", params.ToDate)
+	setParam(m, "includeUnderlyingQuote", params.IncludeUnderlyingQuote)
+	setParam(m, "interval", params.Interval)
+	setParam(m, "strike", params.Strike)
+	// The Schwab API uses "range" as the query parameter name.
+	setParam(m, "range", params.StrikeRange)
+	setParam(m, "volatility", params.Volatility)
+	setParam(m, "underlyingPrice", params.UnderlyingPrice)
+	setParam(m, "interestRate", params.InterestRate)
+	setParam(m, "daysToExpiration", params.DaysToExpiration)
 	return m
 }
 
