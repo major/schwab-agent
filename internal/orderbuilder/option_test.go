@@ -347,3 +347,82 @@ func TestBuildOptionOrderOmitsSpecialInstructionWhenEmpty(t *testing.T) {
 	require.NotNil(t, order)
 	assert.Nil(t, order.SpecialInstruction)
 }
+
+// TestBuildOptionOrderSetsDestination verifies destination is set when provided.
+func TestBuildOptionOrderSetsDestination(t *testing.T) {
+	order, err := BuildOptionOrder(&OptionParams{
+		Underlying:  "AAPL",
+		Expiration:  time.Date(2025, time.December, 19, 0, 0, 0, 0, time.UTC),
+		Strike:      200.0,
+		PutCall:     models.PutCallCall,
+		Action:      models.InstructionBuyToOpen,
+		Quantity:    5,
+		OrderType:   models.OrderTypeLimit,
+		Price:       4.50,
+		Destination: models.RequestedDestinationCBOE,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	require.NotNil(t, order.RequestedDestination)
+	assert.Equal(t, models.RequestedDestinationCBOE, *order.RequestedDestination)
+}
+
+// TestBuildOptionOrderOmitsDestinationWhenEmpty verifies destination is nil when not set.
+func TestBuildOptionOrderOmitsDestinationWhenEmpty(t *testing.T) {
+	order, err := BuildOptionOrder(&OptionParams{
+		Underlying: "AAPL",
+		Expiration: time.Date(2025, time.December, 19, 0, 0, 0, 0, time.UTC),
+		Strike:     200.0,
+		PutCall:    models.PutCallCall,
+		Action:     models.InstructionBuyToOpen,
+		Quantity:   5,
+		OrderType:  models.OrderTypeMarket,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Nil(t, order.RequestedDestination)
+}
+
+// TestBuildOptionOrderSetsPriceLinkFields verifies price link fields are set when provided.
+func TestBuildOptionOrderSetsPriceLinkFields(t *testing.T) {
+	order, err := BuildOptionOrder(&OptionParams{
+		Underlying:     "AAPL",
+		Expiration:     time.Date(2025, time.December, 19, 0, 0, 0, 0, time.UTC),
+		Strike:         200.0,
+		PutCall:        models.PutCallCall,
+		Action:         models.InstructionBuyToOpen,
+		Quantity:       5,
+		OrderType:      models.OrderTypeLimit,
+		Price:          4.50,
+		PriceLinkBasis: models.PriceLinkBasisBid,
+		PriceLinkType:  models.PriceLinkTypePercent,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	require.NotNil(t, order.PriceLinkBasis)
+	assert.Equal(t, models.PriceLinkBasisBid, *order.PriceLinkBasis)
+	require.NotNil(t, order.PriceLinkType)
+	assert.Equal(t, models.PriceLinkTypePercent, *order.PriceLinkType)
+}
+
+// TestBuildOptionOrderOmitsPriceLinkFieldsWhenEmpty verifies price link fields
+// are nil when not provided.
+func TestBuildOptionOrderOmitsPriceLinkFieldsWhenEmpty(t *testing.T) {
+	order, err := BuildOptionOrder(&OptionParams{
+		Underlying: "AAPL",
+		Expiration: time.Date(2025, time.December, 19, 0, 0, 0, 0, time.UTC),
+		Strike:     200.0,
+		PutCall:    models.PutCallCall,
+		Action:     models.InstructionBuyToOpen,
+		Quantity:   5,
+		OrderType:  models.OrderTypeMarket,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Nil(t, order.PriceLinkBasis)
+	assert.Nil(t, order.PriceLinkType)
+}

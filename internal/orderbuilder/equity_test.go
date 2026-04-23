@@ -222,3 +222,100 @@ func TestBuildEquityOrderOmitsSpecialInstructionWhenEmpty(t *testing.T) {
 	require.NotNil(t, order)
 	assert.Nil(t, order.SpecialInstruction)
 }
+
+// TestBuildEquityOrderSetsDestination verifies the destination field is set
+// on the order when provided.
+func TestBuildEquityOrderSetsDestination(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:      "AAPL",
+		Action:      models.InstructionBuy,
+		Quantity:    100,
+		OrderType:   models.OrderTypeLimit,
+		Price:       150.00,
+		Destination: models.RequestedDestinationINET,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	require.NotNil(t, order.RequestedDestination)
+	assert.Equal(t, models.RequestedDestinationINET, *order.RequestedDestination)
+}
+
+// TestBuildEquityOrderOmitsDestinationWhenEmpty verifies destination is nil
+// when not provided.
+func TestBuildEquityOrderOmitsDestinationWhenEmpty(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:    "AAPL",
+		Action:    models.InstructionBuy,
+		Quantity:  100,
+		OrderType: models.OrderTypeMarket,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Nil(t, order.RequestedDestination)
+}
+
+// TestBuildEquityOrderSetsPriceLinkFields verifies price link basis and type
+// fields are set on the order when provided.
+func TestBuildEquityOrderSetsPriceLinkFields(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:         "AAPL",
+		Action:         models.InstructionBuy,
+		Quantity:       100,
+		OrderType:      models.OrderTypeLimit,
+		Price:          150.00,
+		PriceLinkBasis: models.PriceLinkBasisLast,
+		PriceLinkType:  models.PriceLinkTypeValue,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	require.NotNil(t, order.PriceLinkBasis)
+	assert.Equal(t, models.PriceLinkBasisLast, *order.PriceLinkBasis)
+	require.NotNil(t, order.PriceLinkType)
+	assert.Equal(t, models.PriceLinkTypeValue, *order.PriceLinkType)
+}
+
+// TestBuildEquityOrderOmitsPriceLinkFieldsWhenEmpty verifies price link fields
+// are nil when not provided.
+func TestBuildEquityOrderOmitsPriceLinkFieldsWhenEmpty(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:    "AAPL",
+		Action:    models.InstructionBuy,
+		Quantity:  100,
+		OrderType: models.OrderTypeMarket,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Nil(t, order.PriceLinkBasis)
+	assert.Nil(t, order.PriceLinkType)
+}
+
+// TestBuildEquityOrderPriceLinkDoesNotBreakTrailingStopLimit verifies that when
+// explicit price link fields are NOT set, trailing stop limit orders still
+// derive PriceLinkBasis and PriceLinkType from the stop price link values.
+func TestBuildEquityOrderPriceLinkDoesNotBreakTrailingStopLimit(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:             "AAPL",
+		Action:             models.InstructionSell,
+		Quantity:           10,
+		OrderType:          models.OrderTypeTrailingStopLimit,
+		Price:              195.00,
+		StopPriceOffset:    3.00,
+		StopPriceLinkBasis: models.StopPriceLinkBasisMark,
+		StopPriceLinkType:  models.StopPriceLinkTypeTick,
+		StopType:           models.StopTypeStandard,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+
+	// PriceLinkBasis/Type should still be derived from stop price link values
+	// when no explicit price link fields are set.
+	require.NotNil(t, order.PriceLinkBasis)
+	assert.Equal(t, models.PriceLinkBasis(models.StopPriceLinkBasisMark), *order.PriceLinkBasis)
+	require.NotNil(t, order.PriceLinkType)
+	assert.Equal(t, models.PriceLinkType(models.StopPriceLinkTypeTick), *order.PriceLinkType)
+}

@@ -1150,6 +1150,72 @@ func TestOrderBuildParseErrors(t *testing.T) {
 			},
 			wantMsg: "special-instruction is invalid",
 		},
+		// parseDestination invalid value.
+		{
+			name: "equity invalid destination",
+			args: []string{
+				"order", "build", "equity",
+				"--symbol", "AAPL", "--action", "BUY",
+				"--quantity", "10", "--type", "LIMIT",
+				"--price", "150", "--destination", "NOPE",
+			},
+			wantMsg: "destination is invalid",
+		},
+		{
+			name: "option invalid destination",
+			args: []string{
+				"order", "build", "option",
+				"--underlying", "AAPL", "--action", "BUY_TO_OPEN",
+				"--call", "--expiration", "2026-06-19",
+				"--strike", "150", "--quantity", "1",
+				"--destination", "NOPE",
+			},
+			wantMsg: "destination is invalid",
+		},
+		// parsePriceLinkBasis invalid value.
+		{
+			name: "equity invalid price-link-basis",
+			args: []string{
+				"order", "build", "equity",
+				"--symbol", "AAPL", "--action", "BUY",
+				"--quantity", "10", "--type", "LIMIT",
+				"--price", "150", "--price-link-basis", "NOPE",
+			},
+			wantMsg: "price-link-basis is invalid",
+		},
+		{
+			name: "option invalid price-link-basis",
+			args: []string{
+				"order", "build", "option",
+				"--underlying", "AAPL", "--action", "BUY_TO_OPEN",
+				"--call", "--expiration", "2026-06-19",
+				"--strike", "150", "--quantity", "1",
+				"--price-link-basis", "NOPE",
+			},
+			wantMsg: "price-link-basis is invalid",
+		},
+		// parsePriceLinkType invalid value.
+		{
+			name: "equity invalid price-link-type",
+			args: []string{
+				"order", "build", "equity",
+				"--symbol", "AAPL", "--action", "BUY",
+				"--quantity", "10", "--type", "LIMIT",
+				"--price", "150", "--price-link-type", "NOPE",
+			},
+			wantMsg: "price-link-type is invalid",
+		},
+		{
+			name: "option invalid price-link-type",
+			args: []string{
+				"order", "build", "option",
+				"--underlying", "AAPL", "--action", "BUY_TO_OPEN",
+				"--call", "--expiration", "2026-06-19",
+				"--strike", "150", "--quantity", "1",
+				"--price-link-type", "NOPE",
+			},
+			wantMsg: "price-link-type is invalid",
+		},
 	}
 
 	for _, tc := range testCases {

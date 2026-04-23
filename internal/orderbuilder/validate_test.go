@@ -1428,6 +1428,85 @@ func TestValidateCoveredCallRemainingBranches(t *testing.T) {
 	}
 }
 
+// TestValidateEquityOrderRejectsMismatchedPriceLink verifies that setting
+// price-link-basis without price-link-type (or vice versa) is an error.
+func TestValidateEquityOrderRejectsMismatchedPriceLink(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		priceLinkBasis models.PriceLinkBasis
+		priceLinkType  models.PriceLinkType
+	}{
+		{
+			name:           "basis without type",
+			priceLinkBasis: models.PriceLinkBasisLast,
+		},
+		{
+			name:          "type without basis",
+			priceLinkType: models.PriceLinkTypeValue,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateEquityOrder(&EquityParams{
+				Symbol:         "AAPL",
+				Quantity:       10,
+				OrderType:      models.OrderTypeLimit,
+				Price:          150,
+				PriceLinkBasis: tt.priceLinkBasis,
+				PriceLinkType:  tt.priceLinkType,
+			})
+
+			assertValidationError(t, err,
+				"price-link-basis and price-link-type must be specified together",
+				"Add both `--price-link-basis <value>` and `--price-link-type <value>`, or omit both",
+			)
+		})
+	}
+}
+
+// TestValidateEquityOrderAcceptsPairedPriceLink verifies that setting both
+// price-link-basis and price-link-type together passes validation.
+func TestValidateEquityOrderAcceptsPairedPriceLink(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateEquityOrder(&EquityParams{
+		Symbol:         "AAPL",
+		Quantity:       10,
+		OrderType:      models.OrderTypeLimit,
+		Price:          150,
+		PriceLinkBasis: models.PriceLinkBasisLast,
+		PriceLinkType:  models.PriceLinkTypeValue,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateOptionOrderRejectsMismatchedPriceLink verifies that setting
+// price-link-basis without price-link-type (or vice versa) is an error.
+func TestValidateOptionOrderRejectsMismatchedPriceLink(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOptionOrder(&OptionParams{
+		Underlying:     "AAPL",
+		Expiration:     time.Now().UTC().Add(30 * 24 * time.Hour),
+		Strike:         150,
+		Quantity:       1,
+		OrderType:      models.OrderTypeLimit,
+		Price:          3.50,
+		PriceLinkBasis: models.PriceLinkBasisBid,
+	})
+
+	assertValidationError(t, err,
+		"price-link-basis and price-link-type must be specified together",
+		"Add both `--price-link-basis <value>` and `--price-link-type <value>`, or omit both",
+	)
+}
+
 // TestBracketExitInstructionInvertsAction verifies the exit instruction for both directions.
 func TestBracketExitInstructionInvertsAction(t *testing.T) {
 	t.Parallel()

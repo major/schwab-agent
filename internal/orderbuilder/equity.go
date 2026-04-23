@@ -26,6 +26,11 @@ type EquityParams struct {
 	StopPriceLinkType  models.StopPriceLinkType
 	StopType           models.StopType
 	ActivationPrice    float64
+
+	// Routing and price link fields (optional, pass-through to Schwab API).
+	Destination    models.RequestedDestination
+	PriceLinkBasis models.PriceLinkBasis
+	PriceLinkType  models.PriceLinkType
 }
 
 // BuildEquityOrder constructs an OrderRequest for an equity order.
@@ -51,6 +56,22 @@ func BuildEquityOrder(params *EquityParams) (*models.OrderRequest, error) {
 
 	if params.SpecialInstruction != "" {
 		order.SpecialInstruction = ptr(params.SpecialInstruction)
+	}
+
+	if params.Destination != "" {
+		order.RequestedDestination = ptr(params.Destination)
+	}
+
+	// Only set price link fields when explicitly provided by the user.
+	// Trailing stop limit orders derive PriceLinkBasis/PriceLinkType from
+	// the stop price link values in applyEquityPriceFields - these explicit
+	// fields are set afterwards and will override those derived values.
+	if params.PriceLinkBasis != "" {
+		order.PriceLinkBasis = ptr(params.PriceLinkBasis)
+	}
+
+	if params.PriceLinkType != "" {
+		order.PriceLinkType = ptr(params.PriceLinkType)
 	}
 
 	return order, nil

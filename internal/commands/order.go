@@ -507,6 +507,9 @@ func equityOrderFlags() []cli.Flag {
 		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
 		&cli.StringFlag{Name: "session", Usage: "Trading session"},
 		&cli.StringFlag{Name: "special-instruction", Usage: "Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"},
+		&cli.StringFlag{Name: "destination", Usage: "Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)"},
+		&cli.StringFlag{Name: "price-link-basis", Usage: "Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)"},
+		&cli.StringFlag{Name: "price-link-type", Usage: "Price link offset type (VALUE, PERCENT, TICK)"},
 	}
 }
 
@@ -525,6 +528,9 @@ func optionOrderFlags() []cli.Flag {
 		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
 		&cli.StringFlag{Name: "session", Usage: "Trading session"},
 		&cli.StringFlag{Name: "special-instruction", Usage: "Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"},
+		&cli.StringFlag{Name: "destination", Usage: "Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)"},
+		&cli.StringFlag{Name: "price-link-basis", Usage: "Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)"},
+		&cli.StringFlag{Name: "price-link-type", Usage: "Price link offset type (VALUE, PERCENT, TICK)"},
 	}
 }
 
@@ -684,6 +690,21 @@ func parseEquityParams(cmd *cli.Command) (orderbuilder.EquityParams, error) {
 		return orderbuilder.EquityParams{}, err
 	}
 
+	destination, err := parseDestination(cmd.String("destination"))
+	if err != nil {
+		return orderbuilder.EquityParams{}, err
+	}
+
+	priceLinkBasis, err := parsePriceLinkBasis(cmd.String("price-link-basis"))
+	if err != nil {
+		return orderbuilder.EquityParams{}, err
+	}
+
+	priceLinkType, err := parsePriceLinkType(cmd.String("price-link-type"))
+	if err != nil {
+		return orderbuilder.EquityParams{}, err
+	}
+
 	return orderbuilder.EquityParams{
 		Symbol:             strings.TrimSpace(cmd.String("symbol")),
 		Action:             action,
@@ -697,6 +718,9 @@ func parseEquityParams(cmd *cli.Command) (orderbuilder.EquityParams, error) {
 		StopType:           stopType,
 		ActivationPrice:    cmd.Float64("activation-price"),
 		SpecialInstruction: specialInstruction,
+		Destination:        destination,
+		PriceLinkBasis:     priceLinkBasis,
+		PriceLinkType:      priceLinkType,
 		Duration:           duration,
 		Session:            session,
 	}, nil
@@ -734,6 +758,21 @@ func parseOptionParams(cmd *cli.Command) (orderbuilder.OptionParams, error) {
 		return orderbuilder.OptionParams{}, err
 	}
 
+	destination, err := parseDestination(cmd.String("destination"))
+	if err != nil {
+		return orderbuilder.OptionParams{}, err
+	}
+
+	priceLinkBasis, err := parsePriceLinkBasis(cmd.String("price-link-basis"))
+	if err != nil {
+		return orderbuilder.OptionParams{}, err
+	}
+
+	priceLinkType, err := parsePriceLinkType(cmd.String("price-link-type"))
+	if err != nil {
+		return orderbuilder.OptionParams{}, err
+	}
+
 	return orderbuilder.OptionParams{
 		Underlying: strings.TrimSpace(cmd.String("underlying")),
 		Expiration: expiration,
@@ -744,6 +783,9 @@ func parseOptionParams(cmd *cli.Command) (orderbuilder.OptionParams, error) {
 		OrderType:  orderType,
 		Price:              cmd.Float64("price"),
 		SpecialInstruction: specialInstruction,
+		Destination:        destination,
+		PriceLinkBasis:     priceLinkBasis,
+		PriceLinkType:      priceLinkType,
 		Duration:           duration,
 		Session:            session,
 	}, nil
@@ -1294,6 +1336,75 @@ func parseSpecialInstruction(raw string) (models.SpecialInstruction, error) {
 		return value, nil
 	default:
 		return "", newValidationError("special-instruction is invalid")
+	}
+}
+
+// parseDestination converts CLI input to a requested destination enum.
+// Returns empty when not set (optional field).
+func parseDestination(raw string) (models.RequestedDestination, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+
+	value := models.RequestedDestination(strings.ToUpper(strings.TrimSpace(raw)))
+	switch value {
+	case models.RequestedDestinationINET,
+		models.RequestedDestinationECNArca,
+		models.RequestedDestinationCBOE,
+		models.RequestedDestinationAMEX,
+		models.RequestedDestinationPHLX,
+		models.RequestedDestinationISE,
+		models.RequestedDestinationBOX,
+		models.RequestedDestinationNYSE,
+		models.RequestedDestinationNASDAQ,
+		models.RequestedDestinationBATS,
+		models.RequestedDestinationC2,
+		models.RequestedDestinationAUTO:
+		return value, nil
+	default:
+		return "", newValidationError("destination is invalid")
+	}
+}
+
+// parsePriceLinkBasis converts CLI input to a price link basis enum.
+// Returns empty when not set (optional field).
+func parsePriceLinkBasis(raw string) (models.PriceLinkBasis, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+
+	value := models.PriceLinkBasis(strings.ToUpper(strings.TrimSpace(raw)))
+	switch value {
+	case models.PriceLinkBasisManual,
+		models.PriceLinkBasisBase,
+		models.PriceLinkBasisTrigger,
+		models.PriceLinkBasisLast,
+		models.PriceLinkBasisBid,
+		models.PriceLinkBasisAsk,
+		models.PriceLinkBasisAskBid,
+		models.PriceLinkBasisMark,
+		models.PriceLinkBasisAverage:
+		return value, nil
+	default:
+		return "", newValidationError("price-link-basis is invalid")
+	}
+}
+
+// parsePriceLinkType converts CLI input to a price link type enum.
+// Returns empty when not set (optional field).
+func parsePriceLinkType(raw string) (models.PriceLinkType, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+
+	value := models.PriceLinkType(strings.ToUpper(strings.TrimSpace(raw)))
+	switch value {
+	case models.PriceLinkTypeValue,
+		models.PriceLinkTypePercent,
+		models.PriceLinkTypeTick:
+		return value, nil
+	default:
+		return "", newValidationError("price-link-type is invalid")
 	}
 }
 

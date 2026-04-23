@@ -62,6 +62,10 @@ func ValidateEquityOrder(params *EquityParams) error {
 		}
 	}
 
+	if err := validatePriceLinkPair(params.PriceLinkBasis, params.PriceLinkType); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -89,6 +93,10 @@ func ValidateOptionOrder(params *OptionParams) error {
 
 	if params.Strike <= 0 {
 		return validationError("option strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+	}
+
+	if err := validatePriceLinkPair(params.PriceLinkBasis, params.PriceLinkType); err != nil {
+		return err
 	}
 
 	return nil
@@ -421,6 +429,22 @@ func validateExpiration(expiration time.Time) error {
 func validateSpreadPrice(price float64, strategy string) error {
 	if price <= 0 {
 		return validationError("price is required for "+strategy, "Add `--price <amount>` to specify the net debit or credit")
+	}
+
+	return nil
+}
+
+// validatePriceLinkPair checks that price-link-basis and price-link-type are
+// either both set or both unset. Setting one without the other is an error.
+func validatePriceLinkPair(basis models.PriceLinkBasis, linkType models.PriceLinkType) error {
+	basisSet := basis != ""
+	typeSet := linkType != ""
+
+	if basisSet != typeSet {
+		return validationError(
+			"price-link-basis and price-link-type must be specified together",
+			"Add both `--price-link-basis <value>` and `--price-link-type <value>`, or omit both",
+		)
 	}
 
 	return nil
