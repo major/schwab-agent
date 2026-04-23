@@ -105,6 +105,47 @@ JSON at `~/.config/schwab-agent/config.json`. Fields: `client_id`, `client_secre
 
 Renovate bot auto-merges patch/minor/digest after 7 days. Major versions require manual approval. Go toolchain updates grouped separately. Schedule: before 3am Monday, America/Chicago.
 
+## Releases
+
+Semver versioning. Releases are triggered by pushing a GPG-signed tag matching `v*` to `origin`.
+
+### Process
+
+1. Verify on `main` with clean working tree
+2. Run `make test` and `make lint` - both must pass
+3. Review commits since the last tag: `git log $(git describe --tags --abbrev=0)..HEAD --oneline`
+4. Determine version bump (semver):
+   - `feat:` commits = minor bump
+   - Only `fix:`/`chore:`/`test:`/`docs:` = patch bump
+   - Breaking changes = major bump
+5. Create a GPG-signed annotated tag: `git tag -s -m "Release vX.Y.Z" vX.Y.Z`
+6. Push the tag: `git push origin vX.Y.Z`
+
+### Tag message format
+
+```text
+Release vX.Y.Z
+
+Features:
+- Short description of each feat: commit
+
+Fixes:
+- Short description of each fix: commit
+
+Other:
+- Anything notable (CI, deps, test coverage, docs)
+```
+
+Omit any empty section. Keep descriptions concise (one line each).
+
+### What happens after push
+
+1. `.github/workflows/release.yml` triggers on the `v*` tag
+2. goreleaser v2 builds binaries (Linux/Darwin, amd64/arm64, CGO disabled)
+3. `ldflags` injects the version into the binary via `-X main.version={{.Version}}`
+4. cosign signs the checksums file using keyless Sigstore/Fulcio OIDC (no private key)
+5. goreleaser auto-generates changelog from conventional commits (all prefixes included)
+
 ## Intentional Design Decisions
 
 1. **Shared client ref**: `client.Ref` (embedding `*Client`) is pre-allocated and shared by all commands; the Before hook populates `ref.Client` after auth
