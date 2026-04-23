@@ -163,7 +163,7 @@ schwab-agent order build strangle --underlying F --expiration 2026-06-18 \
 Sells a near-term option and buys a longer-term option at the same strike. Useful for income strategies and volatility plays.
 
 ```bash
-schwab-agent order build calendar --underlying F --expiration 2026-06-18 \
+schwab-agent order build calendar --underlying F \
   --near-expiration 2026-05-16 --far-expiration 2026-07-17 --strike 12 --call \
   --open --quantity 1 --price 0.50
 ```
@@ -179,7 +179,7 @@ schwab-agent order build calendar --underlying F --expiration 2026-06-18 \
 Like a calendar spread but with different strikes per leg. Combines time decay and directional bias.
 
 ```bash
-schwab-agent order build diagonal --underlying F --expiration 2026-06-18 \
+schwab-agent order build diagonal --underlying F \
   --near-strike 12 --far-strike 14 --near-expiration 2026-05-16 \
   --far-expiration 2026-07-17 --call --open --quantity 1 --price 0.50
 ```
