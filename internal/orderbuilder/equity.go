@@ -21,7 +21,7 @@ type EquityParams struct {
 
 	// Trailing stop fields. The stop adjusts dynamically via offset
 	// rather than using a fixed StopPrice.
-	StopPriceOffset   float64
+	StopPriceOffset    float64
 	StopPriceLinkBasis models.StopPriceLinkBasis
 	StopPriceLinkType  models.StopPriceLinkType
 	StopType           models.StopType
@@ -77,6 +77,10 @@ func applyEquityPriceFields(order *models.OrderRequest, params *EquityParams) {
 		order.PriceOffset = ptr(params.Price)
 		order.PriceLinkBasis = ptr(models.PriceLinkBasis(params.StopPriceLinkBasis))
 		order.PriceLinkType = ptr(models.PriceLinkType(params.StopPriceLinkType))
+	case models.OrderTypeLimitOnClose:
+		// LOC orders require a limit price, similar to LIMIT orders
+		order.Price = ptr(params.Price)
+		// MOC (MARKET_ON_CLOSE) orders don't require any price fields
 	}
 }
 

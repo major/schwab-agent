@@ -65,14 +65,14 @@ const (
 type AssetMainType string
 
 const (
-	AssetMainTypeEquity      AssetMainType = "EQUITY"
-	AssetMainTypeOption      AssetMainType = "OPTION"
-	AssetMainTypeFuture      AssetMainType = "FUTURE"
-	AssetMainTypeForex       AssetMainType = "FOREX"
-	AssetMainTypeIndex       AssetMainType = "INDEX"
-	AssetMainTypeMutualFund  AssetMainType = "MUTUAL_FUND"
-	AssetMainTypeBond        AssetMainType = "BOND"
-	AssetMainTypeCommodity   AssetMainType = "COMMODITY"
+	AssetMainTypeEquity     AssetMainType = "EQUITY"
+	AssetMainTypeOption     AssetMainType = "OPTION"
+	AssetMainTypeFuture     AssetMainType = "FUTURE"
+	AssetMainTypeForex      AssetMainType = "FOREX"
+	AssetMainTypeIndex      AssetMainType = "INDEX"
+	AssetMainTypeMutualFund AssetMainType = "MUTUAL_FUND"
+	AssetMainTypeBond       AssetMainType = "BOND"
+	AssetMainTypeCommodity  AssetMainType = "COMMODITY"
 )
 
 // EquityAssetSubType represents equity asset subtypes.
@@ -80,15 +80,15 @@ type EquityAssetSubType string
 
 const (
 	EquityAssetSubTypeCommonStock EquityAssetSubType = "COMMON_STOCK"
-	EquityAssetSubTypePreferred    EquityAssetSubType = "PREFERRED"
-	EquityAssetSubTypeWarrant      EquityAssetSubType = "WARRANT"
+	EquityAssetSubTypePreferred   EquityAssetSubType = "PREFERRED"
+	EquityAssetSubTypeWarrant     EquityAssetSubType = "WARRANT"
 )
 
 // MutualFundAssetSubType represents mutual fund subtypes.
 type MutualFundAssetSubType string
 
 const (
-	MutualFundAssetSubTypeOpenEnd  MutualFundAssetSubType = "OPEN_END"
+	MutualFundAssetSubTypeOpenEnd   MutualFundAssetSubType = "OPEN_END"
 	MutualFundAssetSubTypeClosedEnd MutualFundAssetSubType = "CLOSED_END"
 )
 
@@ -96,19 +96,19 @@ const (
 type FundStrategy string
 
 const (
-	FundStrategyGrowth      FundStrategy = "GROWTH"
-	FundStrategyValue       FundStrategy = "VALUE"
+	FundStrategyGrowth        FundStrategy = "GROWTH"
+	FundStrategyValue         FundStrategy = "VALUE"
 	FundStrategyBlendedGrowth FundStrategy = "BLENDED_GROWTH"
-	FundStrategyBlendedValue FundStrategy = "BLENDED_VALUE"
+	FundStrategyBlendedValue  FundStrategy = "BLENDED_VALUE"
 )
 
 // ExpirationType represents option expiration types.
 type ExpirationType string
 
 const (
-	ExpirationTypeStandard ExpirationType = "STANDARD"
-	ExpirationTypeWeekly   ExpirationType = "WEEKLY"
-	ExpirationTypeMonthly  ExpirationType = "MONTHLY"
+	ExpirationTypeStandard  ExpirationType = "STANDARD"
+	ExpirationTypeWeekly    ExpirationType = "WEEKLY"
+	ExpirationTypeMonthly   ExpirationType = "MONTHLY"
 	ExpirationTypeQuarterly ExpirationType = "QUARTERLY"
 )
 
@@ -132,22 +132,22 @@ const (
 type DivFreq string
 
 const (
-	DivFreqAnnual    DivFreq = "ANNUAL"
+	DivFreqAnnual     DivFreq = "ANNUAL"
 	DivFreqSemiAnnual DivFreq = "SEMI_ANNUAL"
-	DivFreqQuarterly DivFreq = "QUARTERLY"
-	DivFreqMonthly   DivFreq = "MONTHLY"
+	DivFreqQuarterly  DivFreq = "QUARTERLY"
+	DivFreqMonthly    DivFreq = "MONTHLY"
 )
 
 // QuoteType represents quote types.
 type QuoteType string
 
 const (
-	QuoteTypeEquity      QuoteType = "EQUITY"
-	QuoteTypeOption      QuoteType = "OPTION"
-	QuoteTypeFuture      QuoteType = "FUTURE"
-	QuoteTypeForex       QuoteType = "FOREX"
-	QuoteTypeIndex       QuoteType = "INDEX"
-	QuoteTypeMutualFund  QuoteType = "MUTUAL_FUND"
+	QuoteTypeEquity     QuoteType = "EQUITY"
+	QuoteTypeOption     QuoteType = "OPTION"
+	QuoteTypeFuture     QuoteType = "FUTURE"
+	QuoteTypeForex      QuoteType = "FOREX"
+	QuoteTypeIndex      QuoteType = "INDEX"
+	QuoteTypeMutualFund QuoteType = "MUTUAL_FUND"
 )
 
 // TransactionType represents transaction types.

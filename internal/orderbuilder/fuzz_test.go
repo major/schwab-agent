@@ -20,11 +20,11 @@ func FuzzParseOCCSymbol(f *testing.F) {
 	// Seed with known-invalid inputs that exercise error paths.
 	f.Add("")
 	f.Add("short")
-	f.Add("AAPL  250620X00200000") // bad put/call
-	f.Add("      250620C00200000") // empty underlying
-	f.Add("AAPL  259920C00200000") // bad date
-	f.Add("AAPL  250620C0020000A") // non-numeric strike
-	f.Add("AAPL  250620C00000000") // zero strike
+	f.Add("AAPL  250620X00200000")  // bad put/call
+	f.Add("      250620C00200000")  // empty underlying
+	f.Add("AAPL  259920C00200000")  // bad date
+	f.Add("AAPL  250620C0020000A")  // non-numeric strike
+	f.Add("AAPL  250620C00000000")  // zero strike
 	f.Add("AAPL  250620C002000001") // too long
 
 	f.Fuzz(func(t *testing.T, input string) {

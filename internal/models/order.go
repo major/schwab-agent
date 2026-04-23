@@ -44,14 +44,14 @@ const (
 type Duration string
 
 const (
-	DurationDay             Duration = "DAY"
-	DurationGoodTillCancel  Duration = "GOOD_TILL_CANCEL"
-	DurationFillOrKill      Duration = "FILL_OR_KILL"
+	DurationDay               Duration = "DAY"
+	DurationGoodTillCancel    Duration = "GOOD_TILL_CANCEL"
+	DurationFillOrKill        Duration = "FILL_OR_KILL"
 	DurationImmediateOrCancel Duration = "IMMEDIATE_OR_CANCEL"
-	DurationEndOfWeek       Duration = "END_OF_WEEK"
-	DurationEndOfMonth      Duration = "END_OF_MONTH"
-	DurationNextEndOfMonth  Duration = "NEXT_END_OF_MONTH"
-	DurationUnknown         Duration = "UNKNOWN"
+	DurationEndOfWeek         Duration = "END_OF_WEEK"
+	DurationEndOfMonth        Duration = "END_OF_MONTH"
+	DurationNextEndOfMonth    Duration = "NEXT_END_OF_MONTH"
+	DurationUnknown           Duration = "UNKNOWN"
 )
 
 // Session represents the market session for order execution.
@@ -68,27 +68,27 @@ const (
 type OrderStatus string
 
 const (
-	OrderStatusAwaitingParentOrder     OrderStatus = "AWAITING_PARENT_ORDER"
-	OrderStatusAwaitingCondition       OrderStatus = "AWAITING_CONDITION"
-	OrderStatusAwaitingStopCondition   OrderStatus = "AWAITING_STOP_CONDITION"
-	OrderStatusAwaitingManualReview    OrderStatus = "AWAITING_MANUAL_REVIEW"
-	OrderStatusAccepted                OrderStatus = "ACCEPTED"
-	OrderStatusAwaitingUROut           OrderStatus = "AWAITING_UR_OUT"
-	OrderStatusPendingActivation       OrderStatus = "PENDING_ACTIVATION"
-	OrderStatusQueued                  OrderStatus = "QUEUED"
-	OrderStatusWorking                 OrderStatus = "WORKING"
-	OrderStatusRejected                OrderStatus = "REJECTED"
-	OrderStatusPendingCancel           OrderStatus = "PENDING_CANCEL"
-	OrderStatusCanceled                OrderStatus = "CANCELED"
-	OrderStatusPendingReplace          OrderStatus = "PENDING_REPLACE"
-	OrderStatusReplaced                OrderStatus = "REPLACED"
-	OrderStatusFilled                  OrderStatus = "FILLED"
-	OrderStatusExpired                 OrderStatus = "EXPIRED"
-	OrderStatusNew                     OrderStatus = "NEW"
-	OrderStatusAwaitingReleaseTime     OrderStatus = "AWAITING_RELEASE_TIME"
-	OrderStatusPendingAcknowledgement  OrderStatus = "PENDING_ACKNOWLEDGEMENT"
-	OrderStatusPendingRecall           OrderStatus = "PENDING_RECALL"
-	OrderStatusUnknown                 OrderStatus = "UNKNOWN"
+	OrderStatusAwaitingParentOrder    OrderStatus = "AWAITING_PARENT_ORDER"
+	OrderStatusAwaitingCondition      OrderStatus = "AWAITING_CONDITION"
+	OrderStatusAwaitingStopCondition  OrderStatus = "AWAITING_STOP_CONDITION"
+	OrderStatusAwaitingManualReview   OrderStatus = "AWAITING_MANUAL_REVIEW"
+	OrderStatusAccepted               OrderStatus = "ACCEPTED"
+	OrderStatusAwaitingUROut          OrderStatus = "AWAITING_UR_OUT"
+	OrderStatusPendingActivation      OrderStatus = "PENDING_ACTIVATION"
+	OrderStatusQueued                 OrderStatus = "QUEUED"
+	OrderStatusWorking                OrderStatus = "WORKING"
+	OrderStatusRejected               OrderStatus = "REJECTED"
+	OrderStatusPendingCancel          OrderStatus = "PENDING_CANCEL"
+	OrderStatusCanceled               OrderStatus = "CANCELED"
+	OrderStatusPendingReplace         OrderStatus = "PENDING_REPLACE"
+	OrderStatusReplaced               OrderStatus = "REPLACED"
+	OrderStatusFilled                 OrderStatus = "FILLED"
+	OrderStatusExpired                OrderStatus = "EXPIRED"
+	OrderStatusNew                    OrderStatus = "NEW"
+	OrderStatusAwaitingReleaseTime    OrderStatus = "AWAITING_RELEASE_TIME"
+	OrderStatusPendingAcknowledgement OrderStatus = "PENDING_ACKNOWLEDGEMENT"
+	OrderStatusPendingRecall          OrderStatus = "PENDING_RECALL"
+	OrderStatusUnknown                OrderStatus = "UNKNOWN"
 )
 
 // OrderStrategyType represents how an order relates to other orders.
@@ -110,27 +110,27 @@ const (
 type ComplexOrderStrategyType string
 
 const (
-	ComplexOrderStrategyTypeNone                  ComplexOrderStrategyType = "NONE"
-	ComplexOrderStrategyTypeCovered               ComplexOrderStrategyType = "COVERED"
-	ComplexOrderStrategyTypeVertical              ComplexOrderStrategyType = "VERTICAL"
-	ComplexOrderStrategyTypeBackRatio             ComplexOrderStrategyType = "BACK_RATIO"
-	ComplexOrderStrategyTypeCalendar              ComplexOrderStrategyType = "CALENDAR"
-	ComplexOrderStrategyTypeDiagonal              ComplexOrderStrategyType = "DIAGONAL"
-	ComplexOrderStrategyTypeStraddle              ComplexOrderStrategyType = "STRADDLE"
-	ComplexOrderStrategyTypeStrangle              ComplexOrderStrategyType = "STRANGLE"
-	ComplexOrderStrategyTypeCollarSynthetic       ComplexOrderStrategyType = "COLLAR_SYNTHETIC"
-	ComplexOrderStrategyTypeButterfly             ComplexOrderStrategyType = "BUTTERFLY"
-	ComplexOrderStrategyTypeCondor                ComplexOrderStrategyType = "CONDOR"
-	ComplexOrderStrategyTypeIronCondor            ComplexOrderStrategyType = "IRON_CONDOR"
-	ComplexOrderStrategyTypeVerticalRoll          ComplexOrderStrategyType = "VERTICAL_ROLL"
-	ComplexOrderStrategyTypeCollarWithStock       ComplexOrderStrategyType = "COLLAR_WITH_STOCK"
-	ComplexOrderStrategyTypeDoubleDiagonal        ComplexOrderStrategyType = "DOUBLE_DIAGONAL"
-	ComplexOrderStrategyTypeUnbalancedButterfly   ComplexOrderStrategyType = "UNBALANCED_BUTTERFLY"
-	ComplexOrderStrategyTypeUnbalancedCondor      ComplexOrderStrategyType = "UNBALANCED_CONDOR"
-	ComplexOrderStrategyTypeUnbalancedIronCondor  ComplexOrderStrategyType = "UNBALANCED_IRON_CONDOR"
+	ComplexOrderStrategyTypeNone                   ComplexOrderStrategyType = "NONE"
+	ComplexOrderStrategyTypeCovered                ComplexOrderStrategyType = "COVERED"
+	ComplexOrderStrategyTypeVertical               ComplexOrderStrategyType = "VERTICAL"
+	ComplexOrderStrategyTypeBackRatio              ComplexOrderStrategyType = "BACK_RATIO"
+	ComplexOrderStrategyTypeCalendar               ComplexOrderStrategyType = "CALENDAR"
+	ComplexOrderStrategyTypeDiagonal               ComplexOrderStrategyType = "DIAGONAL"
+	ComplexOrderStrategyTypeStraddle               ComplexOrderStrategyType = "STRADDLE"
+	ComplexOrderStrategyTypeStrangle               ComplexOrderStrategyType = "STRANGLE"
+	ComplexOrderStrategyTypeCollarSynthetic        ComplexOrderStrategyType = "COLLAR_SYNTHETIC"
+	ComplexOrderStrategyTypeButterfly              ComplexOrderStrategyType = "BUTTERFLY"
+	ComplexOrderStrategyTypeCondor                 ComplexOrderStrategyType = "CONDOR"
+	ComplexOrderStrategyTypeIronCondor             ComplexOrderStrategyType = "IRON_CONDOR"
+	ComplexOrderStrategyTypeVerticalRoll           ComplexOrderStrategyType = "VERTICAL_ROLL"
+	ComplexOrderStrategyTypeCollarWithStock        ComplexOrderStrategyType = "COLLAR_WITH_STOCK"
+	ComplexOrderStrategyTypeDoubleDiagonal         ComplexOrderStrategyType = "DOUBLE_DIAGONAL"
+	ComplexOrderStrategyTypeUnbalancedButterfly    ComplexOrderStrategyType = "UNBALANCED_BUTTERFLY"
+	ComplexOrderStrategyTypeUnbalancedCondor       ComplexOrderStrategyType = "UNBALANCED_CONDOR"
+	ComplexOrderStrategyTypeUnbalancedIronCondor   ComplexOrderStrategyType = "UNBALANCED_IRON_CONDOR"
 	ComplexOrderStrategyTypeUnbalancedVerticalRoll ComplexOrderStrategyType = "UNBALANCED_VERTICAL_ROLL"
-	ComplexOrderStrategyTypeMutualFundSwap        ComplexOrderStrategyType = "MUTUAL_FUND_SWAP"
-	ComplexOrderStrategyTypeCustom                ComplexOrderStrategyType = "CUSTOM"
+	ComplexOrderStrategyTypeMutualFundSwap         ComplexOrderStrategyType = "MUTUAL_FUND_SWAP"
+	ComplexOrderStrategyTypeCustom                 ComplexOrderStrategyType = "CUSTOM"
 )
 
 // AssetType represents the type of financial instrument in an order.
@@ -196,16 +196,16 @@ type RequestedDestination string
 const (
 	RequestedDestinationINET    RequestedDestination = "INET"
 	RequestedDestinationECNArca RequestedDestination = "ECN_ARCA"
-	RequestedDestinationCBOE   RequestedDestination = "CBOE"
-	RequestedDestinationAMEX   RequestedDestination = "AMEX"
-	RequestedDestinationPHLX   RequestedDestination = "PHLX"
-	RequestedDestinationISE    RequestedDestination = "ISE"
-	RequestedDestinationBOX    RequestedDestination = "BOX"
-	RequestedDestinationNYSE   RequestedDestination = "NYSE"
-	RequestedDestinationNASDAQ RequestedDestination = "NASDAQ"
-	RequestedDestinationBATS   RequestedDestination = "BATS"
-	RequestedDestinationC2     RequestedDestination = "C2"
-	RequestedDestinationAUTO   RequestedDestination = "AUTO"
+	RequestedDestinationCBOE    RequestedDestination = "CBOE"
+	RequestedDestinationAMEX    RequestedDestination = "AMEX"
+	RequestedDestinationPHLX    RequestedDestination = "PHLX"
+	RequestedDestinationISE     RequestedDestination = "ISE"
+	RequestedDestinationBOX     RequestedDestination = "BOX"
+	RequestedDestinationNYSE    RequestedDestination = "NYSE"
+	RequestedDestinationNASDAQ  RequestedDestination = "NASDAQ"
+	RequestedDestinationBATS    RequestedDestination = "BATS"
+	RequestedDestinationC2      RequestedDestination = "C2"
+	RequestedDestinationAUTO    RequestedDestination = "AUTO"
 )
 
 // StopPriceLinkBasis represents the reference point for stop price calculation.
@@ -324,16 +324,16 @@ const (
 type ActivityType string
 
 const (
-	ActivityTypeExecution     ActivityType = "EXECUTION"
-	ActivityTypeOrderAction   ActivityType = "ORDER_ACTION"
+	ActivityTypeExecution   ActivityType = "EXECUTION"
+	ActivityTypeOrderAction ActivityType = "ORDER_ACTION"
 )
 
 // ExecutionType represents the type of execution.
 type ExecutionType string
 
 const (
-	ExecutionTypeFill         ExecutionType = "FILL"
-	ExecutionTypeCanceled     ExecutionType = "CANCELED"
+	ExecutionTypeFill     ExecutionType = "FILL"
+	ExecutionTypeCanceled ExecutionType = "CANCELED"
 )
 
 // RuleAction represents the action taken by an API validation rule.
@@ -351,17 +351,17 @@ const (
 // For equity orders, only AssetType and Symbol are needed.
 // For option orders, PutCall, UnderlyingSymbol, and related fields are populated.
 type OrderInstrument struct {
-	AssetType           AssetType `json:"assetType"`
-	Symbol              string    `json:"symbol"`
-	CUSIP               *string   `json:"cusip,omitempty"`
-	Description         *string   `json:"description,omitempty"`
-	InstrumentID        *int64    `json:"instrumentId,omitempty"`
-	NetChange           *float64  `json:"netChange,omitempty"`
-	PutCall             *PutCall  `json:"putCall,omitempty"`
-	UnderlyingSymbol    *string   `json:"underlyingSymbol,omitempty"`
-	OptionMultiplier    *float64  `json:"optionMultiplier,omitempty"`
-	OptionExpirationDate *string  `json:"optionExpirationDate,omitempty"`
-	OptionStrikePrice   *float64  `json:"optionStrikePrice,omitempty"`
+	AssetType            AssetType `json:"assetType"`
+	Symbol               string    `json:"symbol"`
+	CUSIP                *string   `json:"cusip,omitempty"`
+	Description          *string   `json:"description,omitempty"`
+	InstrumentID         *int64    `json:"instrumentId,omitempty"`
+	NetChange            *float64  `json:"netChange,omitempty"`
+	PutCall              *PutCall  `json:"putCall,omitempty"`
+	UnderlyingSymbol     *string   `json:"underlyingSymbol,omitempty"`
+	OptionMultiplier     *float64  `json:"optionMultiplier,omitempty"`
+	OptionExpirationDate *string   `json:"optionExpirationDate,omitempty"`
+	OptionStrikePrice    *float64  `json:"optionStrikePrice,omitempty"`
 }
 
 // OrderLegCollection represents a single leg of an order.
@@ -389,81 +389,81 @@ type ExecutionLeg struct {
 
 // OrderActivity represents an activity (execution or action) on an order.
 type OrderActivity struct {
-	ActivityType          ActivityType   `json:"activityType"`
-	ExecutionType         *ExecutionType `json:"executionType,omitempty"`
-	Quantity              float64        `json:"quantity"`
-	OrderRemainingQuantity float64       `json:"orderRemainingQuantity"`
-	ExecutionLegs         []ExecutionLeg `json:"executionLegs,omitempty"`
+	ActivityType           ActivityType   `json:"activityType"`
+	ExecutionType          *ExecutionType `json:"executionType,omitempty"`
+	Quantity               float64        `json:"quantity"`
+	OrderRemainingQuantity float64        `json:"orderRemainingQuantity"`
+	ExecutionLegs          []ExecutionLeg `json:"executionLegs,omitempty"`
 }
 
 // Order represents an order response from the Schwab API.
 // This is the full order object returned by GET /orders endpoints.
 type Order struct {
-	Session                   Session                  `json:"session"`
-	Duration                  Duration                 `json:"duration"`
-	OrderType                 OrderType                `json:"orderType"`
-	CancelTime                *SchwabTime              `json:"cancelTime,omitempty"`
-	ComplexOrderStrategyType  *ComplexOrderStrategyType `json:"complexOrderStrategyType,omitempty"`
-	Quantity                  *float64                 `json:"quantity,omitempty"`
-	FilledQuantity            *float64                 `json:"filledQuantity,omitempty"`
-	RemainingQuantity         *float64                 `json:"remainingQuantity,omitempty"`
-	RequestedDestination      *RequestedDestination    `json:"requestedDestination,omitempty"`
-	DestinationLinkName       *string                  `json:"destinationLinkName,omitempty"`
-	ReleaseTime               *SchwabTime              `json:"releaseTime,omitempty"`
-	StopPrice                 *float64                 `json:"stopPrice,omitempty"`
-	StopPriceLinkBasis        *StopPriceLinkBasis      `json:"stopPriceLinkBasis,omitempty"`
-	StopPriceLinkType         *StopPriceLinkType       `json:"stopPriceLinkType,omitempty"`
-	StopPriceOffset           *float64                 `json:"stopPriceOffset,omitempty"`
-	StopType                  *StopType                `json:"stopType,omitempty"`
-	PriceLinkBasis            *PriceLinkBasis          `json:"priceLinkBasis,omitempty"`
-	PriceLinkType             *PriceLinkType           `json:"priceLinkType,omitempty"`
-	PriceOffset               *float64                 `json:"priceOffset,omitempty"`
-	Price                     *float64                 `json:"price,omitempty"`
-	TaxLotMethod              *TaxLotMethod            `json:"taxLotMethod,omitempty"`
-	OrderLegCollection        []OrderLegCollection     `json:"orderLegCollection"`
-	ActivationPrice           *float64                 `json:"activationPrice,omitempty"`
-	SpecialInstruction        *SpecialInstruction      `json:"specialInstruction,omitempty"`
-	OrderStrategyType         OrderStrategyType        `json:"orderStrategyType"`
-	OrderID                   *int64                   `json:"orderId,omitempty"`
-	Cancelable                *bool                    `json:"cancelable,omitempty"`
-	Editable                  *bool                    `json:"editable,omitempty"`
-	Status                    *OrderStatus             `json:"status,omitempty"`
-	EnteredTime               *SchwabTime              `json:"enteredTime,omitempty"`
-	CloseTime                 *SchwabTime              `json:"closeTime,omitempty"`
-	Tag                       *string                  `json:"tag,omitempty"`
-	AccountNumber             *int64                   `json:"accountNumber,omitempty"`
-	OrderActivityCollection   []OrderActivity          `json:"orderActivityCollection,omitempty"`
-	ReplacingOrderCollection  []Order                  `json:"replacingOrderCollection,omitempty"`
-	ChildOrderStrategies      []Order                  `json:"childOrderStrategies,omitempty"`
-	StatusDescription         *string                  `json:"statusDescription,omitempty"`
+	Session                  Session                   `json:"session"`
+	Duration                 Duration                  `json:"duration"`
+	OrderType                OrderType                 `json:"orderType"`
+	CancelTime               *SchwabTime               `json:"cancelTime,omitempty"`
+	ComplexOrderStrategyType *ComplexOrderStrategyType `json:"complexOrderStrategyType,omitempty"`
+	Quantity                 *float64                  `json:"quantity,omitempty"`
+	FilledQuantity           *float64                  `json:"filledQuantity,omitempty"`
+	RemainingQuantity        *float64                  `json:"remainingQuantity,omitempty"`
+	RequestedDestination     *RequestedDestination     `json:"requestedDestination,omitempty"`
+	DestinationLinkName      *string                   `json:"destinationLinkName,omitempty"`
+	ReleaseTime              *SchwabTime               `json:"releaseTime,omitempty"`
+	StopPrice                *float64                  `json:"stopPrice,omitempty"`
+	StopPriceLinkBasis       *StopPriceLinkBasis       `json:"stopPriceLinkBasis,omitempty"`
+	StopPriceLinkType        *StopPriceLinkType        `json:"stopPriceLinkType,omitempty"`
+	StopPriceOffset          *float64                  `json:"stopPriceOffset,omitempty"`
+	StopType                 *StopType                 `json:"stopType,omitempty"`
+	PriceLinkBasis           *PriceLinkBasis           `json:"priceLinkBasis,omitempty"`
+	PriceLinkType            *PriceLinkType            `json:"priceLinkType,omitempty"`
+	PriceOffset              *float64                  `json:"priceOffset,omitempty"`
+	Price                    *float64                  `json:"price,omitempty"`
+	TaxLotMethod             *TaxLotMethod             `json:"taxLotMethod,omitempty"`
+	OrderLegCollection       []OrderLegCollection      `json:"orderLegCollection"`
+	ActivationPrice          *float64                  `json:"activationPrice,omitempty"`
+	SpecialInstruction       *SpecialInstruction       `json:"specialInstruction,omitempty"`
+	OrderStrategyType        OrderStrategyType         `json:"orderStrategyType"`
+	OrderID                  *int64                    `json:"orderId,omitempty"`
+	Cancelable               *bool                     `json:"cancelable,omitempty"`
+	Editable                 *bool                     `json:"editable,omitempty"`
+	Status                   *OrderStatus              `json:"status,omitempty"`
+	EnteredTime              *SchwabTime               `json:"enteredTime,omitempty"`
+	CloseTime                *SchwabTime               `json:"closeTime,omitempty"`
+	Tag                      *string                   `json:"tag,omitempty"`
+	AccountNumber            *int64                    `json:"accountNumber,omitempty"`
+	OrderActivityCollection  []OrderActivity           `json:"orderActivityCollection,omitempty"`
+	ReplacingOrderCollection []Order                   `json:"replacingOrderCollection,omitempty"`
+	ChildOrderStrategies     []Order                   `json:"childOrderStrategies,omitempty"`
+	StatusDescription        *string                   `json:"statusDescription,omitempty"`
 }
 
 // OrderRequest represents an order submission to the Schwab API.
 // Used for placing new orders and replacing existing orders.
 type OrderRequest struct {
-	Session                  Session                  `json:"session,omitempty"`
-	Duration                 Duration                 `json:"duration,omitempty"`
-	OrderType                OrderType                `json:"orderType,omitempty"`
-	CancelTime               *SchwabTime              `json:"cancelTime,omitempty"`
+	Session                  Session                   `json:"session,omitempty"`
+	Duration                 Duration                  `json:"duration,omitempty"`
+	OrderType                OrderType                 `json:"orderType,omitempty"`
+	CancelTime               *SchwabTime               `json:"cancelTime,omitempty"`
 	ComplexOrderStrategyType *ComplexOrderStrategyType `json:"complexOrderStrategyType,omitempty"`
-	Quantity                 *float64                 `json:"quantity,omitempty"`
-	RequestedDestination     *RequestedDestination    `json:"requestedDestination,omitempty"`
-	DestinationLinkName      *string                  `json:"destinationLinkName,omitempty"`
-	StopPrice                *float64                 `json:"stopPrice,omitempty"`
-	StopPriceLinkBasis       *StopPriceLinkBasis      `json:"stopPriceLinkBasis,omitempty"`
-	StopPriceLinkType        *StopPriceLinkType       `json:"stopPriceLinkType,omitempty"`
-	StopPriceOffset          *float64                 `json:"stopPriceOffset,omitempty"`
-	StopType                 *StopType                `json:"stopType,omitempty"`
-	PriceLinkBasis           *PriceLinkBasis          `json:"priceLinkBasis,omitempty"`
-	PriceLinkType            *PriceLinkType           `json:"priceLinkType,omitempty"`
-	PriceOffset              *float64                 `json:"priceOffset,omitempty"`
-	Price                    *float64                 `json:"price,omitempty"`
-	TaxLotMethod             *TaxLotMethod            `json:"taxLotMethod,omitempty"`
-	OrderLegCollection       []OrderLegCollection     `json:"orderLegCollection,omitempty"`
-	ActivationPrice          *float64                 `json:"activationPrice,omitempty"`
-	SpecialInstruction       *SpecialInstruction      `json:"specialInstruction,omitempty"`
-	OrderStrategyType        OrderStrategyType        `json:"orderStrategyType"`
-	ChildOrderStrategies     []OrderRequest           `json:"childOrderStrategies,omitempty"`
+	Quantity                 *float64                  `json:"quantity,omitempty"`
+	RequestedDestination     *RequestedDestination     `json:"requestedDestination,omitempty"`
+	DestinationLinkName      *string                   `json:"destinationLinkName,omitempty"`
+	StopPrice                *float64                  `json:"stopPrice,omitempty"`
+	StopPriceLinkBasis       *StopPriceLinkBasis       `json:"stopPriceLinkBasis,omitempty"`
+	StopPriceLinkType        *StopPriceLinkType        `json:"stopPriceLinkType,omitempty"`
+	StopPriceOffset          *float64                  `json:"stopPriceOffset,omitempty"`
+	StopType                 *StopType                 `json:"stopType,omitempty"`
+	PriceLinkBasis           *PriceLinkBasis           `json:"priceLinkBasis,omitempty"`
+	PriceLinkType            *PriceLinkType            `json:"priceLinkType,omitempty"`
+	PriceOffset              *float64                  `json:"priceOffset,omitempty"`
+	Price                    *float64                  `json:"price,omitempty"`
+	TaxLotMethod             *TaxLotMethod             `json:"taxLotMethod,omitempty"`
+	OrderLegCollection       []OrderLegCollection      `json:"orderLegCollection,omitempty"`
+	ActivationPrice          *float64                  `json:"activationPrice,omitempty"`
+	SpecialInstruction       *SpecialInstruction       `json:"specialInstruction,omitempty"`
+	OrderStrategyType        OrderStrategyType         `json:"orderStrategyType"`
+	ChildOrderStrategies     []OrderRequest            `json:"childOrderStrategies,omitempty"`
 }
 
 // OrderValidationDetail represents a single validation finding from order preview.
@@ -529,27 +529,27 @@ type CommissionAndFee struct {
 
 // OrderBalance represents the projected account balance impact of an order.
 type OrderBalance struct {
-	OrderValue              *float64 `json:"orderValue,omitempty"`
-	ProjectedAvailableFund  *float64 `json:"projectedAvailableFund,omitempty"`
-	ProjectedBuyingPower    *float64 `json:"projectedBuyingPower,omitempty"`
-	ProjectedCommission     *float64 `json:"projectedCommission,omitempty"`
+	OrderValue             *float64 `json:"orderValue,omitempty"`
+	ProjectedAvailableFund *float64 `json:"projectedAvailableFund,omitempty"`
+	ProjectedBuyingPower   *float64 `json:"projectedBuyingPower,omitempty"`
+	ProjectedCommission    *float64 `json:"projectedCommission,omitempty"`
 }
 
 // OrderStrategy represents an order within a preview response.
 type OrderStrategy struct {
-	AccountNumber            *string                  `json:"accountNumber,omitempty"`
-	AdvancedOrderType        *AdvancedOrderType       `json:"advancedOrderType,omitempty"`
-	OrderType                OrderType                `json:"orderType"`
-	Status                   *OrderStatus             `json:"status,omitempty"`
-	Duration                 Duration                 `json:"duration"`
-	Session                  Session                  `json:"session"`
-	Price                    *float64                 `json:"price,omitempty"`
-	Quantity                 *float64                 `json:"quantity,omitempty"`
-	OrderStrategyType        OrderStrategyType        `json:"orderStrategyType"`
+	AccountNumber            *string                   `json:"accountNumber,omitempty"`
+	AdvancedOrderType        *AdvancedOrderType        `json:"advancedOrderType,omitempty"`
+	OrderType                OrderType                 `json:"orderType"`
+	Status                   *OrderStatus              `json:"status,omitempty"`
+	Duration                 Duration                  `json:"duration"`
+	Session                  Session                   `json:"session"`
+	Price                    *float64                  `json:"price,omitempty"`
+	Quantity                 *float64                  `json:"quantity,omitempty"`
+	OrderStrategyType        OrderStrategyType         `json:"orderStrategyType"`
 	ComplexOrderStrategyType *ComplexOrderStrategyType `json:"complexOrderStrategyType,omitempty"`
-	OrderLegs                []OrderLegCollection     `json:"orderLegs,omitempty"`
-	OrderBalance             *OrderBalance            `json:"orderBalance,omitempty"`
-	CommissionAndFee         *CommissionAndFee        `json:"commissionAndFee,omitempty"`
+	OrderLegs                []OrderLegCollection      `json:"orderLegs,omitempty"`
+	OrderBalance             *OrderBalance             `json:"orderBalance,omitempty"`
+	CommissionAndFee         *CommissionAndFee         `json:"commissionAndFee,omitempty"`
 }
 
 // PreviewOrder represents the response from the order preview endpoint.
@@ -558,4 +558,51 @@ type PreviewOrder struct {
 	OrderStrategy         *OrderStrategy         `json:"orderStrategy,omitempty"`
 	OrderValidationResult *OrderValidationResult `json:"orderValidationResult,omitempty"`
 	CommissionAndFee      *CommissionAndFee      `json:"commissionAndFee,omitempty"`
+}
+
+// OrderToRequest converts an Order (response) to an OrderRequest (submission) using an allowlist approach.
+// Only fields that exist in OrderRequest are copied from Order.
+// ChildOrderStrategies are recursively converted from []Order to []OrderRequest.
+// Response-only fields (OrderID, Status, FilledQuantity, etc.) are intentionally excluded.
+func OrderToRequest(order *Order) OrderRequest {
+	// Defensive copy of OrderLegCollection so the caller's slice is not aliased.
+	var legs []OrderLegCollection
+	if len(order.OrderLegCollection) > 0 {
+		legs = append([]OrderLegCollection(nil), order.OrderLegCollection...)
+	}
+
+	req := OrderRequest{
+		Session:                  order.Session,
+		Duration:                 order.Duration,
+		OrderType:                order.OrderType,
+		CancelTime:               order.CancelTime,
+		ComplexOrderStrategyType: order.ComplexOrderStrategyType,
+		Quantity:                 order.Quantity,
+		RequestedDestination:     order.RequestedDestination,
+		DestinationLinkName:      order.DestinationLinkName,
+		StopPrice:                order.StopPrice,
+		StopPriceLinkBasis:       order.StopPriceLinkBasis,
+		StopPriceLinkType:        order.StopPriceLinkType,
+		StopPriceOffset:          order.StopPriceOffset,
+		StopType:                 order.StopType,
+		PriceLinkBasis:           order.PriceLinkBasis,
+		PriceLinkType:            order.PriceLinkType,
+		PriceOffset:              order.PriceOffset,
+		Price:                    order.Price,
+		TaxLotMethod:             order.TaxLotMethod,
+		OrderLegCollection:       legs,
+		ActivationPrice:          order.ActivationPrice,
+		SpecialInstruction:       order.SpecialInstruction,
+		OrderStrategyType:        order.OrderStrategyType,
+	}
+
+	// Recursively convert child order strategies from []Order to []OrderRequest.
+	if len(order.ChildOrderStrategies) > 0 {
+		req.ChildOrderStrategies = make([]OrderRequest, len(order.ChildOrderStrategies))
+		for i := range order.ChildOrderStrategies {
+			req.ChildOrderStrategies[i] = OrderToRequest(&order.ChildOrderStrategies[i])
+		}
+	}
+
+	return req
 }

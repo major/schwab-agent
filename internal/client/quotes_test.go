@@ -44,7 +44,7 @@ func TestQuotes_Success(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient("test-token", WithBaseURL(srv.URL))
-	result, err := c.Quotes(context.Background(), []string{"AAPL", "NVDA"})
+	result, err := c.Quotes(context.Background(), []string{"AAPL", "NVDA"}, QuoteParams{})
 
 	require.NoError(t, err)
 	require.Len(t, result, 2)
@@ -68,7 +68,7 @@ func TestQuotes_CommaSeparatedSymbols(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient("test-token", WithBaseURL(srv.URL))
-	_, err := c.Quotes(context.Background(), []string{"AAPL", "NVDA", "TSLA"})
+	_, err := c.Quotes(context.Background(), []string{"AAPL", "NVDA", "TSLA"}, QuoteParams{})
 
 	require.NoError(t, err)
 }
@@ -81,7 +81,7 @@ func TestQuotes_EmptyResult(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient("test-token", WithBaseURL(srv.URL))
-	result, err := c.Quotes(context.Background(), []string{"INVALID"})
+	result, err := c.Quotes(context.Background(), []string{"INVALID"}, QuoteParams{})
 
 	require.NoError(t, err)
 	assert.Empty(t, result)
@@ -113,7 +113,7 @@ func TestQuote_Success(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient("test-token", WithBaseURL(srv.URL))
-	result, err := c.Quote(context.Background(), "AAPL")
+	result, err := c.Quote(context.Background(), "AAPL", QuoteParams{})
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -133,7 +133,7 @@ func TestQuote_404_ReturnsSymbolNotFoundError(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient("test-token", WithBaseURL(srv.URL))
-	result, err := c.Quote(context.Background(), "INVALID")
+	result, err := c.Quote(context.Background(), "INVALID", QuoteParams{})
 
 	require.Error(t, err)
 	assert.Nil(t, result)
@@ -152,7 +152,7 @@ func TestQuote_MissingSymbolInResponse(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient("test-token", WithBaseURL(srv.URL))
-	result, err := c.Quote(context.Background(), "MISSING")
+	result, err := c.Quote(context.Background(), "MISSING", QuoteParams{})
 
 	require.Error(t, err)
 	assert.Nil(t, result)
@@ -170,11 +170,50 @@ func TestQuote_401_ReturnsAuthExpiredError(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient("bad-token", WithBaseURL(srv.URL))
-	result, err := c.Quote(context.Background(), "AAPL")
+	result, err := c.Quote(context.Background(), "AAPL", QuoteParams{})
 
 	require.Error(t, err)
 	assert.Nil(t, result)
 
 	var authErr *apperr.AuthExpiredError
 	require.ErrorAs(t, err, &authErr)
+}
+
+func TestQuoteParams_Fields(t *testing.T) {
+	// Arrange
+	p := QuoteParams{Fields: []string{"quote", "fundamental"}}
+
+	// Act
+	result := quoteParams(p)
+
+	// Assert
+	assert.Equal(t, "quote,fundamental", result["fields"])
+	_, hasIndicative := result["indicative"]
+	assert.False(t, hasIndicative, "indicative key should not be present")
+	assert.Len(t, result, 1)
+}
+
+func TestQuoteParams_Empty(t *testing.T) {
+	// Arrange
+	p := QuoteParams{}
+
+	// Act
+	result := quoteParams(p)
+
+	// Assert
+	assert.Empty(t, result)
+}
+
+func TestQuoteParams_Indicative(t *testing.T) {
+	// Arrange
+	p := QuoteParams{Indicative: true}
+
+	// Act
+	result := quoteParams(p)
+
+	// Assert
+	assert.Equal(t, "true", result["indicative"])
+	_, hasFields := result["fields"]
+	assert.False(t, hasFields, "fields key should not be present")
+	assert.Len(t, result, 1)
 }

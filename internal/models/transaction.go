@@ -2,21 +2,21 @@ package models
 
 // Transaction represents a transaction in an account.
 type Transaction struct {
-	ActivityID       *int64            `json:"activityId,omitempty"`
-	Time             *string           `json:"time,omitempty"`
-	Type             *TransactionType  `json:"type,omitempty"`
-	Status           *string           `json:"status,omitempty"`
-	Description      *string           `json:"description,omitempty"`
-	NetAmount        *float64          `json:"netAmount,omitempty"`
-	AccountNumber    *string           `json:"accountNumber,omitempty"`
-	SubAccount       *string           `json:"subAccount,omitempty"`
-	ActivityType     *string           `json:"activityType,omitempty"`
-	OrderID          *int64            `json:"orderId,omitempty"`
-	PositionID       *int64            `json:"positionId,omitempty"`
-	TradeDate        *string           `json:"tradeDate,omitempty"`
-	SettlementDate   *string           `json:"settlementDate,omitempty"`
-	TransferItems    []TransferItem    `json:"transferItems,omitempty"`
-	User             *UserDetails      `json:"user,omitempty"`
+	ActivityID     *int64           `json:"activityId,omitempty"`
+	Time           *string          `json:"time,omitempty"`
+	Type           *TransactionType `json:"type,omitempty"`
+	Status         *string          `json:"status,omitempty"`
+	Description    *string          `json:"description,omitempty"`
+	NetAmount      *float64         `json:"netAmount,omitempty"`
+	AccountNumber  *string          `json:"accountNumber,omitempty"`
+	SubAccount     *string          `json:"subAccount,omitempty"`
+	ActivityType   *string          `json:"activityType,omitempty"`
+	OrderID        *int64           `json:"orderId,omitempty"`
+	PositionID     *int64           `json:"positionId,omitempty"`
+	TradeDate      *string          `json:"tradeDate,omitempty"`
+	SettlementDate *string          `json:"settlementDate,omitempty"`
+	TransferItems  []TransferItem   `json:"transferItems,omitempty"`
+	User           *UserDetails     `json:"user,omitempty"`
 }
 
 // TransferItem represents a transfer item in a transaction.

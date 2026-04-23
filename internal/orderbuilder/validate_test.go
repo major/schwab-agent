@@ -929,8 +929,8 @@ func TestValidateEquityOrderRequiresOffsetAndPriceForTrailingStopLimit(t *testin
 			wantDetails:     "Add `--price <amount>` to specify the limit price",
 		},
 		{
-			name:    "missing both",
-			wantMsg: "TRAILING_STOP_LIMIT order requires a stop price offset",
+			name:        "missing both",
+			wantMsg:     "TRAILING_STOP_LIMIT order requires a stop price offset",
 			wantDetails: "Add `--stop-offset <amount>` to specify how far the stop trails",
 		},
 	}
@@ -997,6 +997,106 @@ func TestValidateEquityOrderAcceptsValidMarketOrder(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestValidateEquityOrderMOCLOC verifies MOC and LOC order validation.
+func TestValidateEquityOrderMOCLOC(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		params        *EquityParams
+		wantErr       bool
+		wantMessage   string
+		wantDetails   string
+	}{
+		{
+			name: "MOC without price passes",
+			params: &EquityParams{
+				Symbol:    "AAPL",
+				Action:    models.InstructionBuy,
+				Quantity:  10,
+				OrderType: models.OrderTypeMarketOnClose,
+			},
+			wantErr: false,
+		},
+		{
+			name: "MOC with price fails",
+			params: &EquityParams{
+				Symbol:    "AAPL",
+				Action:    models.InstructionBuy,
+				Quantity:  10,
+				OrderType: models.OrderTypeMarketOnClose,
+				Price:     150.00,
+			},
+			wantErr:     true,
+			wantMessage: "MARKET_ON_CLOSE order does not accept a price",
+			wantDetails: "Remove `--price` flag for MOC orders",
+		},
+		{
+			name: "MOC with stop price fails",
+			params: &EquityParams{
+				Symbol:    "AAPL",
+				Action:    models.InstructionBuy,
+				Quantity:  10,
+				OrderType: models.OrderTypeMarketOnClose,
+				StopPrice: 145.00,
+			},
+			wantErr:     true,
+			wantMessage: "MARKET_ON_CLOSE order does not accept a stop price",
+			wantDetails: "Remove `--stop-price` flag for MOC orders",
+		},
+		{
+			name: "LOC with price passes",
+			params: &EquityParams{
+				Symbol:    "AAPL",
+				Action:    models.InstructionBuy,
+				Quantity:  10,
+				OrderType: models.OrderTypeLimitOnClose,
+				Price:     150.00,
+			},
+			wantErr: false,
+		},
+		{
+			name: "LOC without price fails",
+			params: &EquityParams{
+				Symbol:    "AAPL",
+				Action:    models.InstructionBuy,
+				Quantity:  10,
+				OrderType: models.OrderTypeLimitOnClose,
+			},
+			wantErr:     true,
+			wantMessage: "LIMIT_ON_CLOSE order requires a price",
+			wantDetails: "Add `--price <amount>` to specify the limit price",
+		},
+		{
+			name: "LOC with stop price fails",
+			params: &EquityParams{
+				Symbol:    "AAPL",
+				Action:    models.InstructionBuy,
+				Quantity:  10,
+				OrderType: models.OrderTypeLimitOnClose,
+				Price:     150.00,
+				StopPrice: 145.00,
+			},
+			wantErr:     true,
+			wantMessage: "LIMIT_ON_CLOSE order does not accept a stop price",
+			wantDetails: "Remove `--stop-price` flag for LOC orders",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateEquityOrder(tt.params)
+			if tt.wantErr {
+				assertValidationError(t, err, tt.wantMessage, tt.wantDetails)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 // TestValidateVerticalOrderRemainingBranches covers quantity, expiration, and individual strike checks.
 func TestValidateVerticalOrderRemainingBranches(t *testing.T) {
 	t.Parallel()
@@ -1045,11 +1145,11 @@ func TestValidateVerticalOrderRemainingBranches(t *testing.T) {
 		{
 			name: "zero short strike",
 			params: VerticalParams{
-				Underlying:  "F",
-				Expiration:  futureDate,
-				LongStrike:  12,
-				Quantity:    1,
-				Price:       0.50,
+				Underlying: "F",
+				Expiration: futureDate,
+				LongStrike: 12,
+				Quantity:   1,
+				Price:      0.50,
 			},
 			wantMsg: "short strike price must be greater than zero",
 		},
@@ -1337,6 +1437,7 @@ func TestBracketExitInstructionInvertsAction(t *testing.T) {
 	assert.Equal(t, models.InstructionBuy, bracketExitInstruction(models.InstructionSell),
 		"SELL entry should produce BUY exit")
 }
+
 // assertValidationError verifies message and fix suggestion for validation failures.
 func assertValidationError(t *testing.T, err error, expectedMessage, expectedDetails string) {
 	t.Helper()
