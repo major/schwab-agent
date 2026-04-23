@@ -28,80 +28,57 @@ Features are rated for LLM trading usefulness (how valuable is this for an AI ag
 
 ## Critical Gaps
 
-### Account Positions (`?fields=positions`)
+### ~~Account Positions (`?fields=positions`)~~ ✅
 
-**Usefulness: 5** | **Difficulty: Easy**
+**Usefulness: 5** | **Difficulty: Easy** | **Status: Implemented**
 
-The model layer is fully ready: `SecuritiesAccount` has `Positions []Position` with all fields (quantities, P&L, market value, instrument details). However, the client methods pass `nil` query params, so the Schwab API never includes position data in the response. The `Positions` slice always deserializes as empty.
+`--positions` flag on `account list` and `account get` passes `?fields=positions` to the API. Client methods accept variadic `fields ...string`.
 
-schwab-py: `get_account(account_hash, fields=Client.Account.Fields.POSITIONS)`
-schwab-agent: model exists, just needs `?fields=positions` query param passed to the API
+### ~~Trailing Stop Orders~~ ✅
 
-Fix is minimal: add a `--positions` flag (or always include it) and pass `map[string]string{"fields": "positions"}` to `doGet`. No new model code needed.
+**Usefulness: 5** | **Difficulty: Medium** | **Status: Implemented**
 
-This is probably the single highest-impact gap. An LLM cannot make informed trading decisions without knowing what it already owns.
+TRAILING_STOP and TRAILING_STOP_LIMIT supported for equity orders via `--stop-offset`, `--stop-link-basis`, `--stop-link-type`, `--stop-type`, `--activation-price` flags. Defaults: link-basis=LAST, link-type=VALUE, stop-type=STANDARD. TRAILING_STOP_LIMIT uses `priceOffset` (not `price`) per Schwab API. Option orders reject trailing stop types at validation.
 
-### Trailing Stop Orders
+### ~~Special Instructions (ALL_OR_NONE, DO_NOT_REDUCE)~~ ✅
 
-**Usefulness: 5** | **Difficulty: Medium**
+**Usefulness: 4** | **Difficulty: Easy** | **Status: Implemented**
 
-`parseOrderType()` doesn't accept TRAILING_STOP or TRAILING_STOP_LIMIT. The models already have fields for `stopPriceLinkBasis`, `stopPriceLinkType`, `stopPriceOffset`, and `stopType`, but the order builder doesn't expose them.
-
-Trailing stops are fundamental risk management. An LLM managing a portfolio should be able to set a trailing stop at X% or $Y below market price and let it ride.
-
-Implementation requires:
-- Add TRAILING_STOP, TRAILING_STOP_LIMIT to `parseOrderType()`
-- Add CLI flags: `--stop-offset`, `--stop-link-basis`, `--stop-link-type`, `--stop-type`
-- Wire flags into order builder
-- Activation price flag for conditional trailing stops
-
-### Special Instructions (ALL_OR_NONE, DO_NOT_REDUCE)
-
-**Usefulness: 4** | **Difficulty: Easy**
-
-No `--special-instruction` flag on order commands. The model field exists (`SpecialInstruction`) but isn't populated.
-
-ALL_OR_NONE prevents partial fills, which matters when an LLM is sizing positions for specific portfolio allocations. DO_NOT_REDUCE prevents share count adjustment on dividends/splits.
+`--special-instruction` flag on both equity and option order commands. Supports ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE.
 
 ---
 
 ## High-Value Gaps
 
-### Quote Field Filtering
+### ~~Quote Field Filtering~~ ✅
 
-**Usefulness: 4** | **Difficulty: Easy**
+**Usefulness: 4** | **Difficulty: Easy** | **Status: Implemented**
 
-Quote endpoints don't pass `fields` (QUOTE, FUNDAMENTAL, EXTENDED, REFERENCE, REGULAR) or `indicative` params. LLMs get the default field set with no way to request fundamental data (P/E, dividend yield, etc.) alongside price data.
+`--fields` (repeatable StringSliceFlag) and `--indicative` (BoolFlag) on `quote get`. Valid fields: quote, fundamental, extended, reference, regular (case-insensitive). LLMs can now request fundamental data (P/E, dividend yield, etc.) alongside price data without a separate instrument lookup.
 
-An LLM doing any kind of valuation-aware trading needs FUNDAMENTAL fields. Currently requires a separate instrument lookup.
+### ~~Stop Type (STANDARD, BID, ASK, LAST, MARK)~~ ✅
 
-### Stop Type (STANDARD, BID, ASK, LAST, MARK)
+**Usefulness: 4** | **Difficulty: Easy** | **Status: Implemented**
 
-**Usefulness: 4** | **Difficulty: Easy**
+`--stop-type` flag with STANDARD, BID, ASK, LAST, MARK values on equity order commands. LLMs can now specify whether stops trigger on BID, ASK, LAST, or MARK price. MARK is particularly important for options since it reflects fair value.
 
-No `--stop-type` flag. Defaults to whatever Schwab picks. For options and volatile stocks, an LLM should specify whether the stop triggers on BID, ASK, LAST, or MARK price. MARK is particularly important for options since it reflects fair value.
+### ~~Market on Close / Limit on Close~~ ✅
 
-### Market on Close / Limit on Close
+**Usefulness: 3** | **Difficulty: Easy** | **Status: Implemented**
 
-**Usefulness: 3** | **Difficulty: Easy**
+`parseOrderType()` handles "MOC" -> MARKET_ON_CLOSE and "LOC" -> LIMIT_ON_CLOSE. LLMs can now use `order build equity --type MOC` or `--type MARKET_ON_CLOSE` for end-of-day rebalancing strategies and closing auction execution.
 
-MARKET_ON_CLOSE and LIMIT_ON_CLOSE not in `parseOrderType()`. Useful for end-of-day rebalancing strategies. An LLM running a daily rebalance model would use these to execute at the closing auction price.
+### ~~First-Triggers-Second Utility~~ ✅
 
-### First-Triggers-Second Utility
+**Usefulness: 3** | **Difficulty: Medium** | **Status: Implemented**
 
-**Usefulness: 3** | **Difficulty: Medium**
+`order build fts --primary <spec> --secondary <spec>` command. Spec can be inline JSON, @file, or - for stdin. Outputs TRIGGER->SINGLE nested structure. LLMs can now compose multi-step strategies: "buy this stock, then immediately place a covered call" without manual sequencing or hardcoded bracket patterns.
 
-schwab-agent has bracket orders and OCO, but no general-purpose trigger mechanism. schwab-py's `first_triggers_second()` lets you chain any two orders: "buy this stock, then immediately place a covered call." An LLM could compose multi-step strategies without manual sequencing.
+### ~~Order Repeat/Reconstruction~~ ✅
 
-Currently the bracket builder hardcodes the trigger pattern. A general trigger utility would enable more creative order flows.
+**Usefulness: 3** | **Difficulty: Medium** | **Status: Implemented**
 
-### Order Repeat/Reconstruction
-
-**Usefulness: 3** | **Difficulty: Medium**
-
-schwab-py's `construct_repeat_order()` takes a historical order and rebuilds it for resubmission (stripping filled quantities, resetting status, etc.). An LLM that identifies a previously successful trade pattern could repeat it without manually reconstructing every field.
-
-The Python-specific `code_for_builder()` doesn't translate, but the repeat concept does.
+`order repeat <order-id>` with `--build` (default, raw JSON), `--preview` (preview endpoint), `--confirm` (place with safety guards). LLMs can now identify previously successful trade patterns and repeat them without manually reconstructing every field. Handles stripping filled quantities and resetting status automatically.
 
 ---
 
@@ -189,27 +166,27 @@ Limit orders priced away from the market. Schwab usually infers this from the li
 
 If implementing in order of LLM trading value per effort:
 
-| Priority | Feature | Usefulness | Difficulty |
-|----------|---------|------------|------------|
-| 1 | Account positions field | 5 | Easy |
-| 2 | Trailing stop orders | 5 | Medium |
-| 3 | Special instructions | 4 | Easy |
-| 4 | Quote field filtering | 4 | Easy |
-| 5 | Stop type flag | 4 | Easy |
-| 6 | Market/Limit on Close | 3 | Easy |
-| 7 | First-triggers-second | 3 | Medium |
-| 8 | Order repeat | 3 | Medium |
-| 9 | Destination routing | 2 | Easy |
-| 10 | Price link basis/type | 2 | Easy |
-| 11 | Calendar spreads | 2 | Medium |
-| 12 | Diagonal spreads | 2 | Medium |
-| 13 | Collar builder | 2 | Medium |
-| 14 | Butterfly builder | 1 | Hard |
-| 15 | Back ratio builder | 1 | Hard |
-| 16 | Double diagonal builder | 1 | Hard |
-| 17 | Unbalanced strategies | 1 | Hard |
-| 18 | Exercise orders | 1 | Easy |
-| 19 | Cabinet orders | 1 | Easy |
-| 20 | NON_MARKETABLE type | 1 | Easy |
+| Priority | Feature | Usefulness | Difficulty | Status |
+|----------|---------|------------|------------|--------|
+| ~~1~~ | ~~Account positions field~~ | ~~5~~ | ~~Easy~~ | ✅ |
+| ~~2~~ | ~~Trailing stop orders~~ | ~~5~~ | ~~Medium~~ | ✅ |
+| ~~3~~ | ~~Special instructions~~ | ~~4~~ | ~~Easy~~ | ✅ |
+| ~~4~~ | ~~Quote field filtering~~ | ~~4~~ | ~~Easy~~ | ✅ |
+| ~~5~~ | ~~Stop type flag~~ | ~~4~~ | ~~Easy~~ | ✅ |
+| ~~6~~ | ~~Market/Limit on Close~~ | ~~3~~ | ~~Easy~~ | ✅ |
+| ~~7~~ | ~~First-triggers-second~~ | ~~3~~ | ~~Medium~~ | ✅ |
+| ~~8~~ | ~~Order repeat~~ | ~~3~~ | ~~Medium~~ | ✅ |
+| 9 | Destination routing | 2 | Easy | |
+| 10 | Price link basis/type | 2 | Easy | |
+| 11 | Calendar spreads | 2 | Medium | |
+| 12 | Diagonal spreads | 2 | Medium | |
+| 13 | Collar builder | 2 | Medium | |
+| 14 | Butterfly builder | 1 | Hard | |
+| 15 | Back ratio builder | 1 | Hard | |
+| 16 | Double diagonal builder | 1 | Hard | |
+| 17 | Unbalanced strategies | 1 | Hard | |
+| 18 | Exercise orders | 1 | Easy | |
+| 19 | Cabinet orders | 1 | Easy | |
+| 20 | NON_MARKETABLE type | 1 | Easy | |
 
-The first 5 items would cover the most impactful gaps with reasonable effort. Items 1, 3, 4, and 5 are particularly low-hanging fruit since the model fields already exist.
+Items 1-8 are implemented. All high-value gaps (usefulness 3-4, easy-medium difficulty) are now complete.
