@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -19,6 +20,34 @@ import (
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/output"
 )
+
+func TestMain(m *testing.M) {
+	envVars := []string{
+		"SCHWAB_CLIENT_ID",
+		"SCHWAB_CLIENT_SECRET",
+		"SCHWAB_CALLBACK_URL",
+		"SCHWAB_BASE_URL",
+		"SCHWAB_BASE_URL_INSECURE",
+	}
+
+	original := make(map[string]string, len(envVars))
+	for _, key := range envVars {
+		original[key] = os.Getenv(key)
+		_ = os.Unsetenv(key)
+	}
+
+	exitCode := m.Run()
+
+	for _, key := range envVars {
+		if value, ok := original[key]; ok && value != "" {
+			_ = os.Setenv(key, value)
+		} else {
+			_ = os.Unsetenv(key)
+		}
+	}
+
+	os.Exit(exitCode)
+}
 
 // testEnvelope mirrors the standard JSON success envelope for assertions.
 type testEnvelope struct {
@@ -170,7 +199,7 @@ func TestAuthLoginCommand_AutoSetsDefaultAccount(t *testing.T) {
 	deps := defaultAuthDeps()
 	deps.configPath = func() string { return configPath }
 	deps.oauthTokenEndpoint = func() string { return server.URL + "/v1/oauth/token" }
-	deps.newAccountClient = func(token string) accountNumbersClient {
+	deps.newAccountClient = func(token string, _ *auth.Config) accountNumbersClient {
 		return client.NewClient(token, client.WithBaseURL(server.URL))
 	}
 	deps.runLogin = func(cfg *auth.Config, targetTokenPath string, tokenEndpoint string, openBrowser bool, w io.Writer) error {
@@ -216,6 +245,75 @@ func TestAuthLoginCommand_AutoSetsDefaultAccount(t *testing.T) {
 	assert.True(t, payload.Valid)
 	assert.Equal(t, "hash-abc", payload.DefaultAccount)
 	assert.Equal(t, "https://example.com/authorize", payload.AuthorizationURL)
+	assert.True(t, payload.AutoSetDefault)
+}
+
+func TestAuthLoginCommand_DefaultAccountLookupUsesConfiguredProxy(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	proxy := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/proxy/trader/v1/accounts/accountNumbers":
+			assert.Equal(t, "Bearer access-token", r.Header.Get("Authorization"))
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `[{"accountNumber":"123456789","hashValue":"hash-proxy"}]`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer proxy.Close()
+
+	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
+		ClientID:        "client-id",
+		ClientSecret:    "client-secret",
+		CallbackURL:     "https://127.0.0.1:8182",
+		BaseURL:         proxy.URL + "/proxy/",
+		BaseURLInsecure: true,
+	}))
+
+	deps := defaultAuthDeps()
+	deps.configPath = func() string { return configPath }
+	deps.runLogin = func(_ *auth.Config, targetTokenPath string, _ string, openBrowser bool, w io.Writer) error {
+		assert.False(t, openBrowser)
+		_, err := fmt.Fprintln(w, "https://proxy.example.com/proxy/v1/oauth/authorize")
+		require.NoError(t, err)
+
+		return auth.SaveToken(targetTokenPath, &auth.TokenFile{
+			CreationTimestamp: time.Now().UTC().Add(-1 * time.Hour).Unix(),
+			Token: auth.TokenData{
+				AccessToken:  "access-token",
+				TokenType:    "Bearer",
+				ExpiresIn:    1800,
+				RefreshToken: "refresh-token",
+				Scope:        "api",
+				ExpiresAt:    float64(time.Now().UTC().Add(30 * time.Minute).Unix()),
+			},
+		})
+	}
+
+	var stdout bytes.Buffer
+	cmd := newAuthCommand(&auth.Config{
+		ClientID:        "client-id",
+		ClientSecret:    "client-secret",
+		CallbackURL:     "https://127.0.0.1:8182",
+		BaseURL:         proxy.URL + "/proxy/",
+		BaseURLInsecure: true,
+	}, tokenPath, &stdout, deps)
+
+	err := cmd.Run(context.Background(), []string{"auth", "login", "--no-browser"})
+	require.NoError(t, err)
+
+	savedConfig, err := auth.LoadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "hash-proxy", savedConfig.DefaultAccount)
+
+	envelope := decodeAuthEnvelope(t, stdout.Bytes())
+	var payload testLoginPayload
+	require.NoError(t, json.Unmarshal(envelope.Data, &payload))
+	assert.Equal(t, "hash-proxy", payload.DefaultAccount)
+	assert.Equal(t, "https://proxy.example.com/proxy/v1/oauth/authorize", payload.AuthorizationURL)
 	assert.True(t, payload.AutoSetDefault)
 }
 
@@ -338,7 +436,7 @@ func TestConfigDefaultAccount(t *testing.T) {
 func TestRequireAuthConfig_UsesProvidedConfig(t *testing.T) {
 	// When config already has client credentials, it returns the same config.
 	cfg := &auth.Config{ClientID: "id", ClientSecret: "secret"}
-	got, err := requireAuthConfig(cfg, func() string { return "/nonexistent" })
+	got, err := requireAuthConfig(cfg, "/nonexistent")
 	require.NoError(t, err)
 	assert.Equal(t, cfg, got)
 }
@@ -357,7 +455,7 @@ func TestRequireAuthConfig_LoadsFromDisk(t *testing.T) {
 		ClientSecret: "disk-secret",
 	}))
 
-	got, err := requireAuthConfig(&auth.Config{}, func() string { return configPath })
+	got, err := requireAuthConfig(&auth.Config{}, configPath)
 	require.NoError(t, err)
 	assert.Equal(t, "disk-id", got.ClientID)
 }
@@ -368,13 +466,13 @@ func TestRequireAuthConfig_ErrorOnMissingFile(t *testing.T) {
 	t.Setenv("SCHWAB_CLIENT_SECRET", "")
 	t.Setenv("SCHWAB_CALLBACK_URL", "")
 
-	_, err := requireAuthConfig(&auth.Config{}, func() string { return "/nonexistent/config.json" })
+	_, err := requireAuthConfig(&auth.Config{}, "/nonexistent/config.json")
 	assert.Error(t, err)
 }
 
 func TestOptionalAuthConfig_UsesProvided(t *testing.T) {
 	cfg := &auth.Config{ClientID: "provided"}
-	got := optionalAuthConfig(cfg, func() string { return "/nonexistent" })
+	got := optionalAuthConfig(cfg, "/nonexistent")
 	assert.Equal(t, cfg, got)
 }
 
@@ -392,7 +490,7 @@ func TestOptionalAuthConfig_NilFallsBackToFile(t *testing.T) {
 		ClientSecret: "secret",
 	}))
 
-	got := optionalAuthConfig(nil, func() string { return configPath })
+	got := optionalAuthConfig(nil, configPath)
 	assert.Equal(t, "from-disk", got.ClientID)
 }
 
@@ -402,7 +500,7 @@ func TestOptionalAuthConfig_NilWithMissingFileReturnsEmpty(t *testing.T) {
 	t.Setenv("SCHWAB_CLIENT_SECRET", "")
 	t.Setenv("SCHWAB_CALLBACK_URL", "")
 
-	got := optionalAuthConfig(nil, func() string { return "/nonexistent/config.json" })
+	got := optionalAuthConfig(nil, "/nonexistent/config.json")
 	assert.NotNil(t, got)
 	assert.Empty(t, got.ClientID)
 }
@@ -497,5 +595,3 @@ func TestAccountSetDefaultCommand_MissingHash(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "account hash is required")
 }
-
-

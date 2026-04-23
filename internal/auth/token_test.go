@@ -391,6 +391,40 @@ func TestRefreshAccessToken_Success_ReturnsNewTokenFile(t *testing.T) {
 	assert.InDelta(t, float64(time.Now().Unix()+1800), newTF.Token.ExpiresAt, 5.0)
 }
 
+func TestRefreshAccessToken_UsesDerivedTokenURLAndInsecureTLS(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/proxy/v1/oauth/token", r.URL.Path)
+		require.NoError(t, r.ParseForm())
+		assert.Equal(t, "refresh_token", r.Form.Get("grant_type"))
+		assert.Equal(t, "test-refresh-token", r.Form.Get("refresh_token"))
+
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "derived-access-token",
+			"token_type":    "Bearer",
+			"expires_in":    1800,
+			"refresh_token": "derived-refresh-token",
+			"scope":         "api",
+		}))
+	}))
+	defer server.Close()
+
+	cfg := &Config{
+		ClientID:        "test-client",
+		ClientSecret:    "test-secret",
+		BaseURL:         server.URL + "/proxy/",
+		BaseURLInsecure: true,
+	}
+
+	tf := makeTokenFile(time.Now().Add(-1*time.Hour).Unix(), float64(time.Now().Add(-5*time.Minute).Unix()))
+
+	newTF, err := RefreshAccessToken(cfg, tf, "")
+	require.NoError(t, err)
+	require.NotNil(t, newTF)
+	assert.Equal(t, "derived-access-token", newTF.Token.AccessToken)
+	assert.Equal(t, "derived-refresh-token", newTF.Token.RefreshToken)
+}
+
 func TestRefreshAccessToken_PreservesCreationTimestamp(t *testing.T) {
 	// Arrange
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

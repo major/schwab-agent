@@ -1,15 +1,46 @@
 package auth
 
 import (
+	"crypto/tls"
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/major/schwab-agent/internal/apperr"
 )
+
+func TestMain(m *testing.M) {
+	envVars := []string{
+		"SCHWAB_CLIENT_ID",
+		"SCHWAB_CLIENT_SECRET",
+		"SCHWAB_CALLBACK_URL",
+		"SCHWAB_BASE_URL",
+		"SCHWAB_BASE_URL_INSECURE",
+	}
+
+	original := make(map[string]string, len(envVars))
+	for _, key := range envVars {
+		original[key] = os.Getenv(key)
+		_ = os.Unsetenv(key)
+	}
+
+	exitCode := m.Run()
+
+	for _, key := range envVars {
+		if value, ok := original[key]; ok && value != "" {
+			_ = os.Setenv(key, value)
+		} else {
+			_ = os.Unsetenv(key)
+		}
+	}
+
+	os.Exit(exitCode)
+}
 
 func TestLoadConfig_MissingFile_ReturnsValidationError(t *testing.T) {
 	// Arrange
@@ -151,6 +182,103 @@ func TestLoadConfig_DefaultCallbackURL(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, "https://127.0.0.1:8182", cfg.CallbackURL)
+	assert.Equal(t, defaultBaseURL, cfg.BaseURL)
+}
+
+func TestLoadConfig_EnvVarOverridesBaseURLAndInsecure(t *testing.T) {
+	// Arrange
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+
+	configData := Config{
+		ClientID:        "test-id",
+		ClientSecret:    "test-secret",
+		BaseURL:         "https://file.example.com/ignored",
+		BaseURLInsecure: false,
+	}
+
+	data, err := json.Marshal(configData)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(configPath, data, 0o600))
+
+	t.Setenv("SCHWAB_BASE_URL", "  https://env.example.com/proxy/  ")
+	t.Setenv("SCHWAB_BASE_URL_INSECURE", "true")
+
+	// Act
+	cfg, err := LoadConfig(configPath)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "https://env.example.com/proxy", cfg.BaseURL)
+	assert.True(t, cfg.BaseURLInsecure)
+}
+
+func TestLoadConfig_InvalidBaseURLInsecureEnv_ReturnsValidationError(t *testing.T) {
+	// Arrange
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"client_id":"id","client_secret":"secret"}`), 0o600))
+	t.Setenv("SCHWAB_BASE_URL_INSECURE", "definitely-not-bool")
+
+	// Act
+	cfg, err := LoadConfig(configPath)
+
+	// Assert
+	assert.Nil(t, cfg)
+	require.Error(t, err)
+
+	var valErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), "SCHWAB_BASE_URL_INSECURE")
+}
+
+func TestLoadConfig_InvalidBaseURL_ReturnsValidationError(t *testing.T) {
+	// Arrange
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"client_id":"id","client_secret":"secret","base_url":"://bad"}`), 0o600))
+
+	// Act
+	cfg, err := LoadConfig(configPath)
+
+	// Assert
+	assert.Nil(t, cfg)
+	require.Error(t, err)
+
+	var valErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), "base_url")
+}
+
+func TestConfigOAuthHelpers_DeriveURLsFromBaseURL(t *testing.T) {
+	cfg := &Config{BaseURL: "https://proxy.example.com/root"}
+
+	assert.Equal(t, "https://proxy.example.com/root/v1/oauth/authorize", cfg.OAuthAuthorizeURL())
+	assert.Equal(t, "https://proxy.example.com/root/v1/oauth/token", cfg.OAuthTokenURL())
+}
+
+func TestConfigHTTPClient_BaseURLInsecureConfiguresTLS(t *testing.T) {
+	secureClient := (&Config{}).HTTPClient(5 * time.Second)
+	assert.Equal(t, 5*time.Second, secureClient.Timeout)
+	assert.Nil(t, secureClient.Transport)
+
+	insecureClient := (&Config{BaseURLInsecure: true}).HTTPClient(5 * time.Second)
+	require.NotNil(t, insecureClient.Transport)
+
+	transport, ok := insecureClient.Transport.(*http.Transport)
+	require.True(t, ok)
+	require.NotNil(t, transport.TLSClientConfig)
+	assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
+
+	// Sanity check that the helper does not mutate the global default transport.
+	defaultTransport, ok := http.DefaultTransport.(*http.Transport)
+	require.True(t, ok)
+	if defaultTransport.TLSClientConfig != nil {
+		assert.False(t, defaultTransport.TLSClientConfig.InsecureSkipVerify)
+	}
+
+	// Touch the tls import so the intent of the transport assertion is explicit.
+	_ = tls.VersionTLS13
 }
 
 func TestLoadConfig_MissingClientID_ReturnsValidationError(t *testing.T) {

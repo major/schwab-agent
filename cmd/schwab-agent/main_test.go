@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -20,6 +21,34 @@ import (
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/apperr"
 )
+
+func TestMain(m *testing.M) {
+	envVars := []string{
+		"SCHWAB_CLIENT_ID",
+		"SCHWAB_CLIENT_SECRET",
+		"SCHWAB_CALLBACK_URL",
+		"SCHWAB_BASE_URL",
+		"SCHWAB_BASE_URL_INSECURE",
+	}
+
+	original := make(map[string]string, len(envVars))
+	for _, key := range envVars {
+		original[key] = os.Getenv(key)
+		_ = os.Unsetenv(key)
+	}
+
+	exitCode := m.Run()
+
+	for _, key := range envVars {
+		if value, ok := original[key]; ok && value != "" {
+			_ = os.Setenv(key, value)
+		} else {
+			_ = os.Unsetenv(key)
+		}
+	}
+
+	os.Exit(exitCode)
+}
 
 // runApp builds and executes the root command without allowing urfave/cli to call os.Exit.
 func runApp(t *testing.T, args ...string) (string, error) {
@@ -136,6 +165,28 @@ func TestBeforeHook_ReturnsAuthRequiredErrorForMissingConfig(t *testing.T) {
 	assert.Equal(t, 3, apperr.ExitCodeFor(err))
 }
 
+func TestBeforeHook_ReturnsValidationErrorForInvalidBaseURLConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	configPath := filepath.Join(tmpDir, "invalid-config.json")
+	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
+		ClientID:     "test-client",
+		ClientSecret: "test-secret",
+		CallbackURL:  "https://127.0.0.1:8182",
+		BaseURL:      "https://api.schwabapi.com",
+	}))
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"client_id":"test-client","client_secret":"test-secret","base_url":"://bad"}`), 0o600))
+
+	_, err := runApp(t, "schwab-agent", "--config", configPath, "account")
+	require.Error(t, err)
+
+	var validationErr *apperr.ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Contains(t, err.Error(), "invalid base_url")
+	assert.Equal(t, 1, apperr.ExitCodeFor(err))
+}
+
 func TestBeforeHook_ReturnsAuthExpiredErrorForStaleRefreshToken(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
@@ -160,6 +211,33 @@ func TestBeforeHook_ReturnsAuthExpiredErrorForStaleRefreshToken(t *testing.T) {
 	require.ErrorAs(t, err, &authErr)
 	assert.Equal(t, "Run `schwab-agent auth login` to re-authenticate", authErr.Details())
 	assert.Equal(t, 3, apperr.ExitCodeFor(err))
+}
+
+func TestAuthStatus_UsesRuntimeConfigAndTokenFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	defaultConfigPath := filepath.Join(tmpDir, "schwab-agent", "config.json")
+	defaultTokenPath := filepath.Join(tmpDir, "schwab-agent", "token.json")
+	runtimeConfigPath := filepath.Join(tmpDir, "runtime-config.json")
+	runtimeTokenPath := filepath.Join(tmpDir, "runtime-token.json")
+
+	writeTestConfig(t, defaultConfigPath)
+	writeTestToken(t, defaultTokenPath, freshToken())
+	require.NoError(t, auth.SaveConfig(runtimeConfigPath, &auth.Config{
+		ClientID:     "runtime-client-id",
+		ClientSecret: "runtime-secret",
+	}))
+	writeTestToken(t, runtimeTokenPath, freshToken())
+
+	stdout, err := runApp(t,
+		"schwab-agent",
+		"--config", runtimeConfigPath,
+		"--token", runtimeTokenPath,
+		"auth", "status",
+	)
+	require.NoError(t, err)
+	assert.Contains(t, stdout, `"client_id":"runt..."`)
 }
 
 func TestBeforeHook_RefreshesExpiredToken(t *testing.T) {
@@ -198,12 +276,71 @@ func TestBeforeHook_RefreshesExpiredToken(t *testing.T) {
 	defer server.Close()
 
 	deps := defaultAppDeps()
-	deps.tokenRefreshEndpoint = func() string { return server.URL + "/oauth/token" }
+	deps.tokenRefreshEndpoint = func(_ *auth.Config) string { return server.URL + "/oauth/token" }
 	deps.newClient = func(token string, _ ...client.Option) *client.Client {
 		return client.NewClient(token, client.WithBaseURL(server.URL))
 	}
 
 	_, err := runAppWithDeps(t, deps, "schwab-agent", "--config", configPath, "--token", tokenPath, "account", "numbers")
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), refreshCalls.Load())
+
+	refreshed, loadErr := auth.LoadToken(tokenPath)
+	require.NoError(t, loadErr)
+	assert.Equal(t, "fresh-access-token", refreshed.Token.AccessToken)
+	assert.True(t, refreshed.Token.ExpiresAt > float64(time.Now().Unix()))
+}
+
+func TestBeforeHook_UsesConfiguredProxyForRefreshAndAPIRequests(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	configPath := filepath.Join(tmpDir, "schwab-agent", "config.json")
+	tokenPath := filepath.Join(tmpDir, "schwab-agent", "token.json")
+	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
+		ClientID:        "test-client",
+		ClientSecret:    "test-secret",
+		CallbackURL:     "https://127.0.0.1:8182",
+		BaseURL:         "https://placeholder.invalid",
+		BaseURLInsecure: true,
+	}))
+	writeTestToken(t, tokenPath, &auth.TokenFile{
+		CreationTimestamp: time.Now().Add(-time.Hour).Unix(),
+		Token: auth.TokenData{
+			AccessToken:  "expired-access-token",
+			RefreshToken: "refresh-token",
+			ExpiresIn:    1800,
+			ExpiresAt:    float64(time.Now().Add(-time.Hour).Unix()),
+		},
+	})
+
+	var refreshCalls atomic.Int32
+	proxy := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/proxy/v1/oauth/token":
+			refreshCalls.Add(1)
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Equal(t, "Basic dGVzdC1jbGllbnQ6dGVzdC1zZWNyZXQ=", r.Header.Get("Authorization"))
+			_, _ = w.Write([]byte(`{"access_token":"fresh-access-token","token_type":"Bearer","expires_in":1800,"refresh_token":"refresh-token","scope":"api"}`))
+		case "/proxy/trader/v1/accounts/accountNumbers":
+			assert.Equal(t, "Bearer fresh-access-token", r.Header.Get("Authorization"))
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[{"accountNumber":"123456789","hashValue":"hash-123"}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer proxy.Close()
+
+	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
+		ClientID:        "test-client",
+		ClientSecret:    "test-secret",
+		CallbackURL:     "https://127.0.0.1:8182",
+		BaseURL:         proxy.URL + "/proxy/",
+		BaseURLInsecure: true,
+	}))
+
+	_, err := runAppWithDeps(t, defaultAppDeps(), "schwab-agent", "--config", configPath, "--token", tokenPath, "account", "numbers")
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), refreshCalls.Load())
 
