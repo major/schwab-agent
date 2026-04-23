@@ -409,6 +409,10 @@ func ValidateCalendarOrder(params *CalendarParams) error {
 		return validationError("strike price must be greater than zero", "Add `--strike <price>` with a positive value")
 	}
 
+	if params.PutCall == "" {
+		return validationError("option type (call or put) is required", "Add `--call` or `--put`")
+	}
+
 	return validateSpreadPrice(params.Price, "calendar spreads")
 }
 
@@ -458,6 +462,10 @@ func ValidateDiagonalOrder(params *DiagonalParams) error {
 			"near and far strikes must be different for diagonal spreads",
 			"Use different values for `--near-strike` and `--far-strike` (use calendar for same strike)",
 		)
+	}
+
+	if params.PutCall == "" {
+		return validationError("option type (call or put) is required", "Add `--call` or `--put`")
 	}
 
 	return validateSpreadPrice(params.Price, "diagonal spreads")
@@ -510,6 +518,13 @@ func ValidateCollarOrder(params *CollarParams) error {
 
 	if params.CallStrike <= 0 {
 		return validationError("call strike price must be greater than zero", "Add `--call-strike <price>` with a positive value")
+	}
+
+	if params.PutStrike >= params.CallStrike {
+		return validationError(
+			"put strike must be below call strike for a collar",
+			"Use `--put-strike` below `--call-strike` (protective put sits below the covered call)",
+		)
 	}
 
 	return validateSpreadPrice(params.Price, "collars")

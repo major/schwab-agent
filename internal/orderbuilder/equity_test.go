@@ -1,8 +1,10 @@
 package orderbuilder
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -291,6 +293,27 @@ func TestBuildEquityOrderOmitsPriceLinkFieldsWhenEmpty(t *testing.T) {
 	require.NotNil(t, order)
 	assert.Nil(t, order.PriceLinkBasis)
 	assert.Nil(t, order.PriceLinkType)
+}
+
+// TestBuildEquityOrderRejectsMarketWithPriceLink verifies that market orders
+// reject price-link fields since there is no price to link against.
+func TestBuildEquityOrderRejectsMarketWithPriceLink(t *testing.T) {
+	t.Parallel()
+
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:         "AAPL",
+		Action:         models.InstructionBuy,
+		Quantity:       100,
+		OrderType:      models.OrderTypeMarket,
+		PriceLinkBasis: models.PriceLinkBasisLast,
+	})
+
+	require.Nil(t, order)
+	require.Error(t, err)
+
+	var validationErr *apperr.ValidationError
+	require.True(t, errors.As(err, &validationErr))
+	assert.Equal(t, "price-link-basis and price-link-type are not allowed on market orders", validationErr.Message)
 }
 
 // TestBuildEquityOrderPriceLinkDoesNotBreakTrailingStopLimit verifies that when

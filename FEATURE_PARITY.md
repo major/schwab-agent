@@ -88,7 +88,7 @@ TRAILING_STOP and TRAILING_STOP_LIMIT supported for equity orders via `--stop-of
 
 **Usefulness: 2** | **Difficulty: Easy** | **Status: Implemented**
 
-`--destination` flag on equity and option order commands. Valid values: INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO. Pass-through to Schwab API, no routing validation. LLMs can now specify exchange routing for execution quality or liquidity reasons.
+`--destination` flag on equity and option order commands. Valid values: INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO. Input is validated against allowed enum values before sending to Schwab API. LLMs can now specify exchange routing for execution quality or liquidity reasons.
 
 ### ~~Price Link Basis/Type~~ ✅
 

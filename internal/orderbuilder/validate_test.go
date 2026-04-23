@@ -609,6 +609,25 @@ func TestValidateCollarOrderRequiresCallStrike(t *testing.T) {
 	assertValidationError(t, err, "call strike price must be greater than zero", "Add `--call-strike <price>` with a positive value")
 }
 
+// TestValidateCollarOrderRejectsInvertedStrikes verifies put strike must be below call strike.
+func TestValidateCollarOrderRejectsInvertedStrikes(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCollarOrder(&CollarParams{
+		Underlying: "AAPL",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		PutStrike:  160,
+		CallStrike: 140,
+		Quantity:   1,
+		Price:      150.00,
+	})
+
+	assertValidationError(t, err,
+		"put strike must be below call strike for a collar",
+		"Use `--put-strike` below `--call-strike` (protective put sits below the covered call)",
+	)
+}
+
 // TestValidateCollarOrderRequiresExpiration verifies expiration is mandatory.
 func TestValidateCollarOrderRequiresExpiration(t *testing.T) {
 	t.Parallel()
@@ -736,6 +755,7 @@ func TestValidateCalendarOrderRequiresPrice(t *testing.T) {
 		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
 		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
 		Strike:         150,
+		PutCall:        models.PutCallCall,
 		Quantity:       1,
 	})
 
@@ -757,6 +777,22 @@ func TestValidateCalendarOrderRequiresQuantity(t *testing.T) {
 	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
 }
 
+// TestValidateCalendarOrderRejectsMissingPutCall verifies PutCall is mandatory.
+func TestValidateCalendarOrderRejectsMissingPutCall(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCalendarOrder(&CalendarParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		Strike:         150,
+		Quantity:       1,
+		Price:          2.50,
+	})
+
+	assertValidationError(t, err, "option type (call or put) is required", "Add `--call` or `--put`")
+}
+
 // TestValidateCalendarOrderAcceptsValidParams verifies a valid calendar passes.
 func TestValidateCalendarOrderAcceptsValidParams(t *testing.T) {
 	t.Parallel()
@@ -766,6 +802,7 @@ func TestValidateCalendarOrderAcceptsValidParams(t *testing.T) {
 		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
 		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
 		Strike:         150,
+		PutCall:        models.PutCallCall,
 		Quantity:       1,
 		Price:          2.50,
 	})
@@ -896,6 +933,7 @@ func TestValidateDiagonalOrderRequiresPrice(t *testing.T) {
 		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
 		NearStrike:     150,
 		FarStrike:      155,
+		PutCall:        models.PutCallCall,
 		Quantity:       1,
 	})
 
@@ -918,6 +956,23 @@ func TestValidateDiagonalOrderRequiresQuantity(t *testing.T) {
 	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
 }
 
+// TestValidateDiagonalOrderRejectsMissingPutCall verifies PutCall is mandatory.
+func TestValidateDiagonalOrderRejectsMissingPutCall(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateDiagonalOrder(&DiagonalParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		NearStrike:     150,
+		FarStrike:      155,
+		Quantity:       1,
+		Price:          3.00,
+	})
+
+	assertValidationError(t, err, "option type (call or put) is required", "Add `--call` or `--put`")
+}
+
 // TestValidateDiagonalOrderAcceptsValidParams verifies a valid diagonal passes.
 func TestValidateDiagonalOrderAcceptsValidParams(t *testing.T) {
 	t.Parallel()
@@ -928,6 +983,7 @@ func TestValidateDiagonalOrderAcceptsValidParams(t *testing.T) {
 		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
 		NearStrike:     150,
 		FarStrike:      155,
+		PutCall:        models.PutCallCall,
 		Quantity:       1,
 		Price:          3.00,
 	})

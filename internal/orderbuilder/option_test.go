@@ -1,9 +1,11 @@
 package orderbuilder
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -406,6 +408,30 @@ func TestBuildOptionOrderSetsPriceLinkFields(t *testing.T) {
 	assert.Equal(t, models.PriceLinkBasisBid, *order.PriceLinkBasis)
 	require.NotNil(t, order.PriceLinkType)
 	assert.Equal(t, models.PriceLinkTypePercent, *order.PriceLinkType)
+}
+
+// TestBuildOptionOrderRejectsMarketWithPriceLink verifies that market orders
+// reject price-link fields since there is no price to link against.
+func TestBuildOptionOrderRejectsMarketWithPriceLink(t *testing.T) {
+	t.Parallel()
+
+	order, err := BuildOptionOrder(&OptionParams{
+		Underlying:     "AAPL",
+		Expiration:     time.Date(2025, time.December, 19, 0, 0, 0, 0, time.UTC),
+		Strike:         200.0,
+		PutCall:        models.PutCallCall,
+		Action:         models.InstructionBuyToOpen,
+		Quantity:       5,
+		OrderType:      models.OrderTypeMarket,
+		PriceLinkBasis: models.PriceLinkBasisLast,
+	})
+
+	require.Nil(t, order)
+	require.Error(t, err)
+
+	var validationErr *apperr.ValidationError
+	require.True(t, errors.As(err, &validationErr))
+	assert.Equal(t, "price-link-basis and price-link-type are not allowed on market orders", validationErr.Message)
 }
 
 // TestBuildOptionOrderOmitsPriceLinkFieldsWhenEmpty verifies price link fields

@@ -3,6 +3,7 @@ package orderbuilder
 import (
 	"cmp"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -60,6 +61,14 @@ func BuildEquityOrder(params *EquityParams) (*models.OrderRequest, error) {
 
 	if params.Destination != "" {
 		order.RequestedDestination = ptr(params.Destination)
+	}
+
+	// Market orders have no price to link against, so reject price-link fields early.
+	if params.OrderType == models.OrderTypeMarket && (params.PriceLinkBasis != "" || params.PriceLinkType != "") {
+		return nil, apperr.NewValidationError(
+			"price-link-basis and price-link-type are not allowed on market orders",
+			nil,
+		)
 	}
 
 	// Only set price link fields when explicitly provided by the user.
