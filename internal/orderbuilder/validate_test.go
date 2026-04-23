@@ -618,6 +618,37 @@ func TestValidateOptionOrderRejectsNegativeStrike(t *testing.T) {
 	assertValidationError(t, err, "option strike price must be greater than zero", "Add `--strike <price>` with a positive value")
 }
 
+// TestValidateOptionOrderRejectsTrailingStop verifies trailing stop types are rejected for options.
+func TestValidateOptionOrderRejectsTrailingStop(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name      string
+		orderType models.OrderType
+	}{
+		{name: "TRAILING_STOP", orderType: models.OrderTypeTrailingStop},
+		{name: "TRAILING_STOP_LIMIT", orderType: models.OrderTypeTrailingStopLimit},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateOptionOrder(&OptionParams{
+				Underlying: "AAPL",
+				Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+				Strike:     185,
+				Quantity:   5,
+				Action:     models.InstructionBuyToOpen,
+				OrderType:  tc.orderType,
+			})
+
+			require.Error(t, err)
+			assertValidationError(t, err, "trailing stop orders are not supported for options", "Use `order build equity` for trailing stop orders")
+		})
+	}
+}
+
 // TestValidateOptionOrderAcceptsValidParams verifies valid option order passes.
 func TestValidateOptionOrderAcceptsValidParams(t *testing.T) {
 	t.Parallel()
@@ -855,6 +886,101 @@ func TestValidateEquityOrderRequiresBothPricesForStopLimit(t *testing.T) {
 			)
 		})
 	}
+}
+
+// TestValidateEquityOrderRequiresOffsetForTrailingStop verifies TRAILING_STOP requires stop-offset.
+func TestValidateEquityOrderRequiresOffsetForTrailingStop(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateEquityOrder(&EquityParams{
+		Symbol:    "AAPL",
+		Quantity:  10,
+		OrderType: models.OrderTypeTrailingStop,
+	})
+
+	assertValidationError(t, err,
+		"TRAILING_STOP order requires a stop price offset",
+		"Add `--stop-offset <amount>` to specify how far the stop trails",
+	)
+}
+
+// TestValidateEquityOrderRequiresOffsetAndPriceForTrailingStopLimit verifies TRAILING_STOP_LIMIT
+// requires stop-offset and price.
+func TestValidateEquityOrderRequiresOffsetAndPriceForTrailingStopLimit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		price           float64
+		stopPriceOffset float64
+		wantMsg         string
+		wantDetails     string
+	}{
+		{
+			name:        "missing offset",
+			price:       195.00,
+			wantMsg:     "TRAILING_STOP_LIMIT order requires a stop price offset",
+			wantDetails: "Add `--stop-offset <amount>` to specify how far the stop trails",
+		},
+		{
+			name:            "missing price",
+			stopPriceOffset: 3.00,
+			wantMsg:         "TRAILING_STOP_LIMIT order requires a limit price",
+			wantDetails:     "Add `--price <amount>` to specify the limit price",
+		},
+		{
+			name:    "missing both",
+			wantMsg: "TRAILING_STOP_LIMIT order requires a stop price offset",
+			wantDetails: "Add `--stop-offset <amount>` to specify how far the stop trails",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateEquityOrder(&EquityParams{
+				Symbol:          "AAPL",
+				Quantity:        10,
+				OrderType:       models.OrderTypeTrailingStopLimit,
+				Price:           tt.price,
+				StopPriceOffset: tt.stopPriceOffset,
+			})
+
+			assertValidationError(t, err, tt.wantMsg, tt.wantDetails)
+		})
+	}
+}
+
+// TestValidateEquityOrderAcceptsValidTrailingStop verifies valid trailing stop orders pass validation.
+func TestValidateEquityOrderAcceptsValidTrailingStop(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateEquityOrder(&EquityParams{
+		Symbol:          "AAPL",
+		Action:          models.InstructionSell,
+		Quantity:        10,
+		OrderType:       models.OrderTypeTrailingStop,
+		StopPriceOffset: 2.50,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateEquityOrderAcceptsValidTrailingStopLimit verifies valid trailing stop limit orders pass.
+func TestValidateEquityOrderAcceptsValidTrailingStopLimit(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateEquityOrder(&EquityParams{
+		Symbol:          "AAPL",
+		Action:          models.InstructionSell,
+		Quantity:        10,
+		OrderType:       models.OrderTypeTrailingStopLimit,
+		Price:           195.00,
+		StopPriceOffset: 3.00,
+	})
+
+	require.NoError(t, err)
 }
 
 // TestValidateEquityOrderAcceptsValidMarketOrder verifies market orders pass validation.

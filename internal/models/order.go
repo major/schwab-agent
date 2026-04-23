@@ -417,6 +417,7 @@ type Order struct {
 	StopType                  *StopType                `json:"stopType,omitempty"`
 	PriceLinkBasis            *PriceLinkBasis          `json:"priceLinkBasis,omitempty"`
 	PriceLinkType             *PriceLinkType           `json:"priceLinkType,omitempty"`
+	PriceOffset               *float64                 `json:"priceOffset,omitempty"`
 	Price                     *float64                 `json:"price,omitempty"`
 	TaxLotMethod              *TaxLotMethod            `json:"taxLotMethod,omitempty"`
 	OrderLegCollection        []OrderLegCollection     `json:"orderLegCollection"`
@@ -455,6 +456,7 @@ type OrderRequest struct {
 	StopType                 *StopType                `json:"stopType,omitempty"`
 	PriceLinkBasis           *PriceLinkBasis          `json:"priceLinkBasis,omitempty"`
 	PriceLinkType            *PriceLinkType           `json:"priceLinkType,omitempty"`
+	PriceOffset              *float64                 `json:"priceOffset,omitempty"`
 	Price                    *float64                 `json:"price,omitempty"`
 	TaxLotMethod             *TaxLotMethod            `json:"taxLotMethod,omitempty"`
 	OrderLegCollection       []OrderLegCollection     `json:"orderLegCollection,omitempty"`

@@ -32,6 +32,18 @@ func ValidateEquityOrder(params *EquityParams) error {
 		if params.Price == 0 || params.StopPrice == 0 {
 			return validationError("STOP_LIMIT order requires both price and stop price", "Add `--price <amount> --stop-price <amount>`")
 		}
+	case models.OrderTypeTrailingStop:
+		if params.StopPriceOffset <= 0 {
+			return validationError("TRAILING_STOP order requires a stop price offset", "Add `--stop-offset <amount>` to specify how far the stop trails")
+		}
+	case models.OrderTypeTrailingStopLimit:
+		if params.StopPriceOffset <= 0 {
+			return validationError("TRAILING_STOP_LIMIT order requires a stop price offset", "Add `--stop-offset <amount>` to specify how far the stop trails")
+		}
+
+		if params.Price == 0 {
+			return validationError("TRAILING_STOP_LIMIT order requires a limit price", "Add `--price <amount>` to specify the limit price")
+		}
 	}
 
 	return nil
@@ -39,6 +51,14 @@ func ValidateEquityOrder(params *EquityParams) error {
 
 // ValidateOptionOrder validates option order parameters.
 func ValidateOptionOrder(params *OptionParams) error {
+	// Trailing stop orders are only supported for equity orders.
+	if params.OrderType == models.OrderTypeTrailingStop || params.OrderType == models.OrderTypeTrailingStopLimit {
+		return validationError(
+			"trailing stop orders are not supported for options",
+			"Use `order build equity` for trailing stop orders",
+		)
+	}
+
 	if err := validateUnderlying(params.Underlying); err != nil {
 		return err
 	}

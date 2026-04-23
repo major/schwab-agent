@@ -395,6 +395,11 @@ func equityOrderFlags() []cli.Flag {
 		&cli.StringFlag{Name: "type", Usage: "Order type"},
 		&cli.Float64Flag{Name: "price", Usage: "Limit price"},
 		&cli.Float64Flag{Name: "stop-price", Usage: "Stop price"},
+		&cli.Float64Flag{Name: "stop-offset", Usage: "Trailing stop offset amount"},
+		&cli.StringFlag{Name: "stop-link-basis", Usage: "Trailing stop reference price (LAST, BID, ASK, MARK)"},
+		&cli.StringFlag{Name: "stop-link-type", Usage: "Trailing stop offset type (VALUE, PERCENT, TICK)"},
+		&cli.StringFlag{Name: "stop-type", Usage: "Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)"},
+		&cli.Float64Flag{Name: "activation-price", Usage: "Price that activates the trailing stop"},
 		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
 		&cli.StringFlag{Name: "session", Usage: "Trading session"},
 	}
@@ -553,15 +558,35 @@ func parseEquityParams(cmd *cli.Command) (orderbuilder.EquityParams, error) {
 		return orderbuilder.EquityParams{}, err
 	}
 
+	stopLinkBasis, err := parseStopPriceLinkBasis(cmd.String("stop-link-basis"))
+	if err != nil {
+		return orderbuilder.EquityParams{}, err
+	}
+
+	stopLinkType, err := parseStopPriceLinkType(cmd.String("stop-link-type"))
+	if err != nil {
+		return orderbuilder.EquityParams{}, err
+	}
+
+	stopType, err := parseStopType(cmd.String("stop-type"))
+	if err != nil {
+		return orderbuilder.EquityParams{}, err
+	}
+
 	return orderbuilder.EquityParams{
-		Symbol:    strings.TrimSpace(cmd.String("symbol")),
-		Action:    action,
-		Quantity:  cmd.Float64("quantity"),
-		OrderType: orderType,
-		Price:     cmd.Float64("price"),
-		StopPrice: cmd.Float64("stop-price"),
-		Duration:  duration,
-		Session:   session,
+		Symbol:             strings.TrimSpace(cmd.String("symbol")),
+		Action:             action,
+		Quantity:           cmd.Float64("quantity"),
+		OrderType:          orderType,
+		Price:              cmd.Float64("price"),
+		StopPrice:          cmd.Float64("stop-price"),
+		StopPriceOffset:    cmd.Float64("stop-offset"),
+		StopPriceLinkBasis: stopLinkBasis,
+		StopPriceLinkType:  stopLinkType,
+		StopType:           stopType,
+		ActivationPrice:    cmd.Float64("activation-price"),
+		Duration:           duration,
+		Session:            session,
 	}, nil
 }
 
@@ -780,6 +805,8 @@ func parseOrderType(raw string, fallback models.OrderType) (models.OrderType, er
 		models.OrderTypeLimit,
 		models.OrderTypeStop,
 		models.OrderTypeStopLimit,
+		models.OrderTypeTrailingStop,
+		models.OrderTypeTrailingStopLimit,
 		models.OrderTypeNetDebit,
 		models.OrderTypeNetCredit,
 		models.OrderTypeNetZero:
@@ -1058,6 +1085,68 @@ func parsePutCall(call, put bool) (models.PutCall, error) {
 	}
 
 	return models.PutCallPut, nil
+}
+
+// parseStopPriceLinkBasis converts CLI input to a stop price link basis enum.
+// Defaults to LAST when empty, which is the most common trailing stop reference.
+func parseStopPriceLinkBasis(raw string) (models.StopPriceLinkBasis, error) {
+	if strings.TrimSpace(raw) == "" {
+		return models.StopPriceLinkBasisLast, nil
+	}
+
+	value := models.StopPriceLinkBasis(strings.ToUpper(strings.TrimSpace(raw)))
+	switch value {
+	case models.StopPriceLinkBasisManual,
+		models.StopPriceLinkBasisBase,
+		models.StopPriceLinkBasisTrigger,
+		models.StopPriceLinkBasisLast,
+		models.StopPriceLinkBasisBid,
+		models.StopPriceLinkBasisAsk,
+		models.StopPriceLinkBasisAskBid,
+		models.StopPriceLinkBasisMark,
+		models.StopPriceLinkBasisAverage:
+		return value, nil
+	default:
+		return "", newValidationError("stop-link-basis is invalid")
+	}
+}
+
+// parseStopPriceLinkType converts CLI input to a stop price link type enum.
+// Defaults to VALUE when empty, which means the offset is a dollar amount.
+func parseStopPriceLinkType(raw string) (models.StopPriceLinkType, error) {
+	if strings.TrimSpace(raw) == "" {
+		return models.StopPriceLinkTypeValue, nil
+	}
+
+	value := models.StopPriceLinkType(strings.ToUpper(strings.TrimSpace(raw)))
+	switch value {
+	case models.StopPriceLinkTypeValue,
+		models.StopPriceLinkTypePercent,
+		models.StopPriceLinkTypeTick:
+		return value, nil
+	default:
+		return "", newValidationError("stop-link-type is invalid")
+	}
+}
+
+// parseStopType converts CLI input to a stop type enum.
+// Defaults to STANDARD when empty.
+func parseStopType(raw string) (models.StopType, error) {
+	if strings.TrimSpace(raw) == "" {
+		return models.StopTypeStandard, nil
+	}
+
+	value := models.StopType(strings.ToUpper(strings.TrimSpace(raw)))
+	switch value {
+	case models.StopTypeStandard,
+		models.StopTypeBid,
+		models.StopTypeAsk,
+		models.StopTypeLast,
+		models.StopTypeMark:
+		return value, nil
+	default:
+		return "", newValidationError("stop-type is invalid")
+	}
 }
 
 // newValidationError creates a consistent validation error for command parsing.

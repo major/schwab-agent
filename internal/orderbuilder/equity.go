@@ -16,6 +16,14 @@ type EquityParams struct {
 	StopPrice float64
 	Duration  models.Duration
 	Session   models.Session
+
+	// Trailing stop fields. The stop adjusts dynamically via offset
+	// rather than using a fixed StopPrice.
+	StopPriceOffset   float64
+	StopPriceLinkBasis models.StopPriceLinkBasis
+	StopPriceLinkType  models.StopPriceLinkType
+	StopType           models.StopType
+	ActivationPrice    float64
 }
 
 // BuildEquityOrder constructs an OrderRequest for an equity order.
@@ -52,6 +60,30 @@ func applyEquityPriceFields(order *models.OrderRequest, params *EquityParams) {
 	case models.OrderTypeStopLimit:
 		order.Price = ptr(params.Price)
 		order.StopPrice = ptr(params.StopPrice)
+	case models.OrderTypeTrailingStop:
+		applyTrailingStopFields(order, params)
+	case models.OrderTypeTrailingStopLimit:
+		applyTrailingStopFields(order, params)
+
+		// Schwab API uses priceOffset (not price) for trailing stop limit orders.
+		// The offset defines the limit price distance from the triggered stop.
+		// priceLinkBasis/priceLinkType default to the stop price link values.
+		order.PriceOffset = ptr(params.Price)
+		order.PriceLinkBasis = ptr(models.PriceLinkBasis(params.StopPriceLinkBasis))
+		order.PriceLinkType = ptr(models.PriceLinkType(params.StopPriceLinkType))
+	}
+}
+
+// applyTrailingStopFields sets the trailing stop-specific fields shared by
+// TRAILING_STOP and TRAILING_STOP_LIMIT order types.
+func applyTrailingStopFields(order *models.OrderRequest, params *EquityParams) {
+	order.StopPriceOffset = ptr(params.StopPriceOffset)
+	order.StopPriceLinkBasis = ptr(params.StopPriceLinkBasis)
+	order.StopPriceLinkType = ptr(params.StopPriceLinkType)
+	order.StopType = ptr(params.StopType)
+
+	if params.ActivationPrice > 0 {
+		order.ActivationPrice = ptr(params.ActivationPrice)
 	}
 }
 
