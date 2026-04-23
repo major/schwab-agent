@@ -989,6 +989,103 @@ func TestValidateOptionOrderRejectsNegativeStrike(t *testing.T) {
 	assertValidationError(t, err, "option strike price must be greater than zero", "Add `--strike <price>` with a positive value")
 }
 
+// TestValidateCalendarOrderRejectsPastNearExpiration verifies near expiration must be in the future.
+func TestValidateCalendarOrderRejectsPastNearExpiration(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCalendarOrder(&CalendarParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(-24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		Strike:         150,
+		Quantity:       1,
+		Price:          2.50,
+	})
+
+	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+}
+
+// TestValidateCalendarOrderRejectsPastFarExpiration verifies far expiration must be in the future.
+func TestValidateCalendarOrderRejectsPastFarExpiration(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCalendarOrder(&CalendarParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(-24 * time.Hour),
+		Strike:         150,
+		Quantity:       1,
+		Price:          2.50,
+	})
+
+	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+}
+
+// TestValidateDiagonalOrderRejectsPastNearExpiration verifies near expiration must be in the future.
+func TestValidateDiagonalOrderRejectsPastNearExpiration(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateDiagonalOrder(&DiagonalParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(-24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		NearStrike:     150,
+		FarStrike:      155,
+		Quantity:       1,
+		Price:          3.00,
+	})
+
+	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+}
+
+// TestValidateDiagonalOrderRejectsPastFarExpiration verifies far expiration must be in the future.
+func TestValidateDiagonalOrderRejectsPastFarExpiration(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateDiagonalOrder(&DiagonalParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(-24 * time.Hour),
+		NearStrike:     150,
+		FarStrike:      155,
+		Quantity:       1,
+		Price:          3.00,
+	})
+
+	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+}
+
+// TestValidateCollarOrderRequiresPrice verifies price is mandatory for collars.
+func TestValidateCollarOrderRequiresPrice(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCollarOrder(&CollarParams{
+		Underlying: "AAPL",
+		Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		PutStrike:  140,
+		CallStrike: 160,
+		Quantity:   1,
+	})
+
+	assertValidationError(t, err, "price is required for collars", "Add `--price <amount>` to specify the net debit or credit")
+}
+
+// TestValidateCollarOrderRejectsPastExpiration verifies collar expiration must be in the future.
+func TestValidateCollarOrderRejectsPastExpiration(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCollarOrder(&CollarParams{
+		Underlying: "AAPL",
+		Expiration: time.Now().UTC().Add(-24 * time.Hour),
+		PutStrike:  140,
+		CallStrike: 160,
+		Quantity:   1,
+		Price:      150.00,
+	})
+
+	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+}
+
 // TestValidateOptionOrderRejectsTrailingStop verifies trailing stop types are rejected for options.
 func TestValidateOptionOrderRejectsTrailingStop(t *testing.T) {
 	t.Parallel()

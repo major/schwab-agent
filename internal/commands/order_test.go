@@ -2483,6 +2483,276 @@ func TestOrderRepeatConfirmSuccess(t *testing.T) {
 	assert.Equal(t, float64(12345), data["originalOrderId"])
 }
 
+// farExpDate is testFutureExpTime + 30 days, formatted as YYYY-MM-DD.
+// Calendar and diagonal spreads need two different expirations.
+var farExpDate = testFutureExpTime.AddDate(0, 0, 30).Format("2006-01-02")
+
+func TestOrderBuildCalendarCallOpen(t *testing.T) {
+	t.Parallel()
+
+	// Long calendar call spread: buy far-dated call, sell near-dated call.
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "calendar",
+		"--underlying", "AAPL",
+		"--near-expiration", testFutureExpDate,
+		"--far-expiration", farExpDate,
+		"--strike", "150",
+		"--call",
+		"--open",
+		"--quantity", "1",
+		"--price", "2.50",
+		"--duration", "DAY",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeCalendar, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 2.50, *order.Price)
+	assert.Equal(t, models.DurationDay, order.Duration)
+
+	require.Len(t, order.OrderLegCollection, 2)
+
+	// Leg 0: far-dated call (bought).
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
+	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[0].Instrument.PutCall)
+	assert.Equal(t, 1.0, order.OrderLegCollection[0].Quantity)
+
+	// Leg 1: near-dated call (sold).
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
+	require.NotNil(t, order.OrderLegCollection[1].Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[1].Instrument.PutCall)
+}
+
+func TestOrderBuildCalendarPutClose(t *testing.T) {
+	t.Parallel()
+
+	// Closing a put calendar: sell far-dated put, buy near-dated put.
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "calendar",
+		"--underlying", "AAPL",
+		"--near-expiration", testFutureExpDate,
+		"--far-expiration", farExpDate,
+		"--strike", "150",
+		"--put",
+		"--close",
+		"--quantity", "1",
+		"--price", "2.00",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	require.Len(t, order.OrderLegCollection, 2)
+
+	// Closing reverses instructions: far leg sells, near leg buys.
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[1].Instruction)
+
+	// Both legs should be puts.
+	for _, leg := range order.OrderLegCollection {
+		require.NotNil(t, leg.Instrument.PutCall)
+		assert.Equal(t, models.PutCallPut, *leg.Instrument.PutCall)
+	}
+}
+
+func TestOrderBuildDiagonalCallOpen(t *testing.T) {
+	t.Parallel()
+
+	// Diagonal call: different strikes AND different expirations.
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "diagonal",
+		"--underlying", "AAPL",
+		"--near-expiration", testFutureExpDate,
+		"--far-expiration", farExpDate,
+		"--near-strike", "150",
+		"--far-strike", "160",
+		"--call",
+		"--open",
+		"--quantity", "2",
+		"--price", "3.00",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeDiagonal, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 3.00, *order.Price)
+
+	require.Len(t, order.OrderLegCollection, 2)
+
+	// Leg 0: far-dated call at 160 (bought).
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, 2.0, order.OrderLegCollection[0].Quantity)
+	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.Equal(t, 160.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[0].Instrument.PutCall)
+
+	// Leg 1: near-dated call at 150 (sold).
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
+	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.Equal(t, 150.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+}
+
+func TestOrderBuildDiagonalPutOpen(t *testing.T) {
+	t.Parallel()
+
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "diagonal",
+		"--underlying", "AAPL",
+		"--near-expiration", testFutureExpDate,
+		"--far-expiration", farExpDate,
+		"--near-strike", "150",
+		"--far-strike", "140",
+		"--put",
+		"--open",
+		"--quantity", "1",
+		"--price", "2.50",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	require.Len(t, order.OrderLegCollection, 2)
+
+	// Both legs should be puts.
+	for _, leg := range order.OrderLegCollection {
+		require.NotNil(t, leg.Instrument.PutCall)
+		assert.Equal(t, models.PutCallPut, *leg.Instrument.PutCall)
+	}
+}
+
+func TestOrderBuildCollarOpen(t *testing.T) {
+	t.Parallel()
+
+	// Collar opening: buy shares, buy protective put, sell covered call.
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "collar",
+		"--underlying", "AAPL",
+		"--put-strike", "140",
+		"--call-strike", "160",
+		"--expiration", testFutureExpDate,
+		"--quantity", "3",
+		"--price", "450",
+		"--open",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeCollarWithStock, *order.ComplexOrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 450.0, *order.Price)
+
+	// 3 legs: equity, protective put, covered call.
+	require.Len(t, order.OrderLegCollection, 3)
+
+	// Leg 0: equity BUY, 300 shares (3 contracts * 100).
+	equityLeg := order.OrderLegCollection[0]
+	assert.Equal(t, models.InstructionBuy, equityLeg.Instruction)
+	assert.Equal(t, 300.0, equityLeg.Quantity)
+	assert.Equal(t, models.AssetTypeEquity, equityLeg.Instrument.AssetType)
+
+	// Leg 1: protective put BUY_TO_OPEN.
+	putLeg := order.OrderLegCollection[1]
+	assert.Equal(t, models.InstructionBuyToOpen, putLeg.Instruction)
+	require.NotNil(t, putLeg.Instrument.PutCall)
+	assert.Equal(t, models.PutCallPut, *putLeg.Instrument.PutCall)
+	require.NotNil(t, putLeg.Instrument.OptionStrikePrice)
+	assert.Equal(t, 140.0, *putLeg.Instrument.OptionStrikePrice)
+
+	// Leg 2: covered call SELL_TO_OPEN.
+	callLeg := order.OrderLegCollection[2]
+	assert.Equal(t, models.InstructionSellToOpen, callLeg.Instruction)
+	require.NotNil(t, callLeg.Instrument.PutCall)
+	assert.Equal(t, models.PutCallCall, *callLeg.Instrument.PutCall)
+	require.NotNil(t, callLeg.Instrument.OptionStrikePrice)
+	assert.Equal(t, 160.0, *callLeg.Instrument.OptionStrikePrice)
+}
+
+func TestOrderBuildCollarClose(t *testing.T) {
+	t.Parallel()
+
+	// Collar closing: sell shares, sell put, buy call.
+	stdout, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "collar",
+		"--underlying", "AAPL",
+		"--put-strike", "140",
+		"--call-strike", "160",
+		"--expiration", testFutureExpDate,
+		"--quantity", "2",
+		"--price", "300",
+		"--close",
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	require.Len(t, order.OrderLegCollection, 3)
+
+	// Closing reverses all instructions.
+	assert.Equal(t, models.InstructionSell, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[1].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[2].Instruction)
+}
+
+func TestOrderBuildCalendarInvalidDate(t *testing.T) {
+	t.Parallel()
+
+	// Bad near-expiration format should produce a parseDateFlag error.
+	_, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "calendar",
+		"--underlying", "AAPL",
+		"--near-expiration", "not-a-date",
+		"--far-expiration", farExpDate,
+		"--strike", "150",
+		"--call",
+		"--open",
+		"--quantity", "1",
+		"--price", "2.50",
+	)
+	require.Error(t, err)
+
+	var validationErr *apperr.ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Contains(t, validationErr.Error(), "near-expiration must use YYYY-MM-DD format")
+}
+
+func TestOrderBuildDiagonalInvalidDate(t *testing.T) {
+	t.Parallel()
+
+	// Bad far-expiration format should produce a parseDateFlag error.
+	_, err := runOrderCommand(
+		t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "diagonal",
+		"--underlying", "AAPL",
+		"--near-expiration", testFutureExpDate,
+		"--far-expiration", "bad-date",
+		"--near-strike", "150",
+		"--far-strike", "160",
+		"--call",
+		"--open",
+		"--quantity", "1",
+		"--price", "3.00",
+	)
+	require.Error(t, err)
+
+	var validationErr *apperr.ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Contains(t, validationErr.Error(), "far-expiration must use YYYY-MM-DD format")
+}
+
 func TestOrderRepeatConfirmMutableDisabled(t *testing.T) {
 	t.Parallel()
 
