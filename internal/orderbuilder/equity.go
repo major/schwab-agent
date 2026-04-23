@@ -63,8 +63,9 @@ func BuildEquityOrder(params *EquityParams) (*models.OrderRequest, error) {
 		order.RequestedDestination = ptr(params.Destination)
 	}
 
-	// Market orders have no price to link against, so reject price-link fields early.
-	if params.OrderType == models.OrderTypeMarket && (params.PriceLinkBasis != "" || params.PriceLinkType != "") {
+	// Market-style orders have no price to link against, so reject price-link fields early.
+	if (params.OrderType == models.OrderTypeMarket || params.OrderType == models.OrderTypeMarketOnClose) &&
+		(params.PriceLinkBasis != "" || params.PriceLinkType != "") {
 		return nil, apperr.NewValidationError(
 			"price-link-basis and price-link-type are not allowed on market orders",
 			nil,

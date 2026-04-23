@@ -316,6 +316,25 @@ func TestBuildEquityOrderRejectsMarketWithPriceLink(t *testing.T) {
 	assert.Equal(t, "price-link-basis and price-link-type are not allowed on market orders", validationErr.Message)
 }
 
+func TestBuildEquityOrderRejectsMarketOnCloseWithPriceLink(t *testing.T) {
+	t.Parallel()
+
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:         "AAPL",
+		Action:         models.InstructionBuy,
+		Quantity:       100,
+		OrderType:      models.OrderTypeMarketOnClose,
+		PriceLinkBasis: models.PriceLinkBasisLast,
+	})
+
+	require.Nil(t, order)
+	require.Error(t, err)
+
+	var validationErr *apperr.ValidationError
+	require.True(t, errors.As(err, &validationErr))
+	assert.Equal(t, "price-link-basis and price-link-type are not allowed on market orders", validationErr.Message)
+}
+
 // TestBuildEquityOrderPriceLinkDoesNotBreakTrailingStopLimit verifies that when
 // explicit price link fields are NOT set, trailing stop limit orders still
 // derive PriceLinkBasis and PriceLinkType from the stop price link values.

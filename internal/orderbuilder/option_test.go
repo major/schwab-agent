@@ -434,6 +434,28 @@ func TestBuildOptionOrderRejectsMarketWithPriceLink(t *testing.T) {
 	assert.Equal(t, "price-link-basis and price-link-type are not allowed on market orders", validationErr.Message)
 }
 
+func TestBuildOptionOrderRejectsMarketOnCloseWithPriceLink(t *testing.T) {
+	t.Parallel()
+
+	order, err := BuildOptionOrder(&OptionParams{
+		Underlying:     "AAPL",
+		Expiration:     time.Date(2025, time.December, 19, 0, 0, 0, 0, time.UTC),
+		Strike:         200.0,
+		PutCall:        models.PutCallCall,
+		Action:         models.InstructionBuyToOpen,
+		Quantity:       5,
+		OrderType:      models.OrderTypeMarketOnClose,
+		PriceLinkBasis: models.PriceLinkBasisLast,
+	})
+
+	require.Nil(t, order)
+	require.Error(t, err)
+
+	var validationErr *apperr.ValidationError
+	require.True(t, errors.As(err, &validationErr))
+	assert.Equal(t, "price-link-basis and price-link-type are not allowed on market orders", validationErr.Message)
+}
+
 // TestBuildOptionOrderOmitsPriceLinkFieldsWhenEmpty verifies price link fields
 // are nil when not provided.
 func TestBuildOptionOrderOmitsPriceLinkFieldsWhenEmpty(t *testing.T) {
