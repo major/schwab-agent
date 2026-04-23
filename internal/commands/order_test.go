@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -1932,4 +1933,554 @@ func TestOrderReplace_InvalidAction(t *testing.T) {
 	require.Error(t, err)
 	assert.Empty(t, stdout)
 	assert.Contains(t, err.Error(), "action is invalid")
+}
+
+// --- FTS build tests ---
+
+// validPrimarySpec returns a minimal valid primary order spec for FTS tests.
+func validPrimarySpec(t *testing.T) string {
+	t.Helper()
+
+	return mustMarshalJSON(t, models.OrderRequest{
+		Session:           models.SessionNormal,
+		Duration:          models.DurationDay,
+		OrderType:         models.OrderTypeLimit,
+		OrderStrategyType: models.OrderStrategyTypeSingle,
+		Price:             ptrFloat(150.0),
+		OrderLegCollection: []models.OrderLegCollection{
+			{
+				Instruction: models.InstructionBuy,
+				Quantity:    10,
+				Instrument:  models.OrderInstrument{AssetType: models.AssetTypeEquity, Symbol: "AAPL"},
+			},
+		},
+	})
+}
+
+// validSecondarySpec returns a minimal valid secondary order spec for FTS tests.
+func validSecondarySpec(t *testing.T) string {
+	t.Helper()
+
+	return mustMarshalJSON(t, models.OrderRequest{
+		Session:           models.SessionNormal,
+		Duration:          models.DurationDay,
+		OrderType:         models.OrderTypeLimit,
+		OrderStrategyType: models.OrderStrategyTypeSingle,
+		Price:             ptrFloat(160.0),
+		OrderLegCollection: []models.OrderLegCollection{
+			{
+				Instruction: models.InstructionSell,
+				Quantity:    10,
+				Instrument:  models.OrderInstrument{AssetType: models.AssetTypeEquity, Symbol: "AAPL"},
+			},
+		},
+	})
+}
+
+// ptrFloat returns a pointer to a float64 value (test helper).
+func ptrFloat(v float64) *float64 { return &v }
+
+func TestOrderBuildFTSInlineJSON(t *testing.T) {
+	t.Parallel()
+
+	primary := validPrimarySpec(t)
+	secondary := validSecondarySpec(t)
+
+	stdout, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "fts",
+		"--primary", primary,
+		"--secondary", secondary,
+	)
+	require.NoError(t, err)
+
+	// Arrange: decode the output
+	order := decodeOrderRequest(t, stdout)
+
+	// Assert: primary becomes TRIGGER
+	assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
+	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 150.0, *order.Price)
+	require.Len(t, order.OrderLegCollection, 1)
+	assert.Equal(t, "AAPL", order.OrderLegCollection[0].Instrument.Symbol)
+	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
+
+	// Assert: secondary becomes SINGLE child
+	require.Len(t, order.ChildOrderStrategies, 1)
+	child := order.ChildOrderStrategies[0]
+	assert.Equal(t, models.OrderStrategyTypeSingle, child.OrderStrategyType)
+	assert.Equal(t, models.OrderTypeLimit, child.OrderType)
+	require.NotNil(t, child.Price)
+	assert.Equal(t, 160.0, *child.Price)
+	require.Len(t, child.OrderLegCollection, 1)
+	assert.Equal(t, models.InstructionSell, child.OrderLegCollection[0].Instruction)
+}
+
+func TestOrderBuildFTSFromFiles(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	primaryPath := filepath.Join(tmpDir, "primary.json")
+	require.NoError(t, os.WriteFile(primaryPath, []byte(validPrimarySpec(t)), 0o600))
+
+	secondaryPath := filepath.Join(tmpDir, "secondary.json")
+	require.NoError(t, os.WriteFile(secondaryPath, []byte(validSecondarySpec(t)), 0o600))
+
+	stdout, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "fts",
+		"--primary", "@"+primaryPath,
+		"--secondary", "@"+secondaryPath,
+	)
+	require.NoError(t, err)
+
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
+	require.Len(t, order.ChildOrderStrategies, 1)
+	assert.Equal(t, models.OrderStrategyTypeSingle, order.ChildOrderStrategies[0].OrderStrategyType)
+}
+
+func TestOrderBuildFTSMissingPrimary(t *testing.T) {
+	t.Parallel()
+
+	// urfave/cli v3 enforces Required flags before the action runs,
+	// so a missing --primary should produce an error.
+	_, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "fts",
+		"--secondary", validSecondarySpec(t),
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "primary")
+}
+
+func TestOrderBuildFTSMissingSecondary(t *testing.T) {
+	t.Parallel()
+
+	_, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "fts",
+		"--primary", validPrimarySpec(t),
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "secondary")
+}
+
+func TestOrderBuildFTSValidationError(t *testing.T) {
+	t.Parallel()
+
+	// An empty order ({}) has no OrderType and no legs, so ValidateFTSOrder
+	// should reject it as "primary order is empty".
+	emptySpec := `{}`
+
+	_, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "fts",
+		"--primary", emptySpec,
+		"--secondary", validSecondarySpec(t),
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "primary order is empty")
+}
+
+func TestOrderBuildFTSInvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	_, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "fts",
+		"--primary", `{not valid json}`,
+		"--secondary", validSecondarySpec(t),
+	)
+	require.Error(t, err)
+	// readSpecSource rejects invalid JSON before we even try to unmarshal
+	assert.Contains(t, err.Error(), "valid JSON")
+}
+
+func TestOrderBuildFTSRejectsComplexPrimary(t *testing.T) {
+	t.Parallel()
+
+	// A primary with OrderStrategyType=TRIGGER should be rejected by
+	// ValidateFTSOrder since FTS legs cannot be nested complex orders.
+	triggerSpec := mustMarshalJSON(t, models.OrderRequest{
+		Session:           models.SessionNormal,
+		Duration:          models.DurationDay,
+		OrderType:         models.OrderTypeLimit,
+		OrderStrategyType: models.OrderStrategyTypeTrigger,
+		Price:             ptrFloat(150.0),
+		OrderLegCollection: []models.OrderLegCollection{
+			{
+				Instruction: models.InstructionBuy,
+				Quantity:    10,
+				Instrument:  models.OrderInstrument{AssetType: models.AssetTypeEquity, Symbol: "AAPL"},
+			},
+		},
+	})
+
+	_, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
+		"order", "build", "fts",
+		"--primary", triggerSpec,
+		"--secondary", validSecondarySpec(t),
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simple order")
+}
+
+// TestParseOrderType verifies order type parsing including MOC/LOC aliases.
+func TestParseOrderType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		fallback models.OrderType
+		want     models.OrderType
+		wantErr  bool
+	}{
+		{
+			name:     "MARKET_ON_CLOSE full name",
+			input:    "MARKET_ON_CLOSE",
+			fallback: models.OrderTypeMarket,
+			want:     models.OrderTypeMarketOnClose,
+			wantErr:  false,
+		},
+		{
+			name:     "MOC alias",
+			input:    "MOC",
+			fallback: models.OrderTypeMarket,
+			want:     models.OrderTypeMarketOnClose,
+			wantErr:  false,
+		},
+		{
+			name:     "LIMIT_ON_CLOSE full name",
+			input:    "LIMIT_ON_CLOSE",
+			fallback: models.OrderTypeMarket,
+			want:     models.OrderTypeLimitOnClose,
+			wantErr:  false,
+		},
+		{
+			name:     "LOC alias",
+			input:    "LOC",
+			fallback: models.OrderTypeMarket,
+			want:     models.OrderTypeLimitOnClose,
+			wantErr:  false,
+		},
+		{
+			name:     "MARKET",
+			input:    "MARKET",
+			fallback: models.OrderTypeLimit,
+			want:     models.OrderTypeMarket,
+			wantErr:  false,
+		},
+		{
+			name:     "LIMIT",
+			input:    "LIMIT",
+			fallback: models.OrderTypeMarket,
+			want:     models.OrderTypeLimit,
+			wantErr:  false,
+		},
+		{
+			name:     "STOP",
+			input:    "STOP",
+			fallback: models.OrderTypeMarket,
+			want:     models.OrderTypeStop,
+			wantErr:  false,
+		},
+		{
+			name:     "STOP_LIMIT",
+			input:    "STOP_LIMIT",
+			fallback: models.OrderTypeMarket,
+			want:     models.OrderTypeStopLimit,
+			wantErr:  false,
+		},
+		{
+			name:     "empty string uses fallback",
+			input:    "",
+			fallback: models.OrderTypeMarket,
+			want:     models.OrderTypeMarket,
+			wantErr:  false,
+		},
+		{
+			name:     "whitespace uses fallback",
+			input:    "   ",
+			fallback: models.OrderTypeLimit,
+			want:     models.OrderTypeLimit,
+			wantErr:  false,
+		},
+		{
+			name:     "case insensitive",
+			input:    "market",
+			fallback: models.OrderTypeLimit,
+			want:     models.OrderTypeMarket,
+			wantErr:  false,
+		},
+		{
+			name:     "invalid type",
+			input:    "INVALID_TYPE",
+			fallback: models.OrderTypeMarket,
+			want:     "",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := parseOrderType(tt.input, tt.fallback)
+			if tt.wantErr {
+				require.Error(t, err)
+				var validationErr *apperr.ValidationError
+				require.True(t, errors.As(err, &validationErr))
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
+// --- order repeat tests ---
+
+// sampleOrderJSON returns a JSON string for a filled order response. Includes
+// response-only fields (orderId, status, filledQuantity) that OrderToRequest
+// should strip when converting to a submittable request.
+func sampleOrderJSON() string {
+	return `{
+		"session":"NORMAL",
+		"duration":"DAY",
+		"orderType":"LIMIT",
+		"cancelTime":"2025-12-31T00:00:00+0000",
+		"orderStrategyType":"SINGLE",
+		"orderId":12345,
+		"status":"FILLED",
+		"filledQuantity":10,
+		"remainingQuantity":0,
+		"cancelable":false,
+		"editable":false,
+		"price":150.0,
+		"orderLegCollection":[{
+			"instruction":"BUY",
+			"quantity":10,
+			"instrument":{"assetType":"EQUITY","symbol":"AAPL"}
+		}]
+	}`
+}
+
+func TestOrderRepeatBuildDefault(t *testing.T) {
+	t.Parallel()
+
+	// Arrange: mock server returns order on GET, nothing else expected.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/trader/v1/accounts/hash123/orders/12345", r.URL.Path)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte(sampleOrderJSON()))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act: no mode flag means --build (default).
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "repeat", "12345")
+
+	// Assert: raw JSON output (not envelope-wrapped), no response-only fields.
+	require.NoError(t, err)
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
+	assert.Equal(t, models.SessionNormal, order.Session)
+	assert.Equal(t, models.DurationDay, order.Duration)
+	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
+	require.NotNil(t, order.Price)
+	assert.Equal(t, 150.0, *order.Price)
+	require.Len(t, order.OrderLegCollection, 1)
+	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, "AAPL", order.OrderLegCollection[0].Instrument.Symbol)
+	assert.Equal(t, float64(10), order.OrderLegCollection[0].Quantity)
+
+	// Verify CancelTime is preserved through OrderToRequest.
+	assert.Contains(t, stdout, `"cancelTime"`)
+
+	// Verify response-only fields are NOT present in the output.
+	assert.NotContains(t, stdout, `"orderId"`)
+	assert.NotContains(t, stdout, `"status"`)
+	assert.NotContains(t, stdout, `"filledQuantity"`)
+}
+
+func TestOrderRepeatBuildExplicit(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte(sampleOrderJSON()))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act: explicit --build flag.
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "repeat", "--build", "12345")
+
+	// Assert
+	require.NoError(t, err)
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
+	assert.NotContains(t, stdout, `"orderId"`)
+}
+
+func TestOrderRepeatPreview(t *testing.T) {
+	t.Parallel()
+
+	// Arrange: GET returns order, POST to previewOrder returns preview response.
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		requestCount++
+
+		switch {
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/orders/12345"):
+			_, err := w.Write([]byte(sampleOrderJSON()))
+			require.NoError(t, err)
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/previewOrder"):
+			// Verify the posted body is a valid OrderRequest (no response-only fields).
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			var req models.OrderRequest
+			require.NoError(t, json.Unmarshal(body, &req))
+			assert.Equal(t, models.OrderTypeLimit, req.OrderType)
+
+			_, err = w.Write([]byte(`{"orderStrategy":{"orderType":"LIMIT","status":"ACCEPTED"}}`))
+			require.NoError(t, err)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "repeat", "--preview", "12345")
+
+	// Assert: envelope-wrapped preview response.
+	require.NoError(t, err)
+	assert.Equal(t, 2, requestCount, "should make GET + POST requests")
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(12345), data["originalOrderId"])
+	assert.NotNil(t, data["preview"])
+}
+
+func TestOrderRepeatConfirmSuccess(t *testing.T) {
+	t.Parallel()
+
+	// Arrange: GET returns order, POST to orders endpoint returns Location header.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/orders/12345"):
+			_, err := w.Write([]byte(sampleOrderJSON()))
+			require.NoError(t, err)
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/orders"):
+			// PlaceOrder: verify request body, return Location header with new order ID.
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			var req models.OrderRequest
+			require.NoError(t, json.Unmarshal(body, &req))
+			assert.Equal(t, models.OrderTypeLimit, req.OrderType)
+
+			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/99999")
+			w.WriteHeader(http.StatusCreated)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "repeat", "--confirm", "12345")
+
+	// Assert
+	require.NoError(t, err)
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(99999), data["orderId"])
+	assert.Equal(t, float64(12345), data["originalOrderId"])
+}
+
+func TestOrderRepeatConfirmMutableDisabled(t *testing.T) {
+	t.Parallel()
+
+	// Arrange: mutable operations disabled in config.
+	configPath := writeTestConfig(t, "hash123")
+
+	// Act: --confirm should fail before even calling the API.
+	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "repeat", "--confirm", "12345")
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	var validationErr *apperr.ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, mutableDisabledMessage, validationErr.Error())
+}
+
+func TestOrderRepeatInvalidOrderID(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	configPath := writeTestConfig(t, "hash123")
+
+	// Act
+	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "repeat", "abc")
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	var validationErr *apperr.ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "order-id must be a valid integer", validationErr.Error())
+}
+
+func TestOrderRepeatMissingOrderID(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	configPath := writeTestConfig(t, "hash123")
+
+	// Act
+	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "repeat")
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	var validationErr *apperr.ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "order-id is required", validationErr.Error())
+}
+
+func TestOrderRepeatMultipleModes(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	configPath := writeTestConfig(t, "hash123")
+
+	// Act: passing both --build and --preview should error.
+	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "repeat", "--build", "--preview", "12345")
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	var validationErr *apperr.ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "specify only one of --build, --preview, or --confirm", validationErr.Error())
 }

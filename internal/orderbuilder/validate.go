@@ -44,6 +44,22 @@ func ValidateEquityOrder(params *EquityParams) error {
 		if params.Price == 0 {
 			return validationError("TRAILING_STOP_LIMIT order requires a limit price", "Add `--price <amount>` to specify the limit price")
 		}
+	case models.OrderTypeMarketOnClose:
+		// MOC orders are like MARKET orders - no price or stop price allowed
+		if params.Price != 0 {
+			return validationError("MARKET_ON_CLOSE order does not accept a price", "Remove `--price` flag for MOC orders")
+		}
+		if params.StopPrice != 0 {
+			return validationError("MARKET_ON_CLOSE order does not accept a stop price", "Remove `--stop-price` flag for MOC orders")
+		}
+	case models.OrderTypeLimitOnClose:
+		// LOC orders are like LIMIT orders - price is required
+		if params.Price == 0 {
+			return validationError("LIMIT_ON_CLOSE order requires a price", "Add `--price <amount>` to specify the limit price")
+		}
+		if params.StopPrice != 0 {
+			return validationError("LIMIT_ON_CLOSE order does not accept a stop price", "Remove `--stop-price` flag for LOC orders")
+		}
 	}
 
 	return nil
@@ -154,6 +170,43 @@ func ValidateBracketOrder(params *BracketParams) error {
 		if err := validateBracketPriceRelationships(params); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// ValidateFTSOrder validates first-triggers-second order parameters.
+// Each sub-order must be non-empty (has an OrderType or legs) and must not
+// already be a complex order (e.g., TRIGGER, OCO). The content of each
+// sub-order is the caller's responsibility - this only checks structural rules.
+func ValidateFTSOrder(params *FTSParams) error {
+	if err := validateFTSLeg("primary", &params.Primary); err != nil {
+		return err
+	}
+
+	if err := validateFTSLeg("secondary", &params.Secondary); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateFTSLeg checks that a single FTS leg is non-empty and not already a
+// complex order. An order is considered empty when it has no OrderType and no
+// legs. A complex order has an OrderStrategyType other than "" or "SINGLE".
+func validateFTSLeg(name string, order *models.OrderRequest) error {
+	if order.OrderType == "" && len(order.OrderLegCollection) == 0 {
+		return validationError(
+			name+" order is empty",
+			"Provide a valid order with an order type and at least one leg",
+		)
+	}
+
+	if order.OrderStrategyType != "" && order.OrderStrategyType != models.OrderStrategyTypeSingle {
+		return validationError(
+			name+" order must be a simple order, not a "+string(order.OrderStrategyType)+" strategy",
+			"FTS legs cannot be nested complex orders (TRIGGER, OCO, etc.)",
+		)
 	}
 
 	return nil

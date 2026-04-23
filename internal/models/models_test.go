@@ -1216,3 +1216,373 @@ func TestCandleListJSONRoundTrip(t *testing.T) {
 	assert.Equal(t, *cl.Symbol, *cl2.Symbol)
 	assert.Len(t, cl2.Candles, 2)
 }
+
+// TestOrderToRequest verifies that Order (response) converts correctly to OrderRequest (submission).
+func TestOrderToRequest(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		test func(t *testing.T)
+	}{
+		{
+			name: "simple order conversion",
+			test: func(t *testing.T) {
+				// Arrange: Create a simple Order with basic fields.
+				price := 150.50
+				quantity := 10.0
+				order := Order{
+					Session:           SessionNormal,
+					Duration:          DurationDay,
+					OrderType:         OrderTypeLimit,
+					Price:             &price,
+					Quantity:          &quantity,
+					OrderStrategyType: OrderStrategyTypeSingle,
+					OrderLegCollection: []OrderLegCollection{
+						{
+							Instruction: InstructionBuy,
+							Quantity:    10.0,
+							Instrument: OrderInstrument{
+								AssetType: AssetTypeEquity,
+								Symbol:    "AAPL",
+							},
+						},
+					},
+				}
+
+				// Act: Convert to OrderRequest.
+				req := OrderToRequest(&order)
+
+				// Assert: Verify all allowlist fields are copied.
+				assert.Equal(t, SessionNormal, req.Session)
+				assert.Equal(t, DurationDay, req.Duration)
+				assert.Equal(t, OrderTypeLimit, req.OrderType)
+				assert.NotNil(t, req.Price)
+				assert.Equal(t, 150.50, *req.Price)
+				assert.NotNil(t, req.Quantity)
+				assert.Equal(t, 10.0, *req.Quantity)
+				assert.Equal(t, OrderStrategyTypeSingle, req.OrderStrategyType)
+				assert.Len(t, req.OrderLegCollection, 1)
+				assert.Equal(t, InstructionBuy, req.OrderLegCollection[0].Instruction)
+			},
+		},
+		{
+			name: "order with child order strategies",
+			test: func(t *testing.T) {
+				// Arrange: Create a parent Order with child orders (e.g., OCO).
+				price1 := 150.00
+				price2 := 145.00
+				quantity := 10.0
+
+				childOrder1 := Order{
+					Session:           SessionNormal,
+					Duration:          DurationGoodTillCancel,
+					OrderType:         OrderTypeLimit,
+					Price:             &price1,
+					Quantity:          &quantity,
+					OrderStrategyType: OrderStrategyTypeSingle,
+					OrderLegCollection: []OrderLegCollection{
+						{
+							Instruction: InstructionSell,
+							Quantity:    10.0,
+							Instrument: OrderInstrument{
+								AssetType: AssetTypeEquity,
+								Symbol:    "AAPL",
+							},
+						},
+					},
+				}
+
+				childOrder2 := Order{
+					Session:           SessionNormal,
+					Duration:          DurationGoodTillCancel,
+					OrderType:         OrderTypeLimit,
+					Price:             &price2,
+					Quantity:          &quantity,
+					OrderStrategyType: OrderStrategyTypeSingle,
+					OrderLegCollection: []OrderLegCollection{
+						{
+							Instruction: InstructionSell,
+							Quantity:    10.0,
+							Instrument: OrderInstrument{
+								AssetType: AssetTypeEquity,
+								Symbol:    "AAPL",
+							},
+						},
+					},
+				}
+
+				parentOrder := Order{
+					Session:            SessionNormal,
+					Duration:           DurationGoodTillCancel,
+					OrderType:          OrderTypeLimit,
+					OrderStrategyType:  OrderStrategyTypeOCO,
+					ChildOrderStrategies: []Order{childOrder1, childOrder2},
+				}
+
+				// Act: Convert to OrderRequest.
+				req := OrderToRequest(&parentOrder)
+
+				// Assert: Verify parent and children are converted.
+				assert.Equal(t, OrderStrategyTypeOCO, req.OrderStrategyType)
+				assert.Len(t, req.ChildOrderStrategies, 2)
+
+				// Verify first child.
+				assert.Equal(t, OrderTypeLimit, req.ChildOrderStrategies[0].OrderType)
+				assert.NotNil(t, req.ChildOrderStrategies[0].Price)
+				assert.Equal(t, 150.00, *req.ChildOrderStrategies[0].Price)
+				assert.Len(t, req.ChildOrderStrategies[0].OrderLegCollection, 1)
+
+				// Verify second child.
+				assert.Equal(t, OrderTypeLimit, req.ChildOrderStrategies[1].OrderType)
+				assert.NotNil(t, req.ChildOrderStrategies[1].Price)
+				assert.Equal(t, 145.00, *req.ChildOrderStrategies[1].Price)
+				assert.Len(t, req.ChildOrderStrategies[1].OrderLegCollection, 1)
+			},
+		},
+		{
+			name: "minimal order with zero-value optional fields",
+			test: func(t *testing.T) {
+				// Arrange: Create a minimal Order with only required fields.
+				order := Order{
+					Session:           SessionNormal,
+					Duration:          DurationDay,
+					OrderType:         OrderTypeMarket,
+					OrderStrategyType: OrderStrategyTypeSingle,
+					OrderLegCollection: []OrderLegCollection{
+						{
+							Instruction: InstructionBuy,
+							Quantity:    5.0,
+							Instrument: OrderInstrument{
+								AssetType: AssetTypeEquity,
+								Symbol:    "TSLA",
+							},
+						},
+					},
+					// All optional fields are nil/zero.
+				}
+
+				// Act: Convert to OrderRequest.
+				req := OrderToRequest(&order)
+
+				// Assert: Verify required fields are present, optional fields are nil.
+				assert.Equal(t, SessionNormal, req.Session)
+				assert.Equal(t, DurationDay, req.Duration)
+				assert.Equal(t, OrderTypeMarket, req.OrderType)
+				assert.Equal(t, OrderStrategyTypeSingle, req.OrderStrategyType)
+				assert.Nil(t, req.Price)
+				assert.Nil(t, req.StopPrice)
+				assert.Nil(t, req.TaxLotMethod)
+				assert.Nil(t, req.SpecialInstruction)
+				assert.Empty(t, req.ChildOrderStrategies)
+			},
+		},
+		{
+			name: "response-only fields are excluded",
+			test: func(t *testing.T) {
+				// Arrange: Create an Order with response-only fields populated.
+				orderID := int64(12345)
+				status := OrderStatusFilled
+				filledQty := 10.0
+				remainingQty := 0.0
+				tag := "my-tag"
+				accountNum := int64(987654)
+				cancelable := true
+				editable := false
+				statusDesc := "Order filled"
+
+				order := Order{
+					Session:           SessionNormal,
+					Duration:          DurationDay,
+					OrderType:         OrderTypeMarket,
+					OrderStrategyType: OrderStrategyTypeSingle,
+					OrderID:           &orderID,
+					Status:            &status,
+					FilledQuantity:    &filledQty,
+					RemainingQuantity: &remainingQty,
+					Tag:               &tag,
+					AccountNumber:     &accountNum,
+					Cancelable:        &cancelable,
+					Editable:          &editable,
+					StatusDescription: &statusDesc,
+					OrderLegCollection: []OrderLegCollection{
+						{
+							Instruction: InstructionBuy,
+							Quantity:    10.0,
+							Instrument: OrderInstrument{
+								AssetType: AssetTypeEquity,
+								Symbol:    "MSFT",
+							},
+						},
+					},
+				}
+
+				// Act: Convert to OrderRequest.
+				req := OrderToRequest(&order)
+
+				// Assert: Verify response-only fields are NOT in OrderRequest.
+				// OrderRequest doesn't have these fields, so we just verify the conversion succeeds
+				// and the basic fields are present.
+				assert.Equal(t, SessionNormal, req.Session)
+				assert.Equal(t, OrderTypeMarket, req.OrderType)
+				assert.Equal(t, OrderStrategyTypeSingle, req.OrderStrategyType)
+				assert.Len(t, req.OrderLegCollection, 1)
+			},
+		},
+		{
+			name: "nested child order strategies (recursive)",
+			test: func(t *testing.T) {
+				// Arrange: Create a deeply nested structure (parent -> child -> grandchild).
+				price := 100.0
+				qty := 5.0
+
+				grandchild := Order{
+					Session:           SessionNormal,
+					Duration:          DurationDay,
+					OrderType:         OrderTypeMarket,
+					Quantity:          &qty,
+					OrderStrategyType: OrderStrategyTypeSingle,
+					OrderLegCollection: []OrderLegCollection{
+						{
+							Instruction: InstructionBuy,
+							Quantity:    5.0,
+							Instrument: OrderInstrument{
+								AssetType: AssetTypeEquity,
+								Symbol:    "GOOGL",
+							},
+						},
+					},
+				}
+
+				child := Order{
+					Session:            SessionNormal,
+					Duration:           DurationDay,
+					OrderType:          OrderTypeLimit,
+					Price:              &price,
+					Quantity:           &qty,
+					OrderStrategyType:  OrderStrategyTypeTrigger,
+					ChildOrderStrategies: []Order{grandchild},
+					OrderLegCollection: []OrderLegCollection{
+						{
+							Instruction: InstructionSell,
+							Quantity:    5.0,
+							Instrument: OrderInstrument{
+								AssetType: AssetTypeEquity,
+								Symbol:    "GOOGL",
+							},
+						},
+					},
+				}
+
+				parent := Order{
+					Session:            SessionNormal,
+					Duration:           DurationDay,
+					OrderType:          OrderTypeMarket,
+					OrderStrategyType:  OrderStrategyTypeTrigger,
+					ChildOrderStrategies: []Order{child},
+					OrderLegCollection: []OrderLegCollection{
+						{
+							Instruction: InstructionBuy,
+							Quantity:    5.0,
+							Instrument: OrderInstrument{
+								AssetType: AssetTypeEquity,
+								Symbol:    "GOOGL",
+							},
+						},
+					},
+				}
+
+				// Act: Convert to OrderRequest.
+				req := OrderToRequest(&parent)
+
+				// Assert: Verify all levels are converted correctly.
+				assert.Equal(t, OrderStrategyTypeTrigger, req.OrderStrategyType)
+				assert.Len(t, req.ChildOrderStrategies, 1)
+
+				childReq := req.ChildOrderStrategies[0]
+				assert.Equal(t, OrderStrategyTypeTrigger, childReq.OrderStrategyType)
+				assert.NotNil(t, childReq.Price)
+				assert.Equal(t, 100.0, *childReq.Price)
+				assert.Len(t, childReq.ChildOrderStrategies, 1)
+
+				grandchildReq := childReq.ChildOrderStrategies[0]
+				assert.Equal(t, OrderStrategyTypeSingle, grandchildReq.OrderStrategyType)
+				assert.Empty(t, grandchildReq.ChildOrderStrategies)
+			},
+		},
+		{
+			name: "order with special instruction and tax lot method",
+			test: func(t *testing.T) {
+				// Arrange: Create an Order with special instruction and tax lot method.
+				specialInstr := SpecialInstructionAllOrNone
+				taxLot := TaxLotMethodFIFO
+
+				order := Order{
+					Session:            SessionNormal,
+					Duration:           DurationDay,
+					OrderType:          OrderTypeLimit,
+					OrderStrategyType:  OrderStrategyTypeSingle,
+					SpecialInstruction: &specialInstr,
+					TaxLotMethod:       &taxLot,
+					OrderLegCollection: []OrderLegCollection{
+						{
+							Instruction: InstructionSell,
+							Quantity:    100.0,
+							Instrument: OrderInstrument{
+								AssetType: AssetTypeEquity,
+								Symbol:    "IBM",
+							},
+						},
+					},
+				}
+
+				// Act: Convert to OrderRequest.
+				req := OrderToRequest(&order)
+
+				// Assert: Verify special instruction and tax lot method are copied.
+				assert.NotNil(t, req.SpecialInstruction)
+				assert.Equal(t, SpecialInstructionAllOrNone, *req.SpecialInstruction)
+				assert.NotNil(t, req.TaxLotMethod)
+				assert.Equal(t, TaxLotMethodFIFO, *req.TaxLotMethod)
+			},
+		},
+		{
+			name: "cancel time is preserved",
+			test: func(t *testing.T) {
+				// Arrange: Order with CancelTime set.
+				cancelTime := &SchwabTime{Time: time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC)}
+				order := Order{
+					Session:           SessionNormal,
+					Duration:          DurationGoodTillCancel,
+					OrderType:         OrderTypeLimit,
+					CancelTime:        cancelTime,
+					OrderStrategyType: OrderStrategyTypeSingle,
+					OrderLegCollection: []OrderLegCollection{
+						{
+							Instruction: InstructionBuy,
+							Quantity:    10.0,
+							Instrument: OrderInstrument{
+								AssetType: AssetTypeEquity,
+								Symbol:    "AAPL",
+							},
+						},
+					},
+				}
+
+				// Act
+				req := OrderToRequest(&order)
+
+				// Assert: CancelTime is copied.
+				require.NotNil(t, req.CancelTime)
+				assert.Equal(t, cancelTime.Time, req.CancelTime.Time)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tt.test(t)
+		})
+	}
+}

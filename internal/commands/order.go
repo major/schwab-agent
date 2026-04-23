@@ -53,6 +53,18 @@ type orderReplaceData struct {
 	Replaced bool  `json:"replaced"`
 }
 
+// orderRepeatPlaceData wraps a successful order repeat placement response.
+type orderRepeatPlaceData struct {
+	OrderID         int64 `json:"orderId"`
+	OriginalOrderID int64 `json:"originalOrderId"`
+}
+
+// orderRepeatPreviewData wraps an order repeat preview response.
+type orderRepeatPreviewData struct {
+	Preview         *models.PreviewOrder `json:"preview"`
+	OriginalOrderID int64                `json:"originalOrderId"`
+}
+
 const confirmOrderMessage = "Add --confirm to execute this order"
 
 const mutableDisabledMessage = `Mutable operations are disabled by default. ` +
@@ -71,6 +83,7 @@ func OrderCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 			orderBuildCommand(w),
 			orderCancelCommand(c, configPath, w),
 			orderReplaceCommand(c, configPath, w),
+			orderRepeatCommand(c, configPath, w),
 		},
 	}
 }
@@ -382,6 +395,97 @@ func orderReplaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Com
 			}
 
 			return output.WriteSuccess(w, orderReplaceData{OrderID: orderID, Replaced: true}, output.NewMetadata())
+		},
+	}
+}
+
+// orderRepeatCommand fetches an existing order, converts it to a submittable request,
+// and either outputs the JSON (--build/default), previews it, or places it.
+func orderRepeatCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
+	return &cli.Command{
+		Name:      "repeat",
+		Usage:     "Repeat a previous order (fetch, convert, and optionally place)",
+		ArgsUsage: "<order-id>",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{Name: "build", Usage: "Output reconstructed order request JSON (default)"},
+			&cli.BoolFlag{Name: "preview", Usage: "Preview the order without placing it"},
+			&cli.BoolFlag{Name: "confirm", Usage: "Place the order (requires safety guards)"},
+			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			buildMode := cmd.Bool("build")
+			previewMode := cmd.Bool("preview")
+			confirmMode := cmd.Bool("confirm")
+
+			// Reject multiple mode flags to avoid ambiguity.
+			modeCount := 0
+			if buildMode {
+				modeCount++
+			}
+			if previewMode {
+				modeCount++
+			}
+			if confirmMode {
+				modeCount++
+			}
+			if modeCount > 1 {
+				return newValidationError("specify only one of --build, --preview, or --confirm")
+			}
+
+			// Enforce safety guards early for --confirm so we fail fast
+			// before making any API calls. Note: --confirm doubles as
+			// both the mode selector and the safety gate for this command,
+			// so a separate requireConfirm check would be tautological.
+			if confirmMode {
+				if err := requireMutableEnabled(configPath); err != nil {
+					return err
+				}
+			}
+
+			orderID, err := parseRequiredOrderID(cmd)
+			if err != nil {
+				return err
+			}
+
+			account, err := resolveAccount(cmd.String("account"), configPath, nil)
+			if err != nil {
+				return err
+			}
+
+			// Fetch the original order from the API.
+			order, err := c.GetOrder(ctx, account, orderID)
+			if err != nil {
+				return err
+			}
+
+			// Convert to a submittable request (strips response-only fields).
+			request := models.OrderToRequest(order)
+
+			switch {
+			case previewMode:
+				preview, previewErr := c.PreviewOrder(ctx, account, &request)
+				if previewErr != nil {
+					return previewErr
+				}
+				return output.WriteSuccess(w, orderRepeatPreviewData{
+					Preview:         preview,
+					OriginalOrderID: orderID,
+				}, output.NewMetadata())
+
+			case confirmMode:
+				response, placeErr := c.PlaceOrder(ctx, account, &request)
+				if placeErr != nil {
+					return placeErr
+				}
+				return output.WriteSuccess(w, orderRepeatPlaceData{
+					OrderID:         response.OrderID,
+					OriginalOrderID: orderID,
+				}, output.NewMetadata())
+
+			default:
+				// --build or no flag: output raw order request JSON.
+				return writeOrderRequestJSON(w, request)
+			}
 		},
 	}
 }
@@ -813,7 +917,17 @@ func parseOrderType(raw string, fallback models.OrderType) (models.OrderType, er
 		return fallback, nil
 	}
 
-	value := models.OrderType(strings.ToUpper(strings.TrimSpace(raw)))
+	upper := strings.ToUpper(strings.TrimSpace(raw))
+	
+	// Handle aliases: MOC -> MARKET_ON_CLOSE, LOC -> LIMIT_ON_CLOSE
+	switch upper {
+	case "MOC":
+		return models.OrderTypeMarketOnClose, nil
+	case "LOC":
+		return models.OrderTypeLimitOnClose, nil
+	}
+
+	value := models.OrderType(upper)
 	switch value {
 	case models.OrderTypeMarket,
 		models.OrderTypeLimit,
@@ -821,6 +935,8 @@ func parseOrderType(raw string, fallback models.OrderType) (models.OrderType, er
 		models.OrderTypeStopLimit,
 		models.OrderTypeTrailingStop,
 		models.OrderTypeTrailingStopLimit,
+		models.OrderTypeMarketOnClose,
+		models.OrderTypeLimitOnClose,
 		models.OrderTypeNetDebit,
 		models.OrderTypeNetCredit,
 		models.OrderTypeNetZero:

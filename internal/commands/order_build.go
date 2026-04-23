@@ -78,9 +78,71 @@ func orderBuildCommand(w io.Writer) *cli.Command {
 			makeBuildOrderCommand(w, "strangle", "Build a strangle order request",
 				strangleOrderFlags(), parseStrangleParams,
 				orderbuilder.ValidateStrangleOrder, orderbuilder.BuildStrangleOrder),
-			makeBuildOrderCommand(w, "covered-call", "Build a covered call order request (buy shares + sell call)",
-				coveredCallOrderFlags(), parseCoveredCallParams,
-				orderbuilder.ValidateCoveredCallOrder, orderbuilder.BuildCoveredCallOrder),
+		makeBuildOrderCommand(w, "covered-call", "Build a covered call order request (buy shares + sell call)",
+			coveredCallOrderFlags(), parseCoveredCallParams,
+			orderbuilder.ValidateCoveredCallOrder, orderbuilder.BuildCoveredCallOrder),
+			buildFTSCommand(w),
+		},
+	}
+}
+
+// buildFTSCommand creates the "order build fts" subcommand. FTS orders take
+// two full order specs (--primary and --secondary) rather than typed flag params,
+// so the generic makeBuildOrderCommand pipeline doesn't fit here.
+func buildFTSCommand(w io.Writer) *cli.Command {
+	return &cli.Command{
+		Name:  "fts",
+		Usage: "Build a first-triggers-second order from two order specs",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "primary",
+				Usage:    "Primary order spec (inline JSON, @file, or - for stdin)",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "secondary",
+				Usage:    "Secondary order spec (inline JSON, @file, or - for stdin)",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			_ = ctx
+
+			primaryData, err := readSpecSource(cmd, cmd.String("primary"))
+			if err != nil {
+				return err
+			}
+
+			secondaryData, err := readSpecSource(cmd, cmd.String("secondary"))
+			if err != nil {
+				return err
+			}
+
+			var primary models.OrderRequest
+			if err := json.Unmarshal(primaryData, &primary); err != nil {
+				return newValidationError("invalid primary order JSON: " + err.Error())
+			}
+
+			var secondary models.OrderRequest
+			if err := json.Unmarshal(secondaryData, &secondary); err != nil {
+				return newValidationError("invalid secondary order JSON: " + err.Error())
+			}
+
+			params := orderbuilder.FTSParams{
+				Primary:   primary,
+				Secondary: secondary,
+			}
+
+			if err := orderbuilder.ValidateFTSOrder(&params); err != nil {
+				return err
+			}
+
+			result, err := orderbuilder.BuildFTSOrder(&params)
+			if err != nil {
+				return err
+			}
+
+			return writeOrderRequestJSON(w, result)
 		},
 	}
 }

@@ -216,6 +216,36 @@ func bracketExitInstruction(action models.Instruction) models.Instruction {
 	return models.InstructionSell
 }
 
+// FTSParams holds parameters for building a first-triggers-second order.
+// The primary order fires first; when it fills, the secondary order activates.
+// Both fields are full OrderRequest values so callers can compose any order
+// types (equity, option, etc.) without the builder needing to know the details.
+type FTSParams struct {
+	Primary   models.OrderRequest
+	Secondary models.OrderRequest
+}
+
+// BuildFTSOrder constructs a first-triggers-second order.
+//
+// The primary order becomes a TRIGGER that, once filled, activates the
+// secondary order as a SINGLE child. This is simpler than a bracket order:
+// TRIGGER → SINGLE (no OCO layer).
+func BuildFTSOrder(params *FTSParams) (models.OrderRequest, error) {
+	if err := ValidateFTSOrder(params); err != nil {
+		return models.OrderRequest{}, err
+	}
+
+	// Copy by value so we don't mutate the caller's inputs
+	// (consistent with BuildBracketOrder/BuildOCOOrder).
+	primary := params.Primary
+	secondary := params.Secondary
+	primary.OrderStrategyType = models.OrderStrategyTypeTrigger
+	secondary.OrderStrategyType = models.OrderStrategyTypeSingle
+	primary.ChildOrderStrategies = []models.OrderRequest{secondary}
+
+	return primary, nil
+}
+
 // buildEquityLeg constructs a single-leg equity order entry.
 func buildEquityLeg(symbol string, instruction models.Instruction, quantity float64) models.OrderLegCollection {
 	return models.OrderLegCollection{
