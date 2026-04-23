@@ -564,6 +564,286 @@ func TestValidateCoveredCallOrderAcceptsValidParams(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestValidateCalendarOrderRequiresUnderlying verifies underlying is mandatory.
+func TestValidateCalendarOrderRequiresUnderlying(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCalendarOrder(&CalendarParams{
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		Strike:         150,
+		Quantity:       1,
+		Price:          2.50,
+	})
+
+	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+}
+
+// TestValidateCalendarOrderRejectsSameExpiration verifies that both expirations
+// being identical is rejected. Calendar spreads require different expirations.
+func TestValidateCalendarOrderRejectsSameExpiration(t *testing.T) {
+	t.Parallel()
+
+	sameDate := time.Now().UTC().Add(30 * 24 * time.Hour)
+
+	err := ValidateCalendarOrder(&CalendarParams{
+		Underlying:     "AAPL",
+		NearExpiration: sameDate,
+		FarExpiration:  sameDate,
+		Strike:         150,
+		Quantity:       1,
+		Price:          2.50,
+	})
+
+	assertValidationError(t, err,
+		"near and far expirations must be different for calendar spreads",
+		"Use different dates for `--near-expiration` and `--far-expiration`",
+	)
+}
+
+// TestValidateCalendarOrderRejectsNearAfterFar verifies that near expiration
+// must come before far expiration.
+func TestValidateCalendarOrderRejectsNearAfterFar(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCalendarOrder(&CalendarParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(60 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(30 * 24 * time.Hour),
+		Strike:         150,
+		Quantity:       1,
+		Price:          2.50,
+	})
+
+	assertValidationError(t, err,
+		"near expiration must be before far expiration",
+		"Swap `--near-expiration` and `--far-expiration` so the near date comes first",
+	)
+}
+
+// TestValidateCalendarOrderRequiresStrike verifies strike is mandatory.
+func TestValidateCalendarOrderRequiresStrike(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCalendarOrder(&CalendarParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		Quantity:       1,
+		Price:          2.50,
+	})
+
+	assertValidationError(t, err, "strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+}
+
+// TestValidateCalendarOrderRequiresPrice verifies price is mandatory.
+func TestValidateCalendarOrderRequiresPrice(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCalendarOrder(&CalendarParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		Strike:         150,
+		Quantity:       1,
+	})
+
+	assertValidationError(t, err, "price is required for calendar spreads", "Add `--price <amount>` to specify the net debit or credit")
+}
+
+// TestValidateCalendarOrderRequiresQuantity verifies quantity is mandatory.
+func TestValidateCalendarOrderRequiresQuantity(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCalendarOrder(&CalendarParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		Strike:         150,
+		Price:          2.50,
+	})
+
+	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
+}
+
+// TestValidateCalendarOrderAcceptsValidParams verifies a valid calendar passes.
+func TestValidateCalendarOrderAcceptsValidParams(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCalendarOrder(&CalendarParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		Strike:         150,
+		Quantity:       1,
+		Price:          2.50,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateDiagonalOrderRequiresUnderlying verifies underlying is mandatory.
+func TestValidateDiagonalOrderRequiresUnderlying(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateDiagonalOrder(&DiagonalParams{
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		NearStrike:     150,
+		FarStrike:      155,
+		Quantity:       1,
+		Price:          3.00,
+	})
+
+	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+}
+
+// TestValidateDiagonalOrderRejectsSameExpiration verifies that both expirations
+// being identical is rejected.
+func TestValidateDiagonalOrderRejectsSameExpiration(t *testing.T) {
+	t.Parallel()
+
+	sameDate := time.Now().UTC().Add(30 * 24 * time.Hour)
+
+	err := ValidateDiagonalOrder(&DiagonalParams{
+		Underlying:     "AAPL",
+		NearExpiration: sameDate,
+		FarExpiration:  sameDate,
+		NearStrike:     150,
+		FarStrike:      155,
+		Quantity:       1,
+		Price:          3.00,
+	})
+
+	assertValidationError(t, err,
+		"near and far expirations must be different for diagonal spreads",
+		"Use different dates for `--near-expiration` and `--far-expiration`",
+	)
+}
+
+// TestValidateDiagonalOrderRejectsNearAfterFar verifies that near expiration
+// must come before far expiration.
+func TestValidateDiagonalOrderRejectsNearAfterFar(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateDiagonalOrder(&DiagonalParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(60 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(30 * 24 * time.Hour),
+		NearStrike:     150,
+		FarStrike:      155,
+		Quantity:       1,
+		Price:          3.00,
+	})
+
+	assertValidationError(t, err,
+		"near expiration must be before far expiration",
+		"Swap `--near-expiration` and `--far-expiration` so the near date comes first",
+	)
+}
+
+// TestValidateDiagonalOrderRejectsSameStrike verifies that identical strikes
+// are rejected. Diagonals require different strikes (use calendar for same strike).
+func TestValidateDiagonalOrderRejectsSameStrike(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateDiagonalOrder(&DiagonalParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		NearStrike:     150,
+		FarStrike:      150,
+		Quantity:       1,
+		Price:          3.00,
+	})
+
+	assertValidationError(t, err,
+		"near and far strikes must be different for diagonal spreads",
+		"Use different values for `--near-strike` and `--far-strike` (use calendar for same strike)",
+	)
+}
+
+// TestValidateDiagonalOrderRequiresNearStrike verifies near strike is mandatory.
+func TestValidateDiagonalOrderRequiresNearStrike(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateDiagonalOrder(&DiagonalParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		FarStrike:      155,
+		Quantity:       1,
+		Price:          3.00,
+	})
+
+	assertValidationError(t, err, "near strike price must be greater than zero", "Add `--near-strike <price>` with a positive value")
+}
+
+// TestValidateDiagonalOrderRequiresFarStrike verifies far strike is mandatory.
+func TestValidateDiagonalOrderRequiresFarStrike(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateDiagonalOrder(&DiagonalParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		NearStrike:     150,
+		Quantity:       1,
+		Price:          3.00,
+	})
+
+	assertValidationError(t, err, "far strike price must be greater than zero", "Add `--far-strike <price>` with a positive value")
+}
+
+// TestValidateDiagonalOrderRequiresPrice verifies price is mandatory.
+func TestValidateDiagonalOrderRequiresPrice(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateDiagonalOrder(&DiagonalParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		NearStrike:     150,
+		FarStrike:      155,
+		Quantity:       1,
+	})
+
+	assertValidationError(t, err, "price is required for diagonal spreads", "Add `--price <amount>` to specify the net debit or credit")
+}
+
+// TestValidateDiagonalOrderRequiresQuantity verifies quantity is mandatory.
+func TestValidateDiagonalOrderRequiresQuantity(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateDiagonalOrder(&DiagonalParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		NearStrike:     150,
+		FarStrike:      155,
+		Price:          3.00,
+	})
+
+	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
+}
+
+// TestValidateDiagonalOrderAcceptsValidParams verifies a valid diagonal passes.
+func TestValidateDiagonalOrderAcceptsValidParams(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateDiagonalOrder(&DiagonalParams{
+		Underlying:     "AAPL",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		NearStrike:     150,
+		FarStrike:      155,
+		Quantity:       1,
+		Price:          3.00,
+	})
+
+	require.NoError(t, err)
+}
+
 // TestValidateOptionOrderRequiresUnderlying verifies underlying symbol validation.
 func TestValidateOptionOrderRequiresUnderlying(t *testing.T) {
 	t.Parallel()

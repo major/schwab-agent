@@ -337,6 +337,116 @@ func BuildCoveredCallOrder(params *CoveredCallParams) (*models.OrderRequest, err
 	return order, nil
 }
 
+// CalendarParams holds parameters for building a calendar spread order.
+// A calendar spread buys and sells the same option at the same strike but with
+// different expirations. The far-dated option is bought and the near-dated
+// option is sold when opening (long calendar).
+type CalendarParams struct {
+	Underlying     string
+	NearExpiration time.Time // Near-term expiration (sold leg when opening)
+	FarExpiration  time.Time // Far-term expiration (bought leg when opening)
+	Strike         float64   // Strike price shared by both legs
+	PutCall        models.PutCall
+	Open           bool // true = opening position, false = closing
+	Quantity       float64
+	Price          float64 // Net debit amount (always positive)
+	Duration       models.Duration
+	Session        models.Session
+}
+
+// BuildCalendarOrder constructs an OrderRequest for a two-leg calendar spread.
+//
+// A long calendar spread profits from time decay: the near-term option decays
+// faster than the far-term option. Opening is always NET_DEBIT because the
+// far-dated option costs more than the near-dated one.
+//
+//	Open:  BUY_TO_OPEN far + SELL_TO_OPEN near
+//	Close: SELL_TO_CLOSE far + BUY_TO_CLOSE near
+func BuildCalendarOrder(params *CalendarParams) (*models.OrderRequest, error) {
+	longInstruction, shortInstruction := spreadInstructions(params.Open)
+	complexType := models.ComplexOrderStrategyTypeCalendar
+
+	order := &models.OrderRequest{
+		Session:                  cmp.Or(params.Session, models.SessionNormal),
+		Duration:                 cmp.Or(params.Duration, models.DurationDay),
+		OrderType:                models.OrderTypeNetDebit,
+		ComplexOrderStrategyType: &complexType,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		Price:                    ptr(params.Price),
+		OrderLegCollection: []models.OrderLegCollection{
+			// Far leg (bought when opening) listed first for consistency
+			// with how Schwab displays calendar spreads.
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.FarExpiration,
+				Strike: params.Strike, PutCall: params.PutCall,
+				Instruction: longInstruction, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.NearExpiration,
+				Strike: params.Strike, PutCall: params.PutCall,
+				Instruction: shortInstruction, Quantity: params.Quantity,
+			}),
+		},
+	}
+
+	return order, nil
+}
+
+// DiagonalParams holds parameters for building a diagonal spread order.
+// A diagonal spread combines different strikes AND different expirations.
+// Like a calendar, the far-dated option is bought and the near-dated is sold
+// when opening, but the strikes differ between legs.
+type DiagonalParams struct {
+	Underlying     string
+	NearExpiration time.Time // Near-term expiration (sold leg when opening)
+	FarExpiration  time.Time // Far-term expiration (bought leg when opening)
+	NearStrike     float64   // Strike price for the near-term (sold) leg
+	FarStrike      float64   // Strike price for the far-term (bought) leg
+	PutCall        models.PutCall
+	Open           bool // true = opening position, false = closing
+	Quantity       float64
+	Price          float64 // Net debit amount (always positive)
+	Duration       models.Duration
+	Session        models.Session
+}
+
+// BuildDiagonalOrder constructs an OrderRequest for a two-leg diagonal spread.
+//
+// A diagonal combines the time spread of a calendar with the strike spread of
+// a vertical. Opening is always NET_DEBIT because the far-dated option costs
+// more than the near-dated one (like a calendar).
+//
+//	Open:  BUY_TO_OPEN far (FarStrike) + SELL_TO_OPEN near (NearStrike)
+//	Close: SELL_TO_CLOSE far (FarStrike) + BUY_TO_CLOSE near (NearStrike)
+func BuildDiagonalOrder(params *DiagonalParams) (*models.OrderRequest, error) {
+	longInstruction, shortInstruction := spreadInstructions(params.Open)
+	complexType := models.ComplexOrderStrategyTypeDiagonal
+
+	order := &models.OrderRequest{
+		Session:                  cmp.Or(params.Session, models.SessionNormal),
+		Duration:                 cmp.Or(params.Duration, models.DurationDay),
+		OrderType:                models.OrderTypeNetDebit,
+		ComplexOrderStrategyType: &complexType,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		Price:                    ptr(params.Price),
+		OrderLegCollection: []models.OrderLegCollection{
+			// Far leg (bought when opening) listed first.
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.FarExpiration,
+				Strike: params.FarStrike, PutCall: params.PutCall,
+				Instruction: longInstruction, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.NearExpiration,
+				Strike: params.NearStrike, PutCall: params.PutCall,
+				Instruction: shortInstruction, Quantity: params.Quantity,
+			}),
+		},
+	}
+
+	return order, nil
+}
+
 // optionLegParams holds the parameters for constructing a single option leg.
 // Using a struct instead of positional args prevents accidental swaps between
 // the two float64 fields (Strike and Quantity).

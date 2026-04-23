@@ -1202,6 +1202,138 @@ func parseCoveredCallParams(cmd *cli.Command) (orderbuilder.CoveredCallParams, e
 	}, nil
 }
 
+// calendarOrderFlags returns the CLI flags for the calendar spread build command.
+func calendarOrderFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
+		&cli.StringFlag{Name: "near-expiration", Usage: "Near-term expiration date (YYYY-MM-DD)"},
+		&cli.StringFlag{Name: "far-expiration", Usage: "Far-term expiration date (YYYY-MM-DD)"},
+		&cli.Float64Flag{Name: "strike", Usage: "Strike price (shared by both legs)"},
+		&cli.BoolFlag{Name: "call", Usage: "Call calendar spread"},
+		&cli.BoolFlag{Name: "put", Usage: "Put calendar spread"},
+		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
+		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
+		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts"},
+		&cli.Float64Flag{Name: "price", Usage: "Net debit amount"},
+		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
+		&cli.StringFlag{Name: "session", Usage: "Trading session"},
+	}
+}
+
+// parseCalendarParams converts command flags into calendar spread builder params.
+func parseCalendarParams(cmd *cli.Command) (orderbuilder.CalendarParams, error) {
+	putCall, err := parsePutCall(cmd.Bool("call"), cmd.Bool("put"))
+	if err != nil {
+		return orderbuilder.CalendarParams{}, err
+	}
+
+	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+	if err != nil {
+		return orderbuilder.CalendarParams{}, err
+	}
+
+	nearExpiration, err := parseDateFlag(cmd.String("near-expiration"), "near-expiration")
+	if err != nil {
+		return orderbuilder.CalendarParams{}, err
+	}
+
+	farExpiration, err := parseDateFlag(cmd.String("far-expiration"), "far-expiration")
+	if err != nil {
+		return orderbuilder.CalendarParams{}, err
+	}
+
+	duration, session, err := parseDurationSession(cmd)
+	if err != nil {
+		return orderbuilder.CalendarParams{}, err
+	}
+
+	return orderbuilder.CalendarParams{
+		Underlying:     strings.TrimSpace(cmd.String("underlying")),
+		NearExpiration: nearExpiration,
+		FarExpiration:  farExpiration,
+		Strike:         cmd.Float64("strike"),
+		PutCall:        putCall,
+		Open:           isOpen,
+		Quantity:       cmd.Float64("quantity"),
+		Price:          cmd.Float64("price"),
+		Duration:       duration,
+		Session:        session,
+	}, nil
+}
+
+// diagonalOrderFlags returns the CLI flags for the diagonal spread build command.
+func diagonalOrderFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
+		&cli.StringFlag{Name: "near-expiration", Usage: "Near-term expiration date (YYYY-MM-DD)"},
+		&cli.StringFlag{Name: "far-expiration", Usage: "Far-term expiration date (YYYY-MM-DD)"},
+		&cli.Float64Flag{Name: "near-strike", Usage: "Strike price for the near-term (sold) leg"},
+		&cli.Float64Flag{Name: "far-strike", Usage: "Strike price for the far-term (bought) leg"},
+		&cli.BoolFlag{Name: "call", Usage: "Call diagonal spread"},
+		&cli.BoolFlag{Name: "put", Usage: "Put diagonal spread"},
+		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
+		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
+		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts"},
+		&cli.Float64Flag{Name: "price", Usage: "Net debit amount"},
+		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
+		&cli.StringFlag{Name: "session", Usage: "Trading session"},
+	}
+}
+
+// parseDiagonalParams converts command flags into diagonal spread builder params.
+func parseDiagonalParams(cmd *cli.Command) (orderbuilder.DiagonalParams, error) {
+	putCall, err := parsePutCall(cmd.Bool("call"), cmd.Bool("put"))
+	if err != nil {
+		return orderbuilder.DiagonalParams{}, err
+	}
+
+	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+	if err != nil {
+		return orderbuilder.DiagonalParams{}, err
+	}
+
+	nearExpiration, err := parseDateFlag(cmd.String("near-expiration"), "near-expiration")
+	if err != nil {
+		return orderbuilder.DiagonalParams{}, err
+	}
+
+	farExpiration, err := parseDateFlag(cmd.String("far-expiration"), "far-expiration")
+	if err != nil {
+		return orderbuilder.DiagonalParams{}, err
+	}
+
+	duration, session, err := parseDurationSession(cmd)
+	if err != nil {
+		return orderbuilder.DiagonalParams{}, err
+	}
+
+	return orderbuilder.DiagonalParams{
+		Underlying:     strings.TrimSpace(cmd.String("underlying")),
+		NearExpiration: nearExpiration,
+		FarExpiration:  farExpiration,
+		NearStrike:     cmd.Float64("near-strike"),
+		FarStrike:      cmd.Float64("far-strike"),
+		PutCall:        putCall,
+		Open:           isOpen,
+		Quantity:       cmd.Float64("quantity"),
+		Price:          cmd.Float64("price"),
+		Duration:       duration,
+		Session:        session,
+	}, nil
+}
+
+// parseDateFlag parses a named YYYY-MM-DD flag value into a time.Time.
+// Used by calendar/diagonal spreads which have two expiration flags instead
+// of the single --expiration flag used by other spread types.
+func parseDateFlag(raw, flagName string) (time.Time, error) {
+	parsed, err := time.Parse("2006-01-02", strings.TrimSpace(raw))
+	if err != nil {
+		return time.Time{}, newValidationError(flagName + " must use YYYY-MM-DD format")
+	}
+
+	return parsed, nil
+}
+
 // parseExpiration parses the --expiration flag as a YYYY-MM-DD date.
 func parseExpiration(cmd *cli.Command) (time.Time, error) {
 	expiration, err := time.Parse("2006-01-02", strings.TrimSpace(cmd.String("expiration")))
