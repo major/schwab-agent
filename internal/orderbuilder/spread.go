@@ -349,7 +349,7 @@ type CalendarParams struct {
 	PutCall        models.PutCall
 	Open           bool // true = opening position, false = closing
 	Quantity       float64
-	Price          float64 // Net debit amount (always positive)
+	Price          float64 // Net debit (open) or credit (close) amount (always positive)
 	Duration       models.Duration
 	Session        models.Session
 }
@@ -357,19 +357,25 @@ type CalendarParams struct {
 // BuildCalendarOrder constructs an OrderRequest for a two-leg calendar spread.
 //
 // A long calendar spread profits from time decay: the near-term option decays
-// faster than the far-term option. Opening is always NET_DEBIT because the
-// far-dated option costs more than the near-dated one.
+// faster than the far-term option. Opening is NET_DEBIT because the
+// far-dated option costs more than the near-dated one. Closing is NET_CREDIT
+// because the position is being unwound.
 //
-//	Open:  BUY_TO_OPEN far + SELL_TO_OPEN near
-//	Close: SELL_TO_CLOSE far + BUY_TO_CLOSE near
+//	Open:  BUY_TO_OPEN far + SELL_TO_OPEN near (NET_DEBIT)
+//	Close: SELL_TO_CLOSE far + BUY_TO_CLOSE near (NET_CREDIT)
 func BuildCalendarOrder(params *CalendarParams) (*models.OrderRequest, error) {
 	longInstruction, shortInstruction := spreadInstructions(params.Open)
 	complexType := models.ComplexOrderStrategyTypeCalendar
 
+	orderType := models.OrderTypeNetDebit
+	if !params.Open {
+		orderType = models.OrderTypeNetCredit
+	}
+
 	order := &models.OrderRequest{
 		Session:                  cmp.Or(params.Session, models.SessionNormal),
 		Duration:                 cmp.Or(params.Duration, models.DurationDay),
-		OrderType:                models.OrderTypeNetDebit,
+		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
 		Price:                    ptr(params.Price),
@@ -405,7 +411,7 @@ type DiagonalParams struct {
 	PutCall        models.PutCall
 	Open           bool // true = opening position, false = closing
 	Quantity       float64
-	Price          float64 // Net debit amount (always positive)
+	Price          float64 // Net debit (open) or credit (close) amount (always positive)
 	Duration       models.Duration
 	Session        models.Session
 }
@@ -413,19 +419,25 @@ type DiagonalParams struct {
 // BuildDiagonalOrder constructs an OrderRequest for a two-leg diagonal spread.
 //
 // A diagonal combines the time spread of a calendar with the strike spread of
-// a vertical. Opening is always NET_DEBIT because the far-dated option costs
-// more than the near-dated one (like a calendar).
+// a vertical. Opening is NET_DEBIT because the far-dated option costs
+// more than the near-dated one (like a calendar). Closing is NET_CREDIT
+// because the position is being unwound.
 //
-//	Open:  BUY_TO_OPEN far (FarStrike) + SELL_TO_OPEN near (NearStrike)
-//	Close: SELL_TO_CLOSE far (FarStrike) + BUY_TO_CLOSE near (NearStrike)
+//	Open:  BUY_TO_OPEN far (FarStrike) + SELL_TO_OPEN near (NearStrike) (NET_DEBIT)
+//	Close: SELL_TO_CLOSE far (FarStrike) + BUY_TO_CLOSE near (NearStrike) (NET_CREDIT)
 func BuildDiagonalOrder(params *DiagonalParams) (*models.OrderRequest, error) {
 	longInstruction, shortInstruction := spreadInstructions(params.Open)
 	complexType := models.ComplexOrderStrategyTypeDiagonal
 
+	orderType := models.OrderTypeNetDebit
+	if !params.Open {
+		orderType = models.OrderTypeNetCredit
+	}
+
 	order := &models.OrderRequest{
 		Session:                  cmp.Or(params.Session, models.SessionNormal),
 		Duration:                 cmp.Or(params.Duration, models.DurationDay),
-		OrderType:                models.OrderTypeNetDebit,
+		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
 		Price:                    ptr(params.Price),
@@ -458,7 +470,7 @@ type CollarParams struct {
 	Expiration time.Time // Shared expiration for both option legs
 	Quantity   float64   // Number of option contracts (equity shares = quantity * 100)
 	Open       bool      // true = opening position, false = closing
-	Price      float64   // Net debit amount
+	Price      float64   // Net debit (open) or credit (close) amount
 	Duration   models.Duration
 	Session    models.Session
 }
@@ -467,19 +479,21 @@ type CollarParams struct {
 //
 // A collar is a covered call with downside protection: buy shares, sell a call
 // for income, and buy a put for protection. All three legs use the same
-// underlying and the same expiration.
+// underlying and the same expiration. Opening is NET_DEBIT, closing is NET_CREDIT.
 //
 // Opening:
 //
 //	Leg 1: BUY equity shares (quantity * 100)
 //	Leg 2: BUY_TO_OPEN put option (protective put)
 //	Leg 3: SELL_TO_OPEN call option (covered call)
+//	Order type: NET_DEBIT
 //
 // Closing reverses all instructions:
 //
 //	Leg 1: SELL equity shares
 //	Leg 2: SELL_TO_CLOSE put option
 //	Leg 3: BUY_TO_CLOSE call option
+//	Order type: NET_CREDIT
 func BuildCollarOrder(params *CollarParams) (*models.OrderRequest, error) {
 	longInstruction, shortInstruction := spreadInstructions(params.Open)
 	complexType := models.ComplexOrderStrategyTypeCollarWithStock
@@ -490,10 +504,15 @@ func BuildCollarOrder(params *CollarParams) (*models.OrderRequest, error) {
 		equityInstruction = models.InstructionSell
 	}
 
+	orderType := models.OrderTypeNetDebit
+	if !params.Open {
+		orderType = models.OrderTypeNetCredit
+	}
+
 	order := &models.OrderRequest{
 		Session:                  cmp.Or(params.Session, models.SessionNormal),
 		Duration:                 cmp.Or(params.Duration, models.DurationDay),
-		OrderType:                models.OrderTypeNetDebit,
+		OrderType:                orderType,
 		ComplexOrderStrategyType: &complexType,
 		OrderStrategyType:        models.OrderStrategyTypeSingle,
 		Price:                    ptr(params.Price),

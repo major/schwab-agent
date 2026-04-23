@@ -660,7 +660,7 @@ func TestBuildCalendarOrderClose(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
 
 	// Close: far leg SELL_TO_CLOSE, near leg BUY_TO_CLOSE.
 	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[0].Instruction)
@@ -807,7 +807,7 @@ func TestBuildDiagonalOrderClose(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
 
 	// Close: far leg SELL_TO_CLOSE, near leg BUY_TO_CLOSE.
 	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[0].Instruction)
@@ -897,7 +897,8 @@ func TestBuildCollarOrderClose(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, order.OrderLegCollection, 3)
 
-	// Closing: equity SELL, put SELL_TO_CLOSE, call BUY_TO_CLOSE.
+	// Closing: equity SELL, put SELL_TO_CLOSE, call BUY_TO_CLOSE, NET_CREDIT.
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
 	assert.Equal(t, models.InstructionSell, order.OrderLegCollection[0].Instruction)
 	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[1].Instruction)
 	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[2].Instruction)

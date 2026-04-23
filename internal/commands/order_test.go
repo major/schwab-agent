@@ -2549,7 +2549,8 @@ func TestOrderBuildCalendarPutClose(t *testing.T) {
 	order := decodeOrderRequest(t, stdout)
 	require.Len(t, order.OrderLegCollection, 2)
 
-	// Closing reverses instructions: far leg sells, near leg buys.
+	// Closing reverses instructions: far leg sells, near leg buys, NET_CREDIT.
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
 	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[0].Instruction)
 	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[1].Instruction)
 
@@ -2700,7 +2701,8 @@ func TestOrderBuildCollarClose(t *testing.T) {
 	order := decodeOrderRequest(t, stdout)
 	require.Len(t, order.OrderLegCollection, 3)
 
-	// Closing reverses all instructions.
+	// Closing reverses all instructions, NET_CREDIT.
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
 	assert.Equal(t, models.InstructionSell, order.OrderLegCollection[0].Instruction)
 	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[1].Instruction)
 	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[2].Instruction)
