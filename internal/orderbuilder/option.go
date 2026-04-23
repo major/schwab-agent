@@ -15,14 +15,14 @@ const optionContractMultiplier = 100.0
 
 // OptionParams holds parameters for building an option order.
 type OptionParams struct {
-	Underlying string
-	Expiration time.Time
-	Strike     float64
-	PutCall    models.PutCall
-	Action     models.Instruction
-	Quantity   float64
-	OrderType  models.OrderType
-	Price      float64
+	Underlying         string
+	Expiration         time.Time
+	Strike             float64
+	PutCall            models.PutCall
+	Action             models.Instruction
+	Quantity           float64
+	OrderType          models.OrderType
+	Price              float64
 	Duration           models.Duration
 	Session            models.Session
 	SpecialInstruction models.SpecialInstruction

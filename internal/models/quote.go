@@ -144,92 +144,92 @@ type QuoteOption struct {
 
 // QuoteIndex represents index quote data.
 type QuoteIndex struct {
-	Symbol           *string  `json:"symbol,omitempty"`
-	Description      *string  `json:"description,omitempty"`
-	BidPrice         *float64 `json:"bidPrice,omitempty"`
-	AskPrice         *float64 `json:"askPrice,omitempty"`
-	LastPrice        *float64 `json:"lastPrice,omitempty"`
-	OpenPrice        *float64 `json:"openPrice,omitempty"`
-	HighPrice        *float64 `json:"highPrice,omitempty"`
-	LowPrice         *float64 `json:"lowPrice,omitempty"`
-	ClosePrice       *float64 `json:"closePrice,omitempty"`
-	NetChange        *float64 `json:"netChange,omitempty"`
-	NetPercentChange *float64 `json:"netPercentChange,omitempty"`
-	Mark             *float64 `json:"mark,omitempty"`
-	MarkChange       *float64 `json:"markChange,omitempty"`
+	Symbol            *string  `json:"symbol,omitempty"`
+	Description       *string  `json:"description,omitempty"`
+	BidPrice          *float64 `json:"bidPrice,omitempty"`
+	AskPrice          *float64 `json:"askPrice,omitempty"`
+	LastPrice         *float64 `json:"lastPrice,omitempty"`
+	OpenPrice         *float64 `json:"openPrice,omitempty"`
+	HighPrice         *float64 `json:"highPrice,omitempty"`
+	LowPrice          *float64 `json:"lowPrice,omitempty"`
+	ClosePrice        *float64 `json:"closePrice,omitempty"`
+	NetChange         *float64 `json:"netChange,omitempty"`
+	NetPercentChange  *float64 `json:"netPercentChange,omitempty"`
+	Mark              *float64 `json:"mark,omitempty"`
+	MarkChange        *float64 `json:"markChange,omitempty"`
 	MarkPercentChange *float64 `json:"markPercentChange,omitempty"`
-	TotalVolume      *int64   `json:"totalVolume,omitempty"`
-	QuoteTime        *int64   `json:"quoteTime,omitempty"`
-	TradeTime        *int64   `json:"tradeTime,omitempty"`
-	SecurityStatus   *string  `json:"securityStatus,omitempty"`
-	Volatility       *float64 `json:"volatility,omitempty"`
+	TotalVolume       *int64   `json:"totalVolume,omitempty"`
+	QuoteTime         *int64   `json:"quoteTime,omitempty"`
+	TradeTime         *int64   `json:"tradeTime,omitempty"`
+	SecurityStatus    *string  `json:"securityStatus,omitempty"`
+	Volatility        *float64 `json:"volatility,omitempty"`
 }
 
 // QuoteFuture represents futures quote data.
 type QuoteFuture struct {
-	Symbol           *string  `json:"symbol,omitempty"`
-	Description      *string  `json:"description,omitempty"`
-	BidPrice         *float64 `json:"bidPrice,omitempty"`
-	AskPrice         *float64 `json:"askPrice,omitempty"`
-	LastPrice        *float64 `json:"lastPrice,omitempty"`
-	OpenPrice        *float64 `json:"openPrice,omitempty"`
-	HighPrice        *float64 `json:"highPrice,omitempty"`
-	LowPrice         *float64 `json:"lowPrice,omitempty"`
-	ClosePrice       *float64 `json:"closePrice,omitempty"`
-	NetChange        *float64 `json:"netChange,omitempty"`
-	NetPercentChange *float64 `json:"netPercentChange,omitempty"`
-	Mark             *float64 `json:"mark,omitempty"`
-	MarkChange       *float64 `json:"markChange,omitempty"`
+	Symbol            *string  `json:"symbol,omitempty"`
+	Description       *string  `json:"description,omitempty"`
+	BidPrice          *float64 `json:"bidPrice,omitempty"`
+	AskPrice          *float64 `json:"askPrice,omitempty"`
+	LastPrice         *float64 `json:"lastPrice,omitempty"`
+	OpenPrice         *float64 `json:"openPrice,omitempty"`
+	HighPrice         *float64 `json:"highPrice,omitempty"`
+	LowPrice          *float64 `json:"lowPrice,omitempty"`
+	ClosePrice        *float64 `json:"closePrice,omitempty"`
+	NetChange         *float64 `json:"netChange,omitempty"`
+	NetPercentChange  *float64 `json:"netPercentChange,omitempty"`
+	Mark              *float64 `json:"mark,omitempty"`
+	MarkChange        *float64 `json:"markChange,omitempty"`
 	MarkPercentChange *float64 `json:"markPercentChange,omitempty"`
-	TotalVolume      *int64   `json:"totalVolume,omitempty"`
-	QuoteTime        *int64   `json:"quoteTime,omitempty"`
-	TradeTime        *int64   `json:"tradeTime,omitempty"`
-	SecurityStatus   *string  `json:"securityStatus,omitempty"`
-	Volatility       *float64 `json:"volatility,omitempty"`
+	TotalVolume       *int64   `json:"totalVolume,omitempty"`
+	QuoteTime         *int64   `json:"quoteTime,omitempty"`
+	TradeTime         *int64   `json:"tradeTime,omitempty"`
+	SecurityStatus    *string  `json:"securityStatus,omitempty"`
+	Volatility        *float64 `json:"volatility,omitempty"`
 }
 
 // QuoteForex represents forex quote data.
 type QuoteForex struct {
-	Symbol           *string  `json:"symbol,omitempty"`
-	Description      *string  `json:"description,omitempty"`
-	BidPrice         *float64 `json:"bidPrice,omitempty"`
-	AskPrice         *float64 `json:"askPrice,omitempty"`
-	LastPrice        *float64 `json:"lastPrice,omitempty"`
-	OpenPrice        *float64 `json:"openPrice,omitempty"`
-	HighPrice        *float64 `json:"highPrice,omitempty"`
-	LowPrice         *float64 `json:"lowPrice,omitempty"`
-	ClosePrice       *float64 `json:"closePrice,omitempty"`
-	NetChange        *float64 `json:"netChange,omitempty"`
-	NetPercentChange *float64 `json:"netPercentChange,omitempty"`
-	Mark             *float64 `json:"mark,omitempty"`
-	MarkChange       *float64 `json:"markChange,omitempty"`
+	Symbol            *string  `json:"symbol,omitempty"`
+	Description       *string  `json:"description,omitempty"`
+	BidPrice          *float64 `json:"bidPrice,omitempty"`
+	AskPrice          *float64 `json:"askPrice,omitempty"`
+	LastPrice         *float64 `json:"lastPrice,omitempty"`
+	OpenPrice         *float64 `json:"openPrice,omitempty"`
+	HighPrice         *float64 `json:"highPrice,omitempty"`
+	LowPrice          *float64 `json:"lowPrice,omitempty"`
+	ClosePrice        *float64 `json:"closePrice,omitempty"`
+	NetChange         *float64 `json:"netChange,omitempty"`
+	NetPercentChange  *float64 `json:"netPercentChange,omitempty"`
+	Mark              *float64 `json:"mark,omitempty"`
+	MarkChange        *float64 `json:"markChange,omitempty"`
 	MarkPercentChange *float64 `json:"markPercentChange,omitempty"`
-	TotalVolume      *int64   `json:"totalVolume,omitempty"`
-	QuoteTime        *int64   `json:"quoteTime,omitempty"`
-	TradeTime        *int64   `json:"tradeTime,omitempty"`
-	SecurityStatus   *string  `json:"securityStatus,omitempty"`
-	Volatility       *float64 `json:"volatility,omitempty"`
+	TotalVolume       *int64   `json:"totalVolume,omitempty"`
+	QuoteTime         *int64   `json:"quoteTime,omitempty"`
+	TradeTime         *int64   `json:"tradeTime,omitempty"`
+	SecurityStatus    *string  `json:"securityStatus,omitempty"`
+	Volatility        *float64 `json:"volatility,omitempty"`
 }
 
 // QuoteMutualFund represents mutual fund quote data.
 type QuoteMutualFund struct {
-	Symbol           *string  `json:"symbol,omitempty"`
-	Description      *string  `json:"description,omitempty"`
-	BidPrice         *float64 `json:"bidPrice,omitempty"`
-	AskPrice         *float64 `json:"askPrice,omitempty"`
-	LastPrice        *float64 `json:"lastPrice,omitempty"`
-	OpenPrice        *float64 `json:"openPrice,omitempty"`
-	HighPrice        *float64 `json:"highPrice,omitempty"`
-	LowPrice         *float64 `json:"lowPrice,omitempty"`
-	ClosePrice       *float64 `json:"closePrice,omitempty"`
-	NetChange        *float64 `json:"netChange,omitempty"`
-	NetPercentChange *float64 `json:"netPercentChange,omitempty"`
-	Mark             *float64 `json:"mark,omitempty"`
-	MarkChange       *float64 `json:"markChange,omitempty"`
+	Symbol            *string  `json:"symbol,omitempty"`
+	Description       *string  `json:"description,omitempty"`
+	BidPrice          *float64 `json:"bidPrice,omitempty"`
+	AskPrice          *float64 `json:"askPrice,omitempty"`
+	LastPrice         *float64 `json:"lastPrice,omitempty"`
+	OpenPrice         *float64 `json:"openPrice,omitempty"`
+	HighPrice         *float64 `json:"highPrice,omitempty"`
+	LowPrice          *float64 `json:"lowPrice,omitempty"`
+	ClosePrice        *float64 `json:"closePrice,omitempty"`
+	NetChange         *float64 `json:"netChange,omitempty"`
+	NetPercentChange  *float64 `json:"netPercentChange,omitempty"`
+	Mark              *float64 `json:"mark,omitempty"`
+	MarkChange        *float64 `json:"markChange,omitempty"`
 	MarkPercentChange *float64 `json:"markPercentChange,omitempty"`
-	TotalVolume      *int64   `json:"totalVolume,omitempty"`
-	QuoteTime        *int64   `json:"quoteTime,omitempty"`
-	TradeTime        *int64   `json:"tradeTime,omitempty"`
-	SecurityStatus   *string  `json:"securityStatus,omitempty"`
-	Volatility       *float64 `json:"volatility,omitempty"`
+	TotalVolume       *int64   `json:"totalVolume,omitempty"`
+	QuoteTime         *int64   `json:"quoteTime,omitempty"`
+	TradeTime         *int64   `json:"tradeTime,omitempty"`
+	SecurityStatus    *string  `json:"securityStatus,omitempty"`
+	Volatility        *float64 `json:"volatility,omitempty"`
 }
