@@ -1095,6 +1095,60 @@ func TestOrderBuildParseErrors(t *testing.T) {
 			},
 			wantMsg: "session is invalid",
 		},
+		// parseStopPriceLinkBasis invalid value.
+		{
+			name: "equity invalid stop-link-basis",
+			args: []string{
+				"order", "build", "equity",
+				"--symbol", "AAPL", "--action", "SELL",
+				"--quantity", "10", "--type", "TRAILING_STOP",
+				"--stop-offset", "2.50", "--stop-link-basis", "NOPE",
+			},
+			wantMsg: "stop-link-basis is invalid",
+		},
+		// parseStopPriceLinkType invalid value.
+		{
+			name: "equity invalid stop-link-type",
+			args: []string{
+				"order", "build", "equity",
+				"--symbol", "AAPL", "--action", "SELL",
+				"--quantity", "10", "--type", "TRAILING_STOP",
+				"--stop-offset", "2.50", "--stop-link-type", "NOPE",
+			},
+			wantMsg: "stop-link-type is invalid",
+		},
+		// parseStopType invalid value.
+		{
+			name: "equity invalid stop-type",
+			args: []string{
+				"order", "build", "equity",
+				"--symbol", "AAPL", "--action", "SELL",
+				"--quantity", "10", "--type", "TRAILING_STOP",
+				"--stop-offset", "2.50", "--stop-type", "NOPE",
+			},
+			wantMsg: "stop-type is invalid",
+		},
+		// parseSpecialInstruction invalid value.
+		{
+			name: "equity invalid special-instruction",
+			args: []string{
+				"order", "build", "equity",
+				"--symbol", "AAPL", "--action", "BUY",
+				"--quantity", "10", "--special-instruction", "NOPE",
+			},
+			wantMsg: "special-instruction is invalid",
+		},
+		{
+			name: "option invalid special-instruction",
+			args: []string{
+				"order", "build", "option",
+				"--underlying", "AAPL", "--action", "BUY_TO_OPEN",
+				"--call", "--expiration", "2026-06-19",
+				"--strike", "150", "--quantity", "1",
+				"--special-instruction", "NOPE",
+			},
+			wantMsg: "special-instruction is invalid",
+		},
 	}
 
 	for _, tc := range testCases {

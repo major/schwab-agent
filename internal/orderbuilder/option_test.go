@@ -308,3 +308,42 @@ func TestBuildOptionOrderSetsLimitPrice(t *testing.T) {
 	assert.Equal(t, models.SessionPM, order.Session)
 	assert.Equal(t, "SPY   251219P00450500", order.OrderLegCollection[0].Instrument.Symbol)
 }
+
+// TestBuildOptionOrderSetsSpecialInstruction verifies the special instruction
+// field is set on the order when provided.
+func TestBuildOptionOrderSetsSpecialInstruction(t *testing.T) {
+	order, err := BuildOptionOrder(&OptionParams{
+		Underlying:         "AAPL",
+		Expiration:         time.Date(2025, time.December, 19, 0, 0, 0, 0, time.UTC),
+		Strike:             200.0,
+		PutCall:            models.PutCallCall,
+		Action:             models.InstructionBuyToOpen,
+		Quantity:           5,
+		OrderType:          models.OrderTypeLimit,
+		Price:              4.50,
+		SpecialInstruction: models.SpecialInstructionDoNotReduce,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	require.NotNil(t, order.SpecialInstruction)
+	assert.Equal(t, models.SpecialInstructionDoNotReduce, *order.SpecialInstruction)
+}
+
+// TestBuildOptionOrderOmitsSpecialInstructionWhenEmpty verifies the field is
+// nil when no special instruction is provided.
+func TestBuildOptionOrderOmitsSpecialInstructionWhenEmpty(t *testing.T) {
+	order, err := BuildOptionOrder(&OptionParams{
+		Underlying: "AAPL",
+		Expiration: time.Date(2025, time.December, 19, 0, 0, 0, 0, time.UTC),
+		Strike:     200.0,
+		PutCall:    models.PutCallCall,
+		Action:     models.InstructionBuyToOpen,
+		Quantity:   5,
+		OrderType:  models.OrderTypeMarket,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Nil(t, order.SpecialInstruction)
+}

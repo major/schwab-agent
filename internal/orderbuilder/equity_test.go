@@ -89,3 +89,136 @@ func TestBuildEquityOrderSetsLimitAndStopPrice(t *testing.T) {
 	require.NotNil(t, order.StopPrice)
 	assert.Equal(t, 199.25, *order.StopPrice)
 }
+
+// TestBuildEquityOrderSetsTrailingStopFields verifies trailing stop orders set
+// offset/link/stop-type fields and do not set price or stop price.
+func TestBuildEquityOrderSetsTrailingStopFields(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:             "AAPL",
+		Action:             models.InstructionSell,
+		Quantity:           50,
+		OrderType:          models.OrderTypeTrailingStop,
+		StopPriceOffset:    2.50,
+		StopPriceLinkBasis: models.StopPriceLinkBasisLast,
+		StopPriceLinkType:  models.StopPriceLinkTypeValue,
+		StopType:           models.StopTypeStandard,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Equal(t, models.OrderTypeTrailingStop, order.OrderType)
+
+	// Trailing stop fields must be set.
+	require.NotNil(t, order.StopPriceOffset)
+	assert.Equal(t, 2.50, *order.StopPriceOffset)
+	require.NotNil(t, order.StopPriceLinkBasis)
+	assert.Equal(t, models.StopPriceLinkBasisLast, *order.StopPriceLinkBasis)
+	require.NotNil(t, order.StopPriceLinkType)
+	assert.Equal(t, models.StopPriceLinkTypeValue, *order.StopPriceLinkType)
+	require.NotNil(t, order.StopType)
+	assert.Equal(t, models.StopTypeStandard, *order.StopType)
+
+	// Price and stop price must NOT be set for trailing stop.
+	assert.Nil(t, order.Price)
+	assert.Nil(t, order.StopPrice)
+
+	// Activation price was not provided, so it must be nil.
+	assert.Nil(t, order.ActivationPrice)
+}
+
+// TestBuildEquityOrderSetsTrailingStopWithActivationPrice verifies the optional
+// activation price is set when provided.
+func TestBuildEquityOrderSetsTrailingStopWithActivationPrice(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:             "TSLA",
+		Action:             models.InstructionSell,
+		Quantity:           25,
+		OrderType:          models.OrderTypeTrailingStop,
+		StopPriceOffset:    5.00,
+		StopPriceLinkBasis: models.StopPriceLinkBasisBid,
+		StopPriceLinkType:  models.StopPriceLinkTypePercent,
+		StopType:           models.StopTypeBid,
+		ActivationPrice:    150.00,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	require.NotNil(t, order.ActivationPrice)
+	assert.Equal(t, 150.00, *order.ActivationPrice)
+}
+
+// TestBuildEquityOrderSetsTrailingStopLimitFields verifies trailing stop limit
+// orders set both trailing stop fields and the limit price.
+func TestBuildEquityOrderSetsTrailingStopLimitFields(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:             "AAPL",
+		Action:             models.InstructionSell,
+		Quantity:           10,
+		OrderType:          models.OrderTypeTrailingStopLimit,
+		Price:              195.00,
+		StopPriceOffset:    3.00,
+		StopPriceLinkBasis: models.StopPriceLinkBasisMark,
+		StopPriceLinkType:  models.StopPriceLinkTypeTick,
+		StopType:           models.StopTypeStandard,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Equal(t, models.OrderTypeTrailingStopLimit, order.OrderType)
+
+	// Price offset must be set for trailing stop limit (Schwab uses priceOffset,
+	// not price, for the limit component of trailing stop limit orders).
+	require.NotNil(t, order.PriceOffset)
+	assert.Equal(t, 195.00, *order.PriceOffset)
+	assert.Nil(t, order.Price)
+
+	// Trailing stop fields must be set.
+	require.NotNil(t, order.StopPriceOffset)
+	assert.Equal(t, 3.00, *order.StopPriceOffset)
+	require.NotNil(t, order.StopPriceLinkBasis)
+	assert.Equal(t, models.StopPriceLinkBasisMark, *order.StopPriceLinkBasis)
+	require.NotNil(t, order.StopPriceLinkType)
+	assert.Equal(t, models.StopPriceLinkTypeTick, *order.StopPriceLinkType)
+
+	// Stop price must NOT be set (trailing stops use offset, not fixed price).
+	assert.Nil(t, order.StopPrice)
+
+	// Price link fields must mirror stop price link fields for trailing stop limit.
+	require.NotNil(t, order.PriceLinkBasis)
+	assert.Equal(t, models.PriceLinkBasis(models.StopPriceLinkBasisMark), *order.PriceLinkBasis)
+	require.NotNil(t, order.PriceLinkType)
+	assert.Equal(t, models.PriceLinkType(models.StopPriceLinkTypeTick), *order.PriceLinkType)
+}
+
+// TestBuildEquityOrderSetsSpecialInstruction verifies the special instruction
+// field is set on the order when provided.
+func TestBuildEquityOrderSetsSpecialInstruction(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:             "AAPL",
+		Action:             models.InstructionBuy,
+		Quantity:           100,
+		OrderType:          models.OrderTypeLimit,
+		Price:              200.00,
+		SpecialInstruction: models.SpecialInstructionAllOrNone,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	require.NotNil(t, order.SpecialInstruction)
+	assert.Equal(t, models.SpecialInstructionAllOrNone, *order.SpecialInstruction)
+}
+
+// TestBuildEquityOrderOmitsSpecialInstructionWhenEmpty verifies the field is
+// nil when no special instruction is provided.
+func TestBuildEquityOrderOmitsSpecialInstructionWhenEmpty(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:    "AAPL",
+		Action:    models.InstructionBuy,
+		Quantity:  100,
+		OrderType: models.OrderTypeMarket,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Nil(t, order.SpecialInstruction)
+}
