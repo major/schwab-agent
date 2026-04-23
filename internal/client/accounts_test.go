@@ -184,6 +184,97 @@ func TestAccount_404_ReturnsAccountNotFoundError(t *testing.T) {
 	assert.Contains(t, accountErr.Error(), "account invalid-hash not found")
 }
 
+func TestAccounts_WithPositionsField(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify the fields query parameter is sent to the API.
+		assert.Equal(t, "positions", r.URL.Query().Get("fields"))
+
+		w.Header().Set("Content-Type", "application/json")
+		response := []models.Account{
+			{
+				SecuritiesAccount: &models.SecuritiesAccount{
+					Type:          ptr("MARGIN"),
+					AccountNumber: ptr("123456789"),
+					Positions: []models.Position{
+						{
+							LongQuantity: ptr(float64(100)),
+							MarketValue:  ptr(15000.00),
+							Instrument: &models.AccountsInstrument{
+								Symbol:    ptr("AAPL"),
+								AssetType: ptr("EQUITY"),
+							},
+						},
+					},
+				},
+			},
+		}
+		require.NoError(t, json.NewEncoder(w).Encode(response))
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	result, err := c.Accounts(context.Background(), "positions")
+
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	require.Len(t, result[0].SecuritiesAccount.Positions, 1)
+	assert.Equal(t, "AAPL", *result[0].SecuritiesAccount.Positions[0].Instrument.Symbol)
+	assert.Equal(t, 100.0, *result[0].SecuritiesAccount.Positions[0].LongQuantity)
+}
+
+func TestAccounts_WithoutFields_NoQueryParam(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// No fields param should be sent when none are requested.
+		assert.Empty(t, r.URL.Query().Get("fields"))
+
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode([]models.Account{}))
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	_, err := c.Accounts(context.Background())
+
+	require.NoError(t, err)
+}
+
+func TestAccount_WithPositionsField(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "positions", r.URL.Query().Get("fields"))
+		assert.Equal(t, "/trader/v1/accounts/hash123", r.URL.Path)
+
+		w.Header().Set("Content-Type", "application/json")
+		response := models.Account{
+			SecuritiesAccount: &models.SecuritiesAccount{
+				Type:          ptr("MARGIN"),
+				AccountNumber: ptr("123456789"),
+				Positions: []models.Position{
+					{
+						LongQuantity:  ptr(float64(50)),
+						ShortQuantity: ptr(float64(0)),
+						MarketValue:   ptr(8500.00),
+						Instrument: &models.AccountsInstrument{
+							Symbol:    ptr("MSFT"),
+							AssetType: ptr("EQUITY"),
+						},
+					},
+				},
+			},
+		}
+		require.NoError(t, json.NewEncoder(w).Encode(response))
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	result, err := c.Account(context.Background(), "hash123", "positions")
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, result.SecuritiesAccount.Positions, 1)
+	assert.Equal(t, "MSFT", *result.SecuritiesAccount.Positions[0].Instrument.Symbol)
+	assert.Equal(t, 50.0, *result.SecuritiesAccount.Positions[0].LongQuantity)
+}
+
 func TestAccount_WithComplexData(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
