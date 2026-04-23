@@ -34,9 +34,13 @@ Config file location: `~/.config/schwab-agent/config.json`
 |-------|-------------|
 | `client_id` | Schwab app client ID |
 | `client_secret` | Schwab app client secret |
+| `base_url` | Outbound base URL for REST API calls and OAuth authorize/token requests (default: `https://api.schwabapi.com`) |
+| `base_url_insecure` | Set to `true` to skip TLS verification for outbound proxy calls that use a local self-signed certificate |
 | `callback_url` | OAuth2 callback URL (default: https://127.0.0.1:8182) |
 | `default_account` | Default account hash for commands that need an account |
 | `i-also-like-to-live-dangerously` | Set to true to enable mutable operations (order placement, cancel, replace) |
+
+`base_url` is the single source of truth for outbound Schwab traffic. `schwab-agent` derives the OAuth authorize URL (`<base_url>/v1/oauth/authorize`) and token/refresh URL (`<base_url>/v1/oauth/token`) from it, and also uses the same base URL for authenticated REST API requests.
 
 Default callback URL: `https://127.0.0.1:8182`
 
@@ -54,6 +58,8 @@ Environment variables take priority over config file values.
 |----------|-------------|
 | `SCHWAB_CLIENT_ID` | Override client ID from config file |
 | `SCHWAB_CLIENT_SECRET` | Override client secret from config file |
+| `SCHWAB_BASE_URL` | Override outbound REST/OAuth base URL |
+| `SCHWAB_BASE_URL_INSECURE` | Override insecure TLS mode for local self-signed proxies (`true`/`false`) |
 | `SCHWAB_CALLBACK_URL` | Override callback URL (default: https://127.0.0.1:8182) |
 
 ## Troubleshooting
@@ -63,4 +69,5 @@ Environment variables take priority over config file values.
 | "auth required" error | Run `schwab-agent auth login` to get new tokens |
 | "auth expired" error | Refresh token is stale (>6.5 days old), run `schwab-agent auth login` again |
 | "callback error" | Check callback URL matches Schwab app settings (default: https://127.0.0.1:8182) |
+| TLS/certificate error with a local proxy | Set `base_url` to the proxy URL and `base_url_insecure` / `SCHWAB_BASE_URL_INSECURE` to `true` if the proxy uses a self-signed certificate |
 | Missing credentials | Set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add them to config.json |

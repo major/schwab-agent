@@ -46,9 +46,9 @@ func (b *synchronizedBuffer) String() string {
 }
 
 func TestOAuthHTTPClient_HasTimeout(t *testing.T) {
-	// The OAuth HTTP client must have an explicit timeout to prevent hanging
-	// on network issues. http.DefaultClient has Timeout=0 (no timeout).
-	assert.Equal(t, 30*time.Second, oauthHTTPClient.Timeout,
+	// The config-derived OAuth HTTP client must have an explicit timeout to
+	// prevent hanging on network issues. http.DefaultClient has Timeout=0.
+	assert.Equal(t, 30*time.Second, (&Config{}).HTTPClient(oauthHTTPTimeout).Timeout,
 		"OAuth HTTP client must have a timeout to prevent hanging requests")
 }
 
@@ -69,7 +69,7 @@ func TestAuthorizeURL_ReturnsExpectedParametersAndState(t *testing.T) {
 	parsedURL, err := url.Parse(authURL)
 	require.NoError(t, err)
 
-	assert.Equal(t, authorizeEndpoint, parsedURL.Scheme+"://"+parsedURL.Host+parsedURL.Path)
+	assert.Equal(t, cfg.OAuthAuthorizeURL(), parsedURL.Scheme+"://"+parsedURL.Host+parsedURL.Path)
 	assert.Equal(t, state, parsedURL.Query().Get("state"))
 	assert.Equal(t, "test-client", parsedURL.Query().Get("client_id"))
 	assert.Equal(t, "https://127.0.0.1:8182", parsedURL.Query().Get("redirect_uri"))
@@ -78,6 +78,22 @@ func TestAuthorizeURL_ReturnsExpectedParametersAndState(t *testing.T) {
 	assert.Len(t, state, 64)
 	_, err = hex.DecodeString(state)
 	require.NoError(t, err)
+}
+
+func TestAuthorizeURL_UsesDerivedBaseURL(t *testing.T) {
+	cfg := &Config{
+		ClientID:     "test-client",
+		ClientSecret: "unused",
+		CallbackURL:  "https://127.0.0.1:8182",
+		BaseURL:      "https://proxy.example.com/prefix",
+	}
+
+	authURL, _, err := AuthorizeURL(cfg)
+	require.NoError(t, err)
+
+	parsedURL, err := url.Parse(authURL)
+	require.NoError(t, err)
+	assert.Equal(t, "https://proxy.example.com/prefix/v1/oauth/authorize", parsedURL.Scheme+"://"+parsedURL.Host+parsedURL.Path)
 }
 
 func TestExchangeCode_Success_UsesBasicAuthAndReturnsTokenFile(t *testing.T) {
@@ -154,6 +170,40 @@ func TestExchangeCode_Failure_ReturnsAuthCallbackError(t *testing.T) {
 	var callbackErr *apperr.AuthCallbackError
 	assert.ErrorAs(t, err, &callbackErr)
 	assert.Contains(t, err.Error(), "token exchange failed")
+}
+
+func TestExchangeCode_UsesDerivedTokenURLAndInsecureTLS(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/proxy/v1/oauth/token", r.URL.Path)
+		require.NoError(t, r.ParseForm())
+		assert.Equal(t, "authorization_code", r.Form.Get("grant_type"))
+		assert.Equal(t, "derived-code", r.Form.Get("code"))
+		assert.Equal(t, "https://127.0.0.1:8182", r.Form.Get("redirect_uri"))
+
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "proxy-access-token",
+			"token_type":    "Bearer",
+			"expires_in":    1800,
+			"refresh_token": "proxy-refresh-token",
+			"scope":         "api",
+		}))
+	}))
+	defer server.Close()
+
+	cfg := &Config{
+		ClientID:        "client-id",
+		ClientSecret:    "client-secret",
+		CallbackURL:     "https://127.0.0.1:8182",
+		BaseURL:         server.URL + "/proxy/",
+		BaseURLInsecure: true,
+	}
+
+	tokenFile, err := ExchangeCode(cfg, "derived-code", "", time.Unix(1_700_000_000, 0))
+	require.NoError(t, err)
+	require.NotNil(t, tokenFile)
+	assert.Equal(t, "proxy-access-token", tokenFile.Token.AccessToken)
+	assert.Equal(t, "proxy-refresh-token", tokenFile.Token.RefreshToken)
 }
 
 func TestStartCallbackServer_Success_ReturnsCode(t *testing.T) {
@@ -247,7 +297,7 @@ func TestRunLogin_PrintsURLAndSavesToken(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
-	assert.Contains(t, writer.String(), authorizeEndpoint)
+	assert.Contains(t, writer.String(), cfg.OAuthAuthorizeURL())
 
 	tokenFile, err := LoadToken(tokenPath)
 	require.NoError(t, err)

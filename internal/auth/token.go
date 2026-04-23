@@ -15,9 +15,6 @@ import (
 )
 
 const (
-	// tokenEndpoint is the Schwab OAuth token endpoint.
-	tokenEndpoint = "https://api.schwabapi.com/v1/oauth/token" //nolint:gosec // G101: API endpoint URL, not a credential
-
 	// refreshTokenMaxAge is 6.5 days in seconds, matching schwab-py's default.
 	refreshTokenMaxAge = 561600
 
@@ -106,7 +103,7 @@ type tokenErrorResponse struct {
 // The endpoint parameter allows overriding the token URL for testing.
 func RefreshAccessToken(cfg *Config, tf *TokenFile, endpoint string) (*TokenFile, error) {
 	if endpoint == "" {
-		endpoint = tokenEndpoint
+		endpoint = cfg.OAuthTokenURL()
 	}
 
 	// Build form body
@@ -123,7 +120,7 @@ func RefreshAccessToken(cfg *Config, tf *TokenFile, endpoint string) (*TokenFile
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth(cfg.ClientID, cfg.ClientSecret)
 
-	resp, err := oauthHTTPClient.Do(req)
+	resp, err := cfg.HTTPClient(oauthHTTPTimeout).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("token refresh request failed: %w", err)
 	}
@@ -161,5 +158,3 @@ func RefreshAccessToken(cfg *Config, tf *TokenFile, endpoint string) (*TokenFile
 		Token:             newToken,
 	}, nil
 }
-
-

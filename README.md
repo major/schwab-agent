@@ -48,15 +48,23 @@ Create `~/.config/schwab-agent/config.json`:
 {
   "client_id": "your-client-id",
   "client_secret": "your-client-secret",
+  "base_url": "https://api.schwabapi.com",
+  "base_url_insecure": false,
   "callback_url": "https://127.0.0.1:8182"
 }
 ```
+
+`base_url` is the single outbound endpoint root for REST API calls and Schwab OAuth authorize/token requests. Leave it at the default for direct Schwab access, or point it at a Schwab-compatible proxy.
+
+If your proxy terminates TLS with a local self-signed certificate, set `base_url_insecure` to `true` so outbound REST and OAuth token/refresh requests skip certificate verification. This is intentionally opt-in for local development only.
 
 Or use environment variables (these take priority over the config file):
 
 ```bash
 export SCHWAB_CLIENT_ID=your-client-id
 export SCHWAB_CLIENT_SECRET=your-client-secret
+export SCHWAB_BASE_URL=https://api.schwabapi.com   # default
+export SCHWAB_BASE_URL_INSECURE=false              # default
 export SCHWAB_CALLBACK_URL=https://127.0.0.1:8182  # default
 ```
 

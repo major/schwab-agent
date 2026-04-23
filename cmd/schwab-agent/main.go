@@ -7,10 +7,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/urfave/cli/v3"
 
@@ -28,13 +31,13 @@ var version = "dev"
 // Tests override individual fields; production uses defaultAppDeps().
 type appDeps struct {
 	newClient            func(token string, opts ...client.Option) *client.Client
-	tokenRefreshEndpoint func() string
+	tokenRefreshEndpoint func(*auth.Config) string
 }
 
 func defaultAppDeps() appDeps {
 	return appDeps{
 		newClient:            client.NewClient,
-		tokenRefreshEndpoint: func() string { return "https://api.schwabapi.com/v1/oauth/token" },
+		tokenRefreshEndpoint: func(cfg *auth.Config) string { return cfg.OAuthTokenURL() },
 	}
 }
 
@@ -118,6 +121,11 @@ func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 
 			cfg, err := auth.LoadConfig(resolvedConfigPath)
 			if err != nil {
+				var validationErr *apperr.ValidationError
+				if errors.As(err, &validationErr) && !strings.Contains(validationErr.Message, "Missing required credentials") {
+					return ctx, err
+				}
+
 				return ctx, apperr.NewAuthRequiredError(
 					"Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file",
 					err,
@@ -143,7 +151,7 @@ func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 			}
 
 			if auth.IsAccessTokenExpired(token) {
-				refreshed, err := auth.RefreshAccessToken(cfg, token, deps.tokenRefreshEndpoint())
+				refreshed, err := auth.RefreshAccessToken(cfg, token, deps.tokenRefreshEndpoint(cfg))
 				if err != nil {
 					return ctx, err
 				}
@@ -153,9 +161,13 @@ func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 				token = refreshed
 			}
 
-			apiClient.Client = deps.newClient(token.Token.AccessToken,
-				client.WithUserAgent("schwab-agent/"+version),
-			)
+			clientOptions := []client.Option{
+				client.WithUserAgent("schwab-agent/" + version),
+				client.WithBaseURL(cfg.APIBaseURL()),
+				client.WithHTTPClient(cfg.HTTPClient(30 * time.Second)),
+			}
+
+			apiClient.Client = deps.newClient(token.Token.AccessToken, clientOptions...)
 			return ctx, nil
 		},
 		Commands: []*cli.Command{

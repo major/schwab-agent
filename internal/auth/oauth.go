@@ -28,12 +28,6 @@ import (
 )
 
 const (
-	// authorizeEndpoint is Schwab's OAuth authorization endpoint.
-	authorizeEndpoint = "https://api.schwabapi.com/v1/oauth/authorize"
-
-	// oauthTokenEndpoint is Schwab's OAuth token endpoint.
-	oauthTokenEndpoint = "https://api.schwabapi.com/v1/oauth/token" //nolint:gosec // G101: API endpoint URL, not a credential
-
 	// defaultCallbackAddr limits the local callback server to loopback.
 	defaultCallbackAddr = "127.0.0.1:8182"
 
@@ -52,13 +46,6 @@ const (
 	callbackServerTimeout = 300 * time.Second
 )
 
-// oauthHTTPClient is the HTTP client for OAuth token exchange and refresh
-// requests. Has an explicit timeout to prevent hanging on network issues,
-// unlike http.DefaultClient which has no timeout.
-var oauthHTTPClient = &http.Client{
-	Timeout: oauthHTTPTimeout,
-}
-
 // AuthorizeURL builds the Schwab authorization URL and returns it with a random state value.
 func AuthorizeURL(cfg *Config) (authURL, state string, err error) {
 	state, err = randomOAuthState()
@@ -73,7 +60,7 @@ func AuthorizeURL(cfg *Config) (authURL, state string, err error) {
 	query.Set("scope", "api")
 	query.Set("state", state)
 
-	return authorizeEndpoint + "?" + query.Encode(), state, nil
+	return cfg.OAuthAuthorizeURL() + "?" + query.Encode(), state, nil
 }
 
 // ExchangeCode exchanges an OAuth authorization code for a token file.
@@ -81,7 +68,7 @@ func AuthorizeURL(cfg *Config) (authURL, state string, err error) {
 // making the function deterministic for tests.
 func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*TokenFile, error) {
 	if tokenEndpoint == "" {
-		tokenEndpoint = oauthTokenEndpoint
+		tokenEndpoint = cfg.OAuthTokenURL()
 	}
 
 	formData := url.Values{}
@@ -97,7 +84,7 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*Toke
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth(cfg.ClientID, cfg.ClientSecret)
 
-	resp, err := oauthHTTPClient.Do(req)
+	resp, err := cfg.HTTPClient(oauthHTTPTimeout).Do(req)
 	if err != nil {
 		return nil, apperr.NewAuthCallbackError("token exchange request failed", err)
 	}
@@ -390,5 +377,3 @@ func generateSelfSignedCertificate() (tls.Certificate, error) {
 
 	return certificate, nil
 }
-
-
