@@ -84,35 +84,35 @@ TRAILING_STOP and TRAILING_STOP_LIMIT supported for equity orders via `--stop-of
 
 ## Medium-Value Gaps
 
-### Destination Routing
+### ~~Destination Routing~~ ✅
 
-**Usefulness: 2** | **Difficulty: Easy**
+**Usefulness: 2** | **Difficulty: Easy** | **Status: Implemented**
 
-No `--destination` flag for exchange routing (INET, ECN_ARCA, CBOE, AMEX, etc.). The model field exists. Relevant for LLMs that care about execution quality or need to route to specific exchanges for liquidity reasons. Most LLM trading probably doesn't need this.
+`--destination` flag on equity and option order commands. Valid values: INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO. Pass-through to Schwab API, no routing validation. LLMs can now specify exchange routing for execution quality or liquidity reasons.
 
-### Price Link Basis/Type
+### ~~Price Link Basis/Type~~ ✅
 
-**Usefulness: 2** | **Difficulty: Easy**
+**Usefulness: 2** | **Difficulty: Easy** | **Status: Implemented**
 
-`priceLinkBasis` (MANUAL, BASE, TRIGGER, LAST, BID, ASK, etc.) and `priceLinkType` (VALUE, PERCENT, TICK) fields exist in models but aren't exposed. These control how limit prices adjust relative to a reference price. Advanced feature, but useful for LLMs implementing dynamic pricing strategies.
+`--price-link-basis` and `--price-link-type` flags on equity and option order commands. Both must be specified together (validation error if only one is set). PriceLinkBasis values: MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE. PriceLinkType values: VALUE, PERCENT, TICK. Explicit values override the trailing stop limit derivation. LLMs can now implement dynamic pricing strategies with reference-based limit adjustments.
 
-### Calendar Spreads
+### ~~Calendar Spreads~~ ✅
 
-**Usefulness: 2** | **Difficulty: Medium**
+**Usefulness: 2** | **Difficulty: Medium** | **Status: Implemented**
 
-Not in the order builder. A calendar spread sells a near-term option and buys a longer-term option at the same strike. Useful for income strategies and volatility plays, but an LLM could construct this manually with two separate legs using the existing option builder.
+`order build calendar` subcommand. Flags: `--underlying`, `--put-call` (via `--call`/`--put`), `--strike`, `--near-expiration`, `--far-expiration`, `--quantity`, `--open`/`--close`, `--price`, `--duration`, `--session`. Uses `spreadInstructions()` for opposite-direction legs (BUY_TO_OPEN far + SELL_TO_OPEN near when opening). Validates that near and far expirations differ and near comes before far.
 
-### Diagonal Spreads
+### ~~Diagonal Spreads~~ ✅
 
-**Usefulness: 2** | **Difficulty: Medium**
+**Usefulness: 2** | **Difficulty: Medium** | **Status: Implemented**
 
-Not in the order builder. Like a calendar but with different strikes. Same manual workaround as calendar spreads - two legs at different strikes and expirations.
+`order build diagonal` subcommand. Flags: `--underlying`, `--call`/`--put`, `--near-strike`, `--far-strike`, `--near-expiration`, `--far-expiration`, `--quantity`, `--open`/`--close`, `--price`, `--duration`, `--session`. Like calendar but with different strikes per leg. Validates that strikes differ and expirations differ.
 
-### Collar / Collar with Stock
+### ~~Collar / Collar with Stock~~ ✅
 
-**Usefulness: 2** | **Difficulty: Medium**
+**Usefulness: 2** | **Difficulty: Medium** | **Status: Implemented**
 
-Protective collar (long stock + long put + short call). Not in builder. Useful for portfolio protection, but an LLM could construct the legs individually. A dedicated builder would reduce errors and make intent clearer.
+`order build collar` subcommand. Flags: `--underlying`, `--put-strike`, `--call-strike`, `--expiration`, `--quantity`, `--open`/`--close`, `--price`, `--duration`, `--session`. 3-leg order: equity BUY (qty=contracts*100) + protective put BUY_TO_OPEN + covered call SELL_TO_OPEN when opening. Uses COLLAR_WITH_STOCK complex order strategy type.
 
 ---
 
@@ -176,11 +176,11 @@ If implementing in order of LLM trading value per effort:
 | ~~6~~ | ~~Market/Limit on Close~~ | ~~3~~ | ~~Easy~~ | ✅ |
 | ~~7~~ | ~~First-triggers-second~~ | ~~3~~ | ~~Medium~~ | ✅ |
 | ~~8~~ | ~~Order repeat~~ | ~~3~~ | ~~Medium~~ | ✅ |
-| 9 | Destination routing | 2 | Easy | |
-| 10 | Price link basis/type | 2 | Easy | |
-| 11 | Calendar spreads | 2 | Medium | |
-| 12 | Diagonal spreads | 2 | Medium | |
-| 13 | Collar builder | 2 | Medium | |
+| ~~9~~ | ~~Destination routing~~ | ~~2~~ | ~~Easy~~ | ✅ |
+| ~~10~~ | ~~Price link basis/type~~ | ~~2~~ | ~~Easy~~ | ✅ |
+| ~~11~~ | ~~Calendar spreads~~ | ~~2~~ | ~~Medium~~ | ✅ |
+| ~~12~~ | ~~Diagonal spreads~~ | ~~2~~ | ~~Medium~~ | ✅ |
+| ~~13~~ | ~~Collar builder~~ | ~~2~~ | ~~Medium~~ | ✅ |
 | 14 | Butterfly builder | 1 | Hard | |
 | 15 | Back ratio builder | 1 | Hard | |
 | 16 | Double diagonal builder | 1 | Hard | |
@@ -189,4 +189,4 @@ If implementing in order of LLM trading value per effort:
 | 19 | Cabinet orders | 1 | Easy | |
 | 20 | NON_MARKETABLE type | 1 | Easy | |
 
-Items 1-8 are implemented. All high-value gaps (usefulness 3-4, easy-medium difficulty) are now complete.
+Items 1-13 are implemented. All high-value gaps (usefulness 3-4, easy-medium difficulty) and medium-value gaps (usefulness 2, easy-medium difficulty) are now complete.

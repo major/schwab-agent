@@ -10,7 +10,7 @@ Build order JSON payloads offline without making API calls. Use these builders t
 schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --duration DAY
 ```
 
-Sub-types: equity, option, bracket, oco, vertical, iron-condor, straddle, strangle, covered-call.
+Sub-types: equity, option, bracket, oco, vertical, iron-condor, straddle, strangle, covered-call, calendar, diagonal, collar.
 
 ## Bracket Orders
 
@@ -158,6 +158,56 @@ schwab-agent order build strangle --underlying F --expiration 2026-06-18 \
   --call-strike 14 --put-strike 10 --buy --open --quantity 1 --price 0.50
 ```
 
+### Calendar Spread
+
+Sells a near-term option and buys a longer-term option at the same strike. Useful for income strategies and volatility plays.
+
+```bash
+schwab-agent order build calendar --underlying F --expiration 2026-06-18 \
+  --near-expiration 2026-05-16 --far-expiration 2026-07-17 --strike 12 --call \
+  --open --quantity 1 --price 0.50
+```
+
+- `--near-expiration` = the expiration being sold (must be earlier than far)
+- `--far-expiration` = the expiration being bought (must be later than near)
+- `--strike` = same strike for both legs
+- `--call` / `--put` = contract type
+- `--open` / `--close` controls TO_OPEN vs TO_CLOSE instructions
+
+### Diagonal Spread
+
+Like a calendar spread but with different strikes per leg. Combines time decay and directional bias.
+
+```bash
+schwab-agent order build diagonal --underlying F --expiration 2026-06-18 \
+  --near-strike 12 --far-strike 14 --near-expiration 2026-05-16 \
+  --far-expiration 2026-07-17 --call --open --quantity 1 --price 0.50
+```
+
+- `--near-strike` = strike being sold (near-term)
+- `--far-strike` = strike being bought (far-term)
+- `--near-expiration` = near-term expiration (must be earlier than far)
+- `--far-expiration` = far-term expiration (must be later than near)
+- `--call` / `--put` = contract type
+- `--open` / `--close` controls TO_OPEN vs TO_CLOSE instructions
+
+### Collar
+
+Protective collar: long stock + long put + short call. Limits downside while capping upside.
+
+```bash
+schwab-agent order build collar --underlying F --put-strike 10 --call-strike 14 \
+  --expiration 2026-06-18 --quantity 1 --open --price 12.00
+```
+
+- `--quantity 1` = 100 shares + 1 put contract + 1 call contract
+- `--put-strike` = protective put strike (downside protection)
+- `--call-strike` = covered call strike (upside cap)
+- `--expiration` = same expiration for both options
+- `--open` / `--close` controls TO_OPEN vs TO_CLOSE instructions
+- `--price` = net debit (what you pay total per share)
+- Uses Schwab's `COLLAR_WITH_STOCK` complex order strategy type
+
 ### Placing Multi-Leg Orders
 
 All multi-leg builders output raw JSON. To place, pipe through spec mode:
@@ -186,12 +236,18 @@ schwab-agent order build vertical ... | schwab-agent order preview --spec -
 | `--stop-loss` | Stop-loss price (at least one exit required) | bracket, oco |
 | `--underlying` | Underlying symbol | option, multi-leg strategies |
 | `--expiration` | Option expiration (YYYY-MM-DD) | option, multi-leg strategies |
-| `--strike` | Strike price | option, straddle, covered-call |
-| `--call` / `--put` | Contract type | option, vertical |
+| `--strike` | Strike price | option, straddle, covered-call, calendar |
+| `--call` / `--put` | Contract type | option, vertical, calendar, diagonal |
 | `--buy` / `--sell` | Direction | straddle, strangle |
-| `--open` / `--close` | Opening or closing position | vertical, iron-condor, straddle, strangle |
+| `--open` / `--close` | Opening or closing position | vertical, iron-condor, straddle, strangle, calendar, diagonal, collar |
 | `--long-strike` / `--short-strike` | Strikes for legs being bought/sold | vertical |
-| `--call-strike` / `--put-strike` | Separate strikes per leg | strangle, iron-condor |
+| `--call-strike` / `--put-strike` | Separate strikes per leg | strangle, iron-condor, collar |
+| `--near-strike` / `--far-strike` | Strikes for near/far legs | diagonal |
+| `--near-expiration` / `--far-expiration` | Expirations for near/far legs | calendar, diagonal |
+| `--put-strike` / `--call-strike` | Put and call strikes | collar |
+| `--destination` | Exchange routing (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) | equity, option |
+| `--price-link-basis` | Price link basis (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) | equity, option |
+| `--price-link-type` | Price link type (VALUE, PERCENT, TICK) | equity, option |
 | `--confirm` | Actually execute (omit to preview) | all mutable |
 | `--account` | Account hash (uses default if set) | all |
 | `--session` | NORMAL, AM, PM, SEAMLESS | all |
