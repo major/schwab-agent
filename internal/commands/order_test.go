@@ -1467,6 +1467,92 @@ func TestOrderListWithFilters(t *testing.T) {
 	assert.Empty(t, orders)
 }
 
+func TestOrderListMultipleStatuses(t *testing.T) {
+	t.Parallel()
+
+	// Arrange - the Schwab API accepts only one status per request, so multiple
+	// --status flags should produce separate API calls with merged results.
+	var requestStatuses []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/trader/v1/orders", r.URL.Path)
+		status := r.URL.Query().Get("status")
+		requestStatuses = append(requestStatuses, status)
+
+		w.Header().Set("Content-Type", "application/json")
+		switch status {
+		case "WORKING":
+			_, err := w.Write([]byte(`[{"session":"NORMAL","duration":"DAY","orderType":"LIMIT","orderStrategyType":"SINGLE","orderId":111,"status":"WORKING","orderLegCollection":[{"instruction":"BUY","quantity":10,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}]`))
+			require.NoError(t, err)
+		case "FILLED":
+			_, err := w.Write([]byte(`[{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":222,"status":"FILLED","orderLegCollection":[{"instruction":"SELL","quantity":5,"instrument":{"assetType":"EQUITY","symbol":"MSFT"}}]}]`))
+			require.NoError(t, err)
+		default:
+			t.Errorf("unexpected status filter: %q", status)
+		}
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "list", "--status", "WORKING", "--status", "FILLED")
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, []string{"WORKING", "FILLED"}, requestStatuses, "should fan out one request per status")
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	orders, ok := data["orders"].([]any)
+	require.True(t, ok)
+	require.Len(t, orders, 2)
+
+	first, ok := orders[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(111), first["orderId"])
+	assert.Equal(t, "WORKING", first["status"])
+
+	second, ok := orders[1].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(222), second["orderId"])
+	assert.Equal(t, "FILLED", second["status"])
+}
+
+func TestOrderListCommaSeparatedStatuses(t *testing.T) {
+	t.Parallel()
+
+	// Arrange - comma-separated statuses should split into separate API calls,
+	// matching the --fields pattern in quote.go.
+	var requestStatuses []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		status := r.URL.Query().Get("status")
+		requestStatuses = append(requestStatuses, status)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte(`[]`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "list", "--status", "WORKING,FILLED")
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, []string{"WORKING", "FILLED"}, requestStatuses, "comma-separated values should produce separate API calls")
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	orders, ok := data["orders"].([]any)
+	require.True(t, ok)
+	assert.Empty(t, orders)
+}
+
 func TestOrderListAPIError(t *testing.T) {
 	t.Parallel()
 

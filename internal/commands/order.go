@@ -95,16 +95,32 @@ func orderListCommand(c *client.Ref, _ string, w io.Writer) *cli.Command {
 		Usage: "List orders",
 		UsageText: `schwab-agent order list
 schwab-agent order list --status FILLED
+schwab-agent order list --status WORKING --status PENDING_ACTIVATION
+schwab-agent order list --status WORKING,PENDING_ACTIVATION
 schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "status", Usage: "Filter by order status"},
+			&cli.StringSliceFlag{Name: "status", Usage: "Filter by order status (repeatable): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc."},
 			&cli.StringFlag{Name: "from", Usage: "Filter by entered time lower bound"},
 			&cli.StringFlag{Name: "to", Usage: "Filter by entered time upper bound"},
 			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
+			// Split comma-separated values and trim whitespace, matching the
+			// --fields pattern in quote.go. Supports both repeatable flags
+			// (--status WORKING --status FILLED) and comma-separated
+			// (--status WORKING,FILLED).
+			var statuses []string
+			for _, raw := range cmd.StringSlice("status") {
+				for _, part := range strings.Split(raw, ",") {
+					trimmed := strings.TrimSpace(part)
+					if trimmed != "" {
+						statuses = append(statuses, trimmed)
+					}
+				}
+			}
+
 			params := client.OrderListParams{
-				Status:          strings.TrimSpace(cmd.String("status")),
+				Statuses:        statuses,
 				FromEnteredTime: strings.TrimSpace(cmd.String("from")),
 				ToEnteredTime:   strings.TrimSpace(cmd.String("to")),
 			}

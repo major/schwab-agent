@@ -84,13 +84,94 @@ func TestListOrders_WithParams(t *testing.T) {
 
 	c := NewClient("test-token", WithBaseURL(srv.URL))
 	result, err := c.ListOrders(context.Background(), "abc123", OrderListParams{
-		Status:          "FILLED",
+		Statuses:        []string{"FILLED"},
 		FromEnteredTime: "2024-01-01T00:00:00.000Z",
 		ToEnteredTime:   "2024-12-31T23:59:59.000Z",
 	})
 
 	require.NoError(t, err)
 	assert.Empty(t, result)
+}
+
+func TestListOrders_MultipleStatuses(t *testing.T) {
+	// The Schwab API accepts only a single status per request, so multiple
+	// statuses require separate API calls with merged results.
+	workingID := int64(111)
+	filledID := int64(222)
+	workingStatus := models.OrderStatusWorking
+	filledStatus := models.OrderStatusFilled
+
+	var requestCount int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		status := r.URL.Query().Get("status")
+
+		w.Header().Set("Content-Type", "application/json")
+		switch status {
+		case "WORKING":
+			response := []models.Order{{
+				OrderID:           &workingID,
+				Status:            &workingStatus,
+				OrderType:         models.OrderTypeLimit,
+				OrderStrategyType: models.OrderStrategyTypeSingle,
+			}}
+			require.NoError(t, json.NewEncoder(w).Encode(response))
+		case "FILLED":
+			response := []models.Order{{
+				OrderID:           &filledID,
+				Status:            &filledStatus,
+				OrderType:         models.OrderTypeMarket,
+				OrderStrategyType: models.OrderStrategyTypeSingle,
+			}}
+			require.NoError(t, json.NewEncoder(w).Encode(response))
+		default:
+			t.Errorf("unexpected status filter: %q", status)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	result, err := c.ListOrders(context.Background(), "abc123", OrderListParams{
+		Statuses: []string{"WORKING", "FILLED"},
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, 2, requestCount, "should make one API call per status")
+	require.Len(t, result, 2)
+	assert.Equal(t, int64(111), *result[0].OrderID)
+	assert.Equal(t, int64(222), *result[1].OrderID)
+}
+
+func TestListOrders_MultipleStatuses_Dedup(t *testing.T) {
+	// Guard against the unlikely case where the same order appears in multiple
+	// status responses (e.g. status transition mid-request).
+	orderID := int64(333)
+	workingStatus := models.OrderStatusWorking
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		response := []models.Order{{
+			OrderID:           &orderID,
+			Status:            &workingStatus,
+			OrderType:         models.OrderTypeLimit,
+			OrderStrategyType: models.OrderStrategyTypeSingle,
+		}}
+		require.NoError(t, json.NewEncoder(w).Encode(response))
+	}))
+	defer srv.Close()
+
+	// Act
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	result, err := c.ListOrders(context.Background(), "abc123", OrderListParams{
+		Statuses: []string{"WORKING", "PENDING_ACTIVATION"},
+	})
+
+	// Assert - should dedup the duplicate OrderID.
+	require.NoError(t, err)
+	require.Len(t, result, 1, "duplicate OrderID should be deduplicated")
+	assert.Equal(t, int64(333), *result[0].OrderID)
 }
 
 func TestAllOrders_Success(t *testing.T) {
