@@ -48,10 +48,14 @@ Both are required for any mutable operation (place/cancel/replace):
 ```bash
 schwab-agent order list
 schwab-agent order list --status WORKING --from 2025-01-01 --to 2025-01-31
+schwab-agent order list --status WORKING --status PENDING_ACTIVATION
+schwab-agent order list --status WORKING,FILLED,EXPIRED
 schwab-agent order get <order-id>
 ```
 
-Flags: `--status` (filter by status), `--from`/`--to` (filter by entered time).
+Flags: `--status` (filter by status, repeatable), `--from`/`--to` (filter by entered time).
+
+The `--status` flag can be repeated or comma-separated to query multiple statuses. The Schwab API only accepts one status per request, so multiple statuses automatically fan out into separate API calls with merged, deduplicated results.
 
 ## Placing Orders
 

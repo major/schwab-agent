@@ -16,20 +16,23 @@ import (
 
 // OrderListParams holds optional filter parameters for listing orders.
 type OrderListParams struct {
-	Status          string
+	Statuses        []string
 	FromEnteredTime string
 	ToEnteredTime   string
 }
 
-// toQueryParams converts fields to a map for doGet.
+// toQueryParams converts date fields to a map for doGet.
 //
 // The Schwab API requires fromEnteredTime and toEnteredTime as mandatory query
 // parameters in ISO 8601 format. When not provided, fromEnteredTime defaults
 // to 60 days ago and toEnteredTime defaults to now (matching the Python
 // schwab-py client behavior).
+//
+// Status is intentionally omitted here because the Schwab API accepts only a
+// single status value per request. Multiple statuses require separate API calls
+// with merged results, handled by fetchOrders.
 func (p OrderListParams) toQueryParams() map[string]string {
 	params := make(map[string]string)
-	setParam(params, "status", p.Status)
 	params["fromEnteredTime"], params["toEnteredTime"] = defaultDateRange(p.FromEnteredTime, p.ToEnteredTime)
 	return params
 }
@@ -39,23 +42,72 @@ type PlaceOrderResponse struct {
 	OrderID int64
 }
 
+// fetchOrders retrieves orders from the given path, fanning out one API call
+// per status when multiple statuses are requested. The Schwab API accepts only
+// a single status value per request, so multiple statuses require separate
+// calls with merged results.
+//
+// When no statuses are provided, a single unfiltered request is made. When one
+// status is provided, a single filtered request is made. When multiple are
+// provided, one request per status is made and results are merged, deduplicating
+// by OrderID.
+func (c *Client) fetchOrders(ctx context.Context, path string, params OrderListParams) ([]models.Order, error) {
+	baseQuery := params.toQueryParams()
+
+	// Zero or one status: single API call.
+	if len(params.Statuses) <= 1 {
+		if len(params.Statuses) == 1 {
+			baseQuery["status"] = params.Statuses[0]
+		}
+		var result []models.Order
+		if err := c.doGet(ctx, path, baseQuery, &result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	// Multiple statuses: fan out one call per status, merge and dedup.
+	// An order can only have one status at a time, but we guard against
+	// API edge cases (e.g. status transition mid-request) by deduplicating
+	// on OrderID.
+	//
+	// Initialize as empty (not nil) so JSON serialization produces [] instead
+	// of null when all batches are empty, matching the single-status behavior.
+	seen := make(map[int64]bool)
+	merged := make([]models.Order, 0)
+	for _, status := range params.Statuses {
+		query := make(map[string]string, len(baseQuery)+1)
+		for k, v := range baseQuery {
+			query[k] = v
+		}
+		query["status"] = status
+
+		var batch []models.Order
+		if err := c.doGet(ctx, path, query, &batch); err != nil {
+			return nil, err
+		}
+		for i := range batch {
+			if batch[i].OrderID != nil {
+				if seen[*batch[i].OrderID] {
+					continue
+				}
+				seen[*batch[i].OrderID] = true
+			}
+			merged = append(merged, batch[i])
+		}
+	}
+	return merged, nil
+}
+
 // ListOrders retrieves orders for a specific account, filtered by the given params.
 func (c *Client) ListOrders(ctx context.Context, hashValue string, params OrderListParams) ([]models.Order, error) {
 	path := fmt.Sprintf("/trader/v1/accounts/%s/orders", hashValue)
-	var result []models.Order
-	if err := c.doGet(ctx, path, params.toQueryParams(), &result); err != nil {
-		return nil, err
-	}
-	return result, nil
+	return c.fetchOrders(ctx, path, params)
 }
 
 // AllOrders retrieves orders across all accounts, filtered by the given params.
 func (c *Client) AllOrders(ctx context.Context, params OrderListParams) ([]models.Order, error) {
-	var result []models.Order
-	if err := c.doGet(ctx, "/trader/v1/orders", params.toQueryParams(), &result); err != nil {
-		return nil, err
-	}
-	return result, nil
+	return c.fetchOrders(ctx, "/trader/v1/orders", params)
 }
 
 // GetOrder retrieves a specific order by account hash and order ID.
