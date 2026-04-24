@@ -88,18 +88,45 @@ func OrderCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	}
 }
 
+// terminalOrderStatuses are order statuses that represent completed/final states.
+// Orders in these statuses are filtered out by default to show only actionable
+// orders. Use --status all to include them.
+var terminalOrderStatuses = map[models.OrderStatus]bool{
+	models.OrderStatusFilled:   true,
+	models.OrderStatusCanceled: true,
+	models.OrderStatusRejected: true,
+	models.OrderStatusExpired:  true,
+	models.OrderStatusReplaced: true,
+}
+
+// filterNonTerminalOrders returns only orders whose status is not terminal.
+// Orders with a nil Status are included (conservative: don't hide unknowns).
+func filterNonTerminalOrders(orders []models.Order) []models.Order {
+	filtered := make([]models.Order, 0, len(orders))
+	for i := range orders {
+		if orders[i].Status == nil || !terminalOrderStatuses[*orders[i].Status] {
+			filtered = append(filtered, orders[i])
+		}
+	}
+	return filtered
+}
+
 // orderListCommand lists orders for a specific account or all accounts.
+// By default, terminal statuses (FILLED, CANCELED, REJECTED, EXPIRED, REPLACED)
+// are filtered out to show only actionable orders. Use --status all to see
+// everything, or --status <STATUS> to filter by specific statuses.
 func orderListCommand(c *client.Ref, _ string, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "list",
-		Usage: "List orders",
+		Usage: "List orders (defaults to non-terminal statuses)",
 		UsageText: `schwab-agent order list
+schwab-agent order list --status all
 schwab-agent order list --status FILLED
 schwab-agent order list --status WORKING --status PENDING_ACTIVATION
 schwab-agent order list --status WORKING,PENDING_ACTIVATION
 schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 		Flags: []cli.Flag{
-			&cli.StringSliceFlag{Name: "status", Usage: "Filter by order status (repeatable): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc."},
+			&cli.StringSliceFlag{Name: "status", Usage: "Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc."},
 			&cli.StringFlag{Name: "from", Usage: "Filter by entered time lower bound"},
 			&cli.StringFlag{Name: "to", Usage: "Filter by entered time upper bound"},
 			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
@@ -119,25 +146,47 @@ schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 				}
 			}
 
+			// "all" is a pseudo-status that disables default filtering.
+			// When present, fetch everything without any status filter.
+			showAll := false
+			for _, s := range statuses {
+				if strings.EqualFold(s, "all") {
+					showAll = true
+					break
+				}
+			}
+
+			// When specific statuses are requested (not "all"), pass them
+			// through to the API. When "all" or no statuses, fetch unfiltered.
+			var apiStatuses []string
+			if !showAll {
+				apiStatuses = statuses
+			}
+
 			params := client.OrderListParams{
-				Statuses:        statuses,
+				Statuses:        apiStatuses,
 				FromEnteredTime: strings.TrimSpace(cmd.String("from")),
 				ToEnteredTime:   strings.TrimSpace(cmd.String("to")),
 			}
 
 			account := strings.TrimSpace(cmd.String("account"))
+
+			var orders []models.Order
+			var err error
 			if account == "" {
-				orders, err := c.AllOrders(ctx, params)
-				if err != nil {
-					return err
-				}
-
-				return output.WriteSuccess(w, orderListData{Orders: orders}, output.NewMetadata())
+				orders, err = c.AllOrders(ctx, params)
+			} else {
+				orders, err = c.ListOrders(ctx, account, params)
 			}
-
-			orders, err := c.ListOrders(ctx, account, params)
 			if err != nil {
 				return err
+			}
+
+			// When no statuses were explicitly requested, filter out terminal
+			// orders client-side. This avoids N API calls (one per non-terminal
+			// status) since the Schwab API only accepts one status per request.
+			if len(statuses) == 0 {
+				orders = filterNonTerminalOrders(orders)
 			}
 
 			return output.WriteSuccess(w, orderListData{Orders: orders}, output.NewMetadata())

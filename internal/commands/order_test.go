@@ -1367,7 +1367,8 @@ func TestOrderBuildSpreadParseErrors(t *testing.T) {
 func TestOrderListAllAccounts(t *testing.T) {
 	t.Parallel()
 
-	// Arrange
+	// Arrange - mix of terminal and non-terminal orders. Default listing
+	// should filter out terminal statuses (FILLED, CANCELED, etc.).
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/trader/v1/orders", r.URL.Path)
@@ -1375,7 +1376,11 @@ func TestOrderListAllAccounts(t *testing.T) {
 		assert.NotEmpty(t, r.URL.Query().Get("toEnteredTime"))
 
 		w.Header().Set("Content-Type", "application/json")
-		_, err := w.Write([]byte(`[{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":12345,"status":"FILLED","orderLegCollection":[{"instruction":"BUY","quantity":10,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}]`))
+		_, err := w.Write([]byte(`[
+			{"session":"NORMAL","duration":"DAY","orderType":"LIMIT","orderStrategyType":"SINGLE","orderId":111,"status":"WORKING","orderLegCollection":[{"instruction":"BUY","quantity":10,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]},
+			{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":222,"status":"FILLED","orderLegCollection":[{"instruction":"SELL","quantity":5,"instrument":{"assetType":"EQUITY","symbol":"MSFT"}}]},
+			{"session":"NORMAL","duration":"DAY","orderType":"LIMIT","orderStrategyType":"SINGLE","orderId":333,"status":"QUEUED","orderLegCollection":[{"instruction":"BUY","quantity":20,"instrument":{"assetType":"EQUITY","symbol":"GOOG"}}]}
+		]`))
 		require.NoError(t, err)
 	}))
 	defer server.Close()
@@ -1386,18 +1391,24 @@ func TestOrderListAllAccounts(t *testing.T) {
 	// Act
 	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "list")
 
-	// Assert
+	// Assert - FILLED order should be filtered out by default
 	require.NoError(t, err)
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	orders, ok := data["orders"].([]any)
 	require.True(t, ok)
-	require.Len(t, orders, 1)
-	order, ok := orders[0].(map[string]any)
+	require.Len(t, orders, 2, "should exclude terminal FILLED order")
+
+	first, ok := orders[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(12345), order["orderId"])
-	assert.Equal(t, "FILLED", order["status"])
+	assert.Equal(t, float64(111), first["orderId"])
+	assert.Equal(t, "WORKING", first["status"])
+
+	second, ok := orders[1].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(333), second["orderId"])
+	assert.Equal(t, "QUEUED", second["status"])
 }
 
 func TestOrderListWithAccount(t *testing.T) {
@@ -1575,6 +1586,148 @@ func TestOrderListAPIError(t *testing.T) {
 	var httpErr *apperr.HTTPError
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
+}
+
+func TestOrderListDefaultFiltersTerminalStatuses(t *testing.T) {
+	t.Parallel()
+
+	// Arrange - return orders in every terminal status plus one non-terminal.
+	// Default listing (no --status flag) should filter out all terminal ones.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte(`[
+			{"orderId":1,"status":"WORKING"},
+			{"orderId":2,"status":"FILLED"},
+			{"orderId":3,"status":"CANCELED"},
+			{"orderId":4,"status":"REJECTED"},
+			{"orderId":5,"status":"EXPIRED"},
+			{"orderId":6,"status":"REPLACED"},
+			{"orderId":7,"status":"QUEUED"},
+			{"orderId":8,"status":"PENDING_ACTIVATION"}
+		]`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "list")
+
+	// Assert - only non-terminal orders should remain
+	require.NoError(t, err)
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	orders, ok := data["orders"].([]any)
+	require.True(t, ok)
+	require.Len(t, orders, 3, "should keep WORKING, QUEUED, PENDING_ACTIVATION")
+
+	expectedIDs := []float64{1, 7, 8}
+	for i, order := range orders {
+		o, ok := order.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, expectedIDs[i], o["orderId"])
+	}
+}
+
+func TestOrderListStatusAllDisablesFiltering(t *testing.T) {
+	t.Parallel()
+
+	// Arrange - --status all should return everything unfiltered.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// "all" is a pseudo-status handled client-side, not sent to the API.
+		assert.Empty(t, r.URL.Query().Get("status"), "should not send 'all' as API status")
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte(`[
+			{"orderId":1,"status":"WORKING"},
+			{"orderId":2,"status":"FILLED"},
+			{"orderId":3,"status":"CANCELED"}
+		]`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "list", "--status", "all")
+
+	// Assert - all orders should appear, no filtering
+	require.NoError(t, err)
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	orders, ok := data["orders"].([]any)
+	require.True(t, ok)
+	require.Len(t, orders, 3, "should return all orders when --status all")
+}
+
+func TestOrderListExplicitStatusBypassesDefault(t *testing.T) {
+	t.Parallel()
+
+	// Arrange - when the user explicitly requests a terminal status,
+	// it should be passed to the API and returned without client-side filtering.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "FILLED", r.URL.Query().Get("status"))
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte(`[{"orderId":1,"status":"FILLED"},{"orderId":2,"status":"FILLED"}]`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "list", "--status", "FILLED")
+
+	// Assert - explicit status request returns all matching, no default filter
+	require.NoError(t, err)
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	orders, ok := data["orders"].([]any)
+	require.True(t, ok)
+	require.Len(t, orders, 2)
+}
+
+func TestOrderListNilStatusIncludedByDefault(t *testing.T) {
+	t.Parallel()
+
+	// Arrange - orders with no status field should be kept (conservative:
+	// don't hide orders with unknown state).
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte(`[
+			{"orderId":1},
+			{"orderId":2,"status":"FILLED"}
+		]`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "list")
+
+	// Assert - nil-status order kept, FILLED filtered
+	require.NoError(t, err)
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	orders, ok := data["orders"].([]any)
+	require.True(t, ok)
+	require.Len(t, orders, 1)
+	o, ok := orders[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1), o["orderId"])
 }
 
 func TestOrderGetSuccess(t *testing.T) {

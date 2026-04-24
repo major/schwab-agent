@@ -201,6 +201,7 @@ func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 		Commands: []*cli.Command{
 			commands.AuthCommand(loadedConfig, tokenPath, w),
 			commands.AccountCommand(apiClient, configPath, w),
+			commands.PositionCommand(apiClient, configPath, w),
 			commands.OrderCommand(apiClient, configPath, w),
 			commands.QuoteCommand(apiClient, w),
 			commands.ChainCommand(apiClient, w),

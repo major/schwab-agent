@@ -106,6 +106,7 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 |---|---|---|
 | auth.go | auth | login, status, refresh |
 | account.go | account | list, get, numbers, set-default, transaction (list, get) |
+| position.go | position | list (--all-accounts, --account) |
 | quote.go | quote | get |
 | order.go | order | list, get, place (equity/option/bracket/oco), preview, cancel, replace |
 | order_build.go | order build | equity, option, bracket, oco, vertical, iron-condor, straddle, strangle, covered-call |
@@ -113,6 +114,5 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 | history.go | history | get |
 | instrument.go | instrument | search, get |
 | market.go | market | hours, movers |
-
 | symbol.go | symbol | build, parse |
 | schema.go | schema | (direct) |
