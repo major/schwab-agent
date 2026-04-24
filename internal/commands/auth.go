@@ -91,8 +91,9 @@ func AuthCommand(cfg *auth.Config, tokenPath string, w io.Writer) *cli.Command {
 // Tests call this directly with custom deps; production goes through AuthCommand.
 func newAuthCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps authDeps) *cli.Command {
 	return &cli.Command{
-		Name:  "auth",
-		Usage: "Authentication commands",
+		Name:   "auth",
+		Usage:  "Authentication commands",
+		Action: requireSubcommand(),
 		Commands: []*cli.Command{
 			authLoginCommand(cfg, tokenPath, w, deps),
 			authStatusCommand(cfg, tokenPath, w, deps),

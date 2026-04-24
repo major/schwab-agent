@@ -24,8 +24,9 @@ type instrumentGetData struct {
 // InstrumentCommand returns the CLI command for instrument search and lookup.
 func InstrumentCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "instrument",
-		Usage: "Search and look up instruments",
+		Name:   "instrument",
+		Usage:  "Search and look up instruments",
+		Action: requireSubcommand(),
 		Commands: []*cli.Command{
 			{
 				Name:      "search",

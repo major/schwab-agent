@@ -26,8 +26,9 @@ type symbolResult struct {
 // These are pure computation commands that do not require API authentication.
 func SymbolCommand(w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "symbol",
-		Usage: "Option symbol utilities (build and parse OCC symbols)",
+		Name:   "symbol",
+		Usage:  "Option symbol utilities (build and parse OCC symbols)",
+		Action: requireSubcommand(),
 		Commands: []*cli.Command{
 			symbolBuildCommand(w),
 			symbolParseCommand(w),
