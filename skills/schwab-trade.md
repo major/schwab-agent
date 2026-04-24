@@ -57,6 +57,18 @@ Flags: `--status` (filter by status, repeatable), `--from`/`--to` (filter by ent
 
 The `--status` flag can be repeated or comma-separated to query multiple statuses. The Schwab API only accepts one status per request, so multiple statuses automatically fan out into separate API calls with merged, deduplicated results.
 
+## Duration Aliases
+
+Standard trading abbreviations are accepted for `--duration`:
+
+| Alias | Expands to |
+|-------|------------|
+| GTC | GOOD_TILL_CANCEL |
+| FOK | FILL_OR_KILL |
+| IOC | IMMEDIATE_OR_CANCEL |
+
+`DAY` is already short, so no alias needed. Case-insensitive.
+
 ## Placing Orders
 
 ```bash

@@ -2385,6 +2385,102 @@ func TestParseOrderType(t *testing.T) {
 	}
 }
 
+// TestParseDuration verifies duration parsing including GTC/FOK/IOC aliases.
+func TestParseDuration(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		want    models.Duration
+		wantErr bool
+	}{
+		{
+			name:    "DAY full name",
+			input:   "DAY",
+			want:    models.DurationDay,
+			wantErr: false,
+		},
+		{
+			name:    "GOOD_TILL_CANCEL full name",
+			input:   "GOOD_TILL_CANCEL",
+			want:    models.DurationGoodTillCancel,
+			wantErr: false,
+		},
+		{
+			name:    "GTC alias",
+			input:   "GTC",
+			want:    models.DurationGoodTillCancel,
+			wantErr: false,
+		},
+		{
+			name:    "FILL_OR_KILL full name",
+			input:   "FILL_OR_KILL",
+			want:    models.DurationFillOrKill,
+			wantErr: false,
+		},
+		{
+			name:    "FOK alias",
+			input:   "FOK",
+			want:    models.DurationFillOrKill,
+			wantErr: false,
+		},
+		{
+			name:    "IMMEDIATE_OR_CANCEL full name",
+			input:   "IMMEDIATE_OR_CANCEL",
+			want:    models.DurationImmediateOrCancel,
+			wantErr: false,
+		},
+		{
+			name:    "IOC alias",
+			input:   "IOC",
+			want:    models.DurationImmediateOrCancel,
+			wantErr: false,
+		},
+		{
+			name:    "case insensitive alias",
+			input:   "gtc",
+			want:    models.DurationGoodTillCancel,
+			wantErr: false,
+		},
+		{
+			name:    "empty string returns empty default",
+			input:   "",
+			want:    "",
+			wantErr: false,
+		},
+		{
+			name:    "whitespace returns empty default",
+			input:   "   ",
+			want:    "",
+			wantErr: false,
+		},
+		{
+			name:    "invalid duration",
+			input:   "FOREVER",
+			want:    "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := parseDuration(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+
+				var validationErr *apperr.ValidationError
+				require.True(t, errors.As(err, &validationErr))
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
 // --- order repeat tests ---
 
 // sampleOrderJSON returns a JSON string for a filled order response. Includes

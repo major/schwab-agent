@@ -135,7 +135,7 @@ Both `--primary` and `--secondary` required. Accept inline JSON, `@file`, or `-`
 | `--type` | MARKET, LIMIT, STOP, STOP_LIMIT, TRAILING_STOP | equity, bracket |
 | `--price` | Limit price or net debit/credit | LIMIT, STOP_LIMIT, multi-leg |
 | `--stop-price` | Stop trigger price | STOP, STOP_LIMIT |
-| `--duration` | DAY, GOOD_TILL_CANCEL, FILL_OR_KILL, IMMEDIATE_OR_CANCEL, END_OF_WEEK, END_OF_MONTH, NEXT_END_OF_MONTH | all |
+| `--duration` | DAY, GOOD_TILL_CANCEL (or GTC), FILL_OR_KILL (or FOK), IMMEDIATE_OR_CANCEL (or IOC), END_OF_WEEK, END_OF_MONTH, NEXT_END_OF_MONTH | all |
 | `--session` | NORMAL, AM, PM, SEAMLESS | all |
 
 ### Exit Flags
