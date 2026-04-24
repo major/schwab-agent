@@ -46,7 +46,8 @@ Both are required for any mutable operation (place/cancel/replace):
 ## Listing and Getting Orders
 
 ```bash
-schwab-agent order list
+schwab-agent order list                                    # Non-terminal orders only (default)
+schwab-agent order list --status all                       # All orders including filled/canceled
 schwab-agent order list --status WORKING --from 2025-01-01 --to 2025-01-31
 schwab-agent order list --status WORKING --status PENDING_ACTIVATION
 schwab-agent order list --status WORKING,FILLED,EXPIRED
@@ -54,6 +55,8 @@ schwab-agent order get <order-id>
 ```
 
 Flags: `--status` (filter by status, repeatable), `--from`/`--to` (filter by entered time).
+
+By default, `order list` filters out terminal statuses (FILLED, CANCELED, REJECTED, EXPIRED, REPLACED) to show only actionable orders. Use `--status all` to see everything, or pass explicit statuses to override the default.
 
 The `--status` flag can be repeated or comma-separated to query multiple statuses. The Schwab API only accepts one status per request, so multiple statuses automatically fan out into separate API calls with merged, deduplicated results.
 

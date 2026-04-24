@@ -87,6 +87,27 @@ schwab-agent account set-default <hash>      # Set default account
 
 Account list and get enrich results with nicknames from the preferences API (best-effort, degrades gracefully).
 
+## Positions
+
+Flat position list with account identifiers and computed cost basis / P&L fields. Uses the configured default account unless `--account` or `--all-accounts` is specified.
+
+```bash
+schwab-agent position list                   # Default account positions
+schwab-agent position list --account HASH    # Specific account
+schwab-agent position list --all-accounts    # All linked accounts
+```
+
+Each position includes the original API fields plus computed fields:
+
+| Field | Description |
+|-------|-------------|
+| `accountNumber` | Account number |
+| `accountHash` | Account hash value |
+| `accountNickName` | Nickname from preferences (if available) |
+| `totalCostBasis` | averagePrice * (longQuantity + shortQuantity) |
+| `unrealizedPnL` | longOpenProfitLoss + shortOpenProfitLoss |
+| `unrealizedPnLPct` | (unrealizedPnL / totalCostBasis) * 100 |
+
 ## Instruments
 
 ```bash
@@ -131,6 +152,8 @@ Movers flags: `--sort` (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN),
 | "Near-the-money AAPL options" | `chain get AAPL --strike-range NTM` |
 | "Theoretical pricing for AAPL" | `chain get AAPL --strategy ANALYTICAL --volatility 30 --days-to-expiration 45` |
 | "Last 3 months daily prices" | `history get AAPL --period-type month --period 3` |
+| "What positions do I have?" | `position list` |
+| "Show all positions across accounts" | `position list --all-accounts` |
 | "Show my accounts with positions" | `account list --positions` |
 | "What accounts do I have?" | `account numbers` |
 | "Find a stock by name" | `instrument search "Apple" --projection symbol-search` |

@@ -142,6 +142,7 @@ schwab-agent order place --spec @order.json --confirm
 |---|---|
 | `auth` | Login, status, token refresh |
 | `account` | List (with nicknames), get details, set default, transactions |
+| `position` | List positions for one or all accounts (with computed cost basis and P&L) |
 | `quote` | Get quotes for one or more symbols |
 | `order` | List, get, place, preview, build, cancel, replace |
 | `chain` | Option chain data (`get`, `expiration`) |

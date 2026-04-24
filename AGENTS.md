@@ -78,7 +78,7 @@ All command output uses `internal/output` JSON envelopes:
 
 urfave/cli v3. `buildApp()` in main.go constructs the command tree. Before hook skips auth for `auth`, `skills`, `schema`, and `symbol` commands, then loads config + token, refreshes if expired, populates `*client.Ref` for command access.
 
-10 subcommands: auth (setup/login/status), account (list/get/numbers/set-default/transaction), quote (get), order (list/get/place/preview/build/cancel/replace; place/build sub-types: equity/option/bracket/oco), chain, history, instrument, market (hours/movers), symbol (build/parse), schema. Account list/get enriches results with nicknames from the preferences API (best-effort, degrades gracefully).
+11 subcommands: auth (setup/login/status), account (list/get/numbers/set-default/transaction), position (list with --all-accounts/--account), quote (get), order (list/get/place/preview/build/cancel/replace; place/build sub-types: equity/option/bracket/oco), chain, history, instrument, market (hours/movers), symbol (build/parse), schema. Account list/get enriches results with nicknames from the preferences API (best-effort, degrades gracefully). Position list enriches with nicknames and adds computed cost basis / P&L fields. Order list defaults to non-terminal statuses (use --status all for everything).
 
 ## Config
 
