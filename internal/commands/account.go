@@ -64,6 +64,8 @@ func accountListCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "list",
 		Usage: "List all accounts with nicknames and settings",
+		UsageText: `schwab-agent account list
+schwab-agent account list --positions`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "positions",
@@ -98,6 +100,8 @@ func accountGetCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comma
 	return &cli.Command{
 		Name:  "get",
 		Usage: "Get account details by hash value",
+		UsageText: `schwab-agent account get
+schwab-agent account get --positions`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "positions",
@@ -137,8 +141,9 @@ func accountGetCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comma
 // accountNumbersCommand returns the CLI command for listing account numbers and hash values.
 func accountNumbersCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "numbers",
-		Usage: "List account numbers and hash values",
+		Name:      "numbers",
+		Usage:     "List account numbers and hash values",
+		UsageText: "schwab-agent account numbers",
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			numbers, err := c.AccountNumbers(ctx)
 			if err != nil {
@@ -230,6 +235,9 @@ func accountTransactionCommand(c *client.Ref, configPath string, w io.Writer) *c
 			{
 				Name:  "list",
 				Usage: "List transactions for an account",
+				UsageText: `schwab-agent account transaction list
+schwab-agent account transaction list --types TRADE --symbol AAPL
+schwab-agent account transaction list --from 2025-01-01T00:00:00Z --to 2025-01-31T23:59:59Z`,
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "types", Usage: "Transaction type filter (TRADE, DIVIDEND, etc.)"},
 					&cli.StringFlag{Name: "from", Usage: "Start date (YYYY-MM-DDTHH:MM:SSZ)"},
@@ -258,8 +266,9 @@ func accountTransactionCommand(c *client.Ref, configPath string, w io.Writer) *c
 				},
 			},
 			{
-				Name:  "get",
-				Usage: "Get a specific transaction by ID",
+				Name:      "get",
+				Usage:     "Get a specific transaction by ID",
+				UsageText: "schwab-agent account transaction get 98765432101",
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					txnIDStr := cmd.Args().First()
 					if err := requireArg(txnIDStr, "transaction ID"); err != nil {

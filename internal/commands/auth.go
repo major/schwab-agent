@@ -107,6 +107,7 @@ func AccountSetDefaultCommand(configPath string, w io.Writer) *cli.Command {
 		Name:      "set-default",
 		Usage:     "Set the default account hash",
 		ArgsUsage: "<hash>",
+		UsageText: "schwab-agent account set-default ABCDEF1234567890",
 		Action: func(_ context.Context, cmd *cli.Command) error {
 			hash := strings.TrimSpace(cmd.Args().First())
 			if err := requireArg(hash, "account hash"); err != nil {
@@ -129,6 +130,8 @@ func authLoginCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps auth
 	return &cli.Command{
 		Name:  "login",
 		Usage: "Run the OAuth login flow",
+		UsageText: `schwab-agent auth login
+schwab-agent auth login --no-browser`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "no-browser",
@@ -189,8 +192,9 @@ func authLoginCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps auth
 // authStatusCommand returns the auth status command.
 func authStatusCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps authDeps) *cli.Command {
 	return &cli.Command{
-		Name:  "status",
-		Usage: "Show token and config status",
+		Name:      "status",
+		Usage:     "Show token and config status",
+		UsageText: "schwab-agent auth status",
 		Action: func(_ context.Context, cmd *cli.Command) error {
 			defaultConfigPath := deps.configPath()
 			resolvedConfigPath := resolveAuthConfigPath(cmd, defaultConfigPath)
@@ -219,8 +223,9 @@ func authStatusCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps aut
 // authRefreshCommand returns the auth refresh command.
 func authRefreshCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps authDeps) *cli.Command {
 	return &cli.Command{
-		Name:  "refresh",
-		Usage: "Refresh the current access token",
+		Name:      "refresh",
+		Usage:     "Refresh the current access token",
+		UsageText: "schwab-agent auth refresh",
 		Action: func(_ context.Context, cmd *cli.Command) error {
 			defaultConfigPath := deps.configPath()
 			resolvedConfigPath := resolveAuthConfigPath(cmd, defaultConfigPath)

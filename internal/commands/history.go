@@ -24,8 +24,11 @@ func HistoryCommand(c *client.Ref, w io.Writer) *cli.Command {
 		Usage: "Retrieve price history for a symbol",
 		Commands: []*cli.Command{
 			{
-				Name:  "get",
-				Usage: "Get price history candles for a symbol",
+				Name:      "get",
+				Usage:     "Get price history candles for a symbol",
+				UsageText: `schwab-agent history get AAPL
+schwab-agent history get AAPL --period-type day --period 5 --frequency-type minute --frequency 15
+schwab-agent history get AAPL --from 1735689600000 --to 1743379200000`,
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "period-type", Usage: "Period type (day, month, year, ytd)"},
 					&cli.StringFlag{Name: "period", Usage: "Number of periods"},
