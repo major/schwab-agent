@@ -16,7 +16,7 @@ builds:
     main: ./cmd/schwab-agent/
 
 archives:
-  - format: tar.gz
+  - formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 # Keyless cosign signing via Sigstore/Fulcio OIDC (no private key needed).
