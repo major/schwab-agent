@@ -457,6 +457,67 @@ func TestIntegration_OrderConfirmGate(t *testing.T) {
 	assert.Contains(t, stdout, `"orderId":98765`)
 }
 
+func TestUnknownCommand_SuggestsClosestMatch(t *testing.T) {
+	// When an unknown command is used without conflicting flags, the Before
+	// hook should catch it and return a clear error with a suggestion.
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	_, err := runApp(t, "schwab-agent", "price-history")
+	require.Error(t, err)
+
+	var valErr *apperr.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), `unknown command "price-history"`)
+	assert.Contains(t, err.Error(), `Did you mean "history"?`)
+	assert.Equal(t, 1, apperr.ExitCodeFor(err))
+}
+
+func TestUnknownCommand_WithUnknownFlags(t *testing.T) {
+	// When an unknown command is used with flags not defined on the root
+	// command, urfave/cli produces a misleading flag error. The OnUsageError
+	// handler should intercept this and report the unknown command instead.
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	_, err := runApp(t, "schwab-agent", "price-history", "get", "AAPL", "--period-type", "month")
+	require.Error(t, err)
+
+	var valErr *apperr.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), `unknown command "price-history"`)
+	assert.Contains(t, err.Error(), `Did you mean "history"?`)
+	assert.Equal(t, 1, apperr.ExitCodeFor(err))
+}
+
+func TestUnknownCommand_CompletelyWrongName(t *testing.T) {
+	// Even a totally unrecognizable command name should report "unknown
+	// command" rather than a confusing auth or flag error.
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	_, err := runApp(t, "schwab-agent", "frobnicate")
+	require.Error(t, err)
+
+	var valErr *apperr.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), `unknown command "frobnicate"`)
+	assert.Equal(t, 1, apperr.ExitCodeFor(err))
+}
+
+func TestKnownCommand_StillWorks(t *testing.T) {
+	// Sanity check: a known command that requires auth should still produce
+	// an auth error, not an unknown command error.
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	configPath := filepath.Join(tmpDir, "config.json")
+	writeTestConfig(t, configPath)
+
+	_, err := runApp(t, "schwab-agent", "--config", configPath, "account")
+	require.Error(t, err)
+
+	var authErr *apperr.AuthRequiredError
+	require.ErrorAs(t, err, &authErr)
+}
+
 func TestBuildApp_VersionFlag(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 

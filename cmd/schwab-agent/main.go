@@ -8,18 +8,20 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/commands"
-	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 )
 
@@ -72,10 +74,26 @@ func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 		Name:      "schwab-agent",
 		Usage:     "CLI tool for AI agents to trade via Schwab APIs",
 		Version:   version,
+		Suggest:   true,
 		Writer:    w,
 		ErrWriter: os.Stderr,
 		ExitErrHandler: func(_ context.Context, _ *cli.Command, _ error) {
 			// Let main() render the JSON error envelope and set the exit code.
+		},
+		// OnUsageError intercepts flag-parsing errors. When an unknown command
+		// is used (e.g. "price-history" instead of "history"), urfave/cli treats
+		// the unknown name as arguments and then chokes on subcommand flags
+		// like --period-type that aren't defined on the root command. This
+		// detects that case and returns a clear "unknown command" error with a
+		// fuzzy-match suggestion instead of the misleading flag error.
+		OnUsageError: func(_ context.Context, cmd *cli.Command, err error, _ bool) error {
+			if name := cmd.Args().First(); name != "" && !strings.HasPrefix(name, "-") {
+				if cmd.Command(name) == nil {
+					return unknownCommandError(cmd, name)
+				}
+			}
+
+			return err
 		},
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -99,6 +117,15 @@ func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 		},
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 			subcommand := cmd.Args().First()
+
+			// Catch unknown commands before attempting auth. Without this,
+			// "schwab-agent price-history" (no conflicting flags) would fall
+			// through to auth loading and produce a misleading auth error
+			// instead of telling the user the command doesn't exist.
+			if subcommand != "" && cmd.Command(subcommand) == nil {
+				return ctx, unknownCommandError(cmd, subcommand)
+			}
+
 			if subcommand == "auth" || subcommand == "schema" || subcommand == "symbol" {
 				return ctx, nil
 			}
@@ -188,6 +215,46 @@ func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 	app.Commands = append(app.Commands, commands.SchemaCommand(app, w))
 
 	return app
+}
+
+// unknownCommandError builds a ValidationError for an unrecognized command,
+// including a fuzzy-match suggestion when a close match exists.
+func unknownCommandError(cmd *cli.Command, name string) error {
+	msg := fmt.Sprintf("unknown command %q for %q", name, cmd.Name)
+
+	if suggestion := suggestClosestCommand(cmd.Commands, name); suggestion != "" {
+		msg += fmt.Sprintf(". Did you mean %q?", suggestion)
+	}
+
+	return apperr.NewValidationError(msg, nil)
+}
+
+// suggestClosestCommand finds the best matching command name for a given input.
+// It first checks for substring containment (handles "price-history" -> "history"),
+// then falls back to Jaro-Winkler fuzzy matching for typos (handles "ordr" -> "order").
+func suggestClosestCommand(cmds []*cli.Command, provided string) string {
+	lower := strings.ToLower(provided)
+
+	// Prefer the longest substring match so "price-history" picks "history"
+	// over shorter accidental matches.
+	best := ""
+	for _, cmd := range cmds {
+		for _, name := range cmd.Names() {
+			nameLower := strings.ToLower(name)
+			if strings.Contains(lower, nameLower) || strings.Contains(nameLower, lower) {
+				if len(name) > len(best) {
+					best = name
+				}
+			}
+		}
+	}
+
+	if best != "" {
+		return best
+	}
+
+	// Fall back to the built-in Jaro-Winkler fuzzy matcher for genuine typos.
+	return cli.SuggestCommand(cmds, provided)
 }
 
 // defaultConfigPath returns the default config file location.
