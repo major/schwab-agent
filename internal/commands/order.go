@@ -1098,7 +1098,22 @@ func parseOrderType(raw string, fallback models.OrderType) (models.OrderType, er
 }
 
 // parseDuration converts CLI input to a duration enum.
+// Supports standard trading abbreviations: GTC (GOOD_TILL_CANCEL),
+// FOK (FILL_OR_KILL), and IOC (IMMEDIATE_OR_CANCEL).
 func parseDuration(raw string) (models.Duration, error) {
+	upper := strings.ToUpper(strings.TrimSpace(raw))
+
+	// Resolve common trading abbreviations before standard enum validation.
+	// These are universal across brokers and trading platforms.
+	switch upper {
+	case "GTC":
+		return models.DurationGoodTillCancel, nil
+	case "FOK":
+		return models.DurationFillOrKill, nil
+	case "IOC":
+		return models.DurationImmediateOrCancel, nil
+	}
+
 	return parseEnum(raw, validDurations, "", "duration")
 }
 
