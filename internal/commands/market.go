@@ -23,8 +23,9 @@ type moversData struct {
 // MarketCommand returns the CLI command for market hours and movers lookups.
 func MarketCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "market",
-		Usage: "Market hours and top movers",
+		Name:   "market",
+		Usage:  "Market hours and top movers",
+		Action: requireSubcommand(),
 		Commands: []*cli.Command{
 			{
 				Name:      "hours",

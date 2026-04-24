@@ -73,8 +73,9 @@ const mutableDisabledMessage = `Mutable operations are disabled by default. ` +
 // OrderCommand returns the parent order command and all nested order workflows.
 func OrderCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "order",
-		Usage: "List, build, preview, place, cancel, and replace orders",
+		Name:   "order",
+		Usage:  "List, build, preview, place, cancel, and replace orders",
+		Action: requireSubcommand(),
 		Commands: []*cli.Command{
 			orderListCommand(c, configPath, w),
 			orderGetCommand(c, configPath, w),

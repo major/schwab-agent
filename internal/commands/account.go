@@ -41,8 +41,9 @@ type transactionGetData struct {
 // The --account flag overrides the default account hash for all subcommands.
 func AccountCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "account",
-		Usage: "Manage Schwab trading accounts",
+		Name:   "account",
+		Usage:  "Manage Schwab trading accounts",
+		Action: requireSubcommand(),
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "account",
@@ -229,8 +230,9 @@ func enrichAccountsWithPreferences(accounts []models.Account, prefs *models.User
 // and inherit the --account flag.
 func accountTransactionCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "transaction",
-		Usage: "List and look up account transactions",
+		Name:   "transaction",
+		Usage:  "List and look up account transactions",
+		Action: requireSubcommand(),
 		Commands: []*cli.Command{
 			{
 				Name:  "list",

@@ -52,8 +52,9 @@ func makeBuildOrderCommand[P any](
 // orderBuildCommand returns the parent build command for offline order construction.
 func orderBuildCommand(w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "build",
-		Usage: "Build order request JSON without calling the API",
+		Name:   "build",
+		Usage:  "Build order request JSON without calling the API",
+		Action: requireSubcommand(),
 		Commands: []*cli.Command{
 			makeBuildOrderCommand(w, "equity", "Build an equity order request",
 				"schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150.00 --duration DAY",

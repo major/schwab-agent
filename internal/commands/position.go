@@ -35,8 +35,9 @@ type positionListData struct {
 // PositionCommand returns the parent CLI command for position operations.
 func PositionCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "position",
-		Usage: "View positions across accounts",
+		Name:   "position",
+		Usage:  "View positions across accounts",
+		Action: requireSubcommand(),
 		Commands: []*cli.Command{
 			positionListCommand(c, configPath, w),
 		},

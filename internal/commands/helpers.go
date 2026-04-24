@@ -1,8 +1,11 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"strings"
+
+	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/apperr"
 )
@@ -72,6 +75,37 @@ func validEnumString[T ~string](valid []T) string {
 	}
 
 	return strings.Join(s, ", ")
+}
+
+// requireSubcommand returns a cli.ActionFunc that rejects direct invocation of
+// a parent command with a clear error. Without this, urfave/cli produces a
+// confusing "No help topic for '<arg>'" message when the user omits the
+// subcommand (e.g. "quote AAPL" instead of "quote get AAPL").
+func requireSubcommand() cli.ActionFunc {
+	return func(_ context.Context, cmd *cli.Command) error {
+		names := make([]string, 0, len(cmd.Commands))
+		for _, sub := range cmd.Commands {
+			// Skip auto-registered help and any explicitly hidden subcommands
+			// so users see only the real, invokable commands.
+			if sub.Hidden || sub.Name == "help" {
+				continue
+			}
+			names = append(names, sub.Name)
+		}
+		list := strings.Join(names, ", ")
+
+		if arg := cmd.Args().First(); arg != "" {
+			return apperr.NewValidationError(
+				fmt.Sprintf("unknown command %q for %q; available subcommands: %s", arg, cmd.Name, list),
+				nil,
+			)
+		}
+
+		return apperr.NewValidationError(
+			fmt.Sprintf("%q requires a subcommand: %s", cmd.Name, list),
+			nil,
+		)
+	}
 }
 
 // newValidationError creates a consistent validation error for command parsing.

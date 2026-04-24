@@ -13,8 +13,9 @@ import (
 // ChainCommand returns the CLI command for option chain operations.
 func ChainCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "chain",
-		Usage: "Option chain operations",
+		Name:   "chain",
+		Usage:  "Option chain operations",
+		Action: requireSubcommand(),
 		Commands: []*cli.Command{
 			chainGetCommand(c, w),
 			chainExpirationCommand(c, w),

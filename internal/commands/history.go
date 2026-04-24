@@ -20,8 +20,9 @@ type priceHistoryData struct {
 // HistoryCommand returns the CLI command for price history lookups.
 func HistoryCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "history",
-		Usage: "Retrieve price history for a symbol",
+		Name:   "history",
+		Usage:  "Retrieve price history for a symbol",
+		Action: requireSubcommand(),
 		Commands: []*cli.Command{
 			{
 				Name:      "get",

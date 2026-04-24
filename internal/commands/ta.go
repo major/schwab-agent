@@ -194,8 +194,9 @@ func makeSimpleTACommand(cfg simpleTAConfig, c *client.Ref, w io.Writer) *cli.Co
 // TACommand returns the CLI command for technical analysis indicators.
 func TACommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "ta",
-		Usage: "Technical analysis indicators",
+		Name:   "ta",
+		Usage:  "Technical analysis indicators",
+		Action: requireSubcommand(),
 		Commands: []*cli.Command{
 		makeSimpleTACommand(simpleTAConfig{
 			name:  "sma",
