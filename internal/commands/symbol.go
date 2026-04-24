@@ -38,8 +38,10 @@ func SymbolCommand(w io.Writer) *cli.Command {
 // symbolBuildCommand returns the subcommand for building OCC option symbols from components.
 func symbolBuildCommand(w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "build",
-		Usage: "Build an OCC option symbol from components",
+		Name:      "build",
+		Usage:     "Build an OCC option symbol from components",
+		UsageText: `schwab-agent symbol build --underlying AAPL --expiration 2025-06-20 --strike 200 --call
+schwab-agent symbol build --underlying SPY --expiration 2025-07-18 --strike 550 --put`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol (e.g. AAPL)", Required: true},
 			&cli.StringFlag{Name: "expiration", Usage: "Expiration date (YYYY-MM-DD)", Required: true},
@@ -82,6 +84,7 @@ func symbolParseCommand(w io.Writer) *cli.Command {
 		Name:      "parse",
 		Usage:     "Parse an OCC option symbol into components",
 		ArgsUsage: "<symbol>",
+		UsageText: "schwab-agent symbol parse 'AAPL  250620C00200000'",
 		Action: func(_ context.Context, cmd *cli.Command) error {
 			if cmd.NArg() == 0 {
 				return newValidationError("an OCC symbol argument is required (e.g. \"AAPL  250620C00200000\")")

@@ -93,6 +93,9 @@ func orderListCommand(c *client.Ref, _ string, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "list",
 		Usage: "List orders",
+		UsageText: `schwab-agent order list
+schwab-agent order list --status FILLED
+schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "status", Usage: "Filter by order status"},
 			&cli.StringFlag{Name: "from", Usage: "Filter by entered time lower bound"},
@@ -131,6 +134,7 @@ func orderGetCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command
 	return &cli.Command{
 		Name:      "get",
 		Usage:     "Get an order by ID",
+		UsageText: "schwab-agent order get 1234567890",
 		ArgsUsage: "<order-id>",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
@@ -161,6 +165,8 @@ func orderPlaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comma
 	return &cli.Command{
 		Name:  "place",
 		Usage: "Place an order",
+		UsageText: `schwab-agent order place --spec @order.json --confirm
+schwab-agent order place --spec - --confirm`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "spec", Usage: "Inline JSON, @file, or - for stdin"},
 			&cli.BoolFlag{Name: "confirm", Usage: "Confirm order placement"},
@@ -198,15 +204,19 @@ func orderPlaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comma
 		},
 		Commands: []*cli.Command{
 			makePlaceOrderCommand(c, configPath, w, "equity", "Place an equity order",
+				"schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150.00 --duration DAY --confirm",
 				equityOrderFlags(), parseEquityParams,
 				orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder),
 			makePlaceOrderCommand(c, configPath, w, "option", "Place an option order",
+				`schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00 --duration DAY --confirm`,
 				optionOrderFlags(), parseOptionParams,
 				orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder),
 			makePlaceOrderCommand(c, configPath, w, "bracket", "Place a bracket order",
+				`schwab-agent order place bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150.00 --take-profit 170.00 --stop-loss 140.00 --duration DAY --confirm`,
 				bracketOrderFlags(), parseBracketParams,
 				orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder),
 			makePlaceOrderCommand(c, configPath, w, "oco", "Place a one-cancels-other order for an existing position",
+				`schwab-agent order place oco --symbol AAPL --action SELL --quantity 10 --take-profit 170.00 --stop-loss 140.00 --duration DAY --confirm`,
 				ocoOrderFlags(), parseOCOParams,
 				orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder),
 		},
@@ -221,15 +231,16 @@ func makePlaceOrderCommand[P any](
 	c *client.Ref,
 	configPath string,
 	w io.Writer,
-	name, usage string,
+	name, usage, usageText string,
 	flags []cli.Flag,
 	parse func(*cli.Command) (P, error),
 	validate func(*P) error,
 	build func(*P) (*models.OrderRequest, error),
 ) *cli.Command {
 	return &cli.Command{
-		Name:  name,
-		Usage: usage,
+		Name:      name,
+		Usage:     usage,
+		UsageText: usageText,
 		Flags: append(flags,
 			&cli.BoolFlag{Name: "confirm", Usage: "Confirm order placement"},
 			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
@@ -275,8 +286,9 @@ func makePlaceOrderCommand[P any](
 // orderPreviewCommand previews an order from a JSON spec.
 func orderPreviewCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  "preview",
-		Usage: "Preview an order from JSON spec",
+		Name:      "preview",
+		Usage:     "Preview an order from JSON spec",
+		UsageText: "schwab-agent order preview --spec @order.json",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "spec", Usage: "Inline JSON, @file, or - for stdin"},
 			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
@@ -314,6 +326,7 @@ func orderCancelCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comm
 	return &cli.Command{
 		Name:      "cancel",
 		Usage:     "Cancel an order",
+		UsageText: "schwab-agent order cancel 1234567890 --confirm",
 		ArgsUsage: "<order-id>",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "confirm", Usage: "Confirm cancellation"},
@@ -352,6 +365,7 @@ func orderReplaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Com
 	return &cli.Command{
 		Name:      "replace",
 		Usage:     "Replace an order with a new equity order spec",
+		UsageText: "schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm",
 		ArgsUsage: "<order-id>",
 		Flags: append(equityOrderFlags(),
 			&cli.BoolFlag{Name: "confirm", Usage: "Confirm replacement"},
@@ -405,6 +419,9 @@ func orderRepeatCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comm
 	return &cli.Command{
 		Name:      "repeat",
 		Usage:     "Repeat a previous order (fetch, convert, and optionally place)",
+		UsageText: `schwab-agent order repeat 1234567890
+schwab-agent order repeat 1234567890 --preview
+schwab-agent order repeat 1234567890 --confirm`,
 		ArgsUsage: "<order-id>",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "build", Usage: "Output reconstructed order request JSON (default)"},

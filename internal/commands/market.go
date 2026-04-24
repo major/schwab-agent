@@ -30,6 +30,8 @@ func MarketCommand(c *client.Ref, w io.Writer) *cli.Command {
 				Name:      "hours",
 				Usage:     "Get market hours for one or more markets (equity, option, bond, future, forex)",
 				ArgsUsage: "[market ...]",
+				UsageText: `schwab-agent market hours
+schwab-agent market hours equity option`,
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					markets := cmd.Args().Slice()
 					if len(markets) == 0 {
@@ -54,10 +56,12 @@ func MarketCommand(c *client.Ref, w io.Writer) *cli.Command {
 				},
 			},
 			{
-				Name:  "movers",
+				Name: "movers",
 				// Valid index symbols from the Schwab API (not thinkorswim-style).
 			// The API returns a 400 with the full list if you pass an invalid one.
-			Usage: "Get top movers for an index ($SPX, $DJI, $COMPX, NYSE, NASDAQ, OTCBB, INDEX_ALL, EQUITY_ALL, OPTION_ALL, OPTION_PUT, OPTION_CALL)",
+			Usage:     "Get top movers for an index ($SPX, $DJI, $COMPX, NYSE, NASDAQ, OTCBB, INDEX_ALL, EQUITY_ALL, OPTION_ALL, OPTION_PUT, OPTION_CALL)",
+				UsageText: `schwab-agent market movers '$SPX' --sort PERCENT_CHANGE_UP
+schwab-agent market movers '$DJI' --sort VOLUME --frequency 5`,
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "sort", Usage: "Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)"},
 					&cli.StringFlag{Name: "frequency", Usage: "Minimum percent change magnitude (0, 1, 5, 10, 30, 60)"},

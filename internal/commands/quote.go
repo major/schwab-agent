@@ -43,6 +43,9 @@ func quoteGetCommand(c *client.Ref, w io.Writer) *cli.Command {
 		Name:      "get",
 		Usage:     "Get quotes for one or more symbols",
 		ArgsUsage: "<symbol> [symbol...]",
+		UsageText: `schwab-agent quote get AAPL
+schwab-agent quote get AAPL MSFT NVDA
+schwab-agent quote get AAPL --fields quote,fundamental --indicative`,
 		Flags: []cli.Flag{
 			&cli.StringSliceFlag{
 				Name:  "fields",

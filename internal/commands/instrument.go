@@ -28,8 +28,10 @@ func InstrumentCommand(c *client.Ref, w io.Writer) *cli.Command {
 		Usage: "Search and look up instruments",
 		Commands: []*cli.Command{
 			{
-				Name:  "search",
-				Usage: "Search instruments by symbol or description",
+				Name:      "search",
+				Usage:     "Search instruments by symbol or description",
+				UsageText: `schwab-agent instrument search AAPL
+schwab-agent instrument search Apple --projection desc-search`,
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "projection",
@@ -53,8 +55,9 @@ func InstrumentCommand(c *client.Ref, w io.Writer) *cli.Command {
 				},
 			},
 			{
-				Name:  "get",
-				Usage: "Get instrument details by CUSIP",
+				Name:      "get",
+				Usage:     "Get instrument details by CUSIP",
+				UsageText: "schwab-agent instrument get 037833100",
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					cusip := cmd.Args().First()
 					if err := requireArg(cusip, "CUSIP"); err != nil {

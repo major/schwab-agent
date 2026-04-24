@@ -28,6 +28,9 @@ func chainGetCommand(c *client.Ref, w io.Writer) *cli.Command {
 		Name:      "get",
 		Usage:     "Get option chain for a symbol",
 		ArgsUsage: "<symbol>",
+		UsageText: `schwab-agent chain get AAPL
+schwab-agent chain get AAPL --type CALL --strike-count 5
+schwab-agent chain get AAPL --from-date 2025-06-01 --to-date 2025-07-31 --type PUT`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "type",
@@ -127,6 +130,7 @@ func chainExpirationCommand(c *client.Ref, w io.Writer) *cli.Command {
 		Name:      "expiration",
 		Usage:     "Get expiration dates for a symbol",
 		ArgsUsage: "<symbol>",
+		UsageText: "schwab-agent chain expiration AAPL",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			symbol := cmd.Args().First()
 			if err := requireArg(symbol, "symbol"); err != nil {

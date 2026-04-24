@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 )
@@ -40,6 +41,8 @@ func SchemaCommand(app *cli.Command, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "schema",
 		Usage: "Display JSON schema of all available commands",
+		UsageText: `schwab-agent schema
+schwab-agent schema --command "order place equity"`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "command",
@@ -88,7 +91,7 @@ func walkCommands(cmd *cli.Command, prefix string, commands map[string]CommandSc
 			Description: sub.Usage,
 			Flags:       extractFlags(sub.Flags),
 			Args:        map[string]any{},
-			Examples:    []string{},
+			Examples:    parseExamples(sub.UsageText),
 		}
 
 		walkCommands(sub, path, commands)
@@ -149,4 +152,29 @@ func classifyFlag(f cli.Flag) (string, FlagSchema) {
 			Type: "string",
 		}
 	}
+}
+
+// parseExamples splits a UsageText string into individual example lines,
+// trimming whitespace and dropping blanks. Returns an empty slice (not nil)
+// when there are no examples so JSON output stays consistent.
+func parseExamples(usageText string) []string {
+	if strings.TrimSpace(usageText) == "" {
+		return []string{}
+	}
+
+	lines := strings.Split(usageText, "\n")
+	examples := make([]string, 0, len(lines))
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			examples = append(examples, trimmed)
+		}
+	}
+
+	if len(examples) == 0 {
+		return []string{}
+	}
+
+	return examples
 }

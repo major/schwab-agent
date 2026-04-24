@@ -130,8 +130,9 @@ type taOutput struct {
 // SMA, EMA, and RSI share the same pipeline: fetch candles, extract closes,
 // compute indicator, write output. Only the parameters differ.
 type simpleTAConfig struct {
-	name  string
-	usage string
+	name      string
+	usage     string
+	usageText string
 	// defaultPeriod is the indicator's default --period flag value.
 	defaultPeriod int
 	// multiplier controls how many candles to fetch relative to the requested
@@ -156,9 +157,10 @@ func taIndicatorFlags(defaultPeriod int) []cli.Flag {
 // indicator's compute function, and writes the result envelope.
 func makeSimpleTACommand(cfg simpleTAConfig, c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:  cfg.name,
-		Usage: cfg.usage,
-		Flags: taIndicatorFlags(cfg.defaultPeriod),
+		Name:      cfg.name,
+		Usage:     cfg.usage,
+		UsageText: cfg.usageText,
+		Flags:     taIndicatorFlags(cfg.defaultPeriod),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			symbol := cmd.Args().First()
 			if err := requireArg(symbol, "symbol"); err != nil {
@@ -195,27 +197,33 @@ func TACommand(c *client.Ref, w io.Writer) *cli.Command {
 		Name:  "ta",
 		Usage: "Technical analysis indicators",
 		Commands: []*cli.Command{
-			makeSimpleTACommand(simpleTAConfig{
-				name:          "sma",
-				usage:         "Simple Moving Average",
-				defaultPeriod: 20,
-				multiplier:    1,
-				compute:       ta.SMA,
-			}, c, w),
-			makeSimpleTACommand(simpleTAConfig{
-				name:          "ema",
-				usage:         "Exponential Moving Average",
-				defaultPeriod: 20,
-				multiplier:    3,
-				compute:       ta.EMA,
-			}, c, w),
-			makeSimpleTACommand(simpleTAConfig{
-				name:          "rsi",
-				usage:         "Relative Strength Index",
-				defaultPeriod: 14,
-				multiplier:    3,
-				compute:       ta.RSI,
-			}, c, w),
+		makeSimpleTACommand(simpleTAConfig{
+			name:  "sma",
+			usage: "Simple Moving Average",
+			usageText: `schwab-agent ta sma AAPL
+schwab-agent ta sma AAPL --period 50 --interval daily --points 10`,
+			defaultPeriod: 20,
+			multiplier:    1,
+			compute:       ta.SMA,
+		}, c, w),
+		makeSimpleTACommand(simpleTAConfig{
+			name:  "ema",
+			usage: "Exponential Moving Average",
+			usageText: `schwab-agent ta ema AAPL
+schwab-agent ta ema AAPL --period 50 --interval daily --points 10`,
+			defaultPeriod: 20,
+			multiplier:    3,
+			compute:       ta.EMA,
+		}, c, w),
+		makeSimpleTACommand(simpleTAConfig{
+			name:  "rsi",
+			usage: "Relative Strength Index",
+			usageText: `schwab-agent ta rsi AAPL
+schwab-agent ta rsi AAPL --period 14 --interval daily --points 10`,
+			defaultPeriod: 14,
+			multiplier:    3,
+			compute:       ta.RSI,
+		}, c, w),
 			taMACDCommand(c, w),
 			taATRCommand(c, w),
 			taBBandsCommand(c, w),
@@ -232,6 +240,8 @@ func taMACDCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "macd",
 		Usage: "Moving Average Convergence/Divergence",
+		UsageText: `schwab-agent ta macd AAPL
+schwab-agent ta macd AAPL --fast 12 --slow 26 --signal 9 --interval daily --points 10`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{Name: "fast", Usage: "Fast EMA period", Value: 12},
 			&cli.IntFlag{Name: "slow", Usage: "Slow EMA period", Value: 26},
@@ -302,6 +312,8 @@ func taATRCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "atr",
 		Usage: "Average True Range",
+		UsageText: `schwab-agent ta atr AAPL
+schwab-agent ta atr AAPL --period 14 --interval daily --points 10`,
 		Flags: taIndicatorFlags(14),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			symbol := cmd.Args().First()
@@ -346,6 +358,8 @@ func taBBandsCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "bbands",
 		Usage: "Bollinger Bands",
+		UsageText: `schwab-agent ta bbands AAPL
+schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --interval daily --points 10`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{Name: "period", Usage: "BBands period", Value: 20},
 			&cli.Float64Flag{Name: "std-dev", Usage: "Standard deviations", Value: 2.0},
@@ -412,6 +426,8 @@ func taStochCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "stoch",
 		Usage: "Stochastic Oscillator",
+		UsageText: `schwab-agent ta stoch AAPL
+schwab-agent ta stoch AAPL --k-period 14 --smooth-k 3 --d-period 3 --interval daily --points 10`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{Name: "k-period", Usage: "Fast %K lookback period", Value: 14},
 			&cli.IntFlag{Name: "smooth-k", Usage: "Slow %K smoothing period", Value: 3},
@@ -490,6 +506,8 @@ func taADXCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "adx",
 		Usage: "Average Directional Index",
+		UsageText: `schwab-agent ta adx AAPL
+schwab-agent ta adx AAPL --period 14 --interval daily --points 10`,
 		Flags: taIndicatorFlags(14),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			symbol := cmd.Args().First()
@@ -558,6 +576,8 @@ func taVWAPCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "vwap",
 		Usage: "Volume Weighted Average Price",
+		UsageText: `schwab-agent ta vwap AAPL
+schwab-agent ta vwap AAPL --interval 5min --points 10`,
 		// VWAP is cumulative - no --period flag. Only --interval and --points.
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
@@ -611,6 +631,8 @@ func taHVCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "hv",
 		Usage: "Historical Volatility with regime classification",
+		UsageText: `schwab-agent ta hv AAPL
+schwab-agent ta hv AAPL --period 20 --interval daily`,
 		Flags: taIndicatorFlags(20),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			symbol := cmd.Args().First()
@@ -664,6 +686,8 @@ func taExpectedMoveCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
 		Name:  "expected-move",
 		Usage: "Expected price move from ATM straddle pricing",
+		UsageText: `schwab-agent ta expected-move AAPL
+schwab-agent ta expected-move AAPL --dte 45`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{Name: "dte", Usage: "Target days to expiration", Value: 30},
 		},
