@@ -1,113 +1,109 @@
 # Trading and Order Management
 
-Place, preview, cancel, and replace orders. For order construction details (bracket, OCO, multi-leg strategies, flags), see `schwab-order-builder.md`.
-
-## Safety Workflow
-
-Follow this sequence before placing any real order:
-
-1. Check current price: `schwab-agent quote get <symbol>`
-2. Build the order JSON: `schwab-agent order build equity --symbol <SYM> --action BUY --quantity 10 --type LIMIT --price 200`
-3. Preview (pipe build output): `schwab-agent order build equity --symbol <SYM> --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -`
-4. Place with confirmation: `schwab-agent order place equity --symbol <SYM> --action BUY --quantity 10 --type LIMIT --price 200 --confirm`
-5. Verify status: `schwab-agent order list --status WORKING`
+Place, preview, cancel, replace, and repeat orders. For order construction details (multi-leg strategies, builder flags), see `schwab-order-builder.md`.
 
 ## Safety Requirements
 
-- Config flag: `"i-also-like-to-live-dangerously": true` must be set in config
-- CLI flag: `--confirm` must be passed on every mutable command
-- Both are required. Without both, the command will fail with a validation error.
+Both are required for any mutable operation (place/cancel/replace):
+
+1. Config: `"i-also-like-to-live-dangerously": true` in config file
+2. CLI: `--confirm` flag on the command
+
+## Safety Workflow
+
+1. Check price: `schwab-agent quote get <symbol>`
+2. Build order JSON: `schwab-agent order build equity --symbol SYM --action BUY --quantity 10 --type LIMIT --price 200`
+3. Preview: `schwab-agent order build equity ... | schwab-agent order preview --spec -`
+4. Place: `schwab-agent order place equity --symbol SYM --action BUY --quantity 10 --type LIMIT --price 200 --confirm`
+5. Verify: `schwab-agent order list --status WORKING`
 
 ## Intent Mapping
 
-| User says | Order type | Command |
-|-----------|-----------|---------|
-| "buy at current price" | MARKET | `order place equity --type MARKET` (or omit --type) |
-| "buy at $X or less" | LIMIT | `order place equity --type LIMIT --price X` |
-| "sell if it drops to $X" | STOP | `order place equity --type STOP --stop-price X` |
-| "sell at $X but not below $Y" | STOP_LIMIT | `order place equity --type STOP_LIMIT --stop-price X --price Y` |
-| "buy with protection" | BRACKET (full) | `order place bracket --take-profit X --stop-loss Y` |
-| "buy with a safety net" | BRACKET (stop only) | `order place bracket --stop-loss Y` |
-| "buy with a profit target" | BRACKET (TP only) | `order place bracket --take-profit X` |
-| "set take-profit and stop-loss" (already own shares) | OCO | `order place oco --action SELL --take-profit X --stop-loss Y` |
-| "protect my position" (existing shares) | OCO (stop only) | `order place oco --action SELL --stop-loss Y` |
-| "set a profit target" (existing shares) | OCO (TP only) | `order place oco --action SELL --take-profit X` |
-| "buy calls/puts" | OPTION | `order place option --underlying SYM --call/--put ...` |
-| "sell covered calls" (already own shares) | OPTION (single leg) | `order place option --action SELL_TO_OPEN --call ...` |
-| "buy stock and sell a call" (new position) | COVERED | `order build covered-call ...` then place via spec |
-| "bull call spread" | VERTICAL | `order build vertical --call --open --long-strike X --short-strike Y` |
-| "iron condor" | IRON_CONDOR | `order build iron-condor --open ...` |
-| "buy a straddle" | STRADDLE | `order build straddle --buy --open ...` |
-| "buy a strangle" | STRANGLE | `order build strangle --buy --open ...` |
-
-## Scenario Recipes
-
-### Buy at market price
-
-```bash
-schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --confirm
-```
-
-### Buy with a limit price
-
-```bash
-schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --confirm
-```
-
-### Sell with a stop
-
-```bash
-schwab-agent order place equity --symbol TSLA --action SELL --quantity 5 --type STOP --stop-price 150 --confirm
-```
-
-### Buy options
-
-```bash
-schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --confirm
-```
-
-### Preview before placing
-
-Preview requires `--spec` with JSON input. Use `order build` to generate the JSON, then pipe it:
-
-```bash
-schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -
-```
-
-### Cancel an order
-
-```bash
-schwab-agent order cancel 12345 --confirm
-```
-
-### Replace an order
-
-Replace cancels the original order and creates a new one with a different ID. Only equity orders can be replaced.
-
-```bash
-schwab-agent order replace <order-id> --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 205 --confirm
-# Original order → status: REPLACED. Use `order list --status WORKING` to find the new order ID.
-```
+| User says | Command |
+|-----------|---------|
+| "buy at current price" | `order place equity --action BUY --type MARKET` |
+| "buy at $X or less" | `order place equity --action BUY --type LIMIT --price X` |
+| "sell if it drops to $X" | `order place equity --action SELL --type STOP --stop-price X` |
+| "sell at $X but not below $Y" | `order place equity --action SELL --type STOP_LIMIT --stop-price X --price Y` |
+| "trailing stop" | `order place equity --action SELL --type TRAILING_STOP --stop-offset 2.50` |
+| "buy with protection" | `order place bracket --action BUY --take-profit X --stop-loss Y` |
+| "buy with a safety net" | `order place bracket --action BUY --stop-loss Y` |
+| "set take-profit and stop-loss" (own shares) | `order place oco --action SELL --take-profit X --stop-loss Y` |
+| "protect my position" (own shares) | `order place oco --action SELL --stop-loss Y` |
+| "buy calls/puts" | `order place option --underlying SYM --call/--put --action BUY_TO_OPEN` |
+| "sell covered calls" (own shares) | `order place option --action SELL_TO_OPEN --call ...` |
+| "buy stock and sell a call" (new) | `order build covered-call ...` then place via spec |
+| "bull call spread" | `order build vertical --call --open --long-strike X --short-strike Y` |
+| "iron condor" | `order build iron-condor --open ...` |
+| "straddle" | `order build straddle --buy --open ...` |
+| "strangle" | `order build strangle --buy --open ...` |
+| "calendar spread" | `order build calendar --call --open ...` |
+| "diagonal spread" | `order build diagonal --call --open ...` |
+| "collar" | `order build collar --open ...` |
+| "repeat a previous order" | `order repeat <order-id>` |
+| "re-place that order" | `order repeat <order-id> --confirm` |
 
 ## Listing and Getting Orders
 
 ```bash
 schwab-agent order list
-schwab-agent order list --status WORKING
+schwab-agent order list --status WORKING --from 2025-01-01 --to 2025-01-31
 schwab-agent order get <order-id>
 ```
 
-## Spec Mode
+Flags: `--status` (filter by status), `--from`/`--to` (filter by entered time).
 
-Pass a raw JSON order payload directly instead of using flags:
+## Placing Orders
 
 ```bash
-# Inline JSON
+# Equity
+schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --confirm
+
+# Option
+schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --confirm
+
+# Bracket (entry + automatic exits)
+schwab-agent order place bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120 --confirm
+
+# OCO (exit orders for existing position)
+schwab-agent order place oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140 --confirm
+```
+
+## Preview
+
+Preview requires `--spec` with JSON input. Pipe from `order build`:
+
+```bash
+schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -
+```
+
+## Cancel and Replace
+
+```bash
+schwab-agent order cancel <order-id> --confirm
+schwab-agent order replace <order-id> --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 205 --confirm
+```
+
+Replace cancels the original and creates a new order (new ID). Only equity order flags accepted. Original order status becomes REPLACED.
+
+## Repeat
+
+Fetch an existing order, convert it to a submittable request, and optionally place it:
+
+```bash
+schwab-agent order repeat <order-id>            # Output reconstructed order JSON (default, same as --build)
+schwab-agent order repeat <order-id> --preview   # Preview without placing
+schwab-agent order repeat <order-id> --confirm   # Place the order (requires safety guards)
+```
+
+Only one mode flag allowed. `--build`, `--preview`, and `--confirm` are mutually exclusive.
+
+## Spec Mode
+
+Pass raw JSON order payload directly instead of using flags:
+
+```bash
 schwab-agent order place --spec '{"orderType": "LIMIT", ...}' --confirm
-
-# From file
 schwab-agent order place --spec @order.json --confirm
-
-# From stdin
 cat order.json | schwab-agent order place --spec - --confirm
 ```

@@ -2,33 +2,25 @@
 
 CLI tool for AI agents to trade via Charles Schwab APIs. Single binary, JSON output.
 
-> **Disclaimer:** This project is not affiliated with, endorsed by, or sponsored by Charles Schwab & Co., Inc. or any of its subsidiaries. "Schwab" and "thinkorswim" are trademarks of Charles Schwab & Co., Inc.
-
-## Install
-
-```bash
-go install github.com/major/schwab-agent/cmd/schwab-agent@latest
-```
-
-Pre-built binaries for Linux and macOS (amd64/arm64) are on the [releases page](https://github.com/major/schwab-agent/releases).
-
 ## Skill Files
 
 | File | Covers |
 |------|--------|
 | schwab-config-auth.md | Authentication, configuration, environment variables |
-| schwab-read.md | Quotes, option chains, price history, accounts, instruments, transactions, movers, market hours, option symbol build/parse |
-| schwab-trade.md | Order placement, preview, cancel, replace, safety workflow |
-| schwab-order-builder.md | Order construction: equity, option, bracket, OCO, vertical, iron condor, straddle, strangle, covered call |
-| schwab-ta.md | Technical analysis indicators: SMA, EMA, RSI, MACD, ATR, Bollinger Bands, Stochastic, ADX, VWAP, HV |
+| schwab-read.md | Quotes, option chains, chain expirations, price history, accounts, instruments, transactions, movers, market hours, option symbol build/parse |
+| schwab-trade.md | Order listing, placement, preview, cancel, replace, repeat, safety workflow |
+| schwab-order-builder.md | Order construction: equity, option, bracket, OCO, vertical, iron condor, straddle, strangle, covered call, collar, calendar, diagonal, FTS |
+| schwab-ta.md | Technical analysis: SMA, EMA, RSI, MACD, ATR, Bollinger Bands, Stochastic, ADX, VWAP, HV, expected move |
 
 ## Output Format
 
-All commands return JSON.
+All commands return JSON envelopes (except `schema`, `order build`, `symbol build/parse` which return raw JSON).
 
-- Success: `{"data": ..., "metadata": {...}}`
-- Errors: `{"error": {"code": ..., "message": ..., "details": ...}}`
+- Success: `{"data": ..., "metadata": {"timestamp": "..."}}`
+- Error: `{"error": {"code": "...", "message": "...", "details": "..."}}`
 - Partial: `{"data": ..., "errors": [...], "metadata": {...}}`
+
+Error codes: AUTH_REQUIRED, AUTH_EXPIRED, AUTH_CALLBACK, ORDER_REJECTED, SYMBOL_NOT_FOUND, ACCOUNT_NOT_FOUND, HTTP_ERROR, VALIDATION_ERROR, ORDER_BUILD_ERROR
 
 ## Global Flags
 
