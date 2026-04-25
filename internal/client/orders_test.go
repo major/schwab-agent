@@ -13,7 +13,6 @@ import (
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/ptr"
 )
 
 // testOrderRequest creates a simple test order request fixture.
@@ -320,7 +319,7 @@ func TestPreviewOrder_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		commValue := 0.65
 		response := models.PreviewOrder{
-			OrderID: ptr.To(int64(11111)),
+			OrderID: new(int64(11111)),
 			CommissionAndFee: &models.CommissionAndFee{
 				Commission: &models.CommissionDetail{
 					CommissionLegs: []models.CommissionLeg{

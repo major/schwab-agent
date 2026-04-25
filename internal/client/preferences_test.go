@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/ptr"
 )
 
 func TestUserPreference_Success(t *testing.T) {
@@ -24,39 +23,39 @@ func TestUserPreference_Success(t *testing.T) {
 		response := models.UserPreference{
 			Accounts: []models.UserPreferenceAccount{
 				{
-					AccountNumber:      ptr.To("123456789"),
-					PrimaryAccount:     ptr.To(true),
-					Type:                ptr.To("MARGIN"),
-					NickName:           ptr.To("Main Account"),
-					AccountColor:       ptr.To("COLOR_BLUE"),
-					DisplayAcctId:      ptr.To("X123"),
-					AutoPositionEffect: ptr.To(true),
+					AccountNumber:      new("123456789"),
+					PrimaryAccount:     new(true),
+					Type:               new("MARGIN"),
+					NickName:           new("Main Account"),
+					AccountColor:       new("COLOR_BLUE"),
+					DisplayAcctId:      new("X123"),
+					AutoPositionEffect: new(true),
 				},
 				{
-					AccountNumber:      ptr.To("987654321"),
-					PrimaryAccount:     ptr.To(false),
-					Type:                ptr.To("CASH"),
-					NickName:           ptr.To("Savings Account"),
-					AccountColor:       ptr.To("COLOR_GREEN"),
-					DisplayAcctId:      ptr.To("X456"),
-					AutoPositionEffect: ptr.To(false),
+					AccountNumber:      new("987654321"),
+					PrimaryAccount:     new(false),
+					Type:               new("CASH"),
+					NickName:           new("Savings Account"),
+					AccountColor:       new("COLOR_GREEN"),
+					DisplayAcctId:      new("X456"),
+					AutoPositionEffect: new(false),
 				},
 			},
 			Offers: []models.Offer{
 				{
-					ID:          ptr.To("offer-001"),
-					Name:        ptr.To("Premium Features"),
-					Description: ptr.To("Access to advanced tools"),
-					Status:      ptr.To("ACTIVE"),
+					ID:          new("offer-001"),
+					Name:        new("Premium Features"),
+					Description: new("Access to advanced tools"),
+					Status:      new("ACTIVE"),
 				},
 			},
 			StreamerInfo: []models.StreamerInfo{
 				{
-					StreamerURL: ptr.To("https://streamer.schwab.com"),
-					Token:       ptr.To("streamer-token-xyz"),
-					TokenExpTime: ptr.To(int64(1705363200)),
-					AppID:       ptr.To("app-123"),
-					ACL:         ptr.To("ACCT"),
+					StreamerURL:  new("https://streamer.schwab.com"),
+					Token:        new("streamer-token-xyz"),
+					TokenExpTime: new(int64(1705363200)),
+					AppID:        new("app-123"),
+					ACL:          new("ACCT"),
 				},
 			},
 		}
@@ -109,7 +108,7 @@ func TestUserPreference_WithMinimalData(t *testing.T) {
 		response := models.UserPreference{
 			Accounts: []models.UserPreferenceAccount{
 				{
-					AccountNumber: ptr.To("123456789"),
+					AccountNumber: new("123456789"),
 				},
 			},
 		}
@@ -148,29 +147,29 @@ func TestUserPreference_WithComplexStreamerInfo(t *testing.T) {
 		response := models.UserPreference{
 			Accounts: []models.UserPreferenceAccount{
 				{
-					AccountNumber:      ptr.To("123456789"),
-					PrimaryAccount:     ptr.To(true),
-					Type:                ptr.To("MARGIN"),
-					NickName:           ptr.To("Trading Account"),
-					AccountColor:       ptr.To("COLOR_RED"),
-					DisplayAcctId:      ptr.To("X789"),
-					AutoPositionEffect: ptr.To(true),
+					AccountNumber:      new("123456789"),
+					PrimaryAccount:     new(true),
+					Type:               new("MARGIN"),
+					NickName:           new("Trading Account"),
+					AccountColor:       new("COLOR_RED"),
+					DisplayAcctId:      new("X789"),
+					AutoPositionEffect: new(true),
 				},
 			},
 			StreamerInfo: []models.StreamerInfo{
 				{
-					StreamerURL:  ptr.To("https://streamer1.schwab.com"),
-					Token:        ptr.To("token-abc123"),
-					TokenExpTime: ptr.To(int64(1705363200)),
-					AppID:        ptr.To("app-001"),
-					ACL:          ptr.To("ACCT,QUOTE"),
+					StreamerURL:  new("https://streamer1.schwab.com"),
+					Token:        new("token-abc123"),
+					TokenExpTime: new(int64(1705363200)),
+					AppID:        new("app-001"),
+					ACL:          new("ACCT,QUOTE"),
 				},
 				{
-					StreamerURL:  ptr.To("https://streamer2.schwab.com"),
-					Token:        ptr.To("token-def456"),
-					TokenExpTime: ptr.To(int64(1705449600)),
-					AppID:        ptr.To("app-002"),
-					ACL:          ptr.To("ACCT"),
+					StreamerURL:  new("https://streamer2.schwab.com"),
+					Token:        new("token-def456"),
+					TokenExpTime: new(int64(1705449600)),
+					AppID:        new("app-002"),
+					ACL:          new("ACCT"),
 				},
 			},
 		}

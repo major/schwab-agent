@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/ptr"
 )
 
 func TestOptionChain_Success(t *testing.T) {
@@ -23,10 +22,10 @@ func TestOptionChain_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		response := models.OptionChain{
-			Symbol:          ptr.To("AAPL"),
-			Status:          ptr.To("SUCCESS"),
-			UnderlyingPrice: ptr.To(150.25),
-			IsDelayed:       ptr.To(false),
+			Symbol:          new("AAPL"),
+			Status:          new("SUCCESS"),
+			UnderlyingPrice: new(150.25),
+			IsDelayed:       new(false),
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
@@ -53,7 +52,7 @@ func TestOptionChain_AllParams(t *testing.T) {
 		assert.Equal(t, "2025-06-30", q.Get("toDate"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: ptr.To("AAPL")}))
+		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: new("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -85,7 +84,7 @@ func TestOptionChain_AdvancedParams(t *testing.T) {
 		assert.Equal(t, "45", q.Get("daysToExpiration"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: ptr.To("AAPL")}))
+		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: new("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -126,7 +125,7 @@ func TestOptionChain_EmptyParams(t *testing.T) {
 		assert.Empty(t, q.Get("daysToExpiration"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: ptr.To("AAPL")}))
+		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: new("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -141,15 +140,15 @@ func TestOptionChain_WithCallExpDateMap(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.OptionChain{
-			Symbol: ptr.To("AAPL"),
+			Symbol: new("AAPL"),
 			CallExpDateMap: map[string]map[string][]*models.OptionContract{
 				"2025-06-20:30": {
 					"150.0": {
 						{
-							Symbol:      ptr.To("AAPL_062025C150"),
-							StrikePrice: ptr.To(150.0),
-							Bid:         ptr.To(5.50),
-							Ask:         ptr.To(5.80),
+							Symbol:      new("AAPL_062025C150"),
+							StrikePrice: new(150.0),
+							Bid:         new(5.50),
+							Ask:         new(5.80),
 						},
 					},
 				},

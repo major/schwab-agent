@@ -84,8 +84,8 @@ func buildQuoteParams(cmd *cli.Command) (client.QuoteParams, error) {
 	for _, f := range raw {
 		// Support both repeatable (--fields QUOTE --fields FUNDAMENTAL)
 		// and comma-separated (--fields QUOTE,FUNDAMENTAL) forms.
-		parts := strings.Split(f, ",")
-		for _, part := range parts {
+		parts := strings.SplitSeq(f, ",")
+		for part := range parts {
 			trimmed := strings.TrimSpace(part)
 			if trimmed == "" {
 				continue

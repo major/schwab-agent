@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/ptr"
 )
 
 func TestPriceHistory_Success(t *testing.T) {
@@ -23,24 +22,24 @@ func TestPriceHistory_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		response := models.CandleList{
-			Symbol: ptr.To("AAPL"),
-			Empty:  ptr.To(false),
+			Symbol: new("AAPL"),
+			Empty:  new(false),
 			Candles: []models.Candle{
 				{
-					Open:     ptr.To(148.00),
-					High:     ptr.To(152.00),
-					Low:      ptr.To(147.50),
-					Close:    ptr.To(150.25),
-				Volume:   ptr.To(int64(45000000)),
-				Datetime: ptr.To(int64(1700000000000)),
+					Open:     new(148.00),
+					High:     new(152.00),
+					Low:      new(147.50),
+					Close:    new(150.25),
+					Volume:   new(int64(45000000)),
+					Datetime: new(int64(1700000000000)),
 				},
 				{
-					Open:     ptr.To(150.50),
-					High:     ptr.To(153.00),
-					Low:      ptr.To(149.00),
-					Close:    ptr.To(151.75),
-				Volume:   ptr.To(int64(42000000)),
-				Datetime: ptr.To(int64(1700086400000)),
+					Open:     new(150.50),
+					High:     new(153.00),
+					Low:      new(149.00),
+					Close:    new(151.75),
+					Volume:   new(int64(42000000)),
+					Datetime: new(int64(1700086400000)),
 				},
 			},
 		}
@@ -73,7 +72,7 @@ func TestPriceHistory_AllParams(t *testing.T) {
 		assert.Equal(t, "1700100000000", q.Get("endDate"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.CandleList{Symbol: ptr.To("AAPL")}))
+		require.NoError(t, json.NewEncoder(w).Encode(models.CandleList{Symbol: new("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -102,7 +101,7 @@ func TestPriceHistory_DateParams(t *testing.T) {
 		assert.Empty(t, q.Get("period"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.CandleList{Symbol: ptr.To("AAPL")}))
+		require.NoError(t, json.NewEncoder(w).Encode(models.CandleList{Symbol: new("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -120,8 +119,8 @@ func TestPriceHistory_EmptyCandles(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.CandleList{
-			Symbol:  ptr.To("AAPL"),
-			Empty:   ptr.To(true),
+			Symbol:  new("AAPL"),
+			Empty:   new(true),
 			Candles: []models.Candle{},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))

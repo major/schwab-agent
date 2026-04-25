@@ -17,12 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/orderbuilder"
 	"github.com/major/schwab-agent/internal/output"
-	"github.com/major/schwab-agent/internal/ptr"
 )
 
 // testFutureExpTime is a future expiration date for option tests. Computed once
@@ -161,7 +160,7 @@ func TestOrderConfirmGate(t *testing.T) {
 func TestOrderPreviewSpecModes(t *testing.T) {
 	t.Parallel()
 
-	previewResponse := models.PreviewOrder{OrderID: ptr.To(int64(4242))}
+	previewResponse := models.PreviewOrder{OrderID: new(int64(4242))}
 	var requestBodies []string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -421,7 +420,7 @@ func TestOrderMutableGuardTakesPriorityOverConfirm(t *testing.T) {
 func TestOrderPreviewNotBlockedByMutableGuard(t *testing.T) {
 	t.Parallel()
 
-	previewResponse := models.PreviewOrder{OrderID: ptr.To(int64(9999))}
+	previewResponse := models.PreviewOrder{OrderID: new(int64(9999))}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
@@ -542,7 +541,6 @@ func TestOrderPlaceOCOPipeline(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, float64(55555), data["orderId"])
 }
-
 
 // --- Spread build tests (iron condor, vertical, strangle, straddle, covered call) ---
 //
@@ -2248,7 +2246,7 @@ func validPrimarySpec(t *testing.T) string {
 		Duration:          models.DurationDay,
 		OrderType:         models.OrderTypeLimit,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		Price:             ptrFloat(150.0),
+		Price:             new(150.0),
 		OrderLegCollection: []models.OrderLegCollection{
 			{
 				Instruction: models.InstructionBuy,
@@ -2268,7 +2266,7 @@ func validSecondarySpec(t *testing.T) string {
 		Duration:          models.DurationDay,
 		OrderType:         models.OrderTypeLimit,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		Price:             ptrFloat(160.0),
+		Price:             new(160.0),
 		OrderLegCollection: []models.OrderLegCollection{
 			{
 				Instruction: models.InstructionSell,
@@ -2280,7 +2278,9 @@ func validSecondarySpec(t *testing.T) string {
 }
 
 // ptrFloat returns a pointer to a float64 value (test helper).
-func ptrFloat(v float64) *float64 { return &v }
+//
+//go:fix inline
+func ptrFloat(v float64) *float64 { return new(v) }
 
 func TestOrderBuildFTSInlineJSON(t *testing.T) {
 	t.Parallel()
@@ -2405,7 +2405,7 @@ func TestOrderBuildFTSRejectsComplexPrimary(t *testing.T) {
 		Duration:          models.DurationDay,
 		OrderType:         models.OrderTypeLimit,
 		OrderStrategyType: models.OrderStrategyTypeTrigger,
-		Price:             ptrFloat(150.0),
+		Price:             new(150.0),
 		OrderLegCollection: []models.OrderLegCollection{
 			{
 				Instruction: models.InstructionBuy,

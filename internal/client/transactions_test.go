@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/ptr"
 )
 
 func TestTransactions_Success(t *testing.T) {
@@ -28,20 +27,20 @@ func TestTransactions_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := []models.Transaction{
 			{
-				ActivityID:  ptr.To(int64(1001)),
-				Time:        ptr.To("2024-01-15T10:30:00Z"),
-				Type:        transactionTypePtr(models.TransactionTypeTrade),
-				Status:      ptr.To("FILLED"),
-				Description: ptr.To("BUY 100 AAPL"),
-				NetAmount:   ptr.To(-15000.00),
+				ActivityID:  new(int64(1001)),
+				Time:        new("2024-01-15T10:30:00Z"),
+				Type:        new(models.TransactionTypeTrade),
+				Status:      new("FILLED"),
+				Description: new("BUY 100 AAPL"),
+				NetAmount:   new(-15000.00),
 			},
 			{
-				ActivityID:  ptr.To(int64(1002)),
-				Time:        ptr.To("2024-01-16T14:45:00Z"),
-				Type:        transactionTypePtr(models.TransactionTypeDividend),
-				Status:      ptr.To("SETTLED"),
-				Description: ptr.To("DIVIDEND AAPL"),
-				NetAmount:   ptr.To(50.00),
+				ActivityID:  new(int64(1002)),
+				Time:        new("2024-01-16T14:45:00Z"),
+				Type:        new(models.TransactionTypeDividend),
+				Status:      new("SETTLED"),
+				Description: new("DIVIDEND AAPL"),
+				NetAmount:   new(50.00),
 			},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
@@ -71,9 +70,9 @@ func TestTransactions_WithTypeFilter(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := []models.Transaction{
 			{
-				ActivityID:  ptr.To(int64(1001)),
-				Type:        transactionTypePtr(models.TransactionTypeTrade),
-				Description: ptr.To("BUY 100 AAPL"),
+				ActivityID:  new(int64(1001)),
+				Type:        new(models.TransactionTypeTrade),
+				Description: new("BUY 100 AAPL"),
 			},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
@@ -102,9 +101,9 @@ func TestTransactions_WithDateFilters(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := []models.Transaction{
 			{
-				ActivityID:  ptr.To(int64(1001)),
-				Time:        ptr.To("2024-01-15T10:30:00Z"),
-				Description: ptr.To("BUY 100 AAPL"),
+				ActivityID:  new(int64(1001)),
+				Time:        new("2024-01-15T10:30:00Z"),
+				Description: new("BUY 100 AAPL"),
 			},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
@@ -165,12 +164,12 @@ func TestTransaction_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		response := models.Transaction{
-			ActivityID:  ptr.To(int64(1001)),
-			Time:        ptr.To("2024-01-15T10:30:00Z"),
-			Type:        transactionTypePtr(models.TransactionTypeTrade),
-			Status:      ptr.To("FILLED"),
-			Description: ptr.To("BUY 100 AAPL"),
-			NetAmount:   ptr.To(-15000.00),
+			ActivityID:  new(int64(1001)),
+			Time:        new("2024-01-15T10:30:00Z"),
+			Type:        new(models.TransactionTypeTrade),
+			Status:      new("FILLED"),
+			Description: new("BUY 100 AAPL"),
+			NetAmount:   new(-15000.00),
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
@@ -190,29 +189,29 @@ func TestTransaction_WithComplexData(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.Transaction{
-			ActivityID:     ptr.To(int64(1001)),
-			Time:           ptr.To("2024-01-15T10:30:00Z"),
-			Type:           transactionTypePtr(models.TransactionTypeTrade),
-			Status:         ptr.To("FILLED"),
-			Description:    ptr.To("BUY 100 AAPL"),
-			NetAmount:      ptr.To(-15000.00),
-			AccountNumber:  ptr.To("123456789"),
-			SubAccount:     ptr.To("CASH"),
-			ActivityType:   ptr.To("ORDER"),
-			OrderID:        ptr.To(int64(5001)),
-			PositionID:     ptr.To(int64(9001)),
-			TradeDate:      ptr.To("2024-01-15"),
-			SettlementDate: ptr.To("2024-01-17"),
+			ActivityID:     new(int64(1001)),
+			Time:           new("2024-01-15T10:30:00Z"),
+			Type:           new(models.TransactionTypeTrade),
+			Status:         new("FILLED"),
+			Description:    new("BUY 100 AAPL"),
+			NetAmount:      new(-15000.00),
+			AccountNumber:  new("123456789"),
+			SubAccount:     new("CASH"),
+			ActivityType:   new("ORDER"),
+			OrderID:        new(int64(5001)),
+			PositionID:     new(int64(9001)),
+			TradeDate:      new("2024-01-15"),
+			SettlementDate: new("2024-01-17"),
 			TransferItems: []models.TransferItem{
 				{
 					Instrument: &models.TransferInstrument{
-						AssetType:   ptr.To("EQUITY"),
-						Symbol:      ptr.To("AAPL"),
-						Description: ptr.To("Apple Inc"),
+						AssetType:   new("EQUITY"),
+						Symbol:      new("AAPL"),
+						Description: new("Apple Inc"),
 					},
-				Position:         ptr.To(float64(100)),
-				PositionEffect:   ptr.To("OPENING"),
-				PositionQuantity: ptr.To(float64(100)),
+					Position:         new(float64(100)),
+					PositionEffect:   new("OPENING"),
+					PositionQuantity: new(float64(100)),
 				},
 			},
 		}
@@ -262,6 +261,8 @@ func TestTransactions_BearerTokenAuth(t *testing.T) {
 }
 
 // Helper function for TransactionType pointer creation
+//
+//go:fix inline
 func transactionTypePtr(t models.TransactionType) *models.TransactionType {
-	return &t
+	return new(t)
 }

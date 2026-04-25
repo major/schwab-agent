@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"strconv"
 	"strings"
@@ -77,9 +78,7 @@ func (c *Client) fetchOrders(ctx context.Context, path string, params OrderListP
 	merged := make([]models.Order, 0)
 	for _, status := range params.Statuses {
 		query := make(map[string]string, len(baseQuery)+1)
-		for k, v := range baseQuery {
-			query[k] = v
-		}
+		maps.Copy(query, baseQuery)
 		query["status"] = status
 
 		var batch []models.Order

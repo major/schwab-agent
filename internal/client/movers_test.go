@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/ptr"
 )
 
 func TestMovers_Success(t *testing.T) {
@@ -24,26 +23,26 @@ func TestMovers_Success(t *testing.T) {
 		response := models.ScreenerResponse{
 			Screeners: []models.Screener{
 				{
-					Symbol:           ptr.To("AAPL"),
-					Description:      ptr.To("Apple Inc"),
-					LastPrice:        ptr.To(150.25),
-					NetChange:        ptr.To(2.50),
-					NetPercentChange: ptr.To(0.0169),
-				Volume:           ptr.To(int64(12000000)),
-				TotalVolume:      ptr.To(int64(45000000)),
-				Trades:           ptr.To(int64(100000)),
-					MarketShare:      ptr.To(26.67),
+					Symbol:           new("AAPL"),
+					Description:      new("Apple Inc"),
+					LastPrice:        new(150.25),
+					NetChange:        new(2.50),
+					NetPercentChange: new(0.0169),
+					Volume:           new(int64(12000000)),
+					TotalVolume:      new(int64(45000000)),
+					Trades:           new(int64(100000)),
+					MarketShare:      new(26.67),
 				},
 				{
-					Symbol:           ptr.To("NVDA"),
-					Description:      ptr.To("NVIDIA Corp"),
-					LastPrice:        ptr.To(850.50),
-					NetChange:        ptr.To(15.00),
-					NetPercentChange: ptr.To(0.0179),
-				Volume:           ptr.To(int64(8000000)),
-				TotalVolume:      ptr.To(int64(30000000)),
-				Trades:           ptr.To(int64(75000)),
-					MarketShare:      ptr.To(26.67),
+					Symbol:           new("NVDA"),
+					Description:      new("NVIDIA Corp"),
+					LastPrice:        new(850.50),
+					NetChange:        new(15.00),
+					NetPercentChange: new(0.0179),
+					Volume:           new(int64(8000000)),
+					TotalVolume:      new(int64(30000000)),
+					Trades:           new(int64(75000)),
+					MarketShare:      new(26.67),
 				},
 			},
 		}

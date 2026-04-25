@@ -41,13 +41,7 @@ func MACD(closes []float64, fastPeriod, slowPeriod, signalPeriod int) (macdLine,
 	strippedHistogram := StripLeadingZeros(rawHistogram)
 
 	// Align to shortest length to keep slices in sync
-	minLen := len(strippedMACD)
-	if len(strippedSignal) < minLen {
-		minLen = len(strippedSignal)
-	}
-	if len(strippedHistogram) < minLen {
-		minLen = len(strippedHistogram)
-	}
+	minLen := min(len(strippedHistogram), min(len(strippedSignal), len(strippedMACD)))
 
 	// Trim from the front to align (take last minLen elements)
 	if len(strippedMACD) > minLen {

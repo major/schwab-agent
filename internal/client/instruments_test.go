@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/ptr"
 )
 
 func TestSearchInstruments_Success(t *testing.T) {
@@ -26,11 +25,11 @@ func TestSearchInstruments_Success(t *testing.T) {
 		response := models.InstrumentResponse{
 			Instruments: []models.Instrument{
 				{
-					Cusip:       ptr.To("037833100"),
-					Symbol:      ptr.To("AAPL"),
-					Description: ptr.To("Apple Inc"),
-					Exchange:    ptr.To("NASDAQ"),
-					AssetType:   ptr.To("EQUITY"),
+					Cusip:       new("037833100"),
+					Symbol:      new("AAPL"),
+					Description: new("Apple Inc"),
+					Exchange:    new("NASDAQ"),
+					AssetType:   new("EQUITY"),
 				},
 			},
 		}
@@ -56,9 +55,9 @@ func TestSearchInstruments_MultipleResults(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.InstrumentResponse{
 			Instruments: []models.Instrument{
-				{Symbol: ptr.To("AAPL"), Description: ptr.To("Apple Inc")},
-				{Symbol: ptr.To("AAL"), Description: ptr.To("American Airlines")},
-				{Symbol: ptr.To("AAXJ"), Description: ptr.To("iShares MSCI All Country Asia")},
+				{Symbol: new("AAPL"), Description: new("Apple Inc")},
+				{Symbol: new("AAL"), Description: new("American Airlines")},
+				{Symbol: new("AAXJ"), Description: new("iShares MSCI All Country Asia")},
 			},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
@@ -97,11 +96,11 @@ func TestGetInstrument_Success(t *testing.T) {
 		response := models.InstrumentResponse{
 			Instruments: []models.Instrument{
 				{
-					Cusip:       ptr.To("037833100"),
-					Symbol:      ptr.To("AAPL"),
-					Description: ptr.To("Apple Inc"),
-					Exchange:    ptr.To("NASDAQ"),
-					AssetType:   ptr.To("EQUITY"),
+					Cusip:       new("037833100"),
+					Symbol:      new("AAPL"),
+					Description: new("Apple Inc"),
+					Exchange:    new("NASDAQ"),
+					AssetType:   new("EQUITY"),
 				},
 			},
 		}
