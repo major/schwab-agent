@@ -311,8 +311,8 @@ func TestBuildEquityOrderRejectsMarketWithPriceLink(t *testing.T) {
 	require.Nil(t, order)
 	require.Error(t, err)
 
-	var validationErr *apperr.ValidationError
-	require.True(t, errors.As(err, &validationErr))
+	validationErr, ok := errors.AsType[*apperr.ValidationError](err)
+	require.True(t, ok)
 	assert.Equal(t, "price-link-basis and price-link-type are not allowed on market orders", validationErr.Message)
 }
 
@@ -330,8 +330,8 @@ func TestBuildEquityOrderRejectsMarketOnCloseWithPriceLink(t *testing.T) {
 	require.Nil(t, order)
 	require.Error(t, err)
 
-	var validationErr *apperr.ValidationError
-	require.True(t, errors.As(err, &validationErr))
+	validationErr, ok := errors.AsType[*apperr.ValidationError](err)
+	require.True(t, ok)
 	assert.Equal(t, "price-link-basis and price-link-type are not allowed on market orders", validationErr.Message)
 }
 

@@ -240,8 +240,7 @@ func SetDefaultAccount(configPath, hash string) error {
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
 		// If validation error (missing credentials) or file doesn't exist, create a minimal config
-		var valErr *apperr.ValidationError
-		if errors.As(err, &valErr) || os.IsNotExist(err) {
+		if _, ok := errors.AsType[*apperr.ValidationError](err); ok || os.IsNotExist(err) {
 			// For validation errors or missing file, create empty config
 			cfg = &Config{}
 		} else {

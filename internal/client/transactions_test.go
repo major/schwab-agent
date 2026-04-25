@@ -259,10 +259,3 @@ func TestTransactions_BearerTokenAuth(t *testing.T) {
 
 	require.NoError(t, err)
 }
-
-// Helper function for TransactionType pointer creation
-//
-//go:fix inline
-func transactionTypePtr(t models.TransactionType) *models.TransactionType {
-	return new(t)
-}

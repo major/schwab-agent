@@ -412,8 +412,8 @@ func TestValidateFTSOrder(t *testing.T) {
 
 			require.Error(t, err)
 
-			var validationErr *apperr.ValidationError
-			require.True(t, errors.As(err, &validationErr), "expected ValidationError, got %T", err)
+			_, ok := errors.AsType[*apperr.ValidationError](err)
+			require.True(t, ok, "expected ValidationError, got %T", err)
 			assert.Contains(t, err.Error(), tt.wantErr)
 		})
 	}
@@ -541,7 +541,7 @@ func TestBuildFTSOrderRejectsInvalidParams(t *testing.T) {
 
 	require.Error(t, err)
 
-	var validationErr *apperr.ValidationError
-	require.True(t, errors.As(err, &validationErr))
+	_, ok := errors.AsType[*apperr.ValidationError](err)
+	require.True(t, ok)
 	assert.Contains(t, err.Error(), "primary order is empty")
 }

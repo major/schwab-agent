@@ -17,9 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
-	"github.com/major/schwab-agent/internal/apperr"
 )
 
 func TestMain(m *testing.M) {
@@ -123,8 +123,8 @@ func TestBeforeHook_SkipsAuthForAuthCommand(t *testing.T) {
 	var authErr *apperr.AuthRequiredError
 	require.ErrorAs(t, err, &authErr)
 
-	var validationErr *apperr.ValidationError
-	assert.False(t, stderrors.As(err, &validationErr))
+	_, ok := stderrors.AsType[*apperr.ValidationError](err)
+	assert.False(t, ok)
 }
 
 func TestBeforeHook_SkipsAuthForSchemaCommand(t *testing.T) {

@@ -1526,11 +1526,11 @@ func TestValidateEquityOrderMOCLOC(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		params        *EquityParams
-		wantErr       bool
-		wantMessage   string
-		wantDetails   string
+		name        string
+		params      *EquityParams
+		wantErr     bool
+		wantMessage string
+		wantDetails string
 	}{
 		{
 			name: "MOC without price passes",
@@ -1686,8 +1686,8 @@ func TestValidateVerticalOrderRemainingBranches(t *testing.T) {
 			err := ValidateVerticalOrder(&tt.params)
 
 			require.Error(t, err)
-			var validationErr *apperr.ValidationError
-			require.True(t, errors.As(err, &validationErr))
+			validationErr, ok := errors.AsType[*apperr.ValidationError](err)
+			require.True(t, ok)
 			assert.Equal(t, tt.wantMsg, validationErr.Message)
 		})
 	}
@@ -1781,8 +1781,8 @@ func TestValidateIronCondorRemainingBranches(t *testing.T) {
 			err := ValidateIronCondorOrder(&tt.params)
 
 			require.Error(t, err)
-			var validationErr *apperr.ValidationError
-			require.True(t, errors.As(err, &validationErr))
+			validationErr, ok := errors.AsType[*apperr.ValidationError](err)
+			require.True(t, ok)
 			assert.Equal(t, tt.wantMsg, validationErr.Message)
 		})
 	}
@@ -1853,8 +1853,8 @@ func TestValidateStrangleRemainingBranches(t *testing.T) {
 			err := ValidateStrangleOrder(&tt.params)
 
 			require.Error(t, err)
-			var validationErr *apperr.ValidationError
-			require.True(t, errors.As(err, &validationErr))
+			validationErr, ok := errors.AsType[*apperr.ValidationError](err)
+			require.True(t, ok)
 			assert.Equal(t, tt.wantMsg, validationErr.Message)
 		})
 	}
@@ -1899,8 +1899,8 @@ func TestValidateStraddleRemainingBranches(t *testing.T) {
 			err := ValidateStraddleOrder(&tt.params)
 
 			require.Error(t, err)
-			var validationErr *apperr.ValidationError
-			require.True(t, errors.As(err, &validationErr))
+			validationErr, ok := errors.AsType[*apperr.ValidationError](err)
+			require.True(t, ok)
 			assert.Equal(t, tt.wantMsg, validationErr.Message)
 		})
 	}
@@ -1945,8 +1945,8 @@ func TestValidateCoveredCallRemainingBranches(t *testing.T) {
 			err := ValidateCoveredCallOrder(&tt.params)
 
 			require.Error(t, err)
-			var validationErr *apperr.ValidationError
-			require.True(t, errors.As(err, &validationErr))
+			validationErr, ok := errors.AsType[*apperr.ValidationError](err)
+			require.True(t, ok)
 			assert.Equal(t, tt.wantMsg, validationErr.Message)
 		})
 	}
@@ -2047,8 +2047,8 @@ func assertValidationError(t *testing.T, err error, expectedMessage, expectedDet
 
 	require.Error(t, err)
 
-	var validationErr *apperr.ValidationError
-	require.True(t, errors.As(err, &validationErr))
+	validationErr, ok := errors.AsType[*apperr.ValidationError](err)
+	require.True(t, ok)
 	assert.Equal(t, expectedMessage, validationErr.Message)
 	assert.Equal(t, expectedDetails, validationErr.Details())
 }

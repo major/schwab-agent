@@ -73,7 +73,7 @@ func TestRequireSubcommand(t *testing.T) {
 		err := runTestCommand(t, parent, "parent", "alpha")
 
 		// Assert - no ValidationError means requireSubcommand didn't fire
-		var valErr *apperr.ValidationError
-		assert.False(t, errors.As(err, &valErr), "valid subcommand should not produce ValidationError")
+		_, ok := errors.AsType[*apperr.ValidationError](err)
+		assert.False(t, ok, "valid subcommand should not produce ValidationError")
 	})
 }

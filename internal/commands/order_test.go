@@ -2277,11 +2277,6 @@ func validSecondarySpec(t *testing.T) string {
 	})
 }
 
-// ptrFloat returns a pointer to a float64 value (test helper).
-//
-//go:fix inline
-func ptrFloat(v float64) *float64 { return new(v) }
-
 func TestOrderBuildFTSInlineJSON(t *testing.T) {
 	t.Parallel()
 
@@ -2528,8 +2523,8 @@ func TestParseOrderType(t *testing.T) {
 			got, err := parseOrderType(tt.input, tt.fallback)
 			if tt.wantErr {
 				require.Error(t, err)
-				var validationErr *apperr.ValidationError
-				require.True(t, errors.As(err, &validationErr))
+				_, ok := errors.AsType[*apperr.ValidationError](err)
+				require.True(t, ok)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
@@ -2624,8 +2619,8 @@ func TestParseDuration(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 
-				var validationErr *apperr.ValidationError
-				require.True(t, errors.As(err, &validationErr))
+				_, ok := errors.AsType[*apperr.ValidationError](err)
+				require.True(t, ok)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
