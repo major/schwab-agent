@@ -275,6 +275,7 @@ func NewSchwabError(message string, cause error, opts ...ErrorOption) *SchwabErr
 
 // exitCoder is an interface for types that can provide an exit code.
 type exitCoder interface {
+	error
 	ExitCode() int
 }
 
@@ -285,8 +286,7 @@ func ExitCodeFor(err error) int {
 		return 0
 	}
 
-	var coder exitCoder
-	if errors.As(err, &coder) {
+	if coder, ok := errors.AsType[exitCoder](err); ok {
 		return coder.ExitCode()
 	}
 
@@ -295,48 +295,39 @@ func ExitCodeFor(err error) int {
 
 // ErrorCode returns the error classification code for JSON responses.
 func ErrorCode(err error) string {
-	var authReqErr *AuthRequiredError
-	if errors.As(err, &authReqErr) {
+	if _, ok := errors.AsType[*AuthRequiredError](err); ok {
 		return "AUTH_REQUIRED"
 	}
 
-	var authExpErr *AuthExpiredError
-	if errors.As(err, &authExpErr) {
+	if _, ok := errors.AsType[*AuthExpiredError](err); ok {
 		return "AUTH_EXPIRED"
 	}
 
-	var authCallErr *AuthCallbackError
-	if errors.As(err, &authCallErr) {
+	if _, ok := errors.AsType[*AuthCallbackError](err); ok {
 		return "AUTH_CALLBACK"
 	}
 
-	var orderRejErr *OrderRejectedError
-	if errors.As(err, &orderRejErr) {
+	if _, ok := errors.AsType[*OrderRejectedError](err); ok {
 		return "ORDER_REJECTED"
 	}
 
-	var symbolErr *SymbolNotFoundError
-	if errors.As(err, &symbolErr) {
+	if _, ok := errors.AsType[*SymbolNotFoundError](err); ok {
 		return "SYMBOL_NOT_FOUND"
 	}
 
-	var accountErr *AccountNotFoundError
-	if errors.As(err, &accountErr) {
+	if _, ok := errors.AsType[*AccountNotFoundError](err); ok {
 		return "ACCOUNT_NOT_FOUND"
 	}
 
-	var httpErr *HTTPError
-	if errors.As(err, &httpErr) {
+	if _, ok := errors.AsType[*HTTPError](err); ok {
 		return "HTTP_ERROR"
 	}
 
-	var valErr *ValidationError
-	if errors.As(err, &valErr) {
+	if _, ok := errors.AsType[*ValidationError](err); ok {
 		return "VALIDATION_ERROR"
 	}
 
-	var orderBuildErr *OrderBuildError
-	if errors.As(err, &orderBuildErr) {
+	if _, ok := errors.AsType[*OrderBuildError](err); ok {
 		return "ORDER_BUILD_ERROR"
 	}
 

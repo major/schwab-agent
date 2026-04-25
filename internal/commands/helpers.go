@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -29,10 +30,8 @@ func parseEnum[T ~string](raw string, valid []T, fallback T, label string) (T, e
 	}
 
 	candidate := T(strings.ToUpper(v))
-	for _, e := range valid {
-		if candidate == e {
-			return candidate, nil
-		}
+	if slices.Contains(valid, candidate) {
+		return candidate, nil
 	}
 
 	var zero T
@@ -53,10 +52,8 @@ func requireEnum[T ~string](raw string, valid []T, label string) (T, error) {
 	}
 
 	candidate := T(strings.ToUpper(v))
-	for _, e := range valid {
-		if candidate == e {
-			return candidate, nil
-		}
+	if slices.Contains(valid, candidate) {
+		return candidate, nil
 	}
 
 	var zero T

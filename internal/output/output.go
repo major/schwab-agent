@@ -66,15 +66,13 @@ func WriteError(w io.Writer, err error) error {
 
 	// Extract details from specific error types
 	var details string
-	var schwabErr *apperr.SchwabError
-	if errors.As(err, &schwabErr) {
+	if schwabErr, ok := errors.AsType[*apperr.SchwabError](err); ok {
 		details = schwabErr.Details()
 	}
 
 	// Include the upstream response body when available so API errors from
 	// Schwab are visible in the CLI output instead of just "status: NNN".
-	var httpErr *apperr.HTTPError
-	if errors.As(err, &httpErr) {
+	if httpErr, ok := errors.AsType[*apperr.HTTPError](err); ok {
 		if httpErr.Body != "" {
 			details = fmt.Sprintf("status: %d, body: %s", httpErr.StatusCode, httpErr.Body)
 		} else {
@@ -106,5 +104,3 @@ func WritePartial(w io.Writer, data any, errs []string, metadata Metadata) error
 	encoder.SetEscapeHTML(false)
 	return encoder.Encode(envelope)
 }
-
-

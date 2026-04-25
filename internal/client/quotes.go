@@ -55,8 +55,7 @@ func (c *Client) Quote(ctx context.Context, symbol string, p QuoteParams) (*mode
 	err := c.doGet(ctx, path, quoteParams(p), &result)
 	if err != nil {
 		// Convert 404 HTTPError to SymbolNotFoundError
-		var httpErr *apperr.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		if httpErr, ok := errors.AsType[*apperr.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
 			return nil, apperr.NewSymbolNotFoundError(fmt.Sprintf("symbol %s not found", symbol), err)
 		}
 		return nil, err

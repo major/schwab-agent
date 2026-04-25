@@ -10,7 +10,6 @@ import (
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/ptr"
 )
 
 const optionContractMultiplier = 100.0
@@ -66,15 +65,15 @@ func BuildOptionOrder(params *OptionParams) (*models.OrderRequest, error) {
 	}
 
 	if params.OrderType == models.OrderTypeLimit {
-		order.Price = ptr.To(params.Price)
+		order.Price = new(params.Price)
 	}
 
 	if params.SpecialInstruction != "" {
-		order.SpecialInstruction = ptr.To(params.SpecialInstruction)
+		order.SpecialInstruction = new(params.SpecialInstruction)
 	}
 
 	if params.Destination != "" {
-		order.RequestedDestination = ptr.To(params.Destination)
+		order.RequestedDestination = new(params.Destination)
 	}
 
 	// Market-style orders have no price to link against, so reject price-link fields early.
@@ -87,11 +86,11 @@ func BuildOptionOrder(params *OptionParams) (*models.OrderRequest, error) {
 	}
 
 	if params.PriceLinkBasis != "" {
-		order.PriceLinkBasis = ptr.To(params.PriceLinkBasis)
+		order.PriceLinkBasis = new(params.PriceLinkBasis)
 	}
 
 	if params.PriceLinkType != "" {
-		order.PriceLinkType = ptr.To(params.PriceLinkType)
+		order.PriceLinkType = new(params.PriceLinkType)
 	}
 
 	return order, nil

@@ -65,13 +65,7 @@ func BBands(closes []float64, period int, stdDev float64) (upper, middle, lower 
 	lower = StripLeadingZeros(rawLower)
 
 	// Align to shortest length
-	minLen := len(upper)
-	if len(middle) < minLen {
-		minLen = len(middle)
-	}
-	if len(lower) < minLen {
-		minLen = len(lower)
-	}
+	minLen := min(len(lower), min(len(middle), len(upper)))
 	if len(upper) > minLen {
 		upper = upper[len(upper)-minLen:]
 	}

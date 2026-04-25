@@ -234,17 +234,17 @@ func TestErrorChainPreservation(t *testing.T) {
 	}
 }
 
-// TestErrorChainTraversal verifies errors.As() can traverse the error chain.
+// TestErrorChainTraversal verifies errors.AsType() can traverse the error chain.
 func TestErrorChainTraversal(t *testing.T) {
 	underlying := errors.New("root cause")
 	err := NewAuthRequiredError("auth required", underlying)
 
-	var authErr *AuthRequiredError
-	if !errors.As(err, &authErr) {
-		t.Error("errors.As() failed to find AuthRequiredError in chain")
+	authErr, ok := errors.AsType[*AuthRequiredError](err)
+	if !ok {
+		t.Error("errors.AsType() failed to find AuthRequiredError in chain")
 	}
 
-	// Note: errors.As() does not automatically traverse to parent types
+	// Note: errors.AsType() does not automatically traverse to parent types
 	// without explicit As() method implementation. This test verifies
 	// that the specific error type can be found.
 	if authErr.Message != "auth required" {

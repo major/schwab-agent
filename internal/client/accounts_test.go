@@ -12,7 +12,6 @@ import (
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/ptr"
 )
 
 func TestAccountNumbers_Success(t *testing.T) {
@@ -83,14 +82,14 @@ func TestAccounts_Success(t *testing.T) {
 		response := []models.Account{
 			{
 				SecuritiesAccount: &models.SecuritiesAccount{
-					Type:          ptr.To("MARGIN"),
-					AccountNumber: ptr.To("123456789"),
+					Type:          new("MARGIN"),
+					AccountNumber: new("123456789"),
 				},
 			},
 			{
 				SecuritiesAccount: &models.SecuritiesAccount{
-					Type:          ptr.To("CASH"),
-					AccountNumber: ptr.To("987654321"),
+					Type:          new("CASH"),
+					AccountNumber: new("987654321"),
 				},
 			},
 		}
@@ -150,8 +149,8 @@ func TestAccount_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.Account{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				Type:          ptr.To("MARGIN"),
-				AccountNumber: ptr.To("123456789"),
+				Type:          new("MARGIN"),
+				AccountNumber: new("123456789"),
 			},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(response))
@@ -194,15 +193,15 @@ func TestAccounts_WithPositionsField(t *testing.T) {
 		response := []models.Account{
 			{
 				SecuritiesAccount: &models.SecuritiesAccount{
-					Type:          ptr.To("MARGIN"),
-					AccountNumber: ptr.To("123456789"),
+					Type:          new("MARGIN"),
+					AccountNumber: new("123456789"),
 					Positions: []models.Position{
 						{
-							LongQuantity: ptr.To(float64(100)),
-							MarketValue:  ptr.To(15000.00),
+							LongQuantity: new(float64(100)),
+							MarketValue:  new(15000.00),
 							Instrument: &models.AccountsInstrument{
-								Symbol:    ptr.To("AAPL"),
-								AssetType: ptr.To("EQUITY"),
+								Symbol:    new("AAPL"),
+								AssetType: new("EQUITY"),
 							},
 						},
 					},
@@ -247,16 +246,16 @@ func TestAccount_WithPositionsField(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.Account{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				Type:          ptr.To("MARGIN"),
-				AccountNumber: ptr.To("123456789"),
+				Type:          new("MARGIN"),
+				AccountNumber: new("123456789"),
 				Positions: []models.Position{
 					{
-						LongQuantity:  ptr.To(float64(50)),
-						ShortQuantity: ptr.To(float64(0)),
-						MarketValue:   ptr.To(8500.00),
+						LongQuantity:  new(float64(50)),
+						ShortQuantity: new(float64(0)),
+						MarketValue:   new(8500.00),
 						Instrument: &models.AccountsInstrument{
-							Symbol:    ptr.To("MSFT"),
-							AssetType: ptr.To("EQUITY"),
+							Symbol:    new("MSFT"),
+							AssetType: new("EQUITY"),
 						},
 					},
 				},
@@ -281,22 +280,22 @@ func TestAccount_WithComplexData(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		response := models.Account{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				Type:          ptr.To("MARGIN"),
-				AccountNumber: ptr.To("123456789"),
-				RoundTrips:    ptr.To(5),
-				IsForeign:     ptr.To(false),
+				Type:          new("MARGIN"),
+				AccountNumber: new("123456789"),
+				RoundTrips:    new(5),
+				IsForeign:     new(false),
 				CurrentBalances: &models.MarginBalance{
-					CashBalance:    ptr.To(50000.00),
-					BuyingPower:    ptr.To(100000.00),
-					EquityPercentage: ptr.To(0.75),
+					CashBalance:      new(50000.00),
+					BuyingPower:      new(100000.00),
+					EquityPercentage: new(0.75),
 				},
 				Positions: []models.Position{
 					{
-						LongQuantity: ptr.To(float64(100)),
-						MarketValue:  ptr.To(15000.00),
+						LongQuantity: new(float64(100)),
+						MarketValue:  new(15000.00),
 						Instrument: &models.AccountsInstrument{
-							Symbol:    ptr.To("AAPL"),
-							AssetType: ptr.To("EQUITY"),
+							Symbol:    new("AAPL"),
+							AssetType: new("EQUITY"),
 						},
 					},
 				},
@@ -379,4 +378,3 @@ func TestAccount_BearerTokenAuth(t *testing.T) {
 
 	require.NoError(t, err)
 }
-

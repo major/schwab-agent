@@ -15,7 +15,6 @@ import (
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
-	"github.com/major/schwab-agent/internal/ptr"
 )
 
 func TestPositionListSingleAccount(t *testing.T) {
@@ -48,8 +47,8 @@ func TestPositionListSingleAccount(t *testing.T) {
 	}
 
 	srv := accountMockServer(t, map[string]any{
-		"/trader/v1/accounts/HASH123":  account,
-		"/trader/v1/userPreference":    prefs,
+		"/trader/v1/accounts/HASH123": account,
+		"/trader/v1/userPreference":   prefs,
 	})
 	defer srv.Close()
 
@@ -79,8 +78,8 @@ func TestPositionListSingleAccount(t *testing.T) {
 	assert.Equal(t, "12345", pos["accountNumber"])
 	assert.Equal(t, "HASH123", pos["accountHash"])
 	assert.Equal(t, "My IRA", pos["accountNickName"])
-	assert.Equal(t, 15000.0, pos["totalCostBasis"])  // 150 * 100
-	assert.Equal(t, 1000.0, pos["unrealizedPnL"])    // longOpenProfitLoss only
+	assert.Equal(t, 15000.0, pos["totalCostBasis"]) // 150 * 100
+	assert.Equal(t, 1000.0, pos["unrealizedPnL"])   // longOpenProfitLoss only
 
 	// Verify instrument came through.
 	inst, ok := pos["instrument"].(map[string]any)
@@ -174,9 +173,9 @@ func TestPositionListAllAccounts(t *testing.T) {
 	}
 
 	srv := accountMockServer(t, map[string]any{
-		"/trader/v1/accounts":              accounts,
+		"/trader/v1/accounts":                accounts,
 		"/trader/v1/accounts/accountNumbers": accountNumbers,
-		"/trader/v1/userPreference":        prefs,
+		"/trader/v1/userPreference":          prefs,
 	})
 	defer srv.Close()
 
@@ -248,7 +247,7 @@ func TestPositionListAllAccounts_PreferencesFailure(t *testing.T) {
 
 	// No /trader/v1/userPreference route: will 404.
 	srv := accountMockServer(t, map[string]any{
-		"/trader/v1/accounts":              accounts,
+		"/trader/v1/accounts":                accounts,
 		"/trader/v1/accounts/accountNumbers": accountNumbers,
 	})
 	defer srv.Close()
@@ -287,8 +286,8 @@ func TestPositionListNoPositions(t *testing.T) {
 	}
 
 	srv := accountMockServer(t, map[string]any{
-		"/trader/v1/accounts/HASH123":  account,
-		"/trader/v1/userPreference":    map[string]any{"accounts": []any{}},
+		"/trader/v1/accounts/HASH123": account,
+		"/trader/v1/userPreference":   map[string]any{"accounts": []any{}},
 	})
 	defer srv.Close()
 
@@ -389,9 +388,9 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("long position with P&L", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice:       ptr.To(150.0),
-				LongQuantity:       ptr.To(100.0),
-				LongOpenProfitLoss: ptr.To(1000.0),
+				AveragePrice:       new(150.0),
+				LongQuantity:       new(100.0),
+				LongOpenProfitLoss: new(1000.0),
 			},
 		}
 		computePositionFields(&entry)
@@ -409,9 +408,9 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("short position with P&L", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice:        ptr.To(300.0),
-				ShortQuantity:       ptr.To(10.0),
-				ShortOpenProfitLoss: ptr.To(-500.0),
+				AveragePrice:        new(300.0),
+				ShortQuantity:       new(10.0),
+				ShortOpenProfitLoss: new(-500.0),
 			},
 		}
 		computePositionFields(&entry)
@@ -429,11 +428,11 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("both long and short P&L", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice:        ptr.To(100.0),
-				LongQuantity:        ptr.To(50.0),
-				ShortQuantity:       ptr.To(10.0),
-				LongOpenProfitLoss:  ptr.To(500.0),
-				ShortOpenProfitLoss: ptr.To(-200.0),
+				AveragePrice:        new(100.0),
+				LongQuantity:        new(50.0),
+				ShortQuantity:       new(10.0),
+				LongOpenProfitLoss:  new(500.0),
+				ShortOpenProfitLoss: new(-200.0),
 			},
 		}
 		computePositionFields(&entry)
@@ -451,8 +450,8 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("nil averagePrice skips cost basis", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				LongQuantity:       ptr.To(100.0),
-				LongOpenProfitLoss: ptr.To(500.0),
+				LongQuantity:       new(100.0),
+				LongOpenProfitLoss: new(500.0),
 			},
 		}
 		computePositionFields(&entry)
@@ -467,7 +466,7 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("zero quantity skips cost basis", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice: ptr.To(150.0),
+				AveragePrice: new(150.0),
 				// No quantity fields set (both nil, default to 0).
 			},
 		}
@@ -479,8 +478,8 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("no P&L fields", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice: ptr.To(150.0),
-				LongQuantity: ptr.To(100.0),
+				AveragePrice: new(150.0),
+				LongQuantity: new(100.0),
 			},
 		}
 		computePositionFields(&entry)
@@ -505,16 +504,16 @@ func TestFlattenAccountPositions(t *testing.T) {
 	accounts := []models.Account{
 		{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				AccountNumber: ptr.To("11111"),
+				AccountNumber: new("11111"),
 				Positions: []models.Position{
 					{
-						LongQuantity: ptr.To(100.0),
-						AveragePrice: ptr.To(50.0),
-						Instrument:   &models.AccountsInstrument{Symbol: ptr.To("AAPL")},
+						LongQuantity: new(100.0),
+						AveragePrice: new(50.0),
+						Instrument:   &models.AccountsInstrument{Symbol: new("AAPL")},
 					},
 				},
 			},
-			NickName: ptr.To("Trading"),
+			NickName: new("Trading"),
 		},
 		{
 			// Account with no SecuritiesAccount: should be skipped.
@@ -522,12 +521,12 @@ func TestFlattenAccountPositions(t *testing.T) {
 		},
 		{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				AccountNumber: ptr.To("22222"),
+				AccountNumber: new("22222"),
 				Positions: []models.Position{
 					{
-						ShortQuantity: ptr.To(5.0),
-						AveragePrice:  ptr.To(200.0),
-						Instrument:    &models.AccountsInstrument{Symbol: ptr.To("TSLA")},
+						ShortQuantity: new(5.0),
+						AveragePrice:  new(200.0),
+						Instrument:    &models.AccountsInstrument{Symbol: new("TSLA")},
 					},
 				},
 			},
@@ -578,8 +577,8 @@ func TestPositionListComputedFieldsInOutput(t *testing.T) {
 	}
 
 	srv := accountMockServer(t, map[string]any{
-		"/trader/v1/accounts/HASH123":  account,
-		"/trader/v1/userPreference":    map[string]any{"accounts": []any{}},
+		"/trader/v1/accounts/HASH123": account,
+		"/trader/v1/userPreference":   map[string]any{"accounts": []any{}},
 	})
 	defer srv.Close()
 
@@ -604,9 +603,9 @@ func TestPositionListComputedFieldsInOutput(t *testing.T) {
 	pos, ok := positions[0].(map[string]any)
 	require.True(t, ok, "expected position to be map[string]any")
 
-	assert.Equal(t, 15000.0, pos["totalCostBasis"])                     // 150 * 100
-	assert.Equal(t, 1500.0, pos["unrealizedPnL"])                       // longOpenProfitLoss
-	assert.InDelta(t, 10.0, pos["unrealizedPnLPct"].(float64), 0.001)  // 1500/15000*100
+	assert.Equal(t, 15000.0, pos["totalCostBasis"])                   // 150 * 100
+	assert.Equal(t, 1500.0, pos["unrealizedPnL"])                     // longOpenProfitLoss
+	assert.InDelta(t, 10.0, pos["unrealizedPnLPct"].(float64), 0.001) // 1500/15000*100
 
 	// Original API fields should still be present.
 	assert.Equal(t, 100.0, pos["longQuantity"])

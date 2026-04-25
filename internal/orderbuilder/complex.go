@@ -5,7 +5,6 @@ import (
 	"cmp"
 
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/ptr"
 )
 
 // OCOParams holds parameters for building a standalone one-cancels-other order.
@@ -60,11 +59,11 @@ func BuildBracketOrder(params *BracketParams) (*models.OrderRequest, error) {
 	}
 
 	if params.OrderType == models.OrderTypeLimit || params.OrderType == models.OrderTypeStopLimit {
-		order.Price = ptr.To(params.Price)
+		order.Price = new(params.Price)
 	}
 
 	if params.OrderType == models.OrderTypeStop || params.OrderType == models.OrderTypeStopLimit {
-		order.StopPrice = ptr.To(params.Price)
+		order.StopPrice = new(params.Price)
 	}
 
 	return order, nil
@@ -118,7 +117,7 @@ func buildOCOLimitExit(params *OCOParams) models.OrderRequest {
 		Duration:          params.Duration,
 		OrderType:         models.OrderTypeLimit,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		Price:             ptr.To(params.TakeProfit),
+		Price:             new(params.TakeProfit),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Symbol, params.Action, params.Quantity),
 		},
@@ -132,7 +131,7 @@ func buildOCOStopExit(params *OCOParams) models.OrderRequest {
 		Duration:          params.Duration,
 		OrderType:         models.OrderTypeStop,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		StopPrice:         ptr.To(params.StopLoss),
+		StopPrice:         new(params.StopLoss),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Symbol, params.Action, params.Quantity),
 		},
@@ -181,7 +180,7 @@ func buildTakeProfitOrder(params *BracketParams, exitInstruction models.Instruct
 		Duration:          params.Duration,
 		OrderType:         models.OrderTypeLimit,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		Price:             ptr.To(params.TakeProfit),
+		Price:             new(params.TakeProfit),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Symbol, exitInstruction, params.Quantity),
 		},
@@ -195,7 +194,7 @@ func buildStopLossOrder(params *BracketParams, exitInstruction models.Instructio
 		Duration:          params.Duration,
 		OrderType:         models.OrderTypeStop,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		StopPrice:         ptr.To(params.StopLoss),
+		StopPrice:         new(params.StopLoss),
 		OrderLegCollection: []models.OrderLegCollection{
 			buildEquityLeg(params.Symbol, exitInstruction, params.Quantity),
 		},

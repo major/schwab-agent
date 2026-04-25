@@ -11,7 +11,7 @@
 Go CLI tool for AI agents to trade via Charles Schwab APIs. Single binary, JSON-first output, auto-generated skill files for agent consumption.
 
 - **Module**: `github.com/major/schwab-agent`
-- **Go version**: 1.25 (check `/usr/local/go/bin/go version` for newer installs)
+- **Go version**: 1.26 (check `/usr/local/go/bin/go version` for newer installs)
 - **Entry point**: `cmd/schwab-agent/main.go`
 - **Dependencies**: urfave/cli/v3 (CLI framework), pkg/browser (OAuth flow), stretchr/testify (test assertions)
 

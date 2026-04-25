@@ -311,8 +311,8 @@ func TestBuildEquityOrderRejectsMarketWithPriceLink(t *testing.T) {
 	require.Nil(t, order)
 	require.Error(t, err)
 
-	var validationErr *apperr.ValidationError
-	require.True(t, errors.As(err, &validationErr))
+	validationErr, ok := errors.AsType[*apperr.ValidationError](err)
+	require.True(t, ok)
 	assert.Equal(t, "price-link-basis and price-link-type are not allowed on market orders", validationErr.Message)
 }
 
@@ -330,9 +330,27 @@ func TestBuildEquityOrderRejectsMarketOnCloseWithPriceLink(t *testing.T) {
 	require.Nil(t, order)
 	require.Error(t, err)
 
-	var validationErr *apperr.ValidationError
-	require.True(t, errors.As(err, &validationErr))
+	validationErr, ok := errors.AsType[*apperr.ValidationError](err)
+	require.True(t, ok)
 	assert.Equal(t, "price-link-basis and price-link-type are not allowed on market orders", validationErr.Message)
+}
+
+// TestBuildEquityOrderSetsLimitOnClosePrice verifies LOC orders set the limit price.
+func TestBuildEquityOrderSetsLimitOnClosePrice(t *testing.T) {
+	order, err := BuildEquityOrder(&EquityParams{
+		Symbol:    "SPY",
+		Action:    models.InstructionSell,
+		Quantity:  50,
+		OrderType: models.OrderTypeLimitOnClose,
+		Price:     450.25,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Equal(t, models.OrderTypeLimitOnClose, order.OrderType)
+	require.NotNil(t, order.Price, "LOC orders must set Price")
+	assert.Equal(t, 450.25, *order.Price)
+	assert.Nil(t, order.StopPrice, "LOC orders should not set StopPrice")
 }
 
 // TestBuildEquityOrderPriceLinkDoesNotBreakTrailingStopLimit verifies that when

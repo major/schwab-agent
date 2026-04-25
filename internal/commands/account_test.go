@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
-	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -29,13 +29,13 @@ func accountMockServer(t *testing.T, routes map[string]any) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp, ok := routes[r.URL.Path]
 		if !ok {
-		w.WriteHeader(http.StatusNotFound)
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]string{"error": "not found"}))
+			w.WriteHeader(http.StatusNotFound)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]string{"error": "not found"}))
 
 			return
 		}
-	w.Header().Set("Content-Type", "application/json")
-	require.NoError(t, json.NewEncoder(w).Encode(resp))
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(resp))
 	}))
 }
 
@@ -236,8 +236,8 @@ func TestAccountList_APIError(t *testing.T) {
 	err := cmd.Run(context.Background(), []string{"account", "list"})
 	require.Error(t, err)
 
-	var httpErr *apperr.HTTPError
-	assert.True(t, errors.As(err, &httpErr))
+	_, ok := errors.AsType[*apperr.HTTPError](err)
+	assert.True(t, ok)
 }
 
 func TestAccountNumbers_Success(t *testing.T) {
@@ -400,8 +400,8 @@ func TestAccountGet_NoAccount_Error(t *testing.T) {
 	err := cmd.Run(context.Background(), []string{"account", "get"})
 	require.Error(t, err)
 
-	var notFoundErr *apperr.AccountNotFoundError
-	require.True(t, errors.As(err, &notFoundErr))
+	notFoundErr, ok := errors.AsType[*apperr.AccountNotFoundError](err)
+	require.True(t, ok)
 	assert.Contains(t, notFoundErr.Message, "no account specified")
 	assert.Contains(t, notFoundErr.Details(), "schwab-agent account numbers")
 	assert.Contains(t, notFoundErr.Details(), "schwab-agent account set-default")
@@ -447,8 +447,8 @@ func TestAccountGet_APIError(t *testing.T) {
 	err := cmd.Run(context.Background(), []string{"account", "get", "BAD_HASH"})
 	require.Error(t, err)
 
-	var notFoundErr *apperr.AccountNotFoundError
-	assert.True(t, errors.As(err, &notFoundErr))
+	_, ok := errors.AsType[*apperr.AccountNotFoundError](err)
+	assert.True(t, ok)
 }
 
 func TestEnrichAccountsWithPreferences(t *testing.T) {

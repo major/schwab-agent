@@ -18,8 +18,7 @@ func (c *Client) AccountNumbers(ctx context.Context) ([]models.AccountNumber, er
 	err := c.doGet(ctx, "/trader/v1/accounts/accountNumbers", nil, &result)
 	if err != nil {
 		// Convert 404 HTTPError to AccountNotFoundError
-		var httpErr *apperr.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		if httpErr, ok := errors.AsType[*apperr.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
 			return nil, apperr.NewAccountNotFoundError("account numbers not found", err)
 		}
 		return nil, err
@@ -40,8 +39,7 @@ func (c *Client) Accounts(ctx context.Context, fields ...string) ([]models.Accou
 	err := c.doGet(ctx, "/trader/v1/accounts", params, &result)
 	if err != nil {
 		// Convert 404 HTTPError to AccountNotFoundError
-		var httpErr *apperr.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		if httpErr, ok := errors.AsType[*apperr.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
 			return nil, apperr.NewAccountNotFoundError("accounts not found", err)
 		}
 		return nil, err
@@ -63,8 +61,7 @@ func (c *Client) Account(ctx context.Context, hashValue string, fields ...string
 	err := c.doGet(ctx, path, params, &result)
 	if err != nil {
 		// Convert 404 HTTPError to AccountNotFoundError
-		var httpErr *apperr.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		if httpErr, ok := errors.AsType[*apperr.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
 			return nil, apperr.NewAccountNotFoundError(fmt.Sprintf("account %s not found", hashValue), err)
 		}
 		return nil, err

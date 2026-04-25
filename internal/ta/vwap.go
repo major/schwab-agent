@@ -31,7 +31,7 @@ func VWAP(highs, lows, closes, volumes []float64) ([]float64, error) {
 	var cumulativeTV float64
 	var cumulativeVol float64
 
-	for i := 0; i < len(highs); i++ {
+	for i := range highs {
 		// Calculate typical price: (H + L + C) / 3
 		typicalPrice := (highs[i] + lows[i] + closes[i]) / 3.0
 

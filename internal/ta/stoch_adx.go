@@ -11,10 +11,11 @@ import (
 // Stochastic computes the Stochastic Oscillator (%K and %D lines).
 //
 // CRITICAL parameter mapping (schwab-mcp vs go-talib naming differs):
-//   kPeriod  (CLI: --k-period)  -> talib fastKPeriod (lookback, default 14)
-//   smoothK  (CLI: --smooth-k)  -> talib slowKPeriod  (smoothing of %K, default 3)
-//   dPeriod  (CLI: --d-period)  -> talib slowDPeriod  (period of %D, default 3)
-//   slowKMAType and slowDMAType are hardcoded to 0 (SMA) and not exposed.
+//
+//	kPeriod  (CLI: --k-period)  -> talib fastKPeriod (lookback, default 14)
+//	smoothK  (CLI: --smooth-k)  -> talib slowKPeriod  (smoothing of %K, default 3)
+//	dPeriod  (CLI: --d-period)  -> talib slowDPeriod  (period of %D, default 3)
+//	slowKMAType and slowDMAType are hardcoded to 0 (SMA) and not exposed.
 //
 // Returns (slowK, slowD []float64, err error). Both slices are zero-stripped and aligned.
 func Stochastic(highs, lows, closes []float64, kPeriod, smoothK, dPeriod int) (slowK, slowD []float64, err error) {
@@ -39,10 +40,7 @@ func Stochastic(highs, lows, closes []float64, kPeriod, smoothK, dPeriod int) (s
 	slowD = StripLeadingZeros(rawSlowD)
 
 	// Align to shortest length
-	minLen := len(slowK)
-	if len(slowD) < minLen {
-		minLen = len(slowD)
-	}
+	minLen := min(len(slowD), len(slowK))
 	if len(slowK) > minLen {
 		slowK = slowK[len(slowK)-minLen:]
 	}
@@ -80,13 +78,7 @@ func ADX(highs, lows, closes []float64, period int) (adx, plusDI, minusDI []floa
 	minusDI = StripLeadingZeros(rawMinusDI)
 
 	// Align to shortest length
-	minLen := len(adx)
-	if len(plusDI) < minLen {
-		minLen = len(plusDI)
-	}
-	if len(minusDI) < minLen {
-		minLen = len(minusDI)
-	}
+	minLen := min(len(minusDI), min(len(plusDI), len(adx)))
 	if len(adx) > minLen {
 		adx = adx[len(adx)-minLen:]
 	}

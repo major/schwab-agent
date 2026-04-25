@@ -12,9 +12,9 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
-	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/orderbuilder"
 	"github.com/major/schwab-agent/internal/output"
@@ -139,7 +139,7 @@ schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 			// (--status WORKING,FILLED).
 			var statuses []string
 			for _, raw := range cmd.StringSlice("status") {
-				for _, part := range strings.Split(raw, ",") {
+				for part := range strings.SplitSeq(raw, ",") {
 					trimmed := strings.TrimSpace(part)
 					if trimmed != "" {
 						statuses = append(statuses, trimmed)
@@ -483,8 +483,8 @@ func orderReplaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Com
 // and either outputs the JSON (--build/default), previews it, or places it.
 func orderRepeatCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:      "repeat",
-		Usage:     "Repeat a previous order (fetch, convert, and optionally place)",
+		Name:  "repeat",
+		Usage: "Repeat a previous order (fetch, convert, and optionally place)",
 		UsageText: `schwab-agent order repeat 1234567890
 schwab-agent order repeat 1234567890 --preview
 schwab-agent order repeat 1234567890 --confirm`,
@@ -857,13 +857,13 @@ func parseOptionParams(cmd *cli.Command) (orderbuilder.OptionParams, error) {
 	}
 
 	return orderbuilder.OptionParams{
-		Underlying: strings.TrimSpace(cmd.String("underlying")),
-		Expiration: expiration,
-		Strike:     cmd.Float64("strike"),
-		PutCall:    putCall,
-		Action:     action,
-		Quantity:   cmd.Float64("quantity"),
-		OrderType:  orderType,
+		Underlying:         strings.TrimSpace(cmd.String("underlying")),
+		Expiration:         expiration,
+		Strike:             cmd.Float64("strike"),
+		PutCall:            putCall,
+		Action:             action,
+		Quantity:           cmd.Float64("quantity"),
+		OrderType:          orderType,
 		Price:              cmd.Float64("price"),
 		SpecialInstruction: specialInstruction,
 		Destination:        destination,
@@ -967,8 +967,6 @@ func readSpecSource(cmd *cli.Command, spec string) ([]byte, error) {
 
 	return payload, nil
 }
-
-
 
 // requireMutableEnabled checks that mutable operations are explicitly enabled in config.
 func requireMutableEnabled(configPath string) error {
@@ -1626,5 +1624,3 @@ func parsePriceLinkBasis(raw string) (models.PriceLinkBasis, error) {
 func parsePriceLinkType(raw string) (models.PriceLinkType, error) {
 	return parseEnum(raw, validPriceLinkTypes, "", "price-link-type")
 }
-
-

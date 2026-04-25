@@ -110,8 +110,8 @@ func TestLoadToken_PermissionDenied_ReturnsError(t *testing.T) {
 	assert.Nil(t, tf)
 	require.Error(t, err)
 	// Should NOT be AuthRequiredError (file exists but can't be read)
-	var authReqErr *apperr.AuthRequiredError
-	assert.False(t, errors.As(err, &authReqErr))
+	_, ok := errors.AsType[*apperr.AuthRequiredError](err)
+	assert.False(t, ok)
 }
 
 // --- SaveToken tests ---
@@ -553,8 +553,8 @@ func TestRefreshAccessToken_OtherHTTPError_ReturnsGenericError(t *testing.T) {
 	require.Error(t, err)
 
 	// Should NOT be AuthExpiredError for non-invalid_grant errors
-	var authExpErr *apperr.AuthExpiredError
-	assert.False(t, errors.As(err, &authExpErr))
+	_, ok := errors.AsType[*apperr.AuthExpiredError](err)
+	assert.False(t, ok)
 }
 
 // --- Token JSON format compatibility ---
