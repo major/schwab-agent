@@ -40,8 +40,8 @@ Both are required for any mutable operation (place/cancel/replace):
 | "calendar spread" | `order build calendar --call --open ...` |
 | "diagonal spread" | `order build diagonal --call --open ...` |
 | "collar" | `order build collar --open ...` |
-| "repeat a previous order" | `order repeat <order-id>` |
-| "re-place that order" | `order repeat <order-id> --confirm` |
+| "repeat a previous order" | `order repeat <order-id>` or `order repeat --order-id ID` |
+| "re-place that order" | `order repeat <order-id> --confirm` or `order repeat --order-id ID --confirm` |
 
 ## Listing and Getting Orders
 
@@ -52,6 +52,7 @@ schwab-agent order list --status WORKING --from 2025-01-01 --to 2025-01-31
 schwab-agent order list --status WORKING --status PENDING_ACTIVATION
 schwab-agent order list --status WORKING,FILLED,EXPIRED
 schwab-agent order get <order-id>
+schwab-agent order get --order-id <order-id>
 ```
 
 Flags: `--status` (filter by status, repeatable), `--from`/`--to` (filter by entered time).
@@ -100,7 +101,9 @@ schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type 
 
 ```bash
 schwab-agent order cancel <order-id> --confirm
+schwab-agent order cancel --order-id <order-id> --confirm
 schwab-agent order replace <order-id> --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 205 --confirm
+schwab-agent order replace --order-id <order-id> --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 205 --confirm
 ```
 
 Replace cancels the original and creates a new order (new ID). Only equity order flags accepted. Original order status becomes REPLACED.
@@ -113,9 +116,11 @@ Fetch an existing order, convert it to a submittable request, and optionally pla
 schwab-agent order repeat <order-id>            # Output reconstructed order JSON (default, same as --build)
 schwab-agent order repeat <order-id> --preview   # Preview without placing
 schwab-agent order repeat <order-id> --confirm   # Place the order (requires safety guards)
+schwab-agent order repeat --order-id <order-id>  # Flag form also accepted
 ```
 
 Only one mode flag allowed. `--build`, `--preview`, and `--confirm` are mutually exclusive.
+For order get, cancel, replace, and repeat, `--order-id` takes priority when both the flag and positional order ID are provided.
 
 ## Spec Mode
 

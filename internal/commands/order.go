@@ -198,11 +198,13 @@ schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 // orderGetCommand returns a single order by account and ID.
 func orderGetCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:      "get",
-		Usage:     "Get an order by ID",
-		UsageText: "schwab-agent order get 1234567890",
+		Name:  "get",
+		Usage: "Get an order by ID",
+		UsageText: `schwab-agent order get 1234567890
+schwab-agent order get --order-id 1234567890`,
 		ArgsUsage: "<order-id>",
 		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "order-id", Usage: "Order ID"},
 			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -390,11 +392,13 @@ func orderPreviewCommand(c *client.Ref, configPath string, w io.Writer) *cli.Com
 // orderCancelCommand cancels an existing order.
 func orderCancelCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:      "cancel",
-		Usage:     "Cancel an order",
-		UsageText: "schwab-agent order cancel 1234567890 --confirm",
+		Name:  "cancel",
+		Usage: "Cancel an order",
+		UsageText: `schwab-agent order cancel 1234567890 --confirm
+schwab-agent order cancel --order-id 1234567890 --confirm`,
 		ArgsUsage: "<order-id>",
 		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "order-id", Usage: "Order ID"},
 			&cli.BoolFlag{Name: "confirm", Usage: "Confirm cancellation"},
 			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
 		},
@@ -429,11 +433,13 @@ func orderCancelCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comm
 // orderReplaceCommand replaces an existing order with an equity order payload.
 func orderReplaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:      "replace",
-		Usage:     "Replace an order with a new equity order spec",
-		UsageText: "schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm",
+		Name:  "replace",
+		Usage: "Replace an order with a new equity order spec",
+		UsageText: `schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
+schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm`,
 		ArgsUsage: "<order-id>",
 		Flags: append(equityOrderFlags(),
+			&cli.StringFlag{Name: "order-id", Usage: "Order ID"},
 			&cli.BoolFlag{Name: "confirm", Usage: "Confirm replacement"},
 			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
 		),
@@ -486,10 +492,12 @@ func orderRepeatCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comm
 		Name:  "repeat",
 		Usage: "Repeat a previous order (fetch, convert, and optionally place)",
 		UsageText: `schwab-agent order repeat 1234567890
+schwab-agent order repeat --order-id 1234567890
 schwab-agent order repeat 1234567890 --preview
 schwab-agent order repeat 1234567890 --confirm`,
 		ArgsUsage: "<order-id>",
 		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "order-id", Usage: "Order ID"},
 			&cli.BoolFlag{Name: "build", Usage: "Output reconstructed order request JSON (default)"},
 			&cli.BoolFlag{Name: "preview", Usage: "Preview the order without placing it"},
 			&cli.BoolFlag{Name: "confirm", Usage: "Place the order (requires safety guards)"},
@@ -991,11 +999,16 @@ func requireConfirm(confirmed bool) error {
 	return apperr.NewValidationError(confirmOrderMessage, nil)
 }
 
-// parseRequiredOrderID parses the first positional argument as an order ID.
+// parseRequiredOrderID parses the --order-id flag or first positional argument as an order ID.
 func parseRequiredOrderID(cmd *cli.Command) (int64, error) {
-	value := strings.TrimSpace(cmd.Args().First())
+	// Flag takes priority over positional arg, matching resolveAccount() convention.
+	value := strings.TrimSpace(cmd.String("order-id"))
 	if value == "" {
-		return 0, newValidationError("order-id is required")
+		value = strings.TrimSpace(cmd.Args().First())
+	}
+
+	if value == "" {
+		return 0, newValidationError("order-id is required (provide as positional arg or --order-id flag)")
 	}
 
 	orderID, err := strconv.ParseInt(value, 10, 64)
