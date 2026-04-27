@@ -211,7 +211,7 @@ func TestTASMA_PeriodFlag(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "sma", "--period", "10", "AAPL"))
+	require.NoError(t, runTestCommand(t, cmd, "ta", "sma", "--period", "10", "--points", "0", "AAPL"))
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -220,7 +220,7 @@ func TestTASMA_PeriodFlag(t *testing.T) {
 
 	values, ok := data["values"].([]any)
 	require.True(t, ok)
-	// SMA(10) on 50 candles: 50 - 10 + 1 = 41 values
+	// SMA(10) on 50 candles: 50 - 10 + 1 = 41 values (--points 0 returns all)
 	assert.Len(t, values, 41)
 }
 

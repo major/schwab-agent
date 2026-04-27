@@ -148,7 +148,7 @@ func taIndicatorFlags(defaultPeriod int) []cli.Flag {
 	return []cli.Flag{
 		&cli.IntFlag{Name: "period", Usage: "Indicator period", Value: defaultPeriod},
 		&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
-		&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 0},
+		&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
 	}
 }
 
@@ -248,7 +248,7 @@ schwab-agent ta macd AAPL --fast 12 --slow 26 --signal 9 --interval daily --poin
 			&cli.IntFlag{Name: "slow", Usage: "Slow EMA period", Value: 26},
 			&cli.IntFlag{Name: "signal", Usage: "Signal EMA period", Value: 9},
 			&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
-			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 0},
+			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			symbol := cmd.Args().First()
@@ -365,7 +365,7 @@ schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --interval daily --points 
 			&cli.IntFlag{Name: "period", Usage: "BBands period", Value: 20},
 			&cli.Float64Flag{Name: "std-dev", Usage: "Standard deviations", Value: 2.0},
 			&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
-			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 0},
+			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			symbol := cmd.Args().First()
@@ -434,7 +434,7 @@ schwab-agent ta stoch AAPL --k-period 14 --smooth-k 3 --d-period 3 --interval da
 			&cli.IntFlag{Name: "smooth-k", Usage: "Slow %K smoothing period", Value: 3},
 			&cli.IntFlag{Name: "d-period", Usage: "Slow %D period", Value: 3},
 			&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
-			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 0},
+			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			symbol := cmd.Args().First()
@@ -582,7 +582,7 @@ schwab-agent ta vwap AAPL --interval 5min --points 10`,
 		// VWAP is cumulative - no --period flag. Only --interval and --points.
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
-			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 0},
+			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			symbol := cmd.Args().First()
