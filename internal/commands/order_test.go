@@ -160,7 +160,8 @@ func TestOrderConfirmGate(t *testing.T) {
 func TestOrderPreviewSpecModes(t *testing.T) {
 	t.Parallel()
 
-	previewResponse := models.PreviewOrder{OrderID: new(int64(4242))}
+	orderID := int64(4242)
+	previewResponse := models.PreviewOrder{OrderID: &orderID}
 	var requestBodies []string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -420,7 +421,8 @@ func TestOrderMutableGuardTakesPriorityOverConfirm(t *testing.T) {
 func TestOrderPreviewNotBlockedByMutableGuard(t *testing.T) {
 	t.Parallel()
 
-	previewResponse := models.PreviewOrder{OrderID: new(int64(9999))}
+	orderID := int64(9999)
+	previewResponse := models.PreviewOrder{OrderID: &orderID}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
@@ -1759,6 +1761,66 @@ func TestOrderGetSuccess(t *testing.T) {
 	assert.Equal(t, "FILLED", order["status"])
 }
 
+func TestOrderGetOrderIDFlagSuccess(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/trader/v1/accounts/hash123/orders/1234567890", r.URL.Path)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte(`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":1234567890,"status":"FILLED"}`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "get", "--order-id", "1234567890")
+
+	// Assert
+	require.NoError(t, err)
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	order, ok := data["order"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1234567890), order["orderId"])
+}
+
+func TestOrderGetOrderIDFlagWinsOverPositional(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/trader/v1/accounts/hash123/orders/1234567890", r.URL.Path)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte(`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":1234567890,"status":"FILLED"}`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "get", "--order-id", "1234567890", "9999999")
+
+	// Assert
+	require.NoError(t, err)
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	order, ok := data["order"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1234567890), order["orderId"])
+}
+
 func TestOrderGetNoAccount(t *testing.T) {
 	t.Parallel()
 
@@ -1789,7 +1851,7 @@ func TestOrderGetMissingOrderID(t *testing.T) {
 	assert.Empty(t, stdout)
 	var validationErr *apperr.ValidationError
 	require.ErrorAs(t, err, &validationErr)
-	assert.Equal(t, "order-id is required", validationErr.Error())
+	assert.Contains(t, validationErr.Error(), "order-id is required")
 }
 
 func TestOrderGetInvalidOrderID(t *testing.T) {
@@ -1832,6 +1894,32 @@ func TestOrderCancelSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(12345), data["orderId"])
+	assert.Equal(t, true, data["canceled"])
+}
+
+func TestOrderCancelOrderIDFlagSuccess(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/trader/v1/accounts/hash123/orders/1234567890", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "cancel", "--order-id", "1234567890", "--confirm")
+
+	// Assert
+	require.NoError(t, err)
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1234567890), data["orderId"])
 	assert.Equal(t, true, data["canceled"])
 }
 
@@ -1930,6 +2018,47 @@ func TestOrderReplaceSuccess(t *testing.T) {
 	assert.Equal(t, true, data["replaced"])
 }
 
+func TestOrderReplaceOrderIDFlagSuccess(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/trader/v1/accounts/hash123/orders/1234567890", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order", "replace",
+		"--order-id", "1234567890",
+		"--symbol", "AAPL",
+		"--action", "BUY",
+		"--quantity", "10",
+		"--type", "LIMIT",
+		"--price", "185.25",
+		"--duration", "DAY",
+		"--session", "NORMAL",
+		"--confirm",
+	)
+
+	// Assert
+	require.NoError(t, err)
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1234567890), data["orderId"])
+	assert.Equal(t, true, data["replaced"])
+}
+
 func TestOrderReplaceMutableDisabled(t *testing.T) {
 	t.Parallel()
 
@@ -1983,6 +2112,8 @@ func TestParseRequiredOrderID(t *testing.T) {
 	}{
 		{name: "empty", args: []string{"order-test"}, wantError: "order-id is required"},
 		{name: "valid int", args: []string{"order-test", "12345"}, wantID: 12345},
+		{name: "flag valid int", args: []string{"order-test", "--order-id", "67890"}, wantID: 67890},
+		{name: "flag wins over positional", args: []string{"order-test", "--order-id", "67890", "12345"}, wantID: 67890},
 		{name: "invalid non-numeric", args: []string{"order-test", "abc"}, wantError: "order-id must be a valid integer"},
 		{name: "negative int", args: []string{"order-test", "-99"}, wantError: "order-id must be a positive integer"},
 		{name: "zero", args: []string{"order-test", "0"}, wantError: "order-id must be a positive integer"},
@@ -1996,6 +2127,9 @@ func TestParseRequiredOrderID(t *testing.T) {
 			var parsedID int64
 			cmd := &cli.Command{
 				Name: "order-test",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "order-id", Usage: "Order ID"},
+				},
 				Action: func(_ context.Context, cmd *cli.Command) error {
 					var err error
 					parsedID, err = parseRequiredOrderID(cmd)
@@ -2016,7 +2150,7 @@ func TestParseRequiredOrderID(t *testing.T) {
 			require.Error(t, err)
 			var validationErr *apperr.ValidationError
 			require.ErrorAs(t, err, &validationErr)
-			assert.Equal(t, tc.wantError, validationErr.Error())
+			assert.Contains(t, validationErr.Error(), tc.wantError)
 		})
 	}
 }
@@ -2240,13 +2374,14 @@ func TestOrderReplace_InvalidAction(t *testing.T) {
 // validPrimarySpec returns a minimal valid primary order spec for FTS tests.
 func validPrimarySpec(t *testing.T) string {
 	t.Helper()
+	price := 150.0
 
 	return mustMarshalJSON(t, models.OrderRequest{
 		Session:           models.SessionNormal,
 		Duration:          models.DurationDay,
 		OrderType:         models.OrderTypeLimit,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		Price:             new(150.0),
+		Price:             &price,
 		OrderLegCollection: []models.OrderLegCollection{
 			{
 				Instruction: models.InstructionBuy,
@@ -2260,13 +2395,14 @@ func validPrimarySpec(t *testing.T) string {
 // validSecondarySpec returns a minimal valid secondary order spec for FTS tests.
 func validSecondarySpec(t *testing.T) string {
 	t.Helper()
+	price := 160.0
 
 	return mustMarshalJSON(t, models.OrderRequest{
 		Session:           models.SessionNormal,
 		Duration:          models.DurationDay,
 		OrderType:         models.OrderTypeLimit,
 		OrderStrategyType: models.OrderStrategyTypeSingle,
-		Price:             new(160.0),
+		Price:             &price,
 		OrderLegCollection: []models.OrderLegCollection{
 			{
 				Instruction: models.InstructionSell,
@@ -2392,6 +2528,7 @@ func TestOrderBuildFTSInvalidJSON(t *testing.T) {
 
 func TestOrderBuildFTSRejectsComplexPrimary(t *testing.T) {
 	t.Parallel()
+	price := 150.0
 
 	// A primary with OrderStrategyType=TRIGGER should be rejected by
 	// ValidateFTSOrder since FTS legs cannot be nested complex orders.
@@ -2400,7 +2537,7 @@ func TestOrderBuildFTSRejectsComplexPrimary(t *testing.T) {
 		Duration:          models.DurationDay,
 		OrderType:         models.OrderTypeLimit,
 		OrderStrategyType: models.OrderStrategyTypeTrigger,
-		Price:             new(150.0),
+		Price:             &price,
 		OrderLegCollection: []models.OrderLegCollection{
 			{
 				Instruction: models.InstructionBuy,
@@ -2697,6 +2834,33 @@ func TestOrderRepeatBuildDefault(t *testing.T) {
 	assert.NotContains(t, stdout, `"orderId"`)
 	assert.NotContains(t, stdout, `"status"`)
 	assert.NotContains(t, stdout, `"filledQuantity"`)
+}
+
+func TestOrderRepeatOrderIDFlagBuild(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/trader/v1/accounts/hash123/orders/1234567890", r.URL.Path)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte(sampleOrderJSON()))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "repeat", "--order-id", "1234567890")
+
+	// Assert
+	require.NoError(t, err)
+	order := decodeOrderRequest(t, stdout)
+	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
+	assert.NotContains(t, stdout, `"orderId"`)
 }
 
 func TestOrderRepeatBuildExplicit(t *testing.T) {
@@ -3130,7 +3294,7 @@ func TestOrderRepeatMissingOrderID(t *testing.T) {
 	assert.Empty(t, stdout)
 	var validationErr *apperr.ValidationError
 	require.ErrorAs(t, err, &validationErr)
-	assert.Equal(t, "order-id is required", validationErr.Error())
+	assert.Contains(t, validationErr.Error(), "order-id is required")
 }
 
 func TestOrderRepeatMultipleModes(t *testing.T) {
