@@ -13,57 +13,77 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestQuoteGetSingleSymbol(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if r.URL.Path == "/marketdata/v1/AAPL/quotes" {
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer server.Close()
+func TestQuoteGetSymbols(t *testing.T) {
+	// Table-driven test covering both explicit ("quote get") and shorthand
+	// ("quote") invocation paths for single and multi-symbol lookups.
+	// Keeping them in one table ensures the two routing paths stay in sync.
+	// Single-symbol responses are now normalized to match multi-symbol shape
+	// (keyed by symbol), so all cases use the same expectKeys assertion.
+	tests := []struct {
+		name       string
+		serverPath string
+		serverBody string
+		args       []string
+		expectKeys []string
+	}{
+		{
+			name:       "explicit single symbol",
+			serverPath: "/marketdata/v1/AAPL/quotes",
+			serverBody: `{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`,
+			args:       []string{"quote", "get", "AAPL"},
+			expectKeys: []string{"AAPL"},
+		},
+		{
+			name:       "shorthand single symbol",
+			serverPath: "/marketdata/v1/AAPL/quotes",
+			serverBody: `{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`,
+			args:       []string{"quote", "AAPL"},
+			expectKeys: []string{"AAPL"},
+		},
+		{
+			name:       "explicit multiple symbols",
+			serverPath: "/marketdata/v1/quotes",
+			serverBody: `{"AAPL":{"symbol":"AAPL","lastPrice":150.0},"MSFT":{"symbol":"MSFT","lastPrice":400.0}}`,
+			args:       []string{"quote", "get", "AAPL", "MSFT"},
+			expectKeys: []string{"AAPL", "MSFT"},
+		},
+		{
+			name:       "shorthand multiple symbols",
+			serverPath: "/marketdata/v1/quotes",
+			serverBody: `{"AAPL":{"symbol":"AAPL","lastPrice":150.0},"MSFT":{"symbol":"MSFT","lastPrice":400.0}}`,
+			args:       []string{"quote", "AAPL", "MSFT"},
+			expectKeys: []string{"AAPL", "MSFT"},
+		},
+	}
 
-	var buf bytes.Buffer
-	cmd := QuoteCommand(testClient(t, server), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "quote", "get", "AAPL"))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				if r.URL.Path == tt.serverPath {
+					_, _ = w.Write([]byte(tt.serverBody))
+					return
+				}
+				w.WriteHeader(http.StatusNotFound)
+			}))
+			defer server.Close()
 
-	var envelope output.Envelope
-	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
-	data, ok := envelope.Data.(map[string]any)
-	require.True(t, ok)
+			var buf bytes.Buffer
+			cmd := QuoteCommand(testClient(t, server), &buf)
+			require.NoError(t, runTestCommand(t, cmd, tt.args...))
 
-	// Single-symbol response is keyed by symbol, matching multi-symbol shape.
-	aapl, ok := data["AAPL"].(map[string]any)
-	require.True(t, ok, "single-symbol response should be nested under symbol key")
-	assert.Equal(t, "AAPL", aapl["symbol"])
-	assert.NotEmpty(t, envelope.Metadata.Timestamp)
-	assert.Empty(t, envelope.Errors)
-}
+			var envelope output.Envelope
+			require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+			data, ok := envelope.Data.(map[string]any)
+			require.True(t, ok)
 
-func TestQuoteGetMultipleSymbols(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if r.URL.Path == "/marketdata/v1/quotes" {
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0},"MSFT":{"symbol":"MSFT","lastPrice":400.0}}`))
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer server.Close()
-
-	var buf bytes.Buffer
-	cmd := QuoteCommand(testClient(t, server), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "quote", "get", "AAPL", "MSFT"))
-
-	var envelope output.Envelope
-	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
-	data, ok := envelope.Data.(map[string]any)
-	require.True(t, ok)
-	assert.Contains(t, data, "AAPL")
-	assert.Contains(t, data, "MSFT")
-	assert.Empty(t, envelope.Errors)
-	assert.NotEmpty(t, envelope.Metadata.Timestamp)
+			for _, key := range tt.expectKeys {
+				assert.Contains(t, data, key)
+			}
+			assert.Empty(t, envelope.Errors)
+			assert.NotEmpty(t, envelope.Metadata.Timestamp)
+		})
+	}
 }
 
 func TestQuoteGetPartialSuccess(t *testing.T) {
