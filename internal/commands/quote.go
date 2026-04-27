@@ -29,9 +29,10 @@ var validQuoteFields = map[string]bool{
 // QuoteCommand returns the CLI command for stock quote operations.
 func QuoteCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:   "quote",
-		Usage:  "Stock quote operations",
-		Action: requireSubcommand(),
+		Name:           "quote",
+		Usage:          "Stock quote operations",
+		UsageText:      "schwab-agent quote AAPL\nschwab-agent quote AAPL MSFT NVDA\nschwab-agent quote get AAPL",
+		DefaultCommand: "get",
 		Commands: []*cli.Command{
 			quoteGetCommand(c, w),
 		},

@@ -7,6 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
@@ -20,13 +21,14 @@ type priceHistoryData struct {
 // HistoryCommand returns the CLI command for price history lookups.
 func HistoryCommand(c *client.Ref, w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:   "history",
-		Usage:  "Retrieve price history for a symbol",
-		Action: requireSubcommand(),
+		Name:           "history",
+		Usage:          "Retrieve price history for a symbol",
+		UsageText:      "schwab-agent history AAPL\nschwab-agent history get AAPL",
+		DefaultCommand: "get",
 		Commands: []*cli.Command{
 			{
-				Name:      "get",
-				Usage:     "Get price history candles for a symbol",
+				Name:  "get",
+				Usage: "Get price history candles for a symbol",
 				UsageText: `schwab-agent history get AAPL
 schwab-agent history get AAPL --period-type day --period 5 --frequency-type minute --frequency 15
 schwab-agent history get AAPL --from 1735689600000 --to 1743379200000`,
@@ -39,21 +41,28 @@ schwab-agent history get AAPL --from 1735689600000 --to 1743379200000`,
 					&cli.StringFlag{Name: "to", Usage: "End date (milliseconds since epoch)"},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
+					// Reject extra positional args so "history AAPL MSFT" doesn't
+					// silently drop the second symbol. Only one symbol is supported.
+					args := cmd.Args().Slice()
+					if len(args) > 1 {
+						return apperr.NewValidationError("exactly one symbol is required", nil)
+					}
+
 					symbol := cmd.Args().First()
-				if err := requireArg(symbol, "symbol"); err != nil {
-					return err
-				}
+					if err := requireArg(symbol, "symbol"); err != nil {
+						return err
+					}
 
-				params := client.HistoryParams{
-					PeriodType:    cmd.String("period-type"),
-					Period:        cmd.String("period"),
-					FrequencyType: cmd.String("frequency-type"),
-					Frequency:     cmd.String("frequency"),
-					StartDate:     cmd.String("from"),
-					EndDate:       cmd.String("to"),
-				}
+					params := client.HistoryParams{
+						PeriodType:    cmd.String("period-type"),
+						Period:        cmd.String("period"),
+						FrequencyType: cmd.String("frequency-type"),
+						Frequency:     cmd.String("frequency"),
+						StartDate:     cmd.String("from"),
+						EndDate:       cmd.String("to"),
+					}
 
-				result, err := c.PriceHistory(ctx, symbol, &params)
+					result, err := c.PriceHistory(ctx, symbol, &params)
 					if err != nil {
 						return err
 					}
