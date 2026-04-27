@@ -7,7 +7,7 @@ Eleven indicators computed locally from Schwab price history. Pattern: `schwab-a
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--interval` | daily | daily, weekly, 1min, 5min, 15min, 30min |
-| `--points` | 0 (all) | Limit output to N most recent values |
+| `--points` | 1 | Limit output to N most recent values (0 = all) |
 
 Most indicators also accept `--period` (lookback window). Exceptions noted below.
 
@@ -116,14 +116,14 @@ Scalar indicators (HV, Expected Move) return fields directly in `data` instead o
 
 | Intent | Command |
 |--------|---------|
-| "Is AAPL overbought?" | `ta rsi AAPL --points 1` |
-| "20-day moving average" | `ta sma AAPL --period 20 --points 1` |
+| "Is AAPL overbought?" | `ta rsi AAPL` |
+| "20-day moving average" | `ta sma AAPL` |
 | "50/200-day SMA crossover" | `ta sma AAPL --period 50 --points 5` then `--period 200 --points 5` |
 | "MACD signal" | `ta macd AAPL --points 5` |
-| "How volatile is AAPL?" | `ta atr AAPL --points 1` |
-| "Near Bollinger Band?" | `ta bbands AAPL --points 1` |
-| "Stochastic reading" | `ta stoch AAPL --points 1` |
-| "Trending or ranging?" | `ta adx AAPL --points 1` |
+| "How volatile is AAPL?" | `ta atr AAPL` |
+| "Near Bollinger Band?" | `ta bbands AAPL` |
+| "Stochastic reading" | `ta stoch AAPL` |
+| "Trending or ranging?" | `ta adx AAPL` |
 | "EMA crossover (12/26)" | `ta ema AAPL --period 12 --points 5` then `--period 26 --points 5` |
 | "Intraday RSI (5min)" | `ta rsi AAPL --interval 5min --points 20` |
 | "Weekly MACD" | `ta macd NVDA --interval weekly --points 10` |
