@@ -356,6 +356,45 @@ func TestOrderPlaceSpecFromFile(t *testing.T) {
 	assert.Equal(t, float64(24680), data["orderId"])
 }
 
+func TestOrderPlaceUnknownFlagSuggestsSubcommand(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	configPath := writeTestConfigMutable(t, "test-account-hash")
+
+	// Act
+	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "place", "--symbol", "AAPL")
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+
+	var valErr *apperr.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.Contains(t, valErr.Error(), "order place")
+	assert.Contains(t, valErr.Error(), "requires a subcommand")
+	assert.Contains(t, valErr.Error(), "equity")
+	assert.Contains(t, valErr.Error(), "option")
+	assert.Contains(t, valErr.Error(), "bracket")
+	assert.Contains(t, valErr.Error(), "oco")
+	assert.Contains(t, valErr.Error(), "flag provided but not defined: -symbol")
+}
+
+func TestOrderPlaceSpecMissingValueKeepsOriginalUsageError(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	configPath := writeTestConfigMutable(t, "test-account-hash")
+
+	// Act
+	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "place", "--spec")
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	assert.NotContains(t, err.Error(), "requires a subcommand")
+}
+
 func TestOrderMutableGuard(t *testing.T) {
 	t.Parallel()
 

@@ -235,6 +235,12 @@ func orderPlaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Comma
 		Usage: "Place an order",
 		UsageText: `schwab-agent order place --spec @order.json --confirm
 schwab-agent order place --spec - --confirm`,
+		// OnUsageError fires when urfave/cli encounters an unknown flag during
+		// parsing. For `order place`, this typically means the user forgot to
+		// specify a subcommand (equity, option, bracket, oco) and used flags
+		// that belong to one of those subcommands. Overriding the confusing
+		// default "flag provided but not defined" with a subcommand hint.
+		OnUsageError: suggestSubcommands,
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "spec", Usage: "Inline JSON, @file, or - for stdin"},
 			&cli.BoolFlag{Name: "confirm", Usage: "Confirm order placement"},

@@ -80,16 +80,7 @@ func validEnumString[T ~string](valid []T) string {
 // subcommand (e.g. "quote AAPL" instead of "quote get AAPL").
 func requireSubcommand() cli.ActionFunc {
 	return func(_ context.Context, cmd *cli.Command) error {
-		names := make([]string, 0, len(cmd.Commands))
-		for _, sub := range cmd.Commands {
-			// Skip auto-registered help and any explicitly hidden subcommands
-			// so users see only the real, invokable commands.
-			if sub.Hidden || sub.Name == "help" {
-				continue
-			}
-			names = append(names, sub.Name)
-		}
-		list := strings.Join(names, ", ")
+		list := strings.Join(visibleSubcommandNames(cmd), ", ")
 
 		if arg := cmd.Args().First(); arg != "" {
 			return apperr.NewValidationError(
@@ -103,6 +94,44 @@ func requireSubcommand() cli.ActionFunc {
 			nil,
 		)
 	}
+}
+
+// suggestSubcommands handles usage errors that happen before Action runs. This
+// is most useful for parent commands whose subcommands own distinct flags: an
+// unknown flag on the parent usually means the user skipped the subcommand.
+func suggestSubcommands(_ context.Context, cmd *cli.Command, err error, _ bool) error {
+	if !strings.Contains(err.Error(), "flag provided but not defined") {
+		return err
+	}
+
+	names := visibleSubcommandNames(cmd)
+	if len(names) == 0 {
+		return err
+	}
+
+	return apperr.NewValidationError(
+		fmt.Sprintf(
+			"%q requires a subcommand: %s (%s)",
+			cmd.FullName(),
+			strings.Join(names, ", "),
+			err.Error(),
+		),
+		err,
+	)
+}
+
+// visibleSubcommandNames returns only invokable subcommands for user-facing
+// errors, omitting hidden commands and urfave/cli's built-in help command.
+func visibleSubcommandNames(cmd *cli.Command) []string {
+	names := make([]string, 0, len(cmd.Commands))
+	for _, sub := range cmd.Commands {
+		if sub.Hidden || sub.Name == "help" {
+			continue
+		}
+		names = append(names, sub.Name)
+	}
+
+	return names
 }
 
 // newValidationError creates a consistent validation error for command parsing.
