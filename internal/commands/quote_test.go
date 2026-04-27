@@ -32,7 +32,11 @@ func TestQuoteGetSingleSymbol(t *testing.T) {
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "AAPL", data["symbol"])
+
+	// Single-symbol response is keyed by symbol, matching multi-symbol shape.
+	aapl, ok := data["AAPL"].(map[string]any)
+	require.True(t, ok, "single-symbol response should be nested under symbol key")
+	assert.Equal(t, "AAPL", aapl["symbol"])
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Empty(t, envelope.Errors)
 }
@@ -153,7 +157,10 @@ func TestQuoteGetWithFields(t *testing.T) {
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "AAPL", data["symbol"])
+
+	aapl, ok := data["AAPL"].(map[string]any)
+	require.True(t, ok, "single-symbol response should be nested under symbol key")
+	assert.Equal(t, "AAPL", aapl["symbol"])
 }
 
 func TestQuoteGetMultiWithFields(t *testing.T) {
@@ -287,7 +294,10 @@ func TestQuoteGetCommaSeparatedFields(t *testing.T) {
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "AAPL", data["symbol"])
+
+	aapl, ok := data["AAPL"].(map[string]any)
+	require.True(t, ok, "single-symbol response should be nested under symbol key")
+	assert.Equal(t, "AAPL", aapl["symbol"])
 }
 
 func TestQuoteGetFieldsCaseInsensitive(t *testing.T) {

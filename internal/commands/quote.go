@@ -118,12 +118,15 @@ func sortedQuoteFieldNames() string {
 }
 
 // quoteSingle fetches and writes a quote for a single symbol.
+// The result is wrapped in a symbol-keyed map so the response shape
+// matches multi-symbol requests (data.SYMBOL.field). This lets agents
+// parse quotes without branching on argument count. See issue #48.
 func quoteSingle(ctx context.Context, c *client.Ref, w io.Writer, symbol string, p client.QuoteParams) error {
 	quote, err := c.Quote(ctx, symbol, p)
 	if err != nil {
 		return err
 	}
-	return output.WriteSuccess(w, quote, output.NewMetadata())
+	return output.WriteSuccess(w, map[string]any{symbol: quote}, output.NewMetadata())
 }
 
 // quoteMulti fetches quotes for multiple symbols, using WritePartial when some are missing.
