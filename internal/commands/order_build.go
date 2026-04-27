@@ -26,7 +26,7 @@ func makeBuildOrderCommand[P any](
 		Name:      name,
 		Usage:     usage,
 		UsageText: usageText,
-		Flags: flags,
+		Flags:     flags,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			_ = ctx
 
@@ -52,9 +52,10 @@ func makeBuildOrderCommand[P any](
 // orderBuildCommand returns the parent build command for offline order construction.
 func orderBuildCommand(w io.Writer) *cli.Command {
 	return &cli.Command{
-		Name:   "build",
-		Usage:  "Build order request JSON without calling the API",
-		Action: requireSubcommand(),
+		Name:         "build",
+		Usage:        "Build order request JSON without calling the API",
+		OnUsageError: suggestSubcommands,
+		Action:       requireSubcommand(),
 		Commands: []*cli.Command{
 			makeBuildOrderCommand(w, "equity", "Build an equity order request",
 				"schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150.00 --duration DAY",
