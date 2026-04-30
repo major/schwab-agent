@@ -294,6 +294,44 @@ func TestTASMA_LargePeriodScalesHistory(t *testing.T) {
 	assert.Len(t, values, 1, "--points 1 should limit output to 1 entry")
 }
 
+func TestTASMA_MultipleCommaSeparatedPeriods(t *testing.T) {
+	// Arrange: only one price-history request should be needed because the
+	// command fetches enough candles for the largest requested SMA period.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
+		assert.Equal(t, "1", r.URL.Query().Get("period"))
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(mockCandleListJSON("AAPL", 252)))
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	require.NoError(t, runTestCommand(t, cmd, "ta", "sma", "--period", "21,50,200", "--points", "1", "AAPL"))
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	assert.Equal(t, "sma", data["indicator"])
+	assert.Equal(t, "AAPL", data["symbol"])
+	assert.NotContains(t, data, "period", "multi-period output should use periods")
+
+	periods, ok := data["periods"].([]any)
+	require.True(t, ok, "periods should be an array")
+	assert.Equal(t, []any{float64(21), float64(50), float64(200)}, periods)
+
+	values, ok := data["values"].([]any)
+	require.True(t, ok, "values should be an array")
+	require.Len(t, values, 1, "--points 1 should return one merged row")
+
+	latest := values[0].(map[string]any)
+	assert.Contains(t, latest, "datetime")
+	assert.Contains(t, latest, "sma_21")
+	assert.Contains(t, latest, "sma_50")
+	assert.Contains(t, latest, "sma_200")
+}
+
 func TestTAEMA_ValidEnvelope(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(priceHistoryHandler(t, "MSFT", 80))
@@ -320,6 +358,67 @@ func TestTAEMA_ValidEnvelope(t *testing.T) {
 	first := values[0].(map[string]any)
 	assert.Contains(t, first, "datetime")
 	assert.Contains(t, first, "ema")
+}
+
+func TestTAEMA_MultipleRepeatedPeriods(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(priceHistoryHandler(t, "MSFT", 120))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	require.NoError(t, runTestCommand(t, cmd, "ta", "ema", "--period", "12", "--period", "26", "--points", "2", "MSFT"))
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	assert.Equal(t, "ema", data["indicator"])
+
+	periods, ok := data["periods"].([]any)
+	require.True(t, ok, "periods should be an array")
+	assert.Equal(t, []any{float64(12), float64(26)}, periods)
+
+	values, ok := data["values"].([]any)
+	require.True(t, ok, "values should be an array")
+	require.Len(t, values, 2)
+
+	latest := values[1].(map[string]any)
+	assert.Contains(t, latest, "ema_12")
+	assert.Contains(t, latest, "ema_26")
+}
+
+func TestTASimplePeriodValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "zero period",
+			args: []string{"ta", "sma", "--period", "0", "AAPL"},
+		},
+		{
+			name: "duplicate period",
+			args: []string{"ta", "sma", "--period", "21,21", "AAPL"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			server := jsonServer(`{}`)
+			defer server.Close()
+
+			// Act
+			var buf bytes.Buffer
+			cmd := TACommand(testClient(t, server), &buf)
+			err := runTestCommand(t, cmd, tt.args...)
+
+			// Assert
+			require.Error(t, err)
+			var valErr *apperr.ValidationError
+			assert.ErrorAs(t, err, &valErr)
+		})
+	}
 }
 
 func TestTARSI_ValidEnvelope(t *testing.T) {
@@ -354,6 +453,37 @@ func TestTARSI_ValidEnvelope(t *testing.T) {
 		assert.GreaterOrEqual(t, rsiVal, 0.0, "RSI[%d] should be >= 0", i)
 		assert.LessOrEqual(t, rsiVal, 100.0, "RSI[%d] should be <= 100", i)
 	}
+}
+
+func TestTARSI_MultipleCommaSeparatedPeriods(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(priceHistoryHandler(t, "TSLA", 120))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := TACommand(testClient(t, srv), &buf)
+	require.NoError(t, runTestCommand(t, cmd, "ta", "rsi", "--period", "14,21,28", "--points", "2", "TSLA"))
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	assert.Equal(t, "rsi", data["indicator"])
+	assert.Equal(t, "TSLA", data["symbol"])
+	assert.NotContains(t, data, "period", "multi-period output should use periods")
+
+	periods, ok := data["periods"].([]any)
+	require.True(t, ok, "periods should be an array")
+	assert.Equal(t, []any{float64(14), float64(21), float64(28)}, periods)
+
+	values, ok := data["values"].([]any)
+	require.True(t, ok, "values should be an array")
+	require.Len(t, values, 2)
+
+	latest := values[1].(map[string]any)
+	assert.Contains(t, latest, "datetime")
+	assert.Contains(t, latest, "rsi_14")
+	assert.Contains(t, latest, "rsi_21")
+	assert.Contains(t, latest, "rsi_28")
 }
 
 func TestTARSI_MissingSymbol(t *testing.T) {

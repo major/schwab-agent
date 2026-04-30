@@ -126,6 +126,18 @@ type taOutput struct {
 	Values    []map[string]any `json:"values"`
 }
 
+// multiTAOutput is used when SMA/EMA/RSI are requested for more than one
+// period in a single command. The values are keyed as indicator_period (for
+// example, sma_21) so agents can compare crossovers without making multiple
+// CLI calls and then hand-merging separate JSON envelopes.
+type multiTAOutput struct {
+	Indicator string           `json:"indicator"`
+	Symbol    string           `json:"symbol"`
+	Interval  string           `json:"interval"`
+	Periods   []int            `json:"periods"`
+	Values    []map[string]any `json:"values"`
+}
+
 // simpleTAConfig defines a closes-only technical indicator command.
 // SMA, EMA, and RSI share the same pipeline: fetch candles, extract closes,
 // compute indicator, write output. Only the parameters differ.
@@ -142,14 +154,62 @@ type simpleTAConfig struct {
 	compute func(closes []float64, period int) ([]float64, error)
 }
 
-// taIndicatorFlags returns the shared flags for all TA indicator subcommands.
-// RSI defaults to period 14; SMA/EMA default to 20.
+// simpleTAIndicatorFlags returns the shared flags for closes-only indicators.
+// SMA, EMA, and RSI accept multiple periods in a single run.
+func simpleTAIndicatorFlags(defaultPeriod int) []cli.Flag {
+	return []cli.Flag{
+		&cli.IntSliceFlag{Name: "period", Usage: "Indicator period (repeatable or comma-separated)", Value: []int{defaultPeriod}},
+		&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
+		&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
+	}
+}
+
+// taIndicatorFlags returns the shared single-period flags for indicators that
+// are not wired for combined multi-period output.
 func taIndicatorFlags(defaultPeriod int) []cli.Flag {
 	return []cli.Flag{
 		&cli.IntFlag{Name: "period", Usage: "Indicator period", Value: defaultPeriod},
 		&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
 		&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
 	}
+}
+
+// parseTAPeriods returns the requested indicator windows. urfave/cli's slice
+// flag accepts both repeated flags and comma-separated values, which lets a
+// user ask for "21, 50, and 200 day moving averages" in a single command while
+// keeping the old single --period form working unchanged.
+func parseTAPeriods(cmd *cli.Command) ([]int, error) {
+	periods := cmd.IntSlice("period")
+	if len(periods) == 0 {
+		return nil, newValidationError("at least one period is required")
+	}
+
+	seen := make(map[int]struct{}, len(periods))
+	for _, period := range periods {
+		if period <= 0 {
+			return nil, newValidationError("period must be greater than 0")
+		}
+
+		if _, ok := seen[period]; ok {
+			return nil, newValidationError(fmt.Sprintf("duplicate period: %d", period))
+		}
+		seen[period] = struct{}{}
+	}
+
+	return periods, nil
+}
+
+// maxPeriod returns the largest requested period, used to fetch enough candle
+// history once before calculating each moving-average window locally.
+func maxPeriod(periods []int) int {
+	largest := periods[0]
+	for _, period := range periods[1:] {
+		if period > largest {
+			largest = period
+		}
+	}
+
+	return largest
 }
 
 // makeSimpleTACommand builds a CLI command for a closes-only indicator.
@@ -160,14 +220,18 @@ func makeSimpleTACommand(cfg simpleTAConfig, c *client.Ref, w io.Writer) *cli.Co
 		Name:      cfg.name,
 		Usage:     cfg.usage,
 		UsageText: cfg.usageText,
-		Flags:     taIndicatorFlags(cfg.defaultPeriod),
+		Flags:     simpleTAIndicatorFlags(cfg.defaultPeriod),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			symbol := cmd.Args().First()
 			if err := requireArg(symbol, "symbol"); err != nil {
 				return err
 			}
 
-			period := cmd.Int("period")
+			periods, err := parseTAPeriods(cmd)
+			if err != nil {
+				return err
+			}
+			period := maxPeriod(periods)
 			interval := cmd.String("interval")
 			points := cmd.Int("points")
 
@@ -181,12 +245,20 @@ func makeSimpleTACommand(cfg simpleTAConfig, c *client.Ref, w io.Writer) *cli.Co
 				return err
 			}
 
-			values, err := cfg.compute(closes, period)
-			if err != nil {
-				return err
+			valuesByPeriod := make(map[int][]float64, len(periods))
+			for _, p := range periods {
+				values, err := cfg.compute(closes, p)
+				if err != nil {
+					return err
+				}
+				valuesByPeriod[p] = values
 			}
 
-			return writeTAOutput(w, cfg.name, symbol, interval, period, points, timestamps, values)
+			if len(periods) == 1 {
+				return writeTAOutput(w, cfg.name, symbol, interval, periods[0], points, timestamps, valuesByPeriod[periods[0]])
+			}
+
+			return writeMultiTAOutput(w, cfg.name, symbol, interval, periods, points, timestamps, valuesByPeriod)
 		},
 	}
 }
@@ -198,33 +270,35 @@ func TACommand(c *client.Ref, w io.Writer) *cli.Command {
 		Usage:  "Technical analysis indicators",
 		Action: requireSubcommand(),
 		Commands: []*cli.Command{
-		makeSimpleTACommand(simpleTAConfig{
-			name:  "sma",
-			usage: "Simple Moving Average",
-			usageText: `schwab-agent ta sma AAPL
-schwab-agent ta sma AAPL --period 50 --interval daily --points 10`,
-			defaultPeriod: 20,
-			multiplier:    1,
-			compute:       ta.SMA,
-		}, c, w),
-		makeSimpleTACommand(simpleTAConfig{
-			name:  "ema",
-			usage: "Exponential Moving Average",
-			usageText: `schwab-agent ta ema AAPL
-schwab-agent ta ema AAPL --period 50 --interval daily --points 10`,
-			defaultPeriod: 20,
-			multiplier:    3,
-			compute:       ta.EMA,
-		}, c, w),
-		makeSimpleTACommand(simpleTAConfig{
-			name:  "rsi",
-			usage: "Relative Strength Index",
-			usageText: `schwab-agent ta rsi AAPL
-schwab-agent ta rsi AAPL --period 14 --interval daily --points 10`,
-			defaultPeriod: 14,
-			multiplier:    3,
-			compute:       ta.RSI,
-		}, c, w),
+			makeSimpleTACommand(simpleTAConfig{
+				name:  "sma",
+				usage: "Simple Moving Average",
+				usageText: `schwab-agent ta sma AAPL
+	schwab-agent ta sma AAPL --period 50 --interval daily --points 10
+	schwab-agent ta sma AAPL --period 21,50,200 --points 1`,
+				defaultPeriod: 20,
+				multiplier:    1,
+				compute:       ta.SMA,
+			}, c, w),
+			makeSimpleTACommand(simpleTAConfig{
+				name:  "ema",
+				usage: "Exponential Moving Average",
+				usageText: `schwab-agent ta ema AAPL
+	schwab-agent ta ema AAPL --period 50 --interval daily --points 10
+	schwab-agent ta ema AAPL --period 12 --period 26 --points 5`,
+				defaultPeriod: 20,
+				multiplier:    3,
+				compute:       ta.EMA,
+			}, c, w),
+			makeSimpleTACommand(simpleTAConfig{
+				name:  "rsi",
+				usage: "Relative Strength Index",
+				usageText: `schwab-agent ta rsi AAPL
+	schwab-agent ta rsi AAPL --period 14 --interval daily --points 10`,
+				defaultPeriod: 14,
+				multiplier:    3,
+				compute:       ta.RSI,
+			}, c, w),
 			taMACDCommand(c, w),
 			taATRCommand(c, w),
 			taBBandsCommand(c, w),
@@ -916,5 +990,54 @@ func writeTAOutput(
 		Period:    period,
 		Values:    out,
 	}
-	return output.WriteSuccess(w, data, output.NewMetadata())
+	return output.WriteSuccess(w, data, output.TimestampMeta())
+}
+
+// writeMultiTAOutput builds a combined time series for multiple requested
+// periods. Each row represents a candle timestamp and contains one value per
+// period using stable keys such as sma_21, sma_50, and sma_200.
+func writeMultiTAOutput(
+	w io.Writer,
+	indicator, symbol, interval string,
+	periods []int,
+	points int,
+	timestamps []string,
+	valuesByPeriod map[int][]float64,
+) error {
+	maxValues := 0
+	for _, period := range periods {
+		if len(valuesByPeriod[period]) > maxValues {
+			maxValues = len(valuesByPeriod[period])
+		}
+	}
+
+	start := len(timestamps) - maxValues
+	out := make([]map[string]any, maxValues)
+	for i := range maxValues {
+		out[i] = map[string]any{"datetime": timestamps[start+i]}
+	}
+
+	for _, period := range periods {
+		values := valuesByPeriod[period]
+		valueStart := maxValues - len(values)
+		key := fmt.Sprintf("%s_%d", indicator, period)
+		for i, value := range values {
+			out[valueStart+i][key] = value
+		}
+	}
+
+	// Apply --points after merging so the latest timestamp can include every
+	// requested period in one object, which is the common crossover use case.
+	if points > 0 && points < len(out) {
+		out = out[len(out)-points:]
+	}
+
+	data := multiTAOutput{
+		Indicator: indicator,
+		Symbol:    symbol,
+		Interval:  interval,
+		Periods:   periods,
+		Values:    out,
+	}
+	return output.WriteSuccess(w, data, output.TimestampMeta())
 }

@@ -106,6 +106,9 @@ schwab-agent account list
 # Get option chains
 schwab-agent chain get AAPL
 
+# Get multiple moving averages in one technical-analysis run
+schwab-agent ta sma AAPL --period 21,50,200 --points 1
+
 # Place a limit order (requires safety config + --confirm)
 schwab-agent order place equity \
   --symbol AAPL \
