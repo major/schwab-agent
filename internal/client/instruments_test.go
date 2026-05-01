@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -130,4 +131,22 @@ func TestGetInstrument_404(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Nil(t, result)
+	var symErr *apperr.SymbolNotFoundError
+	require.ErrorAs(t, err, &symErr)
+}
+
+func TestSearchInstruments_404(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":"not found"}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	result, err := c.SearchInstruments(context.Background(), "INVALID", "symbol-search")
+
+	require.Error(t, err)
+	assert.Nil(t, result)
+	var symErr *apperr.SymbolNotFoundError
+	require.ErrorAs(t, err, &symErr)
 }

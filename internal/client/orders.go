@@ -1,11 +1,9 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"maps"
 	"net/http"
 	"strconv"
@@ -130,53 +128,41 @@ func (c *Client) PlaceOrder(ctx context.Context, hashValue string, order *models
 		return nil, fmt.Errorf("marshal request body: %w", err)
 	}
 
-	fullURL := c.baseURL + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, bytes.NewReader(encoded))
-	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", c.userAgent)
-
 	c.logger.Debug("http request", "method", http.MethodPost, "path", path)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.resty.R().
+		SetContext(ctx).
+		SetHeader("Content-Type", "application/json").
+		SetBody(encoded).
+		Execute(http.MethodPost, path)
 	if err != nil {
 		return nil, fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
 
-	// Capped at maxResponseSize to prevent memory exhaustion.
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
-	if err != nil {
-		return nil, fmt.Errorf("read response body: %w", err)
-	}
+	respBody := resp.Bytes()
 
 	// Map status codes to typed errors, checking order-rejection codes before
 	// the generic 4xx fallback so callers get OrderRejectedError specifically.
-	if resp.StatusCode == http.StatusUnauthorized {
+	if resp.StatusCode() == http.StatusUnauthorized {
 		return nil, apperr.NewAuthExpiredError("authentication expired", nil)
 	}
-	if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusUnprocessableEntity {
+	if resp.StatusCode() == http.StatusBadRequest || resp.StatusCode() == http.StatusUnprocessableEntity {
 		return nil, apperr.NewOrderRejectedError(
 			fmt.Sprintf("order rejected: %s", string(respBody)),
 			nil,
 		)
 	}
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode() >= 400 {
 		return nil, apperr.NewHTTPError(
-			fmt.Sprintf("HTTP %d", resp.StatusCode),
-			resp.StatusCode,
+			fmt.Sprintf("HTTP %d", resp.StatusCode()),
+			resp.StatusCode(),
 			string(respBody),
 			nil,
 		)
 	}
 
 	// Extract order ID from the Location header (e.g. /trader/v1/accounts/{hash}/orders/12345).
-	location := resp.Header.Get("Location")
+	location := resp.Header().Get("Location")
 	if location == "" {
 		return &PlaceOrderResponse{}, nil
 	}

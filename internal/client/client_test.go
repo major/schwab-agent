@@ -36,9 +36,9 @@ func TestNewClient_Defaults(t *testing.T) {
 
 	assert.Equal(t, "https://api.schwabapi.com", c.baseURL)
 	assert.Equal(t, "test-token", c.token)
-	assert.NotNil(t, c.httpClient)
+	// Timeout and HTTP client are configured via the internal resty client.
+	assert.NotNil(t, c.resty, "resty client must be initialized")
 	assert.NotNil(t, c.logger)
-	assert.Equal(t, 30*time.Second, c.httpClient.Timeout, "default client must have a timeout to prevent hanging requests")
 }
 
 func TestNewClient_WithBaseURL(t *testing.T) {
@@ -47,12 +47,37 @@ func TestNewClient_WithBaseURL(t *testing.T) {
 	assert.Equal(t, "https://custom.api.com", c.baseURL)
 }
 
-func TestNewClient_WithHTTPClient(t *testing.T) {
-	custom := &http.Client{Timeout: 42 * time.Second}
-	c := NewClient("tok", WithHTTPClient(custom))
+// recordingTransport records whether it was invoked. Used to verify that
+// WithHTTPClient transfers the custom transport to the resty client.
+type recordingTransport struct {
+	base   http.RoundTripper
+	called bool
+}
 
-	assert.Equal(t, custom, c.httpClient)
-	assert.Equal(t, 42*time.Second, c.httpClient.Timeout, "WithHTTPClient must override the default timeout")
+func (rt *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	rt.called = true
+	return rt.base.RoundTrip(req)
+}
+
+func TestNewClient_WithHTTPClient(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"name":"ok","value":1}`))
+	}))
+	defer srv.Close()
+
+	rt := &recordingTransport{base: http.DefaultTransport}
+	custom := &http.Client{
+		Timeout:   42 * time.Second,
+		Transport: rt,
+	}
+	c := NewClient("tok", WithBaseURL(srv.URL), WithHTTPClient(custom))
+
+	var result testResponse
+	err := c.doGet(context.Background(), "/test", nil, &result)
+
+	require.NoError(t, err)
+	assert.True(t, rt.called, "WithHTTPClient must apply the custom transport to the resty client")
 }
 
 func TestNewClient_WithLogger(t *testing.T) {
@@ -423,14 +448,14 @@ func TestDoRequest_JSONDecodeError(t *testing.T) {
 }
 
 func TestDoRequest_ResponseBodyCappedAtMaxSize(t *testing.T) {
-	// Verify that responses larger than maxResponseSize are silently truncated
-	// rather than consuming unbounded memory. The truncated JSON will fail to
-	// decode, which is the expected (safe) behavior.
+	// Verify that responses larger than maxResponseSize are rejected rather
+	// than consuming unbounded memory. resty's SetResponseBodyLimit returns an
+	// error immediately when the threshold is exceeded, preventing memory exhaustion.
 	oversizedBody := bytes.Repeat([]byte("x"), maxResponseSize+1024)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(oversizedBody)
+		_, _ = io.Copy(w, bytes.NewReader(oversizedBody))
 	}))
 	defer srv.Close()
 
@@ -438,10 +463,9 @@ func TestDoRequest_ResponseBodyCappedAtMaxSize(t *testing.T) {
 	var result testResponse
 	err := c.doGet(context.Background(), "/huge", nil, &result)
 
-	// The response is truncated, so JSON decode fails. The important thing
-	// is that we don't OOM - we get a clean decode error instead.
+	// Error is returned instead of consuming unbounded memory.
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "decode response")
+	assert.Contains(t, err.Error(), "resty: read exceeds the threshold limit")
 }
 
 func TestDoRequest_UserAgentHeader(t *testing.T) {
@@ -525,6 +549,6 @@ func TestDoRequest_MultipleOptions(t *testing.T) {
 	)
 
 	assert.Equal(t, "https://custom.example.com", c.baseURL)
-	assert.Equal(t, custom, c.httpClient)
+	// c.httpClient field removed; transport is applied to the internal resty client.
 	assert.Equal(t, logger, c.logger)
 }

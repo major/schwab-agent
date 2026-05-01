@@ -18,6 +18,8 @@ c := client.NewClient("bearer-token",
 
 Production code injects the client via the Before hook in `main.go`. Tests use `client.NewClient("test-token", client.WithBaseURL(server.URL))`.
 
+WithHTTPClient extracts the Transport and Timeout from the provided *http.Client and applies them to resty's underlying transport. The resty client handles connection pooling and lifecycle; call c.Close() to release idle connections.
+
 ## Adding a New Endpoint
 
 1. Create `<resource>.go` with methods on `*Client`
@@ -27,14 +29,14 @@ Production code injects the client via the Before hook in `main.go`. Tests use `
 
 ## HTTP Helpers
 
-Core method `doRequest` handles auth headers, content type, status code mapping, and JSON decoding. Thin wrappers:
+Core method `doRequest` uses resty v3 internally. It sets the Bearer token via request middleware (reads c.token at request time for token refresh support), validates Content-Type before JSON decoding, and maps status codes to typed errors. Thin wrappers:
 
 - `doGet(ctx, path, params, result)`: GET with query params
 - `doPost(ctx, path, body, result)`: POST with JSON body
 - `doPut(ctx, path, body, result)`: PUT with JSON body
 - `doDelete(ctx, path, result)`: DELETE
 
-Content-Type header is set only on non-GET requests. Accept header always set.
+Content-Type header is set by resty only when a request body is present (not on GET). Accept: application/json is set globally on the resty client.
 
 ## Error Mapping
 
