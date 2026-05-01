@@ -13,14 +13,14 @@ Go CLI tool for AI agents to trade via Charles Schwab APIs. Single binary, JSON-
 - **Module**: `github.com/major/schwab-agent`
 - **Go version**: 1.26 (check `/usr/local/go/bin/go version` for newer installs)
 - **Entry point**: `cmd/schwab-agent/main.go`
-- **Dependencies**: urfave/cli/v3 (CLI framework), pkg/browser (OAuth flow), resty.dev/v3 (HTTP client), stretchr/testify (test assertions)
+- **Dependencies**: urfave/cli/v3 (CLI framework), pkg/browser (OAuth flow), resty.dev/v3 (HTTP client, used by both internal/client/ and internal/auth/), stretchr/testify (test assertions)
 
 ## Architecture
 
 ```text
 cmd/schwab-agent/       Entry point, buildApp(), Before hook for auth
 internal/
-  auth/                 OAuth2 flow, token lifecycle, config (JSON + env vars)
+  auth/                 OAuth2 flow (resty v3 for token exchange), token lifecycle, config (JSON + env vars)
   client/               Schwab API HTTP client (see internal/client/AGENTS.md)
   commands/             CLI command handlers (see internal/commands/AGENTS.md)
   apperr/               Typed error hierarchy with exit codes
@@ -76,7 +76,7 @@ All command output uses `internal/output` JSON envelopes:
 
 ## CLI Structure
 
-urfave/cli v3. `buildApp()` in main.go constructs the command tree. Before hook skips auth for `auth`, `skills`, `schema`, and `symbol` commands, then loads config + token, refreshes if expired, populates `*client.Ref` for command access.
+urfave/cli v3. `buildApp()` in main.go constructs the command tree. Before hook skips auth for `auth`, `skills`, `schema`, and `symbol` commands, then loads config + token, refreshes if expired, populates `*client.Ref` for command access. An After hook calls `Client.Close()` to release idle connections when the command finishes.
 
 11 subcommands: auth (setup/login/status), account (list/get/numbers/set-default/transaction), position (list with --all-accounts/--account), quote (get), order (list/get/place/preview/build/cancel/replace; place/build sub-types: equity/option/bracket/oco), chain, history, instrument, market (hours/movers), symbol (build/parse), schema. Account list/get enriches results with nicknames from the preferences API (best-effort, degrades gracefully). Position list enriches with nicknames and adds computed cost basis / P&L fields. Order list defaults to non-terminal statuses (use --status all for everything).
 
@@ -153,3 +153,4 @@ Empty sections are omitted automatically.
 3. **Schema introspection**: `schema` command auto-generates from CLI definitions, not manually maintained
 4. **Skill files as plain markdown**: Skill files live in `skills/` as plain `.md` files, not generated from Go code
 5. **No testdata/**: All test data generated inline or via helper functions
+6. **TLSConfig over HTTPClient**: `Config.TLSConfig()` returns a `*tls.Config` instead of the old `*http.Client` factory. Both the API client (`WithTLSConfig`) and auth token exchange (`newOAuthClient`) use this to support insecure proxy setups. The callback server still uses raw net/http (server-side code).

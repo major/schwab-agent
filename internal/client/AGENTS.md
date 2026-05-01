@@ -11,14 +11,14 @@ Functional options pattern:
 ```go
 c := client.NewClient("bearer-token",
     client.WithBaseURL(url),
-    client.WithHTTPClient(httpClient),
+    client.WithTLSConfig(tlsConfig),
     client.WithLogger(logger),
 )
 ```
 
 Production code injects the client via the Before hook in `main.go`. Tests use `client.NewClient("test-token", client.WithBaseURL(server.URL))`.
 
-WithHTTPClient extracts the Transport and Timeout from the provided *http.Client and applies them to resty's underlying transport. The resty client handles connection pooling and lifecycle; call c.Close() to release idle connections.
+WithTLSConfig applies a custom TLS configuration to the resty client's transport (e.g., InsecureSkipVerify for local proxy setups). Pass nil for default TLS behavior. The resty client handles connection pooling and lifecycle; call c.Close() to release idle connections. Close() is wired via an After hook in main.go.
 
 ## Adding a New Endpoint
 
