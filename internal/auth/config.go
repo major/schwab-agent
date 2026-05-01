@@ -6,14 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/major/schwab-agent/internal/apperr"
 )
@@ -84,26 +82,6 @@ func (cfg *Config) TLSConfig() *tls.Config {
 	return &tls.Config{InsecureSkipVerify: true} //nolint:gosec // base_url_insecure is an explicit opt-in for local self-signed proxies
 }
 
-// newHTTPClient builds an HTTP client with the TLS config and timeout.
-// Used internally for OAuth token exchange and refresh requests.
-func (cfg *Config) newHTTPClient(timeout time.Duration) *http.Client {
-	client := &http.Client{Timeout: timeout}
-	tlsCfg := cfg.TLSConfig()
-	if tlsCfg == nil {
-		return client
-	}
-
-	transport, ok := http.DefaultTransport.(*http.Transport)
-	if !ok {
-		return client
-	}
-
-	clonedTransport := transport.Clone()
-	clonedTransport.TLSClientConfig = tlsCfg
-	client.Transport = clonedTransport
-
-	return client
-}
 
 // resolveAPIPath joins an API path onto the normalized base URL while
 // preserving any proxy path prefix present in base_url.
