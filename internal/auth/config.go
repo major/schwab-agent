@@ -73,15 +73,23 @@ func (cfg *Config) OAuthTokenURL() string {
 	return cfg.resolveAPIPath("/v1/oauth/token")
 }
 
-// HTTPClient returns an outbound HTTP client for REST or OAuth requests.
+// TLSConfig returns a TLS configuration for OAuth and API HTTP clients.
 // When base_url_insecure is true we skip certificate verification so local
 // self-signed proxy setups can terminate TLS without requiring a custom trust
-// store on every developer machine.
-func (cfg *Config) HTTPClient(timeout time.Duration) *http.Client {
-	insecure := cfg != nil && cfg.BaseURLInsecure
-	client := &http.Client{Timeout: timeout}
+// store on every developer machine. Returns nil for standard secure connections.
+func (cfg *Config) TLSConfig() *tls.Config {
+	if cfg == nil || !cfg.BaseURLInsecure {
+		return nil
+	}
+	return &tls.Config{InsecureSkipVerify: true} //nolint:gosec // base_url_insecure is an explicit opt-in for local self-signed proxies
+}
 
-	if !insecure {
+// newHTTPClient builds an HTTP client with the TLS config and timeout.
+// Used internally for OAuth token exchange and refresh requests.
+func (cfg *Config) newHTTPClient(timeout time.Duration) *http.Client {
+	client := &http.Client{Timeout: timeout}
+	tlsCfg := cfg.TLSConfig()
+	if tlsCfg == nil {
 		return client
 	}
 
@@ -91,7 +99,7 @@ func (cfg *Config) HTTPClient(timeout time.Duration) *http.Client {
 	}
 
 	clonedTransport := transport.Clone()
-	clonedTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // base_url_insecure is an explicit opt-in for local self-signed proxies
+	clonedTransport.TLSClientConfig = tlsCfg
 	client.Transport = clonedTransport
 
 	return client

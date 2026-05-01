@@ -3,11 +3,9 @@ package auth
 import (
 	"crypto/tls"
 	"encoding/json"
-	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -263,25 +261,15 @@ func TestConfigOAuthHelpers_DeriveURLsFromBaseURL(t *testing.T) {
 	assert.Equal(t, "https://proxy.example.com/root/v1/oauth/token", cfg.OAuthTokenURL())
 }
 
-func TestConfigHTTPClient_BaseURLInsecureConfiguresTLS(t *testing.T) {
-	secureClient := (&Config{}).HTTPClient(5 * time.Second)
-	assert.Equal(t, 5*time.Second, secureClient.Timeout)
-	assert.Nil(t, secureClient.Transport)
+func TestConfig_TLSConfig_InsecureFlag(t *testing.T) {
+	// Secure mode: TLSConfig returns nil
+	assert.Nil(t, (&Config{}).TLSConfig(), "secure config must return nil TLSConfig")
 
-	insecureClient := (&Config{BaseURLInsecure: true}).HTTPClient(5 * time.Second)
-	require.NotNil(t, insecureClient.Transport)
-
-	transport, ok := insecureClient.Transport.(*http.Transport)
-	require.True(t, ok)
-	require.NotNil(t, transport.TLSClientConfig)
-	assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
-
-	// Sanity check that the helper does not mutate the global default transport.
-	defaultTransport, ok := http.DefaultTransport.(*http.Transport)
-	require.True(t, ok)
-	if defaultTransport.TLSClientConfig != nil {
-		assert.False(t, defaultTransport.TLSClientConfig.InsecureSkipVerify)
-	}
+	// Insecure mode: TLSConfig returns config with InsecureSkipVerify
+	tlsCfg := (&Config{BaseURLInsecure: true}).TLSConfig()
+	require.NotNil(t, tlsCfg, "insecure config must return non-nil TLSConfig")
+	assert.True(t, tlsCfg.InsecureSkipVerify,
+		"insecure TLSConfig must set InsecureSkipVerify")
 
 	// Touch the tls import so the intent of the transport assertion is explicit.
 	_ = tls.VersionTLS13

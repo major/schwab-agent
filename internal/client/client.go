@@ -6,6 +6,7 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -94,14 +95,13 @@ func WithBaseURL(baseURL string) Option {
 	}
 }
 
-// WithHTTPClient transfers supported settings from an HTTP client.
-func WithHTTPClient(hc *http.Client) Option {
+// WithTLSConfig applies a custom TLS configuration to the resty client.
+// Pass cfg.TLSConfig() from the auth package to enable insecure-TLS proxy support.
+// A nil config is a no-op.
+func WithTLSConfig(tlsCfg *tls.Config) Option {
 	return func(c *Client) {
-		if hc.Transport != nil {
-			c.resty.SetTransport(hc.Transport)
-		}
-		if hc.Timeout > 0 {
-			c.resty.SetTimeout(hc.Timeout)
+		if tlsCfg != nil {
+			c.resty.SetTLSClientConfig(tlsCfg)
 		}
 	}
 }

@@ -84,7 +84,7 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*Toke
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth(cfg.ClientID, cfg.ClientSecret)
 
-	resp, err := cfg.HTTPClient(oauthHTTPTimeout).Do(req)
+	resp, err := cfg.newHTTPClient(oauthHTTPTimeout).Do(req)
 	if err != nil {
 		return nil, apperr.NewAuthCallbackError("token exchange request failed", err)
 	}

@@ -40,7 +40,7 @@ func defaultAuthDeps() authDeps {
 		newAccountClient: func(token string, cfg *auth.Config) accountNumbersClient {
 			clientOptions := []client.Option{
 				client.WithBaseURL(cfg.APIBaseURL()),
-				client.WithHTTPClient(cfg.HTTPClient(30 * time.Second)),
+				client.WithTLSConfig(cfg.TLSConfig()),
 			}
 
 			return client.NewClient(token, clientOptions...)

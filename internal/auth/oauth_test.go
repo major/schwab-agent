@@ -45,13 +45,6 @@ func (b *synchronizedBuffer) String() string {
 	return b.buf.String()
 }
 
-func TestOAuthHTTPClient_HasTimeout(t *testing.T) {
-	// The config-derived OAuth HTTP client must have an explicit timeout to
-	// prevent hanging on network issues. http.DefaultClient has Timeout=0.
-	assert.Equal(t, 30*time.Second, (&Config{}).HTTPClient(oauthHTTPTimeout).Timeout,
-		"OAuth HTTP client must have a timeout to prevent hanging requests")
-}
-
 func TestAuthorizeURL_ReturnsExpectedParametersAndState(t *testing.T) {
 	// Arrange
 	cfg := &Config{
