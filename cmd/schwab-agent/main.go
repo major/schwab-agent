@@ -197,6 +197,12 @@ func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 			apiClient.Client = deps.newClient(token.Token.AccessToken, clientOptions...)
 			return ctx, nil
 		},
+		After: func(_ context.Context, _ *cli.Command) error {
+			if apiClient.Client != nil {
+				apiClient.Close()
+			}
+			return nil
+		},
 		Commands: []*cli.Command{
 			commands.AuthCommand(loadedConfig, tokenPath, w),
 			commands.AccountCommand(apiClient, configPath, w),
