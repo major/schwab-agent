@@ -5,7 +5,6 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"github.com/major/schwab-agent/internal/apperr"
+	"resty.dev/v3"
 )
 
 const (
@@ -49,11 +49,11 @@ type Ref struct {
 
 // Client is an authenticated HTTP client for the Schwab API.
 type Client struct {
-	baseURL    string
-	httpClient *http.Client
-	token      string
-	userAgent  string
-	logger     *slog.Logger
+	baseURL   string
+	resty     *resty.Client
+	token     string
+	userAgent string
+	logger    *slog.Logger
 }
 
 // Option is a functional option for NewClient.
@@ -61,15 +61,25 @@ type Option func(*Client)
 
 // NewClient creates a new Client with the given token and options.
 func NewClient(token string, opts ...Option) *Client {
+	rc := resty.New()
 	c := &Client{
-		baseURL: defaultBaseURL,
-		httpClient: &http.Client{
-			Timeout: defaultTimeout,
-		},
+		baseURL:   defaultBaseURL,
+		resty:     rc,
 		token:     token,
 		userAgent: defaultUserAgent,
 		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
+	rc.SetBaseURL(defaultBaseURL)
+	rc.SetTimeout(defaultTimeout)
+	rc.SetHeader("Accept", "application/json")
+	rc.SetHeader("User-Agent", defaultUserAgent)
+	rc.SetResponseBodyLimit(maxResponseSize)
+	// Read c.token at request time so token refresh code can mutate the field
+	// directly and the next request immediately uses the new bearer token.
+	rc.AddRequestMiddleware(func(_ *resty.Client, req *resty.Request) error {
+		req.SetHeader("Authorization", "Bearer "+c.token)
+		return nil
+	})
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -80,13 +90,19 @@ func NewClient(token string, opts ...Option) *Client {
 func WithBaseURL(baseURL string) Option {
 	return func(c *Client) {
 		c.baseURL = baseURL
+		c.resty.SetBaseURL(baseURL)
 	}
 }
 
-// WithHTTPClient sets the underlying HTTP client.
+// WithHTTPClient transfers supported settings from an HTTP client.
 func WithHTTPClient(hc *http.Client) Option {
 	return func(c *Client) {
-		c.httpClient = hc
+		if hc.Transport != nil {
+			c.resty.SetTransport(hc.Transport)
+		}
+		if hc.Timeout > 0 {
+			c.resty.SetTimeout(hc.Timeout)
+		}
 	}
 }
 
@@ -101,77 +117,63 @@ func WithLogger(l *slog.Logger) Option {
 func WithUserAgent(ua string) Option {
 	return func(c *Client) {
 		c.userAgent = ua
+		c.resty.SetHeader("User-Agent", ua)
 	}
+}
+
+// Close releases idle connections held by the underlying resty client.
+// Short-lived CLI processes can skip this since the OS reclaims resources on exit.
+func (c *Client) Close() {
+	_ = c.resty.Close()
 }
 
 // doRequest is the core request method that handles authentication, serialization,
 // and error mapping for all HTTP methods.
 func (c *Client) doRequest(ctx context.Context, method, path string, body, result any) error {
-	var reqBody io.Reader
+	req := c.resty.R().SetContext(ctx)
 	if body != nil {
-		encoded, err := json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("marshal request body: %w", err)
-		}
-		reqBody = bytes.NewReader(encoded)
+		// resty auto-sets Content-Type: application/json when SetBody is called
+		// with a struct. It leaves bodyless requests alone, which preserves the
+		// Schwab API quirk where GET plus Content-Type can return HTTP 400.
+		req = req.SetBody(body)
 	}
 
-	endpoint := c.baseURL + path
-	req, err := http.NewRequestWithContext(ctx, method, endpoint, reqBody)
-	if err != nil {
-		return fmt.Errorf("build request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", c.userAgent)
-	// Only set Content-Type when sending a body. The Schwab API returns 400
-	// on GET requests that include Content-Type: application/json.
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	c.logger.Debug("http request", "method", method, "path", path)
-
-	resp, err := c.httpClient.Do(req)
+	resp, err := req.Execute(method, path)
 	if err != nil {
 		return fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
 
-	// Read the full response body for error messages or JSON decoding.
-	// Capped at maxResponseSize to prevent memory exhaustion from a
-	// misbehaving server or proxy returning an unexpectedly large payload.
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
-	if err != nil {
-		return fmt.Errorf("read response body: %w", err)
-	}
+	c.logger.Debug("http request", "method", method, "path", path, "status", resp.StatusCode())
 
 	// Map non-2xx status codes to typed errors.
-	if resp.StatusCode == http.StatusUnauthorized {
+	if resp.StatusCode() == http.StatusUnauthorized {
 		return apperr.NewAuthExpiredError("authentication expired", nil)
 	}
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode() >= 400 {
 		return apperr.NewHTTPError(
-			fmt.Sprintf("HTTP %d", resp.StatusCode),
-			resp.StatusCode,
-			string(respBody),
+			fmt.Sprintf("HTTP %d", resp.StatusCode()),
+			resp.StatusCode(),
+			resp.String(),
 			nil,
 		)
 	}
+	if resp.Size() > maxResponseSize {
+		return fmt.Errorf("execute request: %w", resty.ErrReadExceedsThresholdLimit)
+	}
 
 	// Decode JSON response if a result target was provided and there is a body.
+	respBody := resp.Bytes()
 	if result != nil && len(respBody) > 0 {
 		// Validate Content-Type before attempting JSON decode. Without this,
 		// an HTML error page from a proxy or maintenance window produces a
 		// cryptic json.Unmarshal error instead of a clear diagnostic.
-		ct := resp.Header.Get("Content-Type")
+		ct := resp.Header().Get("Content-Type")
 		if ct != "" {
 			mediaType, _, err := mime.ParseMediaType(ct)
 			if err == nil && mediaType != "application/json" {
 				// Show a body preview so the caller can see what came back
 				// (e.g., an HTML maintenance page or a proxy error).
-				preview := string(respBody)
+				preview := resp.String()
 				if len(preview) > 200 {
 					preview = preview[:200] + "..."
 				}
