@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/auth"
