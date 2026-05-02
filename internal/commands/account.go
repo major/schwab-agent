@@ -2,6 +2,7 @@
 package commands
 
 import (
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -33,6 +34,24 @@ type transactionListData struct {
 // transactionGetData wraps a single transaction response.
 type transactionGetData struct {
 	Transaction *models.Transaction `json:"transaction"`
+}
+
+// accountListOpts holds the options for the account list subcommand.
+type accountListOpts struct {
+	Positions bool
+}
+
+// accountGetOpts holds the options for the account get subcommand.
+type accountGetOpts struct {
+	Positions bool
+}
+
+// accountTransactionListOpts holds the options for the account transaction list subcommand.
+type accountTransactionListOpts struct {
+	Types  string
+	From   string
+	To     string
+	Symbol string
 }
 
 // resolveAccount determines the account hash from multiple sources.
@@ -114,6 +133,7 @@ func NewAccountCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command
 		GroupID: "account-mgmt",
 		RunE:    requireSubcommand,
 	}
+	cmd.SetFlagErrorFunc(suggestSubcommands)
 
 	cmd.PersistentFlags().String("account", "", "Account hash to use (overrides config default)")
 
@@ -130,6 +150,7 @@ func NewAccountCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command
 
 // newAccountListCmd returns the Cobra subcommand for listing all accounts.
 func newAccountListCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	opts := &accountListOpts{}
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all accounts with nicknames and settings",
@@ -137,7 +158,7 @@ func newAccountListCmd(c *client.Ref, w io.Writer) *cobra.Command {
 			"schwab-agent account list --positions",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var fields []string
-			if flagBool(cmd, "positions") {
+			if opts.Positions {
 				fields = append(fields, "positions")
 			}
 
@@ -157,26 +178,32 @@ func newAccountListCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().Bool("positions", false, "Include current positions for each account")
+	cmd.Flags().BoolVar(&opts.Positions, "positions", false, "Include current positions for each account")
 
 	return cmd
 }
 
 // newAccountGetCmd returns the Cobra subcommand for getting a specific account.
 func newAccountGetCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	opts := &accountGetOpts{}
 	cmd := &cobra.Command{
 		Use:   "get [hash]",
 		Short: "Get account details by hash value",
 		Example: "schwab-agent account get\n" +
 			"schwab-agent account get --positions",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			hash, err := resolveAccount(flagString(cmd, "account"), configPath, args)
+			accountFlag, err := cmd.Flags().GetString("account")
+			if err != nil {
+				return err
+			}
+
+			hash, err := resolveAccount(accountFlag, configPath, args)
 			if err != nil {
 				return err
 			}
 
 			var fields []string
-			if flagBool(cmd, "positions") {
+			if opts.Positions {
 				fields = append(fields, "positions")
 			}
 
@@ -198,7 +225,7 @@ func newAccountGetCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comm
 		},
 	}
 
-	cmd.Flags().Bool("positions", false, "Include current positions in the account response")
+	cmd.Flags().BoolVar(&opts.Positions, "positions", false, "Include current positions in the account response")
 
 	return cmd
 }
@@ -257,6 +284,7 @@ func newAccountTransactionCmd(c *client.Ref, configPath string, w io.Writer) *co
 		Short: "List and look up account transactions",
 		RunE:  requireSubcommand,
 	}
+	cmd.SetFlagErrorFunc(suggestSubcommands)
 
 	cmd.AddCommand(
 		newAccountTransactionListCmd(c, configPath, w),
@@ -268,6 +296,7 @@ func newAccountTransactionCmd(c *client.Ref, configPath string, w io.Writer) *co
 
 // newAccountTransactionListCmd returns the Cobra subcommand for listing transactions.
 func newAccountTransactionListCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	opts := &accountTransactionListOpts{}
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List transactions for an account",
@@ -275,16 +304,21 @@ func newAccountTransactionListCmd(c *client.Ref, configPath string, w io.Writer)
 			"schwab-agent account transaction list --types TRADE --symbol AAPL\n" +
 			"schwab-agent account transaction list --from 2025-01-01T00:00:00Z --to 2025-01-31T23:59:59Z",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			account, err := resolveAccount(flagString(cmd, "account"), configPath, nil)
+			accountFlag, err := cmd.Flags().GetString("account")
+			if err != nil {
+				return err
+			}
+
+			account, err := resolveAccount(accountFlag, configPath, nil)
 			if err != nil {
 				return err
 			}
 
 			params := client.TransactionParams{
-				Types:     flagString(cmd, "types"),
-				StartDate: flagString(cmd, "from"),
-				EndDate:   flagString(cmd, "to"),
-				Symbol:    flagString(cmd, "symbol"),
+				Types:     opts.Types,
+				StartDate: opts.From,
+				EndDate:   opts.To,
+				Symbol:    opts.Symbol,
 			}
 
 			result, err := c.Transactions(cmd.Context(), account, params)
@@ -296,10 +330,10 @@ func newAccountTransactionListCmd(c *client.Ref, configPath string, w io.Writer)
 		},
 	}
 
-	cmd.Flags().String("types", "", "Transaction type filter (TRADE, DIVIDEND, etc.)")
-	cmd.Flags().String("from", "", "Start date (YYYY-MM-DDTHH:MM:SSZ)")
-	cmd.Flags().String("to", "", "End date (YYYY-MM-DDTHH:MM:SSZ)")
-	cmd.Flags().String("symbol", "", "Filter by symbol")
+	cmd.Flags().StringVar(&opts.Types, "types", "", "Transaction type filter (TRADE, DIVIDEND, etc.)")
+	cmd.Flags().StringVar(&opts.From, "from", "", "Start date (YYYY-MM-DDTHH:MM:SSZ)")
+	cmd.Flags().StringVar(&opts.To, "to", "", "End date (YYYY-MM-DDTHH:MM:SSZ)")
+	cmd.Flags().StringVar(&opts.Symbol, "symbol", "", "Filter by symbol")
 
 	return cmd
 }
@@ -322,10 +356,17 @@ func newAccountTransactionGetCmd(c *client.Ref, configPath string, w io.Writer) 
 
 			txnID, err := strconv.ParseInt(txnIDStr, 10, 64)
 			if err != nil {
-				return apperr.NewValidationError("transaction ID must be a number", nil)
+				return apperr.NewValidationError(
+					fmt.Sprintf("transaction ID must be a number: %q", txnIDStr), err,
+				)
 			}
 
-			account, err := resolveAccount(flagString(cmd, "account"), configPath, nil)
+			accountFlag, err := cmd.Flags().GetString("account")
+			if err != nil {
+				return err
+			}
+
+			account, err := resolveAccount(accountFlag, configPath, nil)
 			if err != nil {
 				return err
 			}

@@ -178,9 +178,15 @@ func NewPositionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comman
 		RunE:    requireSubcommand,
 	}
 
+	cmd.SetFlagErrorFunc(suggestSubcommands)
 	cmd.AddCommand(newPositionListCmd(c, configPath, w))
 
 	return cmd
+}
+
+// positionListOpts holds the options for the position list subcommand.
+type positionListOpts struct {
+	AllAccounts bool
 }
 
 // newPositionListCmd returns the Cobra subcommand for listing positions.
@@ -188,6 +194,7 @@ func NewPositionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comman
 // With --all-accounts: flattens positions from all linked accounts into a
 // single list with account identifiers on each entry.
 func newPositionListCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	opts := &positionListOpts{}
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List positions for one or all accounts",
@@ -197,14 +204,16 @@ Default: single account (resolved via --account flag or config default).
 With --all-accounts: flattens positions from all linked accounts into a
 single list with account identifiers on each entry.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			allAccounts := flagBool(cmd, "all-accounts")
-			account := flagString(cmd, "account")
+			account, err := cmd.Flags().GetString("account")
+			if err != nil {
+				return err
+			}
 
-			if allAccounts && account != "" {
+			if opts.AllAccounts && account != "" {
 				return apperr.NewValidationError("--all-accounts and --account are mutually exclusive", nil)
 			}
 
-			if allAccounts {
+			if opts.AllAccounts {
 				return listAllAccountPositions(cmd.Context(), c, w)
 			}
 
@@ -212,7 +221,7 @@ single list with account identifiers on each entry.`,
 		},
 	}
 
-	cmd.Flags().Bool("all-accounts", false, "Show positions across all linked accounts")
+	cmd.Flags().BoolVar(&opts.AllAccounts, "all-accounts", false, "Show positions across all linked accounts")
 	cmd.Flags().String("account", "", "Account hash (overrides config default)")
 
 	return cmd

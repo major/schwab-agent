@@ -79,12 +79,12 @@ func TestNewSymbolCmdBuildValidation(t *testing.T) {
 		{
 			name:    "no put or call flag",
 			args:    []string{"build", "--underlying", "AAPL", "--expiration", "2025-06-20", "--strike", "200"},
-			wantMsg: "exactly one of --call or --put is required",
+			wantMsg: "at least one of the flags in the group [call put] is required",
 		},
 		{
 			name:    "both put and call flags",
 			args:    []string{"build", "--underlying", "AAPL", "--expiration", "2025-06-20", "--strike", "200", "--call", "--put"},
-			wantMsg: "exactly one of --call or --put is required",
+			wantMsg: "if any flags in the group [call put] are set none of the others can be",
 		},
 		{
 			name:    "invalid expiration format",

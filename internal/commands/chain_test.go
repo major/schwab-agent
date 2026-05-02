@@ -151,9 +151,8 @@ func TestNewChainCmd(t *testing.T) {
 		cmd := NewChainCmd(testClient(t, server), &buf)
 		_, err := runTestCommand(t, cmd, "get")
 		require.Error(t, err)
-
-		var valErr *apperr.ValidationError
-		assert.ErrorAs(t, err, &valErr)
+		// cobra.ExactArgs returns a plain error, not ValidationError
+		assert.Contains(t, err.Error(), "accepts 1 arg(s), received 0")
 	})
 
 	t.Run("chain expiration without symbol", func(t *testing.T) {
@@ -164,9 +163,8 @@ func TestNewChainCmd(t *testing.T) {
 		cmd := NewChainCmd(testClient(t, server), &buf)
 		_, err := runTestCommand(t, cmd, "expiration")
 		require.Error(t, err)
-
-		var valErr *apperr.ValidationError
-		assert.ErrorAs(t, err, &valErr)
+		// cobra.ExactArgs returns a plain error, not ValidationError
+		assert.Contains(t, err.Error(), "accepts 1 arg(s), received 0")
 	})
 
 	t.Run("chain without subcommand", func(t *testing.T) {

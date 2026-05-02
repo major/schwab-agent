@@ -5,7 +5,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
@@ -21,6 +20,11 @@ type instrumentGetData struct {
 	Instrument *models.Instrument `json:"instrument"`
 }
 
+// instrumentSearchOpts holds the options for the instrument search subcommand.
+type instrumentSearchOpts struct {
+	Projection string
+}
+
 // NewInstrumentCmd returns the Cobra command for instrument search and lookup.
 func NewInstrumentCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -29,6 +33,7 @@ func NewInstrumentCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		GroupID: "market-data",
 		RunE:    requireSubcommand,
 	}
+	cmd.SetFlagErrorFunc(suggestSubcommands)
 
 	cmd.AddCommand(newInstrumentSearchCmd(c, w))
 	cmd.AddCommand(newInstrumentGetCmd(c, w))
@@ -38,19 +43,16 @@ func NewInstrumentCmd(c *client.Ref, w io.Writer) *cobra.Command {
 
 // newInstrumentSearchCmd returns the search subcommand.
 func newInstrumentSearchCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	opts := &instrumentSearchOpts{}
 	cmd := &cobra.Command{
 		Use:     "search QUERY",
 		Short:   "Search instruments by symbol or description",
 		Example: "schwab-agent instrument search AAPL\nschwab-agent instrument search Apple --projection desc-search",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return apperr.NewValidationError("search query is required", nil)
-			}
-
 			query := args[0]
-			projection := flagString(cmd, "projection")
 
-			result, err := c.SearchInstruments(cmd.Context(), query, projection)
+			result, err := c.SearchInstruments(cmd.Context(), query, opts.Projection)
 			if err != nil {
 				return err
 			}
@@ -59,7 +61,7 @@ func newInstrumentSearchCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().String("projection", "symbol-search", "Search projection (symbol-search, symbol-regex, desc-search, desc-regex, search, fundamental)")
+	cmd.Flags().StringVar(&opts.Projection, "projection", "symbol-search", "Search projection (symbol-search, symbol-regex, desc-search, desc-regex, search, fundamental)")
 
 	return cmd
 }
@@ -70,11 +72,8 @@ func newInstrumentGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		Use:     "get CUSIP",
 		Short:   "Get instrument details by CUSIP",
 		Example: "schwab-agent instrument get 037833100",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return apperr.NewValidationError("CUSIP is required", nil)
-			}
-
 			cusip := args[0]
 
 			result, err := c.GetInstrument(cmd.Context(), cusip)

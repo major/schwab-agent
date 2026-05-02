@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -53,17 +54,27 @@ func NewRootCmd(
 				return nil
 			}
 
-			if flagBool(cmd, "verbose") {
+			verbose, err := cmd.Flags().GetBool("verbose")
+			if err != nil {
+				return err
+			}
+			if verbose {
 				logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 				slog.SetDefault(logger)
 			}
 
-			resolvedConfigPath := flagString(cmd, "config")
+			resolvedConfigPath, err := cmd.Flags().GetString("config")
+			if err != nil {
+				return err
+			}
 			if resolvedConfigPath == "" {
 				resolvedConfigPath = defaultConfigPath
 			}
 
-			resolvedTokenPath := flagString(cmd, "token")
+			resolvedTokenPath, err := cmd.Flags().GetString("token")
+			if err != nil {
+				return err
+			}
 			if resolvedTokenPath == "" {
 				resolvedTokenPath = defaultTokenPath
 			}
@@ -103,10 +114,10 @@ func NewRootCmd(
 			if auth.IsAccessTokenExpired(token) {
 				refreshed, err := auth.RefreshAccessToken(cfg, token, deps.TokenRefreshEndpoint(cfg))
 				if err != nil {
-					return err
+					return fmt.Errorf("refreshing access token: %w", err)
 				}
 				if err := auth.SaveToken(resolvedTokenPath, refreshed); err != nil {
-					return err
+					return fmt.Errorf("saving refreshed token to %s: %w", resolvedTokenPath, err)
 				}
 				token = refreshed
 			}
@@ -130,6 +141,7 @@ func NewRootCmd(
 
 	root.SetOut(w)
 	root.SetErr(os.Stderr)
+	root.SetFlagErrorFunc(suggestSubcommands)
 	root.PersistentFlags().StringP("account", "a", "", "Override default account hash")
 	root.PersistentFlags().BoolP("verbose", "v", false, "Enable debug logging to stderr")
 	root.PersistentFlags().String("config", defaultConfigPath, "Path to config file")

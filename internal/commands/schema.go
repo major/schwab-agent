@@ -36,10 +36,16 @@ type FlagSchema struct {
 	Description string `json:"description"`
 }
 
+// schemaOpts holds the options for the schema command.
+type schemaOpts struct {
+	Command string
+}
+
 // NewSchemaCmd returns the Cobra command for schema introspection.
 // It walks the provided root command tree and emits raw JSON, not the standard
 // success/error envelope, so agent tooling can consume the command contract directly.
 func NewSchemaCmd(root *cobra.Command, w io.Writer) *cobra.Command {
+	opts := &schemaOpts{}
 	cmd := &cobra.Command{
 		Use:         "schema",
 		Short:       "Display JSON schema of all available commands",
@@ -55,13 +61,12 @@ func NewSchemaCmd(root *cobra.Command, w io.Writer) *cobra.Command {
 			delete(allCommands, cmd.Name())
 			globalFlags := extractFlags(root.PersistentFlags())
 
-			filter := flagString(cmd, "command")
-			if filter != "" {
-				cs, ok := allCommands[filter]
+			if opts.Command != "" {
+				cs, ok := allCommands[opts.Command]
 				if !ok {
-					return apperr.NewValidationError(fmt.Sprintf("command %q not found", filter), nil)
+					return apperr.NewValidationError(fmt.Sprintf("command %q not found", opts.Command), nil)
 				}
-				allCommands = map[string]CommandSchema{filter: cs}
+				allCommands = map[string]CommandSchema{opts.Command: cs}
 			}
 
 			schema := SchemaOutput{
@@ -74,7 +79,7 @@ func NewSchemaCmd(root *cobra.Command, w io.Writer) *cobra.Command {
 			return enc.Encode(schema)
 		},
 	}
-	cmd.Flags().String("command", "", `Filter to a single command path (e.g., "order place equity")`)
+	cmd.Flags().StringVar(&opts.Command, "command", "", `Filter to a single command path (e.g., "order place equity")`)
 	return cmd
 }
 

@@ -36,21 +36,29 @@ func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		RunE:    requireSubcommand,
 		GroupID: "market-data",
 	}
+	cmd.SetFlagErrorFunc(suggestSubcommands)
 
 	cmd.AddCommand(newQuoteGetCmd(c, w))
 
 	return cmd
 }
 
+// quoteGetOpts holds the options for the quote get subcommand.
+type quoteGetOpts struct {
+	Fields      []string
+	Indicative  bool
+}
+
 // newQuoteGetCmd returns the Cobra subcommand for retrieving quotes.
 func newQuoteGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	opts := &quoteGetOpts{}
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "Get quotes for one or more symbols",
 		Long:  "Get quotes for one or more symbols with optional field filtering and indicative quotes",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			params, err := buildCobraQuoteParams(cmd)
+			params, err := buildCobraQuoteParams(opts)
 			if err != nil {
 				return err
 			}
@@ -62,18 +70,17 @@ func newQuoteGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringSlice("fields", nil, "Quote fields to return (repeatable): quote, fundamental, extended, reference, regular")
-	cmd.Flags().Bool("indicative", false, "Request indicative (non-tradeable) quotes")
+	cmd.Flags().StringSliceVar(&opts.Fields, "fields", nil, "Quote fields to return (repeatable): quote, fundamental, extended, reference, regular")
+	cmd.Flags().BoolVar(&opts.Indicative, "indicative", false, "Request indicative (non-tradeable) quotes")
 
 	return cmd
 }
 
-// buildCobraQuoteParams constructs a QuoteParams from Cobra flags, validating
+// buildCobraQuoteParams constructs a QuoteParams from option struct, validating
 // field values against the allowed set (case-insensitive).
-func buildCobraQuoteParams(cmd *cobra.Command) (client.QuoteParams, error) {
-	raw := flagStringSlice(cmd, "fields")
-	fields := make([]string, 0, len(raw))
-	for _, f := range raw {
+func buildCobraQuoteParams(opts *quoteGetOpts) (client.QuoteParams, error) {
+	fields := make([]string, 0, len(opts.Fields))
+	for _, f := range opts.Fields {
 		// Support both repeatable (--fields QUOTE --fields FUNDAMENTAL)
 		// and comma-separated (--fields QUOTE,FUNDAMENTAL) forms.
 		parts := strings.SplitSeq(f, ",")
@@ -94,7 +101,7 @@ func buildCobraQuoteParams(cmd *cobra.Command) (client.QuoteParams, error) {
 	}
 	return client.QuoteParams{
 		Fields:     fields,
-		Indicative: flagBool(cmd, "indicative"),
+		Indicative: opts.Indicative,
 	}, nil
 }
 

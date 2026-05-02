@@ -22,6 +22,15 @@ type symbolResult struct {
 	Strike     float64 `json:"strike"`
 }
 
+// symbolBuildOpts holds the options for the symbol build subcommand.
+type symbolBuildOpts struct {
+	Underlying string
+	Expiration string
+	Strike     float64
+	Call       bool
+	Put        bool
+}
+
 // NewSymbolCmd returns the Cobra command for option symbol utilities.
 // These are pure computation commands that do not require API authentication.
 func NewSymbolCmd(w io.Writer) *cobra.Command {
@@ -32,6 +41,7 @@ func NewSymbolCmd(w io.Writer) *cobra.Command {
 		Annotations: map[string]string{"skipAuth": "true"},
 		RunE:        requireSubcommand,
 	}
+	cmd.SetFlagErrorFunc(suggestSubcommands)
 	cmd.AddCommand(newSymbolBuildCmd(w))
 	cmd.AddCommand(newSymbolParseCmd(w))
 	return cmd
@@ -39,54 +49,51 @@ func NewSymbolCmd(w io.Writer) *cobra.Command {
 
 // newSymbolBuildCmd returns the Cobra subcommand for building OCC option symbols from components.
 func newSymbolBuildCmd(w io.Writer) *cobra.Command {
+	opts := &symbolBuildOpts{}
 	cmd := &cobra.Command{
 		Use:   "build",
 		Short: "Build an OCC option symbol from components",
 		Long:  "Build an OCC option symbol from components (underlying, expiration, strike, call/put)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			underlying := flagString(cmd, "underlying")
-			if underlying == "" {
+			if opts.Underlying == "" {
 				return apperr.NewValidationError("underlying is required", nil)
 			}
 
-			expiration := flagString(cmd, "expiration")
-			if expiration == "" {
+			if opts.Expiration == "" {
 				return apperr.NewValidationError("expiration is required", nil)
 			}
 
-			strike := flagFloat64(cmd, "strike")
-			call := flagBool(cmd, "call")
-			put := flagBool(cmd, "put")
-
-			putCall, err := parsePutCall(call, put)
+			putCall, err := parsePutCall(opts.Call, opts.Put)
 			if err != nil {
 				return err
 			}
 
-			expirationTime, err := time.Parse("2006-01-02", strings.TrimSpace(expiration))
+			expirationTime, err := time.Parse("2006-01-02", strings.TrimSpace(opts.Expiration))
 			if err != nil {
 				return apperr.NewValidationError("expiration must use YYYY-MM-DD format", err)
 			}
 
-			underlying = strings.TrimSpace(underlying)
-			symbol := orderbuilder.BuildOCCSymbol(underlying, expirationTime, strike, string(putCall))
+			underlying := strings.TrimSpace(opts.Underlying)
+			symbol := orderbuilder.BuildOCCSymbol(underlying, expirationTime, opts.Strike, string(putCall))
 
 			result := symbolResult{
 				Symbol:     symbol,
 				Underlying: underlying,
 				Expiration: expirationTime.Format("2006-01-02"),
 				PutCall:    string(putCall),
-				Strike:     strike,
+				Strike:     opts.Strike,
 			}
 
 			return output.WriteSuccess(w, result, output.NewMetadata())
 		},
 	}
-	cmd.Flags().String("underlying", "", "Underlying symbol (e.g. AAPL)")
-	cmd.Flags().String("expiration", "", "Expiration date (YYYY-MM-DD)")
-	cmd.Flags().Float64("strike", 0, "Strike price (e.g. 200, 450.50)")
-	cmd.Flags().Bool("call", false, "Call option")
-	cmd.Flags().Bool("put", false, "Put option")
+	cmd.Flags().StringVar(&opts.Underlying, "underlying", "", "Underlying symbol (e.g. AAPL)")
+	cmd.Flags().StringVar(&opts.Expiration, "expiration", "", "Expiration date (YYYY-MM-DD)")
+	cmd.Flags().Float64Var(&opts.Strike, "strike", 0, "Strike price (e.g. 200, 450.50)")
+	cmd.Flags().BoolVar(&opts.Call, "call", false, "Call option")
+	cmd.Flags().BoolVar(&opts.Put, "put", false, "Put option")
+	cmd.MarkFlagsMutuallyExclusive("call", "put")
+	cmd.MarkFlagsOneRequired("call", "put")
 	return cmd
 }
 
