@@ -79,7 +79,7 @@ func newQuoteGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	}
 
 	if err := structcli.Define(cmd, opts); err != nil {
-		return nil
+		panic(err)
 	}
 
 	return cmd
