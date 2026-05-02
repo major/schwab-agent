@@ -178,6 +178,7 @@ func NewPositionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comman
 		RunE:    requireSubcommand,
 	}
 
+	cmd.SetFlagErrorFunc(suggestSubcommands)
 	cmd.AddCommand(newPositionListCmd(c, configPath, w))
 
 	return cmd

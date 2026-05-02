@@ -286,6 +286,7 @@ func NewOrderCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 		RunE:    requireSubcommand,
 	}
 
+	cmd.SetFlagErrorFunc(suggestSubcommands)
 	cmd.AddCommand(newOrderListCmd(c, configPath, w))
 	cmd.AddCommand(newOrderGetCmd(c, configPath, w))
 	cmd.AddCommand(newOrderPlaceCmd(c, configPath, w))
@@ -512,6 +513,7 @@ func makeCobraPlaceOrderCommand[O any, P any](
 	build func(*P) (*models.OrderRequest, error),
 ) *cobra.Command {
 	opts := newOpts()
+	var confirm bool
 	cmd := &cobra.Command{
 		Use:   name,
 		Short: usage,
@@ -528,11 +530,7 @@ func makeCobraPlaceOrderCommand[O any, P any](
 				return err
 			}
 
-			confirmed, err := cmd.Flags().GetBool("confirm")
-			if err != nil {
-				return err
-			}
-			if err := requireConfirm(confirmed); err != nil {
+			if err := requireConfirm(confirm); err != nil {
 				return err
 			}
 
@@ -572,7 +570,7 @@ func makeCobraPlaceOrderCommand[O any, P any](
 	if flagSetup != nil {
 		flagSetup(cmd, opts)
 	}
-	cmd.Flags().Bool("confirm", false, "Confirm order placement")
+	cmd.Flags().BoolVar(&confirm, "confirm", false, "Confirm order placement")
 
 	return cmd
 }
