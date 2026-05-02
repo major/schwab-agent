@@ -14,8 +14,8 @@ import (
 
 // buildFTSOpts holds local flags for first-triggers-second order builds.
 type buildFTSOpts struct {
-	Primary   string `flag:"primary" flagdescr:"Primary order spec (inline JSON, @file, or - for stdin)"`
-	Secondary string `flag:"secondary" flagdescr:"Secondary order spec (inline JSON, @file, or - for stdin)"`
+	Primary   string `flag:"primary" flagdescr:"Primary order spec (inline JSON, @file, or - for stdin)" flagrequired:"true"`
+	Secondary string `flag:"secondary" flagdescr:"Secondary order spec (inline JSON, @file, or - for stdin)" flagrequired:"true"`
 }
 
 // Attach implements structcli.Options interface.

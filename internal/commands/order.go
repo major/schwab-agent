@@ -73,7 +73,7 @@ func (o *orderGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 // orderPlaceOpts holds local flags for top-level spec-based order placement.
 type orderPlaceOpts struct {
-	Spec    string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin"`
+	Spec    string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin" flagrequired:"true"`
 	Confirm bool   `flag:"confirm" flagdescr:"Confirm order placement"`
 }
 
@@ -82,7 +82,7 @@ func (o *orderPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // orderPreviewOpts holds local flags for order preview.
 type orderPreviewOpts struct {
-	Spec string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin"`
+	Spec string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin" flagrequired:"true"`
 }
 
 // Attach implements structcli.Options interface.
@@ -108,23 +108,23 @@ func (o *orderReplaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // equityPlaceOpts holds flags shared by equity place, build, and replace flows.
 type equityPlaceOpts struct {
-	Symbol             string  `flag:"symbol" flagdescr:"Equity symbol"`
-	Action             string  `flag:"action" flagdescr:"Order action"`
-	Quantity           float64 `flag:"quantity" flagdescr:"Share quantity"`
-	Type               string  `flag:"type" flagdescr:"Order type"`
-	Price              float64 `flag:"price" flagdescr:"Limit price"`
-	StopPrice          float64 `flag:"stop-price" flagdescr:"Stop price"`
-	StopOffset         float64 `flag:"stop-offset" flagdescr:"Trailing stop offset amount"`
-	StopLinkBasis      string  `flag:"stop-link-basis" flagdescr:"Trailing stop reference price (LAST, BID, ASK, MARK)"`
-	StopLinkType       string  `flag:"stop-link-type" flagdescr:"Trailing stop offset type (VALUE, PERCENT, TICK)"`
-	StopType           string  `flag:"stop-type" flagdescr:"Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)"`
-	ActivationPrice    float64 `flag:"activation-price" flagdescr:"Price that activates the trailing stop"`
-	Duration           string  `flag:"duration" flagdescr:"Order duration"`
-	Session            string  `flag:"session" flagdescr:"Trading session"`
-	SpecialInstruction string  `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"`
-	Destination        string  `flag:"destination" flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)"`
-	PriceLinkBasis     string  `flag:"price-link-basis" flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)"`
-	PriceLinkType      string  `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)"`
+	Symbol             string  `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
+	Action             string  `flag:"action" flagdescr:"Order action" flagrequired:"true" flaggroup:"order"`
+	Quantity           float64 `flag:"quantity" flagdescr:"Share quantity" flagrequired:"true" flaggroup:"execution"`
+	Type               string  `flag:"type" flagdescr:"Order type" flaggroup:"order"`
+	Price              float64 `flag:"price" flagdescr:"Limit price" flaggroup:"pricing"`
+	StopPrice          float64 `flag:"stop-price" flagdescr:"Stop price" flaggroup:"pricing"`
+	StopOffset         float64 `flag:"stop-offset" flagdescr:"Trailing stop offset amount" flaggroup:"pricing"`
+	StopLinkBasis      string  `flag:"stop-link-basis" flagdescr:"Trailing stop reference price (LAST, BID, ASK, MARK)" flaggroup:"pricing"`
+	StopLinkType       string  `flag:"stop-link-type" flagdescr:"Trailing stop offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
+	StopType           string  `flag:"stop-type" flagdescr:"Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)" flaggroup:"pricing"`
+	ActivationPrice    float64 `flag:"activation-price" flagdescr:"Price that activates the trailing stop" flaggroup:"pricing"`
+	Duration           string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session            string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	SpecialInstruction string  `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)" flaggroup:"execution"`
+	Destination        string  `flag:"destination" flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)" flaggroup:"execution"`
+	PriceLinkBasis     string  `flag:"price-link-basis" flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)" flaggroup:"pricing"`
+	PriceLinkType      string  `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
 }
 
 // Attach implements structcli.Options interface.
@@ -132,21 +132,21 @@ func (o *equityPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // optionPlaceOpts holds flags shared by option place and build flows.
 type optionPlaceOpts struct {
-	Underlying         string  `flag:"underlying" flagdescr:"Underlying symbol"`
-	Expiration         string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
-	Strike             float64 `flag:"strike" flagdescr:"Strike price"`
-	Call               bool    `flag:"call" flagdescr:"Call option"`
-	Put                bool    `flag:"put" flagdescr:"Put option"`
-	Action             string  `flag:"action" flagdescr:"Order action"`
-	Quantity           float64 `flag:"quantity" flagdescr:"Contract quantity"`
-	Type               string  `flag:"type" flagdescr:"Order type"`
-	Price              float64 `flag:"price" flagdescr:"Limit price"`
-	Duration           string  `flag:"duration" flagdescr:"Order duration"`
-	Session            string  `flag:"session" flagdescr:"Trading session"`
-	SpecialInstruction string  `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"`
-	Destination        string  `flag:"destination" flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)"`
-	PriceLinkBasis     string  `flag:"price-link-basis" flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)"`
-	PriceLinkType      string  `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)"`
+	Underlying         string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration         string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	Strike             float64 `flag:"strike" flagdescr:"Strike price" flagrequired:"true" flaggroup:"contract"`
+	Call               bool    `flag:"call" flagdescr:"Call option" flaggroup:"contract"`
+	Put                bool    `flag:"put" flagdescr:"Put option" flaggroup:"contract"`
+	Action             string  `flag:"action" flagdescr:"Order action" flagrequired:"true" flaggroup:"order"`
+	Quantity           float64 `flag:"quantity" flagdescr:"Contract quantity" flagrequired:"true" flaggroup:"execution"`
+	Type               string  `flag:"type" flagdescr:"Order type" flaggroup:"order"`
+	Price              float64 `flag:"price" flagdescr:"Limit price" flaggroup:"pricing"`
+	Duration           string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session            string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	SpecialInstruction string  `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)" flaggroup:"execution"`
+	Destination        string  `flag:"destination" flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)" flaggroup:"execution"`
+	PriceLinkBasis     string  `flag:"price-link-basis" flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)" flaggroup:"pricing"`
+	PriceLinkType      string  `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
 }
 
 // Attach implements structcli.Options interface.
@@ -154,15 +154,15 @@ func (o *optionPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // bracketPlaceOpts holds flags shared by bracket place and build flows.
 type bracketPlaceOpts struct {
-	Symbol     string  `flag:"symbol" flagdescr:"Equity symbol"`
-	Action     string  `flag:"action" flagdescr:"Order action"`
-	Quantity   float64 `flag:"quantity" flagdescr:"Share quantity"`
-	Type       string  `flag:"type" flagdescr:"Entry order type"`
-	Price      float64 `flag:"price" flagdescr:"Entry price"`
-	TakeProfit float64 `flag:"take-profit" flagdescr:"Take-profit exit price"`
-	StopLoss   float64 `flag:"stop-loss" flagdescr:"Stop-loss exit price"`
-	Duration   string  `flag:"duration" flagdescr:"Order duration"`
-	Session    string  `flag:"session" flagdescr:"Trading session"`
+	Symbol     string  `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
+	Action     string  `flag:"action" flagdescr:"Order action" flagrequired:"true" flaggroup:"order"`
+	Quantity   float64 `flag:"quantity" flagdescr:"Share quantity" flagrequired:"true" flaggroup:"execution"`
+	Type       string  `flag:"type" flagdescr:"Entry order type" flaggroup:"order"`
+	Price      float64 `flag:"price" flagdescr:"Entry price" flaggroup:"pricing"`
+	TakeProfit float64 `flag:"take-profit" flagdescr:"Take-profit exit price" flaggroup:"pricing"`
+	StopLoss   float64 `flag:"stop-loss" flagdescr:"Stop-loss exit price" flaggroup:"pricing"`
+	Duration   string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session    string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -170,13 +170,13 @@ func (o *bracketPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // ocoPlaceOpts holds flags shared by OCO place and build flows.
 type ocoPlaceOpts struct {
-	Symbol     string  `flag:"symbol" flagdescr:"Equity symbol"`
-	Action     string  `flag:"action" flagdescr:"Exit action (SELL to close long, BUY to close short)"`
-	Quantity   float64 `flag:"quantity" flagdescr:"Share quantity"`
-	TakeProfit float64 `flag:"take-profit" flagdescr:"Take-profit exit price (limit order)"`
-	StopLoss   float64 `flag:"stop-loss" flagdescr:"Stop-loss exit price (stop order)"`
-	Duration   string  `flag:"duration" flagdescr:"Order duration"`
-	Session    string  `flag:"session" flagdescr:"Trading session"`
+	Symbol     string  `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
+	Action     string  `flag:"action" flagdescr:"Exit action (SELL to close long, BUY to close short)" flagrequired:"true" flaggroup:"order"`
+	Quantity   float64 `flag:"quantity" flagdescr:"Share quantity" flagrequired:"true" flaggroup:"execution"`
+	TakeProfit float64 `flag:"take-profit" flagdescr:"Take-profit exit price (limit order)" flaggroup:"pricing"`
+	StopLoss   float64 `flag:"stop-loss" flagdescr:"Stop-loss exit price (stop order)" flaggroup:"pricing"`
+	Duration   string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session    string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -184,18 +184,18 @@ func (o *ocoPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // verticalBuildOpts holds flags for vertical spread build flows.
 type verticalBuildOpts struct {
-	Underlying  string  `flag:"underlying" flagdescr:"Underlying symbol"`
-	Expiration  string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
-	LongStrike  float64 `flag:"long-strike" flagdescr:"Strike price of the option being bought"`
-	ShortStrike float64 `flag:"short-strike" flagdescr:"Strike price of the option being sold"`
-	Call        bool    `flag:"call" flagdescr:"Call spread"`
-	Put         bool    `flag:"put" flagdescr:"Put spread"`
-	Open        bool    `flag:"open" flagdescr:"Opening position"`
-	Close       bool    `flag:"close" flagdescr:"Closing position"`
-	Quantity    float64 `flag:"quantity" flagdescr:"Number of contracts"`
-	Price       float64 `flag:"price" flagdescr:"Net debit or credit amount"`
-	Duration    string  `flag:"duration" flagdescr:"Order duration"`
-	Session     string  `flag:"session" flagdescr:"Trading session"`
+	Underlying  string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration  string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	LongStrike  float64 `flag:"long-strike" flagdescr:"Strike price of the option being bought" flagrequired:"true" flaggroup:"contract"`
+	ShortStrike float64 `flag:"short-strike" flagdescr:"Strike price of the option being sold" flagrequired:"true" flaggroup:"contract"`
+	Call        bool    `flag:"call" flagdescr:"Call spread" flaggroup:"contract"`
+	Put         bool    `flag:"put" flagdescr:"Put spread" flaggroup:"contract"`
+	Open        bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close       bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity    float64 `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
+	Price       float64 `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration    string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session     string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -203,18 +203,18 @@ func (o *verticalBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // ironCondorBuildOpts holds flags for iron condor build flows.
 type ironCondorBuildOpts struct {
-	Underlying      string  `flag:"underlying" flagdescr:"Underlying symbol"`
-	Expiration      string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
-	PutLongStrike   float64 `flag:"put-long-strike" flagdescr:"Lowest strike: put being bought (protection)"`
-	PutShortStrike  float64 `flag:"put-short-strike" flagdescr:"Put being sold (premium)"`
-	CallShortStrike float64 `flag:"call-short-strike" flagdescr:"Call being sold (premium)"`
-	CallLongStrike  float64 `flag:"call-long-strike" flagdescr:"Highest strike: call being bought (protection)"`
-	Open            bool    `flag:"open" flagdescr:"Opening position"`
-	Close           bool    `flag:"close" flagdescr:"Closing position"`
-	Quantity        float64 `flag:"quantity" flagdescr:"Number of contracts"`
-	Price           float64 `flag:"price" flagdescr:"Net credit or debit amount"`
-	Duration        string  `flag:"duration" flagdescr:"Order duration"`
-	Session         string  `flag:"session" flagdescr:"Trading session"`
+	Underlying      string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration      string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	PutLongStrike   float64 `flag:"put-long-strike" flagdescr:"Lowest strike: put being bought (protection)" flagrequired:"true" flaggroup:"contract"`
+	PutShortStrike  float64 `flag:"put-short-strike" flagdescr:"Put being sold (premium)" flagrequired:"true" flaggroup:"contract"`
+	CallShortStrike float64 `flag:"call-short-strike" flagdescr:"Call being sold (premium)" flagrequired:"true" flaggroup:"contract"`
+	CallLongStrike  float64 `flag:"call-long-strike" flagdescr:"Highest strike: call being bought (protection)" flagrequired:"true" flaggroup:"contract"`
+	Open            bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close           bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity        float64 `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
+	Price           float64 `flag:"price" flagdescr:"Net credit or debit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration        string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session         string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -222,18 +222,18 @@ func (o *ironCondorBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // strangleBuildOpts holds flags for strangle build flows.
 type strangleBuildOpts struct {
-	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol"`
-	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
-	CallStrike float64 `flag:"call-strike" flagdescr:"Strike price for the call leg"`
-	PutStrike  float64 `flag:"put-strike" flagdescr:"Strike price for the put leg"`
-	Buy        bool    `flag:"buy" flagdescr:"Buy the strangle (long, net debit)"`
-	Sell       bool    `flag:"sell" flagdescr:"Sell the strangle (short, net credit)"`
-	Open       bool    `flag:"open" flagdescr:"Opening position"`
-	Close      bool    `flag:"close" flagdescr:"Closing position"`
-	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts"`
-	Price      float64 `flag:"price" flagdescr:"Net debit or credit amount"`
-	Duration   string  `flag:"duration" flagdescr:"Order duration"`
-	Session    string  `flag:"session" flagdescr:"Trading session"`
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	CallStrike float64 `flag:"call-strike" flagdescr:"Strike price for the call leg" flagrequired:"true" flaggroup:"contract"`
+	PutStrike  float64 `flag:"put-strike" flagdescr:"Strike price for the put leg" flagrequired:"true" flaggroup:"contract"`
+	Buy        bool    `flag:"buy" flagdescr:"Buy the strangle (long, net debit)" flaggroup:"execution"`
+	Sell       bool    `flag:"sell" flagdescr:"Sell the strangle (short, net credit)" flaggroup:"execution"`
+	Open       bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close      bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
+	Price      float64 `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration   string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session    string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -241,17 +241,17 @@ func (o *strangleBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // straddleBuildOpts holds flags for straddle build flows.
 type straddleBuildOpts struct {
-	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol"`
-	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
-	Strike     float64 `flag:"strike" flagdescr:"Strike price (shared by call and put legs)"`
-	Buy        bool    `flag:"buy" flagdescr:"Buy the straddle (long, net debit)"`
-	Sell       bool    `flag:"sell" flagdescr:"Sell the straddle (short, net credit)"`
-	Open       bool    `flag:"open" flagdescr:"Opening position"`
-	Close      bool    `flag:"close" flagdescr:"Closing position"`
-	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts"`
-	Price      float64 `flag:"price" flagdescr:"Net debit or credit amount"`
-	Duration   string  `flag:"duration" flagdescr:"Order duration"`
-	Session    string  `flag:"session" flagdescr:"Trading session"`
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	Strike     float64 `flag:"strike" flagdescr:"Strike price (shared by call and put legs)" flagrequired:"true" flaggroup:"contract"`
+	Buy        bool    `flag:"buy" flagdescr:"Buy the straddle (long, net debit)" flaggroup:"execution"`
+	Sell       bool    `flag:"sell" flagdescr:"Sell the straddle (short, net credit)" flaggroup:"execution"`
+	Open       bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close      bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
+	Price      float64 `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration   string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session    string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -259,13 +259,13 @@ func (o *straddleBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // coveredCallBuildOpts holds flags for covered call build flows.
 type coveredCallBuildOpts struct {
-	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol"`
-	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
-	Strike     float64 `flag:"strike" flagdescr:"Call strike price"`
-	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts (1 contract = 100 shares)"`
-	Price      float64 `flag:"price" flagdescr:"Net debit amount"`
-	Duration   string  `flag:"duration" flagdescr:"Order duration"`
-	Session    string  `flag:"session" flagdescr:"Trading session"`
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	Strike     float64 `flag:"strike" flagdescr:"Call strike price" flagrequired:"true" flaggroup:"contract"`
+	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts (1 contract = 100 shares)" flagrequired:"true" flaggroup:"execution"`
+	Price      float64 `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration   string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session    string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -273,16 +273,16 @@ func (o *coveredCallBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // collarBuildOpts holds flags for collar-with-stock build flows.
 type collarBuildOpts struct {
-	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol"`
-	PutStrike  float64 `flag:"put-strike" flagdescr:"Protective put strike price"`
-	CallStrike float64 `flag:"call-strike" flagdescr:"Covered call strike price"`
-	Expiration string  `flag:"expiration" flagdescr:"Expiration date for both options (YYYY-MM-DD)"`
-	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts (1 contract = 100 shares)"`
-	Open       bool    `flag:"open" flagdescr:"Opening position"`
-	Close      bool    `flag:"close" flagdescr:"Closing position"`
-	Price      float64 `flag:"price" flagdescr:"Net debit amount"`
-	Duration   string  `flag:"duration" flagdescr:"Order duration"`
-	Session    string  `flag:"session" flagdescr:"Trading session"`
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	PutStrike  float64 `flag:"put-strike" flagdescr:"Protective put strike price" flagrequired:"true" flaggroup:"contract"`
+	CallStrike float64 `flag:"call-strike" flagdescr:"Covered call strike price" flagrequired:"true" flaggroup:"contract"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date for both options (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts (1 contract = 100 shares)" flagrequired:"true" flaggroup:"execution"`
+	Open       bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close      bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Price      float64 `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration   string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session    string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -290,18 +290,18 @@ func (o *collarBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // calendarBuildOpts holds flags for calendar spread build flows.
 type calendarBuildOpts struct {
-	Underlying     string  `flag:"underlying" flagdescr:"Underlying symbol"`
-	NearExpiration string  `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)"`
-	FarExpiration  string  `flag:"far-expiration" flagdescr:"Far-term expiration date (YYYY-MM-DD)"`
-	Strike         float64 `flag:"strike" flagdescr:"Strike price (shared by both legs)"`
-	Call           bool    `flag:"call" flagdescr:"Call calendar spread"`
-	Put            bool    `flag:"put" flagdescr:"Put calendar spread"`
-	Open           bool    `flag:"open" flagdescr:"Opening position"`
-	Close          bool    `flag:"close" flagdescr:"Closing position"`
-	Quantity       float64 `flag:"quantity" flagdescr:"Number of contracts"`
-	Price          float64 `flag:"price" flagdescr:"Net debit amount"`
-	Duration       string  `flag:"duration" flagdescr:"Order duration"`
-	Session        string  `flag:"session" flagdescr:"Trading session"`
+	Underlying     string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	NearExpiration string  `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	FarExpiration  string  `flag:"far-expiration" flagdescr:"Far-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	Strike         float64 `flag:"strike" flagdescr:"Strike price (shared by both legs)" flagrequired:"true" flaggroup:"contract"`
+	Call           bool    `flag:"call" flagdescr:"Call calendar spread" flaggroup:"contract"`
+	Put            bool    `flag:"put" flagdescr:"Put calendar spread" flaggroup:"contract"`
+	Open           bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close          bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity       float64 `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
+	Price          float64 `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration       string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session        string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -309,19 +309,19 @@ func (o *calendarBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // diagonalBuildOpts holds flags for diagonal spread build flows.
 type diagonalBuildOpts struct {
-	Underlying     string  `flag:"underlying" flagdescr:"Underlying symbol"`
-	NearExpiration string  `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)"`
-	FarExpiration  string  `flag:"far-expiration" flagdescr:"Far-term expiration date (YYYY-MM-DD)"`
-	NearStrike     float64 `flag:"near-strike" flagdescr:"Strike price for the near-term (sold) leg"`
-	FarStrike      float64 `flag:"far-strike" flagdescr:"Strike price for the far-term (bought) leg"`
-	Call           bool    `flag:"call" flagdescr:"Call diagonal spread"`
-	Put            bool    `flag:"put" flagdescr:"Put diagonal spread"`
-	Open           bool    `flag:"open" flagdescr:"Opening position"`
-	Close          bool    `flag:"close" flagdescr:"Closing position"`
-	Quantity       float64 `flag:"quantity" flagdescr:"Number of contracts"`
-	Price          float64 `flag:"price" flagdescr:"Net debit amount"`
-	Duration       string  `flag:"duration" flagdescr:"Order duration"`
-	Session        string  `flag:"session" flagdescr:"Trading session"`
+	Underlying     string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	NearExpiration string  `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	FarExpiration  string  `flag:"far-expiration" flagdescr:"Far-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	NearStrike     float64 `flag:"near-strike" flagdescr:"Strike price for the near-term (sold) leg" flagrequired:"true" flaggroup:"contract"`
+	FarStrike      float64 `flag:"far-strike" flagdescr:"Strike price for the far-term (bought) leg" flagrequired:"true" flaggroup:"contract"`
+	Call           bool    `flag:"call" flagdescr:"Call diagonal spread" flaggroup:"contract"`
+	Put            bool    `flag:"put" flagdescr:"Put diagonal spread" flaggroup:"contract"`
+	Open           bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close          bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity       float64 `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
+	Price          float64 `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration       string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session        string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.

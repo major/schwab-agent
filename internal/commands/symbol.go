@@ -25,9 +25,9 @@ type symbolResult struct {
 
 // symbolBuildOpts holds the options for the symbol build subcommand.
 type symbolBuildOpts struct {
-	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol (e.g. AAPL)"`
-	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
-	Strike     float64 `flag:"strike" flagdescr:"Strike price (e.g. 200, 450.50)"`
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol (e.g. AAPL)" flagrequired:"true"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true"`
+	Strike     float64 `flag:"strike" flagdescr:"Strike price (e.g. 200, 450.50)" flagrequired:"true"`
 	Call       bool    `flag:"call" flagdescr:"Call option"`
 	Put        bool    `flag:"put" flagdescr:"Put option"`
 }
@@ -119,7 +119,7 @@ func newSymbolParseCmd(w io.Writer) *cobra.Command {
 		Long: `Parse an OCC option symbol string into its underlying, expiration date, strike
 price, and contract type components. No API call or authentication required.`,
 		Example: `  schwab-agent symbol parse "AAPL  250620C00200000"`,
-		Args:  cobra.ExactArgs(1),
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			symbol := args[0]
 			components, err := orderbuilder.ParseOCCSymbol(symbol)

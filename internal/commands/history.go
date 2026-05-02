@@ -19,12 +19,12 @@ type priceHistoryData struct {
 
 // historyGetOpts holds the options for the history get subcommand.
 type historyGetOpts struct {
-	PeriodType    string `flag:"period-type" flagdescr:"Period type (day, month, year, ytd)"`
-	Period        string `flag:"period" flagdescr:"Number of periods"`
-	FrequencyType string `flag:"frequency-type" flagdescr:"Frequency type (minute, daily, weekly, monthly)"`
-	Frequency     string `flag:"frequency" flagdescr:"Frequency value"`
-	From          string `flag:"from" flagdescr:"Start date (milliseconds since epoch)"`
-	To            string `flag:"to" flagdescr:"End date (milliseconds since epoch)"`
+	PeriodType    string `flag:"period-type" flagdescr:"Period type (day, month, year, ytd)" flaggroup:"period"`
+	Period        string `flag:"period" flagdescr:"Number of periods" flaggroup:"period"`
+	FrequencyType string `flag:"frequency-type" flagdescr:"Frequency type (minute, daily, weekly, monthly)" flaggroup:"frequency"`
+	Frequency     string `flag:"frequency" flagdescr:"Frequency value" flaggroup:"frequency"`
+	From          string `flag:"from" flagdescr:"Start date (milliseconds since epoch)" flaggroup:"range"`
+	To            string `flag:"to" flagdescr:"End date (milliseconds since epoch)" flaggroup:"range"`
 }
 
 // Attach implements structcli.Options interface.

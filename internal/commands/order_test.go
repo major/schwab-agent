@@ -2313,7 +2313,7 @@ func TestNewOrderCmdPreview_EmptySpec(t *testing.T) {
 	// Assert
 	require.Error(t, err)
 	assert.Empty(t, stdout)
-	assert.Contains(t, err.Error(), "spec is required")
+	assert.Contains(t, err.Error(), "spec")
 }
 
 func TestNewOrderCmdPreview_APIError(t *testing.T) {
@@ -2346,7 +2346,7 @@ func TestNewOrderCmdPlace_MissingSpec(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Empty(t, stdout)
-	assert.Contains(t, err.Error(), "spec is required")
+	assert.Contains(t, err.Error(), "spec")
 }
 
 func TestNewOrderCmdPlace_InvalidSpec_NonJSONPrefix(t *testing.T) {

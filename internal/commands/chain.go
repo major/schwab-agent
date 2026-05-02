@@ -12,19 +12,19 @@ import (
 
 // chainGetOpts holds the options for the chain get subcommand.
 type chainGetOpts struct {
-	Type                  string `flag:"type" flagdescr:"Contract type: CALL, PUT, or ALL"`
-	StrikeCount           string `flag:"strike-count" flagdescr:"Number of strikes to return"`
-	Strategy              string `flag:"strategy" flagdescr:"Option pricing strategy"`
-	FromDate              string `flag:"from-date" flagdescr:"Start date (YYYY-MM-DD)"`
-	ToDate                string `flag:"to-date" flagdescr:"End date (YYYY-MM-DD)"`
-	IncludeUnderlyingQuote bool   `flag:"include-underlying-quote" flagdescr:"Include underlying quote data in response"`
-	Interval              string `flag:"interval" flagdescr:"Strike interval for spread strategy chains"`
-	Strike                string `flag:"strike" flagdescr:"Filter to a specific strike price"`
-	StrikeRange           string `flag:"strike-range" flagdescr:"Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL"`
-	Volatility            string `flag:"volatility" flagdescr:"Volatility for theoretical pricing calculations"`
-	UnderlyingPrice       string `flag:"underlying-price" flagdescr:"Override underlying price for theoretical calculations"`
-	InterestRate          string `flag:"interest-rate" flagdescr:"Interest rate for theoretical pricing calculations"`
-	DaysToExpiration      string `flag:"days-to-expiration" flagdescr:"Days to expiration for theoretical pricing calculations"`
+	Type                   string `flag:"type" flagdescr:"Contract type: CALL, PUT, or ALL" flaggroup:"contract"`
+	StrikeCount            string `flag:"strike-count" flagdescr:"Number of strikes to return" flaggroup:"filtering"`
+	Strategy               string `flag:"strategy" flagdescr:"Option pricing strategy" flaggroup:"contract"`
+	FromDate               string `flag:"from-date" flagdescr:"Start date (YYYY-MM-DD)" flaggroup:"filtering"`
+	ToDate                 string `flag:"to-date" flagdescr:"End date (YYYY-MM-DD)" flaggroup:"filtering"`
+	IncludeUnderlyingQuote bool   `flag:"include-underlying-quote" flagdescr:"Include underlying quote data in response" flaggroup:"filtering"`
+	Interval               string `flag:"interval" flagdescr:"Strike interval for spread strategy chains" flaggroup:"filtering"`
+	Strike                 string `flag:"strike" flagdescr:"Filter to a specific strike price" flaggroup:"filtering"`
+	StrikeRange            string `flag:"strike-range" flagdescr:"Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL" flaggroup:"filtering"`
+	Volatility             string `flag:"volatility" flagdescr:"Volatility for theoretical pricing calculations" flaggroup:"pricing"`
+	UnderlyingPrice        string `flag:"underlying-price" flagdescr:"Override underlying price for theoretical calculations" flaggroup:"pricing"`
+	InterestRate           string `flag:"interest-rate" flagdescr:"Interest rate for theoretical pricing calculations" flaggroup:"pricing"`
+	DaysToExpiration       string `flag:"days-to-expiration" flagdescr:"Days to expiration for theoretical pricing calculations" flaggroup:"pricing"`
 }
 
 // Attach implements structcli.Options interface.
@@ -61,7 +61,7 @@ specific moneyness with --strike-range (ITM, NTM, OTM, ALL).`,
   schwab-agent chain get AAPL --from-date 2025-06-01 --to-date 2025-07-31 --type PUT
   schwab-agent chain get AAPL --strategy ANALYTICAL --volatility 30.5 --days-to-expiration 45
   schwab-agent chain get AAPL --strike-range NTM --include-underlying-quote`,
-		Args:    cobra.ExactArgs(1),
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
