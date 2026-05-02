@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/models"
@@ -13,9 +14,12 @@ import (
 
 // buildFTSOpts holds local flags for first-triggers-second order builds.
 type buildFTSOpts struct {
-	Primary   string
-	Secondary string
+	Primary   string `flag:"primary" flagdescr:"Primary order spec (inline JSON, @file, or - for stdin)"`
+	Secondary string `flag:"secondary" flagdescr:"Secondary order spec (inline JSON, @file, or - for stdin)"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *buildFTSOpts) Attach(_ *cobra.Command) error { return nil }
 
 // makeCobraBuildOrderCommand creates a Cobra build subcommand that parses
 // flags, validates params, and writes raw order request JSON without API calls.
@@ -33,6 +37,10 @@ func makeCobraBuildOrderCommand[O any, P any](
 		Use:   name,
 		Short: usage,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, any(opts).(structcli.Options)); err != nil {
+				return err
+			}
+
 			params, err := parse(opts, args)
 			if err != nil {
 				return err
@@ -89,6 +97,10 @@ func newBuildFTSCmd(w io.Writer) *cobra.Command {
 		Short:   "Build a first-triggers-second order from two order specs",
 		Example: "schwab-agent order build fts --primary @primary-order.json --secondary @secondary-order.json",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			if strings.TrimSpace(opts.Primary) == "" {
 				return newValidationError("primary is required")
 			}
@@ -131,8 +143,9 @@ func newBuildFTSCmd(w io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Primary, "primary", "", "Primary order spec (inline JSON, @file, or - for stdin)")
-	cmd.Flags().StringVar(&opts.Secondary, "secondary", "", "Secondary order spec (inline JSON, @file, or - for stdin)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
