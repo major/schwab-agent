@@ -2,7 +2,6 @@
 package commands
 
 import (
-	"context"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -49,7 +48,7 @@ Examples:
 				EndDate:       flagString(cmd, "to"),
 			}
 
-			result, err := c.PriceHistory(context.Background(), symbol, &params)
+			result, err := c.PriceHistory(cmd.Context(), symbol, &params)
 			if err != nil {
 				return err
 			}
