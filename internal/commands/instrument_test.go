@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 )
 
@@ -64,9 +63,8 @@ func TestNewInstrumentCmd_Search_MissingQuery(t *testing.T) {
 	cmd := NewInstrumentCmd(testClient(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "search")
 	require.Error(t, err)
-
-	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	// cobra.ExactArgs(1) produces a standard error, not ValidationError
+	assert.ErrorContains(t, err, "accepts 1 arg(s), received 0")
 }
 
 func TestNewInstrumentCmd_Get_Success(t *testing.T) {
@@ -99,9 +97,8 @@ func TestNewInstrumentCmd_Get_MissingCUSIP(t *testing.T) {
 	cmd := NewInstrumentCmd(testClient(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get")
 	require.Error(t, err)
-
-	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	// cobra.ExactArgs(1) produces a standard error, not ValidationError
+	assert.ErrorContains(t, err, "accepts 1 arg(s), received 0")
 }
 
 func TestNewInstrumentCmd_Get_APIError(t *testing.T) {
