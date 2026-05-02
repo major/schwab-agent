@@ -11,7 +11,6 @@ import (
 	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
-	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -53,6 +52,31 @@ type quoteGetOpts struct {
 // Attach implements structcli.Options interface.
 func (o *quoteGetOpts) Attach(_ *cobra.Command) error { return nil }
 
+// Validate implements structcli.Validatable. Called automatically during
+// Unmarshal() after flag decoding. Checks that all --fields values are
+// recognized quote field names.
+func (o *quoteGetOpts) Validate(_ context.Context) []error {
+	var errs []error
+	for _, f := range o.Fields {
+		for part := range strings.SplitSeq(f, ",") {
+			trimmed := strings.TrimSpace(part)
+			if trimmed == "" {
+				continue
+			}
+			lower := strings.ToLower(trimmed)
+			if !validQuoteFields[lower] {
+				errs = append(errs, fmt.Errorf("invalid field %q: must be one of %s", trimmed, sortedQuoteFieldNames()))
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		return errs
+	}
+
+	return nil
+}
+
 // newQuoteGetCmd returns the Cobra subcommand for retrieving quotes.
 func newQuoteGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &quoteGetOpts{}
@@ -70,14 +94,13 @@ market cap.`,
   schwab-agent quote get AAPL --fields fundamental --indicative`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Unmarshal decodes flags and runs quoteGetOpts.Validate(),
+			// which rejects unrecognized --fields values.
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 
-			params, err := buildCobraQuoteParams(opts)
-			if err != nil {
-				return err
-			}
+			params := buildCobraQuoteParams(opts)
 
 			if len(args) == 1 {
 				return quoteSingle(cmd.Context(), c, w, args[0], params)
@@ -93,33 +116,25 @@ market cap.`,
 	return cmd
 }
 
-// buildCobraQuoteParams constructs a QuoteParams from option struct, validating
-// field values against the allowed set (case-insensitive).
-func buildCobraQuoteParams(opts *quoteGetOpts) (client.QuoteParams, error) {
+// buildCobraQuoteParams constructs a QuoteParams from the validated option struct.
+// Field validation has already been performed by quoteGetOpts.Validate().
+func buildCobraQuoteParams(opts *quoteGetOpts) client.QuoteParams {
 	fields := make([]string, 0, len(opts.Fields))
 	for _, f := range opts.Fields {
 		// Support both repeatable (--fields QUOTE --fields FUNDAMENTAL)
 		// and comma-separated (--fields QUOTE,FUNDAMENTAL) forms.
-		parts := strings.SplitSeq(f, ",")
-		for part := range parts {
+		for part := range strings.SplitSeq(f, ",") {
 			trimmed := strings.TrimSpace(part)
 			if trimmed == "" {
 				continue
 			}
-			lower := strings.ToLower(trimmed)
-			if !validQuoteFields[lower] {
-				return client.QuoteParams{}, apperr.NewValidationError(
-					fmt.Sprintf("invalid field %q: must be one of %s", trimmed, sortedQuoteFieldNames()),
-					nil,
-				)
-			}
-			fields = append(fields, lower)
+			fields = append(fields, strings.ToLower(trimmed))
 		}
 	}
 	return client.QuoteParams{
 		Fields:     fields,
 		Indicative: opts.Indicative,
-	}, nil
+	}
 }
 
 // sortedQuoteFieldNames returns the valid field names sorted alphabetically,

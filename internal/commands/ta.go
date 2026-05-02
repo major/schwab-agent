@@ -179,6 +179,34 @@ type simpleTAOpts struct {
 // Attach implements structcli.Options interface.
 func (o *simpleTAOpts) Attach(_ *cobra.Command) error { return nil }
 
+// Validate implements structcli.Validatable. Called automatically during
+// Unmarshal() after flag decoding. Checks that all requested periods are
+// positive and unique.
+func (o *simpleTAOpts) Validate(_ context.Context) []error {
+	if len(o.Period) == 0 {
+		return []error{fmt.Errorf("at least one period is required")}
+	}
+
+	var errs []error
+	seen := make(map[int]struct{}, len(o.Period))
+	for _, period := range o.Period {
+		if period <= 0 {
+			errs = append(errs, fmt.Errorf("period must be greater than 0"))
+		}
+
+		if _, ok := seen[period]; ok {
+			errs = append(errs, fmt.Errorf("duplicate period: %d", period))
+		}
+		seen[period] = struct{}{}
+	}
+
+	if len(errs) > 0 {
+		return errs
+	}
+
+	return nil
+}
+
 // macdOpts holds CLI flags for the MACD subcommand.
 type macdOpts struct {
 	Fast     int        `flag:"fast" flagdescr:"Fast EMA period" default:"12" flaggroup:"indicator"`
@@ -329,31 +357,6 @@ can be repeated or comma-separated for multiple lookbacks. Default period is 14.
 	return cmd
 }
 
-// cobraParseTAPeriods returns the requested indicator windows from the option struct.
-// Cobra's IntSlice flag accepts both repeated flags and comma-separated values,
-// which lets a user ask for "21, 50, and 200 day moving averages" in a single
-// command while keeping the old single --period form working unchanged.
-func cobraParseTAPeriods(opts *simpleTAOpts) ([]int, error) {
-	periods := opts.Period
-	if len(periods) == 0 {
-		return nil, newValidationError("at least one period is required")
-	}
-
-	seen := make(map[int]struct{}, len(periods))
-	for _, period := range periods {
-		if period <= 0 {
-			return nil, newValidationError("period must be greater than 0")
-		}
-
-		if _, ok := seen[period]; ok {
-			return nil, newValidationError(fmt.Sprintf("duplicate period: %d", period))
-		}
-		seen[period] = struct{}{}
-	}
-
-	return periods, nil
-}
-
 // makeCobraSimpleTACommand builds a Cobra command for a closes-only indicator.
 // The returned command fetches candles, extracts close prices, runs the
 // indicator's compute function, and writes the result envelope.
@@ -366,16 +369,14 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 		Example: cfg.example,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Unmarshal decodes flags and runs simpleTAOpts.Validate(),
+			// which rejects zero/negative and duplicate periods.
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 
 			symbol := args[0]
-
-			periods, err := cobraParseTAPeriods(opts)
-			if err != nil {
-				return err
-			}
+			periods := opts.Period
 			period := maxPeriod(periods)
 
 			interval := string(opts.Interval)

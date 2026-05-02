@@ -2,7 +2,10 @@ package apperr
 
 import (
 	"errors"
+	"fmt"
 	"testing"
+
+	structclierrors "github.com/leodido/structcli/errors"
 )
 
 // TestExitCodeForAuthRequiredError verifies AuthRequiredError maps to exit code 3.
@@ -190,6 +193,33 @@ func TestErrorCodeForOrderBuildError(t *testing.T) {
 	code := ErrorCode(err)
 	if code != "ORDER_BUILD_ERROR" {
 		t.Errorf("ErrorCode(OrderBuildError) = %q, want %q", code, "ORDER_BUILD_ERROR")
+	}
+}
+
+// TestErrorCodeForStructcliValidationError verifies structcli's ValidationError
+// (produced by the Validatable interface) maps to VALIDATION_ERROR, same as
+// our internal ValidationError.
+func TestErrorCodeForStructcliValidationError(t *testing.T) {
+	err := &structclierrors.ValidationError{
+		ContextName: "test-cmd",
+		Errors:      []error{fmt.Errorf("field is invalid")},
+	}
+	code := ErrorCode(err)
+	if code != "VALIDATION_ERROR" {
+		t.Errorf("ErrorCode(structcli ValidationError) = %q, want %q", code, "VALIDATION_ERROR")
+	}
+}
+
+// TestExitCodeForStructcliValidationError verifies structcli's ValidationError
+// maps to exit code 1 (default for non-exitCoder errors).
+func TestExitCodeForStructcliValidationError(t *testing.T) {
+	err := &structclierrors.ValidationError{
+		ContextName: "test-cmd",
+		Errors:      []error{fmt.Errorf("field is invalid")},
+	}
+	code := ExitCodeFor(err)
+	if code != 1 {
+		t.Errorf("ExitCodeFor(structcli ValidationError) = %d, want 1", code)
 	}
 }
 
