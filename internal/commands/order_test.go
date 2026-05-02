@@ -68,6 +68,8 @@ func runOrderCommand(t *testing.T, c *client.Ref, configPath, stdin string, args
 
 	var stdout strings.Builder
 	cmd := NewOrderCmd(c, configPath, &stdout)
+	cmd.PersistentFlags().String("account", "", "Account hash value")
+	cmd.PersistentFlags().String("config", configPath, "Path to config file")
 	cmd.SetIn(strings.NewReader(stdin))
 
 	if len(args) > 0 && args[0] == "order" {
@@ -1113,7 +1115,7 @@ func TestNewOrderCmdBuildParseErrors(t *testing.T) {
 				"--expiration", "2026-06-19",
 				"--strike", "150", "--quantity", "1",
 			},
-			wantMsg: "exactly one of --call or --put is required",
+			wantMsg: "at least one of the flags in the group [call put] is required",
 		},
 		// parseDurationSession error in option path.
 		{
@@ -1257,9 +1259,7 @@ func TestNewOrderCmdBuildParseErrors(t *testing.T) {
 			require.Error(t, err)
 			assert.Empty(t, stdout)
 
-			var validationErr *apperr.ValidationError
-			require.ErrorAs(t, err, &validationErr)
-			assert.Contains(t, validationErr.Error(), tc.wantMsg)
+			assert.ErrorContains(t, err, tc.wantMsg)
 		})
 	}
 }
@@ -1313,7 +1313,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 				"--call-short-strike", "420", "--call-long-strike", "430",
 				"--quantity", "1", "--price", "1.00",
 			},
-			wantMsg: "exactly one of --open or --close is required",
+			wantMsg: "at least one of the flags in the group [open close] is required",
 		},
 		{
 			name: "vertical missing open/close",
@@ -1323,7 +1323,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 				"--long-strike", "180", "--short-strike", "190",
 				"--call", "--quantity", "1", "--price", "2.00",
 			},
-			wantMsg: "exactly one of --open or --close is required",
+			wantMsg: "at least one of the flags in the group [open close] is required",
 		},
 		// Missing mutually exclusive buy/sell.
 		{
@@ -1334,7 +1334,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 				"--call-strike", "300", "--put-strike", "250",
 				"--open", "--quantity", "1", "--price", "10.00",
 			},
-			wantMsg: "exactly one of --buy or --sell is required",
+			wantMsg: "at least one of the flags in the group [buy sell] is required",
 		},
 		{
 			name: "straddle missing buy/sell",
@@ -1344,7 +1344,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 				"--strike", "130",
 				"--open", "--quantity", "1", "--price", "15.00",
 			},
-			wantMsg: "exactly one of --buy or --sell is required",
+			wantMsg: "at least one of the flags in the group [buy sell] is required",
 		},
 		// Missing mutually exclusive call/put.
 		{
@@ -1355,7 +1355,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 				"--long-strike", "180", "--short-strike", "190",
 				"--open", "--quantity", "1", "--price", "2.00",
 			},
-			wantMsg: "exactly one of --call or --put is required",
+			wantMsg: "at least one of the flags in the group [call put] is required",
 		},
 		// Invalid duration.
 		{
@@ -1391,9 +1391,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			require.Error(t, err)
 			assert.Empty(t, stdout)
 
-			var validationErr *apperr.ValidationError
-			require.ErrorAs(t, err, &validationErr)
-			assert.Contains(t, validationErr.Error(), tc.wantMsg)
+			assert.ErrorContains(t, err, tc.wantMsg)
 		})
 	}
 }
@@ -2159,15 +2157,16 @@ func TestParseRequiredOrderID(t *testing.T) {
 
 			// Arrange
 			var parsedID int64
+			opts := &orderGetOpts{}
 			cmd := &cobra.Command{
 				Use: "order-test",
 				RunE: func(cmd *cobra.Command, args []string) error {
 					var err error
-					parsedID, err = parseRequiredOrderID(cmd, args)
+					parsedID, err = parseRequiredOrderID(opts.OrderID, args)
 					return err
 				},
 			}
-			cmd.Flags().String("order-id", "", "Order ID")
+			cmd.Flags().StringVar(&opts.OrderID, "order-id", "", "Order ID")
 
 			// Act
 			_, err := runTestCommand(t, cmd, tc.args...)
