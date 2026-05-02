@@ -51,10 +51,11 @@ func newHistoryGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get SYMBOL",
 		Short: "Get price history candles for a symbol",
-		Long: `Get price history candles for a symbol.
-
-Examples:
-  schwab-agent history get AAPL
+		Long: `Get price history candles for a symbol. Supports configurable period types (day,
+month, year, ytd), frequency types (minute, daily, weekly, monthly), and
+date ranges via epoch milliseconds. Returns OHLCV candle data.`,
+		Example: `  schwab-agent history get AAPL
+  schwab-agent history get AAPL --period-type month --period 3 --frequency-type daily --frequency 1
   schwab-agent history get AAPL --period-type day --period 5 --frequency-type minute --frequency 15
   schwab-agent history get AAPL --from 1735689600000 --to 1743379200000`,
 		Args: cobra.ExactArgs(1),

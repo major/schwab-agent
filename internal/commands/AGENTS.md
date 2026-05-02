@@ -30,7 +30,7 @@ func QuoteCommand(c *client.Ref, w io.Writer) *cli.Command {
 1. Create `<name>.go` with a public `<Name>Command()` constructor
 2. Register in `cmd/schwab-agent/main.go` inside `buildApp()`
 3. Create `<name>_test.go` with tests
-4. Update the relevant skill file in `skills/` if the command is agent-facing
+4. Add meaningful Long (2-5 sentences) and Example (3-5 examples) fields for agent discoverability
 
 ## Output Rules
 

@@ -143,9 +143,10 @@ type multiTAOutput struct {
 // SMA, EMA, and RSI share the same pipeline: fetch candles, extract closes,
 // compute indicator, write output. Only the parameters differ.
 type simpleTAConfig struct {
-	name      string
-	usage     string
-	usageText string
+	name    string
+	usage   string
+	long    string
+	example string
 	// defaultPeriod is the indicator's default --period flag value.
 	defaultPeriod int
 	// multiplier controls how many candles to fetch relative to the requested
@@ -262,8 +263,12 @@ func (o *expectedMoveOpts) Attach(_ *cobra.Command) error { return nil }
 // NewTACmd returns the Cobra command for technical analysis indicators.
 func NewTACmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "ta",
-		Short:   "Technical analysis indicators",
+		Use:   "ta",
+		Short: "Technical analysis indicators",
+		Long: `Compute technical analysis indicators from Schwab price history. All indicators
+are calculated locally after fetching candles. Use --interval to select data
+frequency (daily, weekly, 1min, 5min, 15min, 30min) and --points to limit
+output to the N most recent values.`,
 		GroupID: "market-data",
 		RunE:    requireSubcommand,
 	}
@@ -273,9 +278,13 @@ func NewTACmd(c *client.Ref, w io.Writer) *cobra.Command {
 		makeCobraSimpleTACommand(simpleTAConfig{
 			name:  "sma",
 			usage: "Simple Moving Average",
-			usageText: `schwab-agent ta sma AAPL
-	schwab-agent ta sma AAPL --period 50 --interval daily --points 10
-	schwab-agent ta sma AAPL --period 21,50,200 --points 1`,
+			long: `Compute Simple Moving Average for a symbol. The --period flag sets the lookback
+window (default 20). Multiple periods can be requested in one command using
+comma-separated values or repeated flags, producing crossover-ready output
+with keys like sma_21, sma_50, sma_200.`,
+			example: `  schwab-agent ta sma AAPL
+  schwab-agent ta sma AAPL --period 50 --interval daily --points 10
+  schwab-agent ta sma AAPL --period 21,50,200 --points 1`,
 			defaultPeriod: 20,
 			multiplier:    1,
 			compute:       ta.SMA,
@@ -283,9 +292,13 @@ func NewTACmd(c *client.Ref, w io.Writer) *cobra.Command {
 		makeCobraSimpleTACommand(simpleTAConfig{
 			name:  "ema",
 			usage: "Exponential Moving Average",
-			usageText: `schwab-agent ta ema AAPL
-	schwab-agent ta ema AAPL --period 50 --interval daily --points 10
-	schwab-agent ta ema AAPL --period 12 --period 26 --points 5`,
+			long: `Compute Exponential Moving Average for a symbol. EMA gives more weight to
+recent prices than SMA. The --period flag can be repeated or comma-separated
+for multiple lookbacks in one command (e.g. --period 12,26 for crossover
+analysis).`,
+			example: `  schwab-agent ta ema AAPL
+  schwab-agent ta ema AAPL --period 50 --interval daily --points 10
+  schwab-agent ta ema AAPL --period 12,26 --points 5`,
 			defaultPeriod: 20,
 			multiplier:    3,
 			compute:       ta.EMA,
@@ -293,8 +306,12 @@ func NewTACmd(c *client.Ref, w io.Writer) *cobra.Command {
 		makeCobraSimpleTACommand(simpleTAConfig{
 			name:  "rsi",
 			usage: "Relative Strength Index",
-			usageText: `schwab-agent ta rsi AAPL
-	schwab-agent ta rsi AAPL --period 14 --interval daily --points 10`,
+			long: `Compute Relative Strength Index for a symbol. RSI ranges 0-100: values above
+70 suggest overbought conditions, below 30 suggest oversold. The --period flag
+can be repeated or comma-separated for multiple lookbacks. Default period is 14.`,
+			example: `  schwab-agent ta rsi AAPL
+  schwab-agent ta rsi AAPL --period 14 --interval daily --points 10
+  schwab-agent ta rsi AAPL --period 9 --interval 5min --points 20`,
 			defaultPeriod: 14,
 			multiplier:    3,
 			compute:       ta.RSI,
@@ -343,10 +360,11 @@ func cobraParseTAPeriods(opts *simpleTAOpts) ([]int, error) {
 func makeCobraSimpleTACommand(cfg simpleTAConfig, c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &simpleTAOpts{}
 	cmd := &cobra.Command{
-		Use:   cfg.name + " SYMBOL",
-		Short: cfg.usage,
-		Long:  cfg.usageText,
-		Args:  cobra.ExactArgs(1),
+		Use:     cfg.name + " SYMBOL",
+		Short:   cfg.usage,
+		Long:    cfg.long,
+		Example: cfg.example,
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
@@ -403,8 +421,13 @@ func cobraTAMACDCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "macd SYMBOL",
 		Short: "Moving Average Convergence/Divergence",
-		Long: `schwab-agent ta macd AAPL
-schwab-agent ta macd AAPL --fast 12 --slow 26 --signal 9 --interval daily --points 10`,
+		Long: `Compute MACD (Moving Average Convergence/Divergence) for a symbol. Uses
+--fast, --slow, and --signal periods instead of --period. Output keys include
+macd, signal, and histogram (histogram = macd - signal). Defaults: fast=12,
+slow=26, signal=9.`,
+		Example: `  schwab-agent ta macd AAPL
+  schwab-agent ta macd AAPL --fast 12 --slow 26 --signal 9 --points 10
+  schwab-agent ta macd NVDA --interval weekly --points 10`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
@@ -471,8 +494,11 @@ func cobraTAATRCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "atr SYMBOL",
 		Short: "Average True Range",
-		Long: `schwab-agent ta atr AAPL
-schwab-agent ta atr AAPL --period 14 --interval daily --points 10`,
+		Long: `Compute Average True Range for a symbol. ATR measures volatility in price
+units: higher values indicate wider price swings. Uses high, low, and close
+data with Wilder smoothing. Default period is 14.`,
+		Example: `  schwab-agent ta atr AAPL
+  schwab-agent ta atr AAPL --period 14 --interval daily --points 10`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
@@ -521,8 +547,12 @@ func cobraTABBandsCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bbands SYMBOL",
 		Short: "Bollinger Bands",
-		Long: `schwab-agent ta bbands AAPL
-schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --interval daily --points 10`,
+		Long: `Compute Bollinger Bands for a symbol. Output keys are upper, middle, and lower
+bands. Price near the upper band is relatively high, near the lower band is
+relatively low. Use --std-dev to widen or narrow the bands (default 2.0).`,
+		Example: `  schwab-agent ta bbands AAPL
+  schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --points 10
+  schwab-agent ta bbands AAPL --std-dev 1.5 --points 10`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
@@ -587,8 +617,11 @@ func cobraTAStochCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stoch SYMBOL",
 		Short: "Stochastic Oscillator",
-		Long: `schwab-agent ta stoch AAPL
-schwab-agent ta stoch AAPL --k-period 14 --smooth-k 3 --d-period 3 --interval daily --points 10`,
+		Long: `Compute Stochastic Oscillator for a symbol. Output keys are slowk and slowd,
+both ranging 0-100. Above 80 and below 20 are common signal thresholds.
+Configurable via --k-period, --smooth-k, and --d-period.`,
+		Example: `  schwab-agent ta stoch AAPL
+  schwab-agent ta stoch AAPL --k-period 14 --smooth-k 3 --d-period 3 --points 10`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
@@ -663,8 +696,11 @@ func cobraTAADXCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "adx SYMBOL",
 		Short: "Average Directional Index",
-		Long: `schwab-agent ta adx AAPL
-schwab-agent ta adx AAPL --period 14 --interval daily --points 10`,
+		Long: `Compute Average Directional Index for a symbol. ADX above 25 indicates a
+trending market, below 20 indicates a ranging market. Output includes adx,
+plus_di, and minus_di for directional bias. Default period is 14.`,
+		Example: `  schwab-agent ta adx AAPL
+  schwab-agent ta adx AAPL --period 14 --interval daily --points 10`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
@@ -737,8 +773,12 @@ func cobraTAVWAPCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "vwap SYMBOL",
 		Short: "Volume Weighted Average Price",
-		Long: `schwab-agent ta vwap AAPL
-schwab-agent ta vwap AAPL --interval 5min --points 10`,
+		Long: `Compute Volume Weighted Average Price for a symbol. VWAP is a cumulative
+indicator with no --period flag. Primarily used for intraday analysis with
+minute-level intervals. Price above VWAP suggests bullish bias, below
+suggests bearish.`,
+		Example: `  schwab-agent ta vwap AAPL
+  schwab-agent ta vwap AAPL --interval 5min --points 20`,
 		Args: cobra.ExactArgs(1),
 		// VWAP is cumulative - no --period flag. Only --interval and --points.
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -794,8 +834,12 @@ func cobraTAHVCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "hv SYMBOL",
 		Short: "Historical Volatility with regime classification",
-		Long: `schwab-agent ta hv AAPL
-schwab-agent ta hv AAPL --period 20 --interval daily`,
+		Long: `Compute Historical Volatility for a symbol. Returns a scalar summary (not
+time series) with annualized volatility, percentile rank, and regime
+classification (low, normal, high, extreme). Includes daily, weekly, and
+monthly volatility breakdowns.`,
+		Example: `  schwab-agent ta hv AAPL
+  schwab-agent ta hv AAPL --period 20 --interval daily`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
@@ -854,8 +898,12 @@ func cobraTAExpectedMoveCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "expected-move SYMBOL",
 		Short: "Expected price move from ATM straddle pricing",
-		Long: `schwab-agent ta expected-move AAPL
-schwab-agent ta expected-move AAPL --dte 45`,
+		Long: `Compute expected price move from ATM straddle pricing. Fetches the option
+chain, finds the nearest expiration to --dte (default 30), and prices the
+ATM straddle. Output includes 1x and 2x standard deviation ranges (upper
+and lower bounds).`,
+		Example: `  schwab-agent ta expected-move AAPL
+  schwab-agent ta expected-move AAPL --dte 45`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {

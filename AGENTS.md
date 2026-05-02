@@ -4,11 +4,11 @@
 > Keep README.md updated whenever the project changes.
 > Check /usr/local for newer Go versions before assuming the system Go is current.
 > Leave generous comments when fixing bugs or working around API quirks. Anything that might save a future developer from re-discovering the same issue is worth writing down.
-> Keep skill files in `skills/` updated whenever CLI commands, flags, or behavior change.
+
 
 ## Project
 
-Go CLI tool for AI agents to trade via Charles Schwab APIs. Single binary, JSON-first output, auto-generated skill files for agent consumption.
+Go CLI tool for AI agents to trade via Charles Schwab APIs. Single binary, JSON-first output, workflow knowledge embedded in command help text.
 
 - **Module**: `github.com/major/schwab-agent`
 - **Go version**: 1.26 (check `/usr/local/go/bin/go version` for newer installs)
@@ -27,7 +27,6 @@ internal/
   models/               Data structures/schemas for API payloads
   orderbuilder/         Order construction/validation (equity, option, bracket, OCO) + OCC symbol build/parse
   output/               JSON envelope writers (success, error, partial)
-skills/                 Agent skill files (plain markdown, manually maintained)
 ```
 
 ## Build and Test
@@ -151,6 +150,6 @@ Empty sections are omitted automatically.
 1. **Shared client ref**: `client.Ref` (embedding `*Client`) is pre-allocated and shared by all commands; the Before hook populates `ref.Client` after auth
 2. **Env vars override config**: Priority is env vars > config file > defaults
 3. **Schema introspection**: `schema` command auto-generates from CLI definitions, not manually maintained
-4. **Skill files as plain markdown**: Skill files live in `skills/` as plain `.md` files, not generated from Go code
+4. **Workflow knowledge in help text**: Command Long descriptions and Example fields embed the workflow knowledge that was previously in separate skill files
 5. **No testdata/**: All test data generated inline or via helper functions
 6. **TLSConfig over HTTPClient**: `Config.TLSConfig()` returns a `*tls.Config` instead of the old `*http.Client` factory. Both the API client (`WithTLSConfig`) and auth token exchange (`newOAuthClient`) use this to support insecure proxy setups. The callback server still uses raw net/http (server-side code).

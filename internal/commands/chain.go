@@ -50,9 +50,17 @@ func NewChainCmd(c *client.Ref, w io.Writer) *cobra.Command {
 func newChainGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &chainGetOpts{}
 	cmd := &cobra.Command{
-		Use:     "get <symbol>",
-		Short:   "Get option chain for a symbol",
-		Example: "schwab-agent chain get AAPL\nschwab-agent chain get AAPL --type CALL --strike-count 5\nschwab-agent chain get AAPL --from-date 2025-06-01 --to-date 2025-07-31 --type PUT",
+		Use:   "get <symbol>",
+		Short: "Get option chain for a symbol",
+		Long: `Get the full option chain for a symbol with optional filtering by contract type,
+strike range, expiration dates, and strategy. Use --strategy ANALYTICAL with
+--volatility and --days-to-expiration for theoretical pricing. Filter to
+specific moneyness with --strike-range (ITM, NTM, OTM, ALL).`,
+		Example: `  schwab-agent chain get AAPL
+  schwab-agent chain get AAPL --type CALL --strike-count 5
+  schwab-agent chain get AAPL --from-date 2025-06-01 --to-date 2025-07-31 --type PUT
+  schwab-agent chain get AAPL --strategy ANALYTICAL --volatility 30.5 --days-to-expiration 45
+  schwab-agent chain get AAPL --strike-range NTM --include-underlying-quote`,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
@@ -103,9 +111,12 @@ func newChainGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 // newChainExpirationCmd returns the Cobra subcommand for retrieving option expiration dates.
 func newChainExpirationCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:     "expiration <symbol>",
-		Short:   "Get expiration dates for a symbol",
-		Example: "schwab-agent chain expiration AAPL",
+		Use:   "expiration <symbol>",
+		Short: "Get expiration dates for a symbol",
+		Long: `Get available option expiration dates for a symbol without fetching the full
+chain data. Useful for discovering valid expirations before requesting a
+detailed chain.`,
+		Example: "  schwab-agent chain expiration AAPL",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			symbol := args[0]

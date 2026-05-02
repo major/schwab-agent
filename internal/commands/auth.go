@@ -200,8 +200,12 @@ func NewAuthCmd(configPath, tokenPath string, w io.Writer, deps AuthDeps) *cobra
 	deps = completeAuthDeps(deps, configPath)
 
 	cmd := &cobra.Command{
-		Use:         "auth",
-		Short:       "Authentication commands",
+		Use:   "auth",
+		Short: "Authentication commands",
+		Long: `Manage OAuth2 authentication with the Schwab API. Login starts the OAuth flow,
+status checks token expiration, and refresh forces a token refresh. Auth
+commands bypass the global auth check so they can run without existing tokens.
+Tokens are stored locally and refreshed automatically during normal use.`,
 		Annotations: map[string]string{"skipAuth": "true"},
 		GroupID:     "account-mgmt",
 		RunE:        requireSubcommand,
@@ -221,6 +225,12 @@ func newAuthLoginCmd(tokenPath string, w io.Writer, deps AuthDeps) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Run the OAuth login flow",
+		Long: `Start the OAuth2 login flow to authenticate with Schwab. Opens a browser by
+default; use --no-browser to print the authorization URL instead. After
+authorization, tokens are stored locally. If exactly one account is found,
+it is automatically set as the default.`,
+		Example: `  schwab-agent auth login
+  schwab-agent auth login --no-browser`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
@@ -291,6 +301,10 @@ func newAuthStatusCmd(tokenPath string, w io.Writer, deps AuthDeps) *cobra.Comma
 	return &cobra.Command{
 		Use:   "status",
 		Short: "Show token and config status",
+		Long: `Show current authentication status including access token expiration, refresh
+token expiration, configured default account, and client ID (redacted). Use
+this to check whether tokens are still valid before running other commands.`,
+		Example: "  schwab-agent auth status",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			defaultConfigPath := deps.ConfigPath()
 			resolvedConfigPath := cobraResolveConfigPath(cmd, defaultConfigPath)
@@ -321,6 +335,10 @@ func newAuthRefreshCmd(tokenPath string, w io.Writer, deps AuthDeps) *cobra.Comm
 	return &cobra.Command{
 		Use:   "refresh",
 		Short: "Refresh the current access token",
+		Long: `Force a refresh of the current access token without re-authenticating. Requires
+a valid refresh token (not expired). If the refresh token is stale (older than
+6.5 days), run auth login again instead.`,
+		Example: "  schwab-agent auth refresh",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			defaultConfigPath := deps.ConfigPath()
 			resolvedConfigPath := cobraResolveConfigPath(cmd, defaultConfigPath)

@@ -138,8 +138,12 @@ func enrichAccountsWithPreferences(accounts []models.Account, prefs *models.User
 // The --account persistent flag overrides the default account hash for all subcommands.
 func NewAccountCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "account",
-		Short:   "Manage Schwab trading accounts",
+		Use:   "account",
+		Short: "Manage Schwab trading accounts",
+		Long: `Manage Schwab trading accounts. List accounts with nicknames, view account
+details, look up account numbers and hash values, set a default account, and
+query transaction history. Account list and get enrich results with nicknames
+from the preferences API (best-effort, degrades gracefully).`,
 		GroupID: "account-mgmt",
 		RunE:    requireSubcommand,
 	}
@@ -164,8 +168,12 @@ func newAccountListCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all accounts with nicknames and settings",
-		Example: "schwab-agent account list\n" +
-			"schwab-agent account list --positions",
+		Long: `List all linked Schwab accounts with nicknames and settings enriched from
+the preferences API. Use --positions to include current positions for each
+account in the response. Nicknames are loaded best-effort and omitted if
+the preferences API is unavailable.`,
+		Example: `  schwab-agent account list
+  schwab-agent account list --positions`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
@@ -205,8 +213,13 @@ func newAccountGetCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "get [hash]",
 		Short: "Get account details by hash value",
-		Example: "schwab-agent account get\n" +
-			"schwab-agent account get --positions",
+		Long: `Get details for a single account by hash value. The hash can be passed as a
+positional argument, via --account, or resolved from the default_account
+config. Results are enriched with nicknames from the preferences API. Use
+--positions to include current positions.`,
+		Example: `  schwab-agent account get
+  schwab-agent account get ABCDEF1234567890
+  schwab-agent account get --positions`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
@@ -255,9 +268,12 @@ func newAccountGetCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comm
 // newAccountNumbersCmd returns the Cobra subcommand for listing account numbers and hash values.
 func newAccountNumbersCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:     "numbers",
-		Short:   "List account numbers and hash values",
-		Example: "schwab-agent account numbers",
+		Use:   "numbers",
+		Short: "List account numbers and hash values",
+		Long: `List account numbers and their corresponding hash values. Hash values are
+used as account identifiers in all other commands. Use set-default to store
+a hash as the default account.`,
+		Example: "  schwab-agent account numbers",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			numbers, err := c.AccountNumbers(cmd.Context())
 			if err != nil {
@@ -273,9 +289,12 @@ func newAccountNumbersCmd(c *client.Ref, w io.Writer) *cobra.Command {
 // This command has no safety guard (no requireMutableEnabled) - matches existing behavior.
 func newAccountSetDefaultCmd(configPath string, w io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:     "set-default <hash>",
-		Short:   "Set the default account hash",
-		Example: "schwab-agent account set-default ABCDEF1234567890",
+		Use:   "set-default <hash>",
+		Short: "Set the default account hash",
+		Long: `Set the default account hash in the config file. Commands that require an
+account will use this value when --account is not specified. Run account
+numbers to find valid hash values.`,
+		Example: "  schwab-agent account set-default ABCDEF1234567890",
 		RunE: func(_ *cobra.Command, args []string) error {
 			hash := ""
 			if len(args) > 0 {
@@ -304,7 +323,10 @@ func newAccountTransactionCmd(c *client.Ref, configPath string, w io.Writer) *co
 	cmd := &cobra.Command{
 		Use:   "transaction",
 		Short: "List and look up account transactions",
-		RunE:  requireSubcommand,
+		Long: `Query transaction history for an account. Transactions are account-scoped and
+inherit the --account flag from the parent command. Filter by type, date range,
+and symbol.`,
+		RunE: requireSubcommand,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
@@ -322,9 +344,12 @@ func newAccountTransactionListCmd(c *client.Ref, configPath string, w io.Writer)
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List transactions for an account",
-		Example: "schwab-agent account transaction list\n" +
-			"schwab-agent account transaction list --types TRADE --symbol AAPL\n" +
-			"schwab-agent account transaction list --from 2025-01-01T00:00:00Z --to 2025-01-31T23:59:59Z",
+		Long: `List transactions for an account with optional filtering by type, date range,
+and symbol. Date values use ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Uses the
+default account unless --account is specified.`,
+		Example: `  schwab-agent account transaction list
+  schwab-agent account transaction list --types TRADE --symbol AAPL
+  schwab-agent account transaction list --from 2025-01-01T00:00:00Z --to 2025-01-31T23:59:59Z`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
