@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -45,9 +46,12 @@ func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
 
 // quoteGetOpts holds the options for the quote get subcommand.
 type quoteGetOpts struct {
-	Fields      []string
-	Indicative  bool
+	Fields     []string `flag:"fields" flagdescr:"Quote fields to return (repeatable): quote, fundamental, extended, reference, regular"`
+	Indicative bool     `flag:"indicative" flagdescr:"Request indicative (non-tradeable) quotes"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *quoteGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 // newQuoteGetCmd returns the Cobra subcommand for retrieving quotes.
 func newQuoteGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
@@ -55,9 +59,21 @@ func newQuoteGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "Get quotes for one or more symbols",
-		Long:  "Get quotes for one or more symbols with optional field filtering and indicative quotes",
-		Args:  cobra.MinimumNArgs(1),
+		Long: `Get quotes for one or more symbols. Multiple symbols return a partial response
+when some are missing. Use --fields to select specific data groups (quote,
+fundamental, extended, reference, regular). Key output fields include last
+price, bid/ask, volume, 52-week high/low, PE ratio, dividend yield, and
+market cap.`,
+		Example: `  schwab-agent quote get AAPL
+  schwab-agent quote get AAPL NVDA TSLA
+  schwab-agent quote get AAPL --fields quote,fundamental
+  schwab-agent quote get AAPL --fields fundamental --indicative`,
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			params, err := buildCobraQuoteParams(opts)
 			if err != nil {
 				return err
@@ -70,8 +86,9 @@ func newQuoteGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringSliceVar(&opts.Fields, "fields", nil, "Quote fields to return (repeatable): quote, fundamental, extended, reference, regular")
-	cmd.Flags().BoolVar(&opts.Indicative, "indicative", false, "Request indicative (non-tradeable) quotes")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }

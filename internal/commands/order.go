@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -54,223 +55,277 @@ type orderReplaceData struct {
 
 // orderListOpts holds local flags for the order list subcommand.
 type orderListOpts struct {
-	Status []string
-	From   string
-	To     string
+	Status []string `flag:"status" flagdescr:"Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc."`
+	From   string   `flag:"from" flagdescr:"Filter by entered time lower bound"`
+	To     string   `flag:"to" flagdescr:"Filter by entered time upper bound"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *orderListOpts) Attach(_ *cobra.Command) error { return nil }
 
 // orderGetOpts holds local flags for the order get subcommand.
 type orderGetOpts struct {
-	OrderID string
+	OrderID string `flag:"order-id" flagdescr:"Order ID"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *orderGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 // orderPlaceOpts holds local flags for top-level spec-based order placement.
 type orderPlaceOpts struct {
-	Spec    string
-	Confirm bool
+	Spec    string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin"`
+	Confirm bool   `flag:"confirm" flagdescr:"Confirm order placement"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *orderPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // orderPreviewOpts holds local flags for order preview.
 type orderPreviewOpts struct {
-	Spec string
+	Spec string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *orderPreviewOpts) Attach(_ *cobra.Command) error { return nil }
 
 // orderCancelOpts holds local flags for order cancellation.
 type orderCancelOpts struct {
-	OrderID string
-	Confirm bool
+	OrderID string `flag:"order-id" flagdescr:"Order ID"`
+	Confirm bool   `flag:"confirm" flagdescr:"Confirm cancellation"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *orderCancelOpts) Attach(_ *cobra.Command) error { return nil }
 
 // orderReplaceOpts holds local flags for order replacement.
 type orderReplaceOpts struct {
-	OrderID string
-	Confirm bool
+	OrderID string `flag:"order-id" flagdescr:"Order ID"`
+	Confirm bool   `flag:"confirm" flagdescr:"Confirm replacement"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *orderReplaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // equityPlaceOpts holds flags shared by equity place, build, and replace flows.
 type equityPlaceOpts struct {
-	Symbol             string
-	Action             string
-	Quantity           float64
-	Type               string
-	Price              float64
-	StopPrice          float64
-	StopOffset         float64
-	StopLinkBasis      string
-	StopLinkType       string
-	StopType           string
-	ActivationPrice    float64
-	Duration           string
-	Session            string
-	SpecialInstruction string
-	Destination        string
-	PriceLinkBasis     string
-	PriceLinkType      string
+	Symbol             string  `flag:"symbol" flagdescr:"Equity symbol"`
+	Action             string  `flag:"action" flagdescr:"Order action"`
+	Quantity           float64 `flag:"quantity" flagdescr:"Share quantity"`
+	Type               string  `flag:"type" flagdescr:"Order type"`
+	Price              float64 `flag:"price" flagdescr:"Limit price"`
+	StopPrice          float64 `flag:"stop-price" flagdescr:"Stop price"`
+	StopOffset         float64 `flag:"stop-offset" flagdescr:"Trailing stop offset amount"`
+	StopLinkBasis      string  `flag:"stop-link-basis" flagdescr:"Trailing stop reference price (LAST, BID, ASK, MARK)"`
+	StopLinkType       string  `flag:"stop-link-type" flagdescr:"Trailing stop offset type (VALUE, PERCENT, TICK)"`
+	StopType           string  `flag:"stop-type" flagdescr:"Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)"`
+	ActivationPrice    float64 `flag:"activation-price" flagdescr:"Price that activates the trailing stop"`
+	Duration           string  `flag:"duration" flagdescr:"Order duration"`
+	Session            string  `flag:"session" flagdescr:"Trading session"`
+	SpecialInstruction string  `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"`
+	Destination        string  `flag:"destination" flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)"`
+	PriceLinkBasis     string  `flag:"price-link-basis" flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)"`
+	PriceLinkType      string  `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *equityPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // optionPlaceOpts holds flags shared by option place and build flows.
 type optionPlaceOpts struct {
-	Underlying         string
-	Expiration         string
-	Strike             float64
-	Call               bool
-	Put                bool
-	Action             string
-	Quantity           float64
-	Type               string
-	Price              float64
-	Duration           string
-	Session            string
-	SpecialInstruction string
-	Destination        string
-	PriceLinkBasis     string
-	PriceLinkType      string
+	Underlying         string  `flag:"underlying" flagdescr:"Underlying symbol"`
+	Expiration         string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
+	Strike             float64 `flag:"strike" flagdescr:"Strike price"`
+	Call               bool    `flag:"call" flagdescr:"Call option"`
+	Put                bool    `flag:"put" flagdescr:"Put option"`
+	Action             string  `flag:"action" flagdescr:"Order action"`
+	Quantity           float64 `flag:"quantity" flagdescr:"Contract quantity"`
+	Type               string  `flag:"type" flagdescr:"Order type"`
+	Price              float64 `flag:"price" flagdescr:"Limit price"`
+	Duration           string  `flag:"duration" flagdescr:"Order duration"`
+	Session            string  `flag:"session" flagdescr:"Trading session"`
+	SpecialInstruction string  `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"`
+	Destination        string  `flag:"destination" flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)"`
+	PriceLinkBasis     string  `flag:"price-link-basis" flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)"`
+	PriceLinkType      string  `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *optionPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // bracketPlaceOpts holds flags shared by bracket place and build flows.
 type bracketPlaceOpts struct {
-	Symbol     string
-	Action     string
-	Quantity   float64
-	Type       string
-	Price      float64
-	TakeProfit float64
-	StopLoss   float64
-	Duration   string
-	Session    string
+	Symbol     string  `flag:"symbol" flagdescr:"Equity symbol"`
+	Action     string  `flag:"action" flagdescr:"Order action"`
+	Quantity   float64 `flag:"quantity" flagdescr:"Share quantity"`
+	Type       string  `flag:"type" flagdescr:"Entry order type"`
+	Price      float64 `flag:"price" flagdescr:"Entry price"`
+	TakeProfit float64 `flag:"take-profit" flagdescr:"Take-profit exit price"`
+	StopLoss   float64 `flag:"stop-loss" flagdescr:"Stop-loss exit price"`
+	Duration   string  `flag:"duration" flagdescr:"Order duration"`
+	Session    string  `flag:"session" flagdescr:"Trading session"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *bracketPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // ocoPlaceOpts holds flags shared by OCO place and build flows.
 type ocoPlaceOpts struct {
-	Symbol     string
-	Action     string
-	Quantity   float64
-	TakeProfit float64
-	StopLoss   float64
-	Duration   string
-	Session    string
+	Symbol     string  `flag:"symbol" flagdescr:"Equity symbol"`
+	Action     string  `flag:"action" flagdescr:"Exit action (SELL to close long, BUY to close short)"`
+	Quantity   float64 `flag:"quantity" flagdescr:"Share quantity"`
+	TakeProfit float64 `flag:"take-profit" flagdescr:"Take-profit exit price (limit order)"`
+	StopLoss   float64 `flag:"stop-loss" flagdescr:"Stop-loss exit price (stop order)"`
+	Duration   string  `flag:"duration" flagdescr:"Order duration"`
+	Session    string  `flag:"session" flagdescr:"Trading session"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *ocoPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // verticalBuildOpts holds flags for vertical spread build flows.
 type verticalBuildOpts struct {
-	Underlying  string
-	Expiration  string
-	LongStrike  float64
-	ShortStrike float64
-	Call        bool
-	Put         bool
-	Open        bool
-	Close       bool
-	Quantity    float64
-	Price       float64
-	Duration    string
-	Session     string
+	Underlying  string  `flag:"underlying" flagdescr:"Underlying symbol"`
+	Expiration  string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
+	LongStrike  float64 `flag:"long-strike" flagdescr:"Strike price of the option being bought"`
+	ShortStrike float64 `flag:"short-strike" flagdescr:"Strike price of the option being sold"`
+	Call        bool    `flag:"call" flagdescr:"Call spread"`
+	Put         bool    `flag:"put" flagdescr:"Put spread"`
+	Open        bool    `flag:"open" flagdescr:"Opening position"`
+	Close       bool    `flag:"close" flagdescr:"Closing position"`
+	Quantity    float64 `flag:"quantity" flagdescr:"Number of contracts"`
+	Price       float64 `flag:"price" flagdescr:"Net debit or credit amount"`
+	Duration    string  `flag:"duration" flagdescr:"Order duration"`
+	Session     string  `flag:"session" flagdescr:"Trading session"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *verticalBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // ironCondorBuildOpts holds flags for iron condor build flows.
 type ironCondorBuildOpts struct {
-	Underlying      string
-	Expiration      string
-	PutLongStrike   float64
-	PutShortStrike  float64
-	CallShortStrike float64
-	CallLongStrike  float64
-	Open            bool
-	Close           bool
-	Quantity        float64
-	Price           float64
-	Duration        string
-	Session         string
+	Underlying      string  `flag:"underlying" flagdescr:"Underlying symbol"`
+	Expiration      string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
+	PutLongStrike   float64 `flag:"put-long-strike" flagdescr:"Lowest strike: put being bought (protection)"`
+	PutShortStrike  float64 `flag:"put-short-strike" flagdescr:"Put being sold (premium)"`
+	CallShortStrike float64 `flag:"call-short-strike" flagdescr:"Call being sold (premium)"`
+	CallLongStrike  float64 `flag:"call-long-strike" flagdescr:"Highest strike: call being bought (protection)"`
+	Open            bool    `flag:"open" flagdescr:"Opening position"`
+	Close           bool    `flag:"close" flagdescr:"Closing position"`
+	Quantity        float64 `flag:"quantity" flagdescr:"Number of contracts"`
+	Price           float64 `flag:"price" flagdescr:"Net credit or debit amount"`
+	Duration        string  `flag:"duration" flagdescr:"Order duration"`
+	Session         string  `flag:"session" flagdescr:"Trading session"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *ironCondorBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // strangleBuildOpts holds flags for strangle build flows.
 type strangleBuildOpts struct {
-	Underlying string
-	Expiration string
-	CallStrike float64
-	PutStrike  float64
-	Buy        bool
-	Sell       bool
-	Open       bool
-	Close      bool
-	Quantity   float64
-	Price      float64
-	Duration   string
-	Session    string
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
+	CallStrike float64 `flag:"call-strike" flagdescr:"Strike price for the call leg"`
+	PutStrike  float64 `flag:"put-strike" flagdescr:"Strike price for the put leg"`
+	Buy        bool    `flag:"buy" flagdescr:"Buy the strangle (long, net debit)"`
+	Sell       bool    `flag:"sell" flagdescr:"Sell the strangle (short, net credit)"`
+	Open       bool    `flag:"open" flagdescr:"Opening position"`
+	Close      bool    `flag:"close" flagdescr:"Closing position"`
+	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts"`
+	Price      float64 `flag:"price" flagdescr:"Net debit or credit amount"`
+	Duration   string  `flag:"duration" flagdescr:"Order duration"`
+	Session    string  `flag:"session" flagdescr:"Trading session"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *strangleBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // straddleBuildOpts holds flags for straddle build flows.
 type straddleBuildOpts struct {
-	Underlying string
-	Expiration string
-	Strike     float64
-	Buy        bool
-	Sell       bool
-	Open       bool
-	Close      bool
-	Quantity   float64
-	Price      float64
-	Duration   string
-	Session    string
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
+	Strike     float64 `flag:"strike" flagdescr:"Strike price (shared by call and put legs)"`
+	Buy        bool    `flag:"buy" flagdescr:"Buy the straddle (long, net debit)"`
+	Sell       bool    `flag:"sell" flagdescr:"Sell the straddle (short, net credit)"`
+	Open       bool    `flag:"open" flagdescr:"Opening position"`
+	Close      bool    `flag:"close" flagdescr:"Closing position"`
+	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts"`
+	Price      float64 `flag:"price" flagdescr:"Net debit or credit amount"`
+	Duration   string  `flag:"duration" flagdescr:"Order duration"`
+	Session    string  `flag:"session" flagdescr:"Trading session"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *straddleBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // coveredCallBuildOpts holds flags for covered call build flows.
 type coveredCallBuildOpts struct {
-	Underlying string
-	Expiration string
-	Strike     float64
-	Quantity   float64
-	Price      float64
-	Duration   string
-	Session    string
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
+	Strike     float64 `flag:"strike" flagdescr:"Call strike price"`
+	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts (1 contract = 100 shares)"`
+	Price      float64 `flag:"price" flagdescr:"Net debit amount"`
+	Duration   string  `flag:"duration" flagdescr:"Order duration"`
+	Session    string  `flag:"session" flagdescr:"Trading session"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *coveredCallBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // collarBuildOpts holds flags for collar-with-stock build flows.
 type collarBuildOpts struct {
-	Underlying string
-	PutStrike  float64
-	CallStrike float64
-	Expiration string
-	Quantity   float64
-	Open       bool
-	Close      bool
-	Price      float64
-	Duration   string
-	Session    string
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol"`
+	PutStrike  float64 `flag:"put-strike" flagdescr:"Protective put strike price"`
+	CallStrike float64 `flag:"call-strike" flagdescr:"Covered call strike price"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date for both options (YYYY-MM-DD)"`
+	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts (1 contract = 100 shares)"`
+	Open       bool    `flag:"open" flagdescr:"Opening position"`
+	Close      bool    `flag:"close" flagdescr:"Closing position"`
+	Price      float64 `flag:"price" flagdescr:"Net debit amount"`
+	Duration   string  `flag:"duration" flagdescr:"Order duration"`
+	Session    string  `flag:"session" flagdescr:"Trading session"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *collarBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // calendarBuildOpts holds flags for calendar spread build flows.
 type calendarBuildOpts struct {
-	Underlying     string
-	NearExpiration string
-	FarExpiration  string
-	Strike         float64
-	Call           bool
-	Put            bool
-	Open           bool
-	Close          bool
-	Quantity       float64
-	Price          float64
-	Duration       string
-	Session        string
+	Underlying     string  `flag:"underlying" flagdescr:"Underlying symbol"`
+	NearExpiration string  `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)"`
+	FarExpiration  string  `flag:"far-expiration" flagdescr:"Far-term expiration date (YYYY-MM-DD)"`
+	Strike         float64 `flag:"strike" flagdescr:"Strike price (shared by both legs)"`
+	Call           bool    `flag:"call" flagdescr:"Call calendar spread"`
+	Put            bool    `flag:"put" flagdescr:"Put calendar spread"`
+	Open           bool    `flag:"open" flagdescr:"Opening position"`
+	Close          bool    `flag:"close" flagdescr:"Closing position"`
+	Quantity       float64 `flag:"quantity" flagdescr:"Number of contracts"`
+	Price          float64 `flag:"price" flagdescr:"Net debit amount"`
+	Duration       string  `flag:"duration" flagdescr:"Order duration"`
+	Session        string  `flag:"session" flagdescr:"Trading session"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *calendarBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // diagonalBuildOpts holds flags for diagonal spread build flows.
 type diagonalBuildOpts struct {
-	Underlying     string
-	NearExpiration string
-	FarExpiration  string
-	NearStrike     float64
-	FarStrike      float64
-	Call           bool
-	Put            bool
-	Open           bool
-	Close          bool
-	Quantity       float64
-	Price          float64
-	Duration       string
-	Session        string
+	Underlying     string  `flag:"underlying" flagdescr:"Underlying symbol"`
+	NearExpiration string  `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)"`
+	FarExpiration  string  `flag:"far-expiration" flagdescr:"Far-term expiration date (YYYY-MM-DD)"`
+	NearStrike     float64 `flag:"near-strike" flagdescr:"Strike price for the near-term (sold) leg"`
+	FarStrike      float64 `flag:"far-strike" flagdescr:"Strike price for the far-term (bought) leg"`
+	Call           bool    `flag:"call" flagdescr:"Call diagonal spread"`
+	Put            bool    `flag:"put" flagdescr:"Put diagonal spread"`
+	Open           bool    `flag:"open" flagdescr:"Opening position"`
+	Close          bool    `flag:"close" flagdescr:"Closing position"`
+	Quantity       float64 `flag:"quantity" flagdescr:"Number of contracts"`
+	Price          float64 `flag:"price" flagdescr:"Net debit amount"`
+	Duration       string  `flag:"duration" flagdescr:"Order duration"`
+	Session        string  `flag:"session" flagdescr:"Trading session"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *diagonalBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 const confirmOrderMessage = "Add --confirm to execute this order"
 
@@ -280,8 +335,12 @@ const mutableDisabledMessage = `Mutable operations are disabled by default. ` +
 // NewOrderCmd returns the Cobra command for order operations.
 func NewOrderCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "order",
-		Short:   "List, build, preview, place, cancel, and replace orders",
+		Use:   "order",
+		Short: "List, build, preview, place, cancel, and replace orders",
+		Long: `Manage orders across your Schwab accounts. Supports listing, viewing, placing,
+previewing, building, canceling, and replacing orders. Placing, canceling, and
+replacing orders require both the "i-also-like-to-live-dangerously" config flag
+and --confirm on each command. Duration aliases GTC, FOK, and IOC are accepted.`,
 		GroupID: "trading",
 		RunE:    requireSubcommand,
 	}
@@ -328,13 +387,21 @@ func newOrderListCmd(c *client.Ref, _ string, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List orders (defaults to non-terminal statuses)",
-		Example: `schwab-agent order list
-schwab-agent order list --status all
-schwab-agent order list --status FILLED
-schwab-agent order list --status WORKING --status PENDING_ACTIVATION
-schwab-agent order list --status WORKING,PENDING_ACTIVATION
-schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
+		Long: `List orders for the current account, or all accounts when no --account is set.
+By default, terminal statuses (FILLED, CANCELED, REJECTED, EXPIRED, REPLACED)
+are filtered out to show only actionable orders. Use --status all to see
+everything. Multiple --status values fan out into separate API calls with
+merged, deduplicated results.`,
+		Example: `  schwab-agent order list
+  schwab-agent order list --status all
+  schwab-agent order list --status WORKING --status PENDING_ACTIVATION
+  schwab-agent order list --status WORKING,FILLED,EXPIRED
+  schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			var statuses []string
 			for _, raw := range opts.Status {
 				for part := range strings.SplitSeq(raw, ",") {
@@ -388,9 +455,9 @@ schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 		},
 	}
 
-	cmd.Flags().StringSliceVar(&opts.Status, "status", nil, "Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc.")
-	cmd.Flags().StringVar(&opts.From, "from", "", "Filter by entered time lower bound")
-	cmd.Flags().StringVar(&opts.To, "to", "", "Filter by entered time upper bound")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -401,9 +468,16 @@ func newOrderGetCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "get [order-id]",
 		Short: "Get an order by ID",
-		Example: `schwab-agent order get 1234567890
-schwab-agent order get --order-id 1234567890`,
+		Long: `Retrieve a single order by its ID. The order ID can be passed as a positional
+argument or with the --order-id flag. When both are provided, the flag takes
+priority. Requires a default account or --account flag.`,
+		Example: `  schwab-agent order get 1234567890
+  schwab-agent order get --order-id 1234567890`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			orderID, err := parseRequiredOrderID(opts.OrderID, args)
 			if err != nil {
 				return err
@@ -428,7 +502,9 @@ schwab-agent order get --order-id 1234567890`,
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.OrderID, "order-id", "", "Order ID")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -439,9 +515,22 @@ func newOrderPlaceCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "place",
 		Short: "Place an order",
-		Example: `schwab-agent order place --spec @order.json --confirm
-schwab-agent order place --spec - --confirm`,
+		Long: `Place an order via subcommand (equity, option, bracket, oco) or from a JSON spec
+with --spec. Both safety guards are required: set "i-also-like-to-live-dangerously"
+to true in config.json, and pass --confirm on every placement. Recommended workflow:
+check the price with quote get, build the order JSON with order build, preview it
+with order preview, then place with --confirm.`,
+		Example: `  # Place from a JSON file
+  schwab-agent order place --spec @order.json --confirm
+  # Place from stdin (piped from order build)
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec - --confirm
+  # Place from inline JSON
+  schwab-agent order place --spec '{"orderType":"LIMIT",...}' --confirm`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			if strings.TrimSpace(opts.Spec) == "" {
 				return newValidationError("spec is required for `order place` without a subcommand")
 			}
@@ -487,14 +576,61 @@ schwab-agent order place --spec - --confirm`,
 	}
 
 	cmd.SetFlagErrorFunc(suggestSubcommands)
-	cmd.Flags().StringVar(&opts.Spec, "spec", "", "Inline JSON, @file, or - for stdin")
-	cmd.Flags().BoolVar(&opts.Confirm, "confirm", false, "Confirm order placement")
-	cmd.AddCommand(
-		makeCobraPlaceOrderCommand(c, configPath, w, "equity", "Place an equity order", func() *equityPlaceOpts { return &equityPlaceOpts{} }, equityOrderFlagSetup, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder),
-		makeCobraPlaceOrderCommand(c, configPath, w, "option", "Place an option order", func() *optionPlaceOpts { return &optionPlaceOpts{} }, optionOrderFlagSetup, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder),
-		makeCobraPlaceOrderCommand(c, configPath, w, "bracket", "Place a bracket order", func() *bracketPlaceOpts { return &bracketPlaceOpts{} }, bracketOrderFlagSetup, parseBracketParams, orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder),
-		makeCobraPlaceOrderCommand(c, configPath, w, "oco", "Place a one-cancels-other order for an existing position", func() *ocoPlaceOpts { return &ocoPlaceOpts{} }, ocoOrderFlagSetup, parseOCOParams, orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder),
-	)
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
+
+	equityCmd := makeCobraPlaceOrderCommand(c, configPath, w, "equity", "Place an equity order", func() *equityPlaceOpts { return &equityPlaceOpts{} }, equityOrderFlagSetup, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
+	equityCmd.Long = `Place an equity (stock) order. Supports MARKET, LIMIT, STOP, STOP_LIMIT, and
+TRAILING_STOP order types. Default type is MARKET if --type is omitted. Duration
+aliases GTC, FOK, and IOC are accepted alongside their full names. Both safety
+guards are required for placement.`
+	equityCmd.Example = `  # Buy 10 shares at market price
+  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --confirm
+  # Buy with a limit price, good till cancel
+  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC --confirm
+  # Sell with a trailing stop ($2.50 offset)
+  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type TRAILING_STOP --stop-offset 2.50 --confirm
+  # Sell with a stop-limit order
+  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type STOP_LIMIT --stop-price 145 --price 144 --confirm`
+
+	optionCmd := makeCobraPlaceOrderCommand(c, configPath, w, "option", "Place an option order", func() *optionPlaceOpts { return &optionPlaceOpts{} }, optionOrderFlagSetup, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder)
+	optionCmd.Long = `Place a single-leg option order. Requires --underlying, --expiration, --strike,
+and exactly one of --call or --put. Use BUY_TO_OPEN/SELL_TO_CLOSE for new
+positions and SELL_TO_OPEN/BUY_TO_CLOSE for existing ones. Both safety guards
+are required for placement.`
+	optionCmd.Example = `  # Buy a call option to open
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --confirm
+  # Sell a put at a limit price
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50 --confirm
+  # Close an existing call position
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action SELL_TO_CLOSE --quantity 1 --confirm`
+
+	bracketCmd := makeCobraPlaceOrderCommand(c, configPath, w, "bracket", "Place a bracket order", func() *bracketPlaceOpts { return &bracketPlaceOpts{} }, bracketOrderFlagSetup, parseBracketParams, orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder)
+	bracketCmd.Long = `Place a bracket order that combines an entry trade with automatic exit orders.
+At least one of --take-profit or --stop-loss is required. Exit instructions are
+auto-inverted from the entry action (BUY entry creates SELL exits). Canceling
+the parent cascades to all child orders.`
+	bracketCmd.Example = `  # Buy with both take-profit and stop-loss
+  schwab-agent order place bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120 --confirm
+  # Buy with only a stop-loss safety net
+  schwab-agent order place bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170 --confirm
+  # Buy with only a take-profit target
+  schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300 --confirm`
+
+	ocoCmd := makeCobraPlaceOrderCommand(c, configPath, w, "oco", "Place a one-cancels-other order for an existing position", func() *ocoPlaceOpts { return &ocoPlaceOpts{} }, ocoOrderFlagSetup, parseOCOParams, orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder)
+	ocoCmd.Long = `Place a one-cancels-other order for an existing position. When one exit fills,
+the other is automatically canceled. At least one of --take-profit or --stop-loss
+is required. For long positions use SELL; for short positions use BUY. Unlike
+bracket orders, OCO has no entry leg.`
+	ocoCmd.Example = `  # Set take-profit and stop-loss for a long position
+  schwab-agent order place oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140 --confirm
+  # Protect a position with only a stop-loss
+  schwab-agent order place oco --symbol AAPL --action SELL --quantity 50 --stop-loss 140 --confirm
+  # Close a short position with exits
+  schwab-agent order place oco --symbol TSLA --action BUY --quantity 10 --take-profit 200 --stop-loss 250 --confirm`
+
+	cmd.AddCommand(equityCmd, optionCmd, bracketCmd, ocoCmd)
 
 	return cmd
 }
@@ -518,6 +654,10 @@ func makeCobraPlaceOrderCommand[O any, P any](
 		Use:   name,
 		Short: usage,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, any(opts).(structcli.Options)); err != nil {
+				return err
+			}
+
 			configFlag, err := cmd.Flags().GetString("config")
 			if err != nil {
 				return err
@@ -579,10 +719,19 @@ func makeCobraPlaceOrderCommand[O any, P any](
 func newOrderPreviewCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 	opts := &orderPreviewOpts{}
 	cmd := &cobra.Command{
-		Use:     "preview",
-		Short:   "Preview an order from JSON spec",
-		Example: "schwab-agent order preview --spec @order.json",
+		Use:   "preview",
+		Short: "Preview an order from JSON spec",
+		Long: `Preview an order from a JSON spec without placing it. Returns estimated
+commissions, fees, and order details. Pipe output from order build for a
+build-then-preview workflow. Does not require safety guards since no order
+is actually placed.`,
+		Example: `  schwab-agent order preview --spec @order.json
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			if strings.TrimSpace(opts.Spec) == "" {
 				return newValidationError("spec is required")
 			}
@@ -611,7 +760,9 @@ func newOrderPreviewCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Co
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Spec, "spec", "", "Inline JSON, @file, or - for stdin")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -622,9 +773,16 @@ func newOrderCancelCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Com
 	cmd := &cobra.Command{
 		Use:   "cancel [order-id]",
 		Short: "Cancel an order",
-		Example: `schwab-agent order cancel 1234567890 --confirm
-schwab-agent order cancel --order-id 1234567890 --confirm`,
+		Long: `Cancel an existing order by ID. Requires both safety guards: the
+"i-also-like-to-live-dangerously" config flag and --confirm. The order ID can
+be passed as a positional argument or with --order-id (flag takes priority).`,
+		Example: `  schwab-agent order cancel 1234567890 --confirm
+  schwab-agent order cancel --order-id 1234567890 --confirm`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			configFlag, err := cmd.Flags().GetString("config")
 			if err != nil {
 				return err
@@ -664,8 +822,9 @@ schwab-agent order cancel --order-id 1234567890 --confirm`,
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.OrderID, "order-id", "", "Order ID")
-	cmd.Flags().BoolVar(&opts.Confirm, "confirm", false, "Confirm cancellation")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -677,9 +836,20 @@ func newOrderReplaceCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "replace [order-id]",
 		Short: "Replace an order with a new equity order spec",
-		Example: `schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
-schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm`,
+		Long: `Replace an existing order with a new equity order. The original order is
+canceled and a new one is created with a new ID. Only equity order flags are
+accepted. Requires both safety guards. The original order status becomes
+REPLACED after the new order is created.`,
+		Example: `  schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
+  schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+			if err := structcli.Unmarshal(cmd, equityOpts); err != nil {
+				return err
+			}
+
 			configFlag, err := cmd.Flags().GetString("config")
 			if err != nil {
 				return err
@@ -734,76 +904,41 @@ schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --qu
 	}
 
 	equityOrderFlagSetup(cmd, equityOpts)
-	cmd.Flags().StringVar(&opts.OrderID, "order-id", "", "Order ID")
-	cmd.Flags().BoolVar(&opts.Confirm, "confirm", false, "Confirm replacement")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
 
 // equityOrderFlagSetup registers equity order flags on cmd.
 func equityOrderFlagSetup(cmd *cobra.Command, opts *equityPlaceOpts) {
-	cmd.Flags().StringVar(&opts.Symbol, "symbol", "", "Equity symbol")
-	cmd.Flags().StringVar(&opts.Action, "action", "", "Order action")
-	cmd.Flags().Float64Var(&opts.Quantity, "quantity", 0, "Share quantity")
-	cmd.Flags().StringVar(&opts.Type, "type", "", "Order type")
-	cmd.Flags().Float64Var(&opts.Price, "price", 0, "Limit price")
-	cmd.Flags().Float64Var(&opts.StopPrice, "stop-price", 0, "Stop price")
-	cmd.Flags().Float64Var(&opts.StopOffset, "stop-offset", 0, "Trailing stop offset amount")
-	cmd.Flags().StringVar(&opts.StopLinkBasis, "stop-link-basis", "", "Trailing stop reference price (LAST, BID, ASK, MARK)")
-	cmd.Flags().StringVar(&opts.StopLinkType, "stop-link-type", "", "Trailing stop offset type (VALUE, PERCENT, TICK)")
-	cmd.Flags().StringVar(&opts.StopType, "stop-type", "", "Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)")
-	cmd.Flags().Float64Var(&opts.ActivationPrice, "activation-price", 0, "Price that activates the trailing stop")
-	cmd.Flags().StringVar(&opts.Duration, "duration", "", "Order duration")
-	cmd.Flags().StringVar(&opts.Session, "session", "", "Trading session")
-	cmd.Flags().StringVar(&opts.SpecialInstruction, "special-instruction", "", "Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)")
-	cmd.Flags().StringVar(&opts.Destination, "destination", "", "Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)")
-	cmd.Flags().StringVar(&opts.PriceLinkBasis, "price-link-basis", "", "Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)")
-	cmd.Flags().StringVar(&opts.PriceLinkType, "price-link-type", "", "Price link offset type (VALUE, PERCENT, TICK)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 }
 
 // optionOrderFlagSetup registers option order flags on cmd.
 func optionOrderFlagSetup(cmd *cobra.Command, opts *optionPlaceOpts) {
-	cmd.Flags().StringVar(&opts.Underlying, "underlying", "", "Underlying symbol")
-	cmd.Flags().StringVar(&opts.Expiration, "expiration", "", "Expiration date (YYYY-MM-DD)")
-	cmd.Flags().Float64Var(&opts.Strike, "strike", 0, "Strike price")
-	cmd.Flags().BoolVar(&opts.Call, "call", false, "Call option")
-	cmd.Flags().BoolVar(&opts.Put, "put", false, "Put option")
-	cmd.Flags().StringVar(&opts.Action, "action", "", "Order action")
-	cmd.Flags().Float64Var(&opts.Quantity, "quantity", 0, "Contract quantity")
-	cmd.Flags().StringVar(&opts.Type, "type", "", "Order type")
-	cmd.Flags().Float64Var(&opts.Price, "price", 0, "Limit price")
-	cmd.Flags().StringVar(&opts.Duration, "duration", "", "Order duration")
-	cmd.Flags().StringVar(&opts.Session, "session", "", "Trading session")
-	cmd.Flags().StringVar(&opts.SpecialInstruction, "special-instruction", "", "Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)")
-	cmd.Flags().StringVar(&opts.Destination, "destination", "", "Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)")
-	cmd.Flags().StringVar(&opts.PriceLinkBasis, "price-link-basis", "", "Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)")
-	cmd.Flags().StringVar(&opts.PriceLinkType, "price-link-type", "", "Price link offset type (VALUE, PERCENT, TICK)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 	cmd.MarkFlagsMutuallyExclusive("call", "put")
 	cmd.MarkFlagsOneRequired("call", "put")
 }
 
 // bracketOrderFlagSetup registers bracket order flags on cmd.
 func bracketOrderFlagSetup(cmd *cobra.Command, opts *bracketPlaceOpts) {
-	cmd.Flags().StringVar(&opts.Symbol, "symbol", "", "Equity symbol")
-	cmd.Flags().StringVar(&opts.Action, "action", "", "Order action")
-	cmd.Flags().Float64Var(&opts.Quantity, "quantity", 0, "Share quantity")
-	cmd.Flags().StringVar(&opts.Type, "type", "", "Entry order type")
-	cmd.Flags().Float64Var(&opts.Price, "price", 0, "Entry price")
-	cmd.Flags().Float64Var(&opts.TakeProfit, "take-profit", 0, "Take-profit exit price")
-	cmd.Flags().Float64Var(&opts.StopLoss, "stop-loss", 0, "Stop-loss exit price")
-	cmd.Flags().StringVar(&opts.Duration, "duration", "", "Order duration")
-	cmd.Flags().StringVar(&opts.Session, "session", "", "Trading session")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 }
 
 // ocoOrderFlagSetup registers standalone OCO order flags on cmd.
 func ocoOrderFlagSetup(cmd *cobra.Command, opts *ocoPlaceOpts) {
-	cmd.Flags().StringVar(&opts.Symbol, "symbol", "", "Equity symbol")
-	cmd.Flags().StringVar(&opts.Action, "action", "", "Exit action (SELL to close long, BUY to close short)")
-	cmd.Flags().Float64Var(&opts.Quantity, "quantity", 0, "Share quantity")
-	cmd.Flags().Float64Var(&opts.TakeProfit, "take-profit", 0, "Take-profit exit price (limit order)")
-	cmd.Flags().Float64Var(&opts.StopLoss, "stop-loss", 0, "Stop-loss exit price (stop order)")
-	cmd.Flags().StringVar(&opts.Duration, "duration", "", "Order duration")
-	cmd.Flags().StringVar(&opts.Session, "session", "", "Trading session")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 }
 
 // parseOCOParams converts command flags into standalone OCO builder params.
@@ -831,18 +966,9 @@ func parseOCOParams(opts *ocoPlaceOpts, _ []string) (*orderbuilder.OCOParams, er
 
 // verticalOrderFlagSetup registers vertical spread flags on cmd.
 func verticalOrderFlagSetup(cmd *cobra.Command, opts *verticalBuildOpts) {
-	cmd.Flags().StringVar(&opts.Underlying, "underlying", "", "Underlying symbol")
-	cmd.Flags().StringVar(&opts.Expiration, "expiration", "", "Expiration date (YYYY-MM-DD)")
-	cmd.Flags().Float64Var(&opts.LongStrike, "long-strike", 0, "Strike price of the option being bought")
-	cmd.Flags().Float64Var(&opts.ShortStrike, "short-strike", 0, "Strike price of the option being sold")
-	cmd.Flags().BoolVar(&opts.Call, "call", false, "Call spread")
-	cmd.Flags().BoolVar(&opts.Put, "put", false, "Put spread")
-	cmd.Flags().BoolVar(&opts.Open, "open", false, "Opening position")
-	cmd.Flags().BoolVar(&opts.Close, "close", false, "Closing position")
-	cmd.Flags().Float64Var(&opts.Quantity, "quantity", 0, "Number of contracts")
-	cmd.Flags().Float64Var(&opts.Price, "price", 0, "Net debit or credit amount")
-	cmd.Flags().StringVar(&opts.Duration, "duration", "", "Order duration")
-	cmd.Flags().StringVar(&opts.Session, "session", "", "Trading session")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 	cmd.MarkFlagsMutuallyExclusive("call", "put")
 	cmd.MarkFlagsOneRequired("call", "put")
 	cmd.MarkFlagsMutuallyExclusive("open", "close")
@@ -851,18 +977,9 @@ func verticalOrderFlagSetup(cmd *cobra.Command, opts *verticalBuildOpts) {
 
 // ironCondorOrderFlagSetup registers iron condor flags on cmd.
 func ironCondorOrderFlagSetup(cmd *cobra.Command, opts *ironCondorBuildOpts) {
-	cmd.Flags().StringVar(&opts.Underlying, "underlying", "", "Underlying symbol")
-	cmd.Flags().StringVar(&opts.Expiration, "expiration", "", "Expiration date (YYYY-MM-DD)")
-	cmd.Flags().Float64Var(&opts.PutLongStrike, "put-long-strike", 0, "Lowest strike: put being bought (protection)")
-	cmd.Flags().Float64Var(&opts.PutShortStrike, "put-short-strike", 0, "Put being sold (premium)")
-	cmd.Flags().Float64Var(&opts.CallShortStrike, "call-short-strike", 0, "Call being sold (premium)")
-	cmd.Flags().Float64Var(&opts.CallLongStrike, "call-long-strike", 0, "Highest strike: call being bought (protection)")
-	cmd.Flags().BoolVar(&opts.Open, "open", false, "Opening position")
-	cmd.Flags().BoolVar(&opts.Close, "close", false, "Closing position")
-	cmd.Flags().Float64Var(&opts.Quantity, "quantity", 0, "Number of contracts")
-	cmd.Flags().Float64Var(&opts.Price, "price", 0, "Net credit or debit amount")
-	cmd.Flags().StringVar(&opts.Duration, "duration", "", "Order duration")
-	cmd.Flags().StringVar(&opts.Session, "session", "", "Trading session")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 	cmd.MarkFlagsMutuallyExclusive("open", "close")
 	cmd.MarkFlagsOneRequired("open", "close")
 }
@@ -1385,18 +1502,9 @@ func parseVerticalParams(opts *verticalBuildOpts, _ []string) (*orderbuilder.Ver
 
 // strangleOrderFlagSetup registers strangle flags on cmd.
 func strangleOrderFlagSetup(cmd *cobra.Command, opts *strangleBuildOpts) {
-	cmd.Flags().StringVar(&opts.Underlying, "underlying", "", "Underlying symbol")
-	cmd.Flags().StringVar(&opts.Expiration, "expiration", "", "Expiration date (YYYY-MM-DD)")
-	cmd.Flags().Float64Var(&opts.CallStrike, "call-strike", 0, "Strike price for the call leg")
-	cmd.Flags().Float64Var(&opts.PutStrike, "put-strike", 0, "Strike price for the put leg")
-	cmd.Flags().BoolVar(&opts.Buy, "buy", false, "Buy the strangle (long, net debit)")
-	cmd.Flags().BoolVar(&opts.Sell, "sell", false, "Sell the strangle (short, net credit)")
-	cmd.Flags().BoolVar(&opts.Open, "open", false, "Opening position")
-	cmd.Flags().BoolVar(&opts.Close, "close", false, "Closing position")
-	cmd.Flags().Float64Var(&opts.Quantity, "quantity", 0, "Number of contracts")
-	cmd.Flags().Float64Var(&opts.Price, "price", 0, "Net debit or credit amount")
-	cmd.Flags().StringVar(&opts.Duration, "duration", "", "Order duration")
-	cmd.Flags().StringVar(&opts.Session, "session", "", "Trading session")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 	cmd.MarkFlagsMutuallyExclusive("buy", "sell")
 	cmd.MarkFlagsOneRequired("buy", "sell")
 	cmd.MarkFlagsMutuallyExclusive("open", "close")
@@ -1441,17 +1549,9 @@ func parseStrangleParams(opts *strangleBuildOpts, _ []string) (*orderbuilder.Str
 
 // straddleOrderFlagSetup registers straddle flags on cmd.
 func straddleOrderFlagSetup(cmd *cobra.Command, opts *straddleBuildOpts) {
-	cmd.Flags().StringVar(&opts.Underlying, "underlying", "", "Underlying symbol")
-	cmd.Flags().StringVar(&opts.Expiration, "expiration", "", "Expiration date (YYYY-MM-DD)")
-	cmd.Flags().Float64Var(&opts.Strike, "strike", 0, "Strike price (shared by call and put legs)")
-	cmd.Flags().BoolVar(&opts.Buy, "buy", false, "Buy the straddle (long, net debit)")
-	cmd.Flags().BoolVar(&opts.Sell, "sell", false, "Sell the straddle (short, net credit)")
-	cmd.Flags().BoolVar(&opts.Open, "open", false, "Opening position")
-	cmd.Flags().BoolVar(&opts.Close, "close", false, "Closing position")
-	cmd.Flags().Float64Var(&opts.Quantity, "quantity", 0, "Number of contracts")
-	cmd.Flags().Float64Var(&opts.Price, "price", 0, "Net debit or credit amount")
-	cmd.Flags().StringVar(&opts.Duration, "duration", "", "Order duration")
-	cmd.Flags().StringVar(&opts.Session, "session", "", "Trading session")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 	cmd.MarkFlagsMutuallyExclusive("buy", "sell")
 	cmd.MarkFlagsOneRequired("buy", "sell")
 	cmd.MarkFlagsMutuallyExclusive("open", "close")
@@ -1495,13 +1595,9 @@ func parseStraddleParams(opts *straddleBuildOpts, _ []string) (*orderbuilder.Str
 
 // coveredCallOrderFlagSetup registers covered call flags on cmd.
 func coveredCallOrderFlagSetup(cmd *cobra.Command, opts *coveredCallBuildOpts) {
-	cmd.Flags().StringVar(&opts.Underlying, "underlying", "", "Underlying symbol")
-	cmd.Flags().StringVar(&opts.Expiration, "expiration", "", "Expiration date (YYYY-MM-DD)")
-	cmd.Flags().Float64Var(&opts.Strike, "strike", 0, "Call strike price")
-	cmd.Flags().Float64Var(&opts.Quantity, "quantity", 0, "Number of contracts (1 contract = 100 shares)")
-	cmd.Flags().Float64Var(&opts.Price, "price", 0, "Net debit amount")
-	cmd.Flags().StringVar(&opts.Duration, "duration", "", "Order duration")
-	cmd.Flags().StringVar(&opts.Session, "session", "", "Trading session")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 }
 
 // parseCoveredCallParams converts command flags into covered call builder params.
@@ -1529,16 +1625,9 @@ func parseCoveredCallParams(opts *coveredCallBuildOpts, _ []string) (*orderbuild
 
 // collarOrderFlagSetup registers collar-with-stock flags on cmd.
 func collarOrderFlagSetup(cmd *cobra.Command, opts *collarBuildOpts) {
-	cmd.Flags().StringVar(&opts.Underlying, "underlying", "", "Underlying symbol")
-	cmd.Flags().Float64Var(&opts.PutStrike, "put-strike", 0, "Protective put strike price")
-	cmd.Flags().Float64Var(&opts.CallStrike, "call-strike", 0, "Covered call strike price")
-	cmd.Flags().StringVar(&opts.Expiration, "expiration", "", "Expiration date for both options (YYYY-MM-DD)")
-	cmd.Flags().Float64Var(&opts.Quantity, "quantity", 0, "Number of contracts (1 contract = 100 shares)")
-	cmd.Flags().BoolVar(&opts.Open, "open", false, "Opening position")
-	cmd.Flags().BoolVar(&opts.Close, "close", false, "Closing position")
-	cmd.Flags().Float64Var(&opts.Price, "price", 0, "Net debit amount")
-	cmd.Flags().StringVar(&opts.Duration, "duration", "", "Order duration")
-	cmd.Flags().StringVar(&opts.Session, "session", "", "Trading session")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 	cmd.MarkFlagsMutuallyExclusive("open", "close")
 	cmd.MarkFlagsOneRequired("open", "close")
 }
@@ -1575,18 +1664,9 @@ func parseCollarParams(opts *collarBuildOpts, _ []string) (*orderbuilder.CollarP
 
 // calendarOrderFlagSetup registers calendar spread flags on cmd.
 func calendarOrderFlagSetup(cmd *cobra.Command, opts *calendarBuildOpts) {
-	cmd.Flags().StringVar(&opts.Underlying, "underlying", "", "Underlying symbol")
-	cmd.Flags().StringVar(&opts.NearExpiration, "near-expiration", "", "Near-term expiration date (YYYY-MM-DD)")
-	cmd.Flags().StringVar(&opts.FarExpiration, "far-expiration", "", "Far-term expiration date (YYYY-MM-DD)")
-	cmd.Flags().Float64Var(&opts.Strike, "strike", 0, "Strike price (shared by both legs)")
-	cmd.Flags().BoolVar(&opts.Call, "call", false, "Call calendar spread")
-	cmd.Flags().BoolVar(&opts.Put, "put", false, "Put calendar spread")
-	cmd.Flags().BoolVar(&opts.Open, "open", false, "Opening position")
-	cmd.Flags().BoolVar(&opts.Close, "close", false, "Closing position")
-	cmd.Flags().Float64Var(&opts.Quantity, "quantity", 0, "Number of contracts")
-	cmd.Flags().Float64Var(&opts.Price, "price", 0, "Net debit amount")
-	cmd.Flags().StringVar(&opts.Duration, "duration", "", "Order duration")
-	cmd.Flags().StringVar(&opts.Session, "session", "", "Trading session")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 	cmd.MarkFlagsMutuallyExclusive("call", "put")
 	cmd.MarkFlagsOneRequired("call", "put")
 	cmd.MarkFlagsMutuallyExclusive("open", "close")
@@ -1636,19 +1716,9 @@ func parseCalendarParams(opts *calendarBuildOpts, _ []string) (*orderbuilder.Cal
 
 // diagonalOrderFlagSetup registers diagonal spread flags on cmd.
 func diagonalOrderFlagSetup(cmd *cobra.Command, opts *diagonalBuildOpts) {
-	cmd.Flags().StringVar(&opts.Underlying, "underlying", "", "Underlying symbol")
-	cmd.Flags().StringVar(&opts.NearExpiration, "near-expiration", "", "Near-term expiration date (YYYY-MM-DD)")
-	cmd.Flags().StringVar(&opts.FarExpiration, "far-expiration", "", "Far-term expiration date (YYYY-MM-DD)")
-	cmd.Flags().Float64Var(&opts.NearStrike, "near-strike", 0, "Strike price for the near-term (sold) leg")
-	cmd.Flags().Float64Var(&opts.FarStrike, "far-strike", 0, "Strike price for the far-term (bought) leg")
-	cmd.Flags().BoolVar(&opts.Call, "call", false, "Call diagonal spread")
-	cmd.Flags().BoolVar(&opts.Put, "put", false, "Put diagonal spread")
-	cmd.Flags().BoolVar(&opts.Open, "open", false, "Opening position")
-	cmd.Flags().BoolVar(&opts.Close, "close", false, "Closing position")
-	cmd.Flags().Float64Var(&opts.Quantity, "quantity", 0, "Number of contracts")
-	cmd.Flags().Float64Var(&opts.Price, "price", 0, "Net debit amount")
-	cmd.Flags().StringVar(&opts.Duration, "duration", "", "Order duration")
-	cmd.Flags().StringVar(&opts.Session, "session", "", "Trading session")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 	cmd.MarkFlagsMutuallyExclusive("call", "put")
 	cmd.MarkFlagsOneRequired("call", "put")
 	cmd.MarkFlagsMutuallyExclusive("open", "close")

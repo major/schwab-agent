@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -24,19 +25,24 @@ type symbolResult struct {
 
 // symbolBuildOpts holds the options for the symbol build subcommand.
 type symbolBuildOpts struct {
-	Underlying string
-	Expiration string
-	Strike     float64
-	Call       bool
-	Put        bool
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol (e.g. AAPL)"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
+	Strike     float64 `flag:"strike" flagdescr:"Strike price (e.g. 200, 450.50)"`
+	Call       bool    `flag:"call" flagdescr:"Call option"`
+	Put        bool    `flag:"put" flagdescr:"Put option"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *symbolBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewSymbolCmd returns the Cobra command for option symbol utilities.
 // These are pure computation commands that do not require API authentication.
 func NewSymbolCmd(w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         "symbol",
-		Short:       "OCC symbol operations",
+		Use:   "symbol",
+		Short: "OCC symbol operations",
+		Long: `Build and parse OCC-format option symbols locally. These are pure computation
+commands that make no API calls and require no authentication.`,
 		GroupID:     "tools",
 		Annotations: map[string]string{"skipAuth": "true"},
 		RunE:        requireSubcommand,
@@ -53,8 +59,16 @@ func newSymbolBuildCmd(w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "build",
 		Short: "Build an OCC option symbol from components",
-		Long:  "Build an OCC option symbol from components (underlying, expiration, strike, call/put)",
+		Long: `Build an OCC option symbol from underlying, expiration date, strike price, and
+contract type. No API call or authentication required. Output is JSON with the
+constructed symbol and its components.`,
+		Example: `  schwab-agent symbol build --underlying AAPL --expiration 2025-06-20 --strike 200 --call
+  schwab-agent symbol build --underlying TSLA --expiration 2025-12-19 --strike 350.50 --put`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			if opts.Underlying == "" {
 				return apperr.NewValidationError("underlying is required", nil)
 			}
@@ -87,11 +101,11 @@ func newSymbolBuildCmd(w io.Writer) *cobra.Command {
 			return output.WriteSuccess(w, result, output.NewMetadata())
 		},
 	}
-	cmd.Flags().StringVar(&opts.Underlying, "underlying", "", "Underlying symbol (e.g. AAPL)")
-	cmd.Flags().StringVar(&opts.Expiration, "expiration", "", "Expiration date (YYYY-MM-DD)")
-	cmd.Flags().Float64Var(&opts.Strike, "strike", 0, "Strike price (e.g. 200, 450.50)")
-	cmd.Flags().BoolVar(&opts.Call, "call", false, "Call option")
-	cmd.Flags().BoolVar(&opts.Put, "put", false, "Put option")
+
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
+
 	cmd.MarkFlagsMutuallyExclusive("call", "put")
 	cmd.MarkFlagsOneRequired("call", "put")
 	return cmd
@@ -102,7 +116,9 @@ func newSymbolParseCmd(w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "parse <symbol>",
 		Short: "Parse an OCC option symbol into components",
-		Long:  "Parse an OCC option symbol into components (underlying, expiration, strike, call/put)",
+		Long: `Parse an OCC option symbol string into its underlying, expiration date, strike
+price, and contract type components. No API call or authentication required.`,
+		Example: `  schwab-agent symbol parse "AAPL  250620C00200000"`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			symbol := args[0]

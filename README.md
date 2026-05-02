@@ -86,13 +86,7 @@ schwab-agent auth status
 
 Every command returns structured JSON. Success responses use a `{"data": ..., "metadata": ...}` envelope. Errors use `{"error": {"code": ..., "message": ..., "details": ...}}`.
 
-For full command reference with examples, see the [skill files](skills/):
-
-- [Configuration and auth](skills/schwab-config-auth.md)
-- [Read-only commands](skills/schwab-read.md) (quotes, chains, history, accounts, instruments)
-- [Trading workflow](skills/schwab-trade.md) (safety, order placement, cancellation)
-- [Order builder](skills/schwab-order-builder.md) (equity, option, bracket, OCO, spreads)
-- [Technical analysis](skills/schwab-ta.md) (SMA, EMA, RSI, MACD, ATR, BBands, Stoch, ADX, VWAP, HV, expected-move)
+Run any command with `--help` to see detailed usage, examples, and available flags.
 
 ### Quick examples
 
@@ -154,7 +148,6 @@ schwab-agent order place --spec @order.json --confirm
 | `market` | Market hours and top movers |
 | `symbol` | Build and parse OCC option symbols (no auth required) |
 | `instrument` | Search instruments |
-| `schema` | CLI schema introspection (auto-generated) |
 
 ### Global flags
 
@@ -176,12 +169,17 @@ Both are required. This prevents accidental trades from misconfigured agents.
 
 ## Agent integration
 
-schwab-agent ships with [skill files](skills/SKILL.md) that teach AI agents how to use the CLI. These cover command reference, examples, JSON output format, and common recipes.
-
-The `schema` command provides machine-readable CLI introspection:
+Every command includes detailed `--help` output with usage descriptions and concrete examples that agents can reference. The `--jsonschema` flag provides machine-readable CLI introspection:
 
 ```bash
-schwab-agent schema
+# Full JSON Schema for the entire CLI
+schwab-agent --jsonschema
+
+# Tree view showing all commands with their flags
+schwab-agent --jsonschema=tree
+
+# Schema for a specific subcommand
+schwab-agent quote --jsonschema
 ```
 
 ## Development
@@ -204,11 +202,10 @@ internal/
   auth/                 OAuth2 flow, token lifecycle, config
   client/               Schwab API HTTP client
   commands/             CLI command handlers
-  errors/               Typed error hierarchy with exit codes
+  apperr/               Typed error hierarchy with exit codes
   models/               API data structures
   orderbuilder/         Order construction and validation
   output/               JSON envelope output
-skills/                 Agent skill files (plain markdown)
 ```
 
 ## Exit codes

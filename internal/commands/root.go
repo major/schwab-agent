@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -175,6 +176,11 @@ func hasSkipAuthAnnotation(cmd *cobra.Command) bool {
 		if current.Annotations["skipAuth"] == "true" {
 			return true
 		}
+	}
+
+	// structcli help topic commands (env-vars, config-keys) don't require auth
+	if structcli.IsHelpTopicCommand(cmd) {
+		return true
 	}
 
 	return false

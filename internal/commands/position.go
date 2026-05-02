@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -186,8 +187,11 @@ func NewPositionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comman
 
 // positionListOpts holds the options for the position list subcommand.
 type positionListOpts struct {
-	AllAccounts bool
+	AllAccounts bool `flag:"all-accounts" flagdescr:"Show positions across all linked accounts"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *positionListOpts) Attach(_ *cobra.Command) error { return nil }
 
 // newPositionListCmd returns the Cobra subcommand for listing positions.
 // Default: single account (resolved via --account flag or config default).
@@ -198,12 +202,18 @@ func newPositionListCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List positions for one or all accounts",
-		Long: `List positions for one or all accounts.
-
-Default: single account (resolved via --account flag or config default).
-With --all-accounts: flattens positions from all linked accounts into a
-single list with account identifiers on each entry.`,
+		Long: `List positions as a flat list with account identifiers and computed cost basis
+and P&L fields that Schwab's API does not provide directly. Uses the default
+account unless --account or --all-accounts is specified. Computed fields
+include totalCostBasis, unrealizedPnL, and unrealizedPnLPct.`,
+		Example: `  schwab-agent position list
+  schwab-agent position list --account ABCDEF1234567890
+  schwab-agent position list --all-accounts`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			account, err := cmd.Flags().GetString("account")
 			if err != nil {
 				return err
@@ -221,7 +231,10 @@ single list with account identifiers on each entry.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.AllAccounts, "all-accounts", false, "Show positions across all linked accounts")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
+
 	cmd.Flags().String("account", "", "Account hash (overrides config default)")
 
 	return cmd

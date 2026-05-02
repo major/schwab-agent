@@ -4,21 +4,21 @@
 > Keep README.md updated whenever the project changes.
 > Check /usr/local for newer Go versions before assuming the system Go is current.
 > Leave generous comments when fixing bugs or working around API quirks. Anything that might save a future developer from re-discovering the same issue is worth writing down.
-> Keep skill files in `skills/` updated whenever CLI commands, flags, or behavior change.
+
 
 ## Project
 
-Go CLI tool for AI agents to trade via Charles Schwab APIs. Single binary, JSON-first output, auto-generated skill files for agent consumption.
+Go CLI tool for AI agents to trade via Charles Schwab APIs. Single binary, JSON-first output, workflow knowledge embedded in command help text.
 
 - **Module**: `github.com/major/schwab-agent`
 - **Go version**: 1.26 (check `/usr/local/go/bin/go version` for newer installs)
 - **Entry point**: `cmd/schwab-agent/main.go`
-- **Dependencies**: urfave/cli/v3 (CLI framework), pkg/browser (OAuth flow), resty.dev/v3 (HTTP client, used by both internal/client/ and internal/auth/), stretchr/testify (test assertions)
+- **Dependencies**: spf13/cobra v1.10.2 (CLI framework), leodido/structcli v0.17.0 (struct-tag flag registration + JSON Schema), pkg/browser (OAuth flow), resty.dev/v3 (HTTP client, used by both internal/client/ and internal/auth/), stretchr/testify (test assertions)
 
 ## Architecture
 
 ```text
-cmd/schwab-agent/       Entry point, buildApp(), Before hook for auth
+cmd/schwab-agent/       Entry point, buildApp(), PersistentPreRunE auth hook
 internal/
   auth/                 OAuth2 flow (resty v3 for token exchange), token lifecycle, config (JSON + env vars)
   client/               Schwab API HTTP client (see internal/client/AGENTS.md)
@@ -27,7 +27,6 @@ internal/
   models/               Data structures/schemas for API payloads
   orderbuilder/         Order construction/validation (equity, option, bracket, OCO) + OCC symbol build/parse
   output/               JSON envelope writers (success, error, partial)
-skills/                 Agent skill files (plain markdown, manually maintained)
 ```
 
 ## Build and Test
@@ -76,9 +75,11 @@ All command output uses `internal/output` JSON envelopes:
 
 ## CLI Structure
 
-urfave/cli v3. `buildApp()` in main.go constructs the command tree. Before hook skips auth for `auth`, `skills`, `schema`, and `symbol` commands, then loads config + token, refreshes if expired, populates `*client.Ref` for command access. An After hook calls `Client.Close()` to release idle connections when the command finishes.
+spf13/cobra + leodido/structcli. `buildApp()` in main.go constructs the command tree via `buildAppWithDeps()`. PersistentPreRunE on the root command skips auth for `auth` and `symbol` commands (and structcli help topics), then loads config + token, refreshes if expired, populates `*client.Ref` for command access. PersistentPostRunE calls `Client.Close()` to release idle connections when the command finishes. `structcli.Setup()` is called after all subcommands are added to enable `--jsonschema` flag and help topics (e.g., `env-vars`).
 
-11 subcommands: auth (setup/login/status), account (list/get/numbers/set-default/transaction), position (list with --all-accounts/--account), quote (get), order (list/get/place/preview/build/cancel/replace; place/build sub-types: equity/option/bracket/oco), chain, history, instrument, market (hours/movers), symbol (build/parse), schema. Account list/get enriches results with nicknames from the preferences API (best-effort, degrades gracefully). Position list enriches with nicknames and adds computed cost basis / P&L fields. Order list defaults to non-terminal statuses (use --status all for everything).
+Command flags use structcli struct tags (`flag`, `flagdescr`, `default`, `flagshort`) with `Define()` for registration and `Unmarshal()` in RunE for parsing. Root persistent flags (--account, --verbose, --config, --token) stay as manual Cobra registrations. `MarkFlagsMutuallyExclusive`/`MarkFlagsOneRequired` calls remain as raw Cobra after `Define()`.
+
+11 subcommands: auth (setup/login/status), account (list/get/numbers/set-default/transaction), position (list with --all-accounts/--account), quote (get), order (list/get/place/preview/build/cancel/replace; place/build sub-types: equity/option/bracket/oco), chain, history, instrument, market (hours/movers), symbol (build/parse), ta (sma/ema/rsi/macd/atr/bbands/stoch/adx/vwap/hv/expected-move). Account list/get enriches results with nicknames from the preferences API (best-effort, degrades gracefully). Position list enriches with nicknames and adds computed cost basis / P&L fields. Order list defaults to non-terminal statuses (use --status all for everything).
 
 ## Config
 
@@ -150,7 +151,8 @@ Empty sections are omitted automatically.
 
 1. **Shared client ref**: `client.Ref` (embedding `*Client`) is pre-allocated and shared by all commands; the Before hook populates `ref.Client` after auth
 2. **Env vars override config**: Priority is env vars > config file > defaults
-3. **Schema introspection**: `schema` command auto-generates from CLI definitions, not manually maintained
-4. **Skill files as plain markdown**: Skill files live in `skills/` as plain `.md` files, not generated from Go code
+3. **Schema introspection**: `--jsonschema` flag auto-generates JSON Schema from CLI definitions via structcli, not manually maintained
+4. **Workflow knowledge in help text**: Command Long descriptions and Example fields embed the workflow knowledge that was previously in separate skill files
 5. **No testdata/**: All test data generated inline or via helper functions
 6. **TLSConfig over HTTPClient**: `Config.TLSConfig()` returns a `*tls.Config` instead of the old `*http.Client` factory. Both the API client (`WithTLSConfig`) and auth token exchange (`newOAuthClient`) use this to support insecure proxy setups. The callback server still uses raw net/http (server-side code).
+7. **Struct tag migration pattern**: Command flags defined via structcli struct tags (`flag`, `flagdescr`, `default`, `flagshort`) with `Define()` in command setup and `Unmarshal()` at the top of RunE. Root persistent flags and Cobra relationship checks stay as raw Cobra calls.

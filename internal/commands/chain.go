@@ -3,6 +3,7 @@ package commands
 import (
 	"io"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -11,20 +12,23 @@ import (
 
 // chainGetOpts holds the options for the chain get subcommand.
 type chainGetOpts struct {
-	Type                  string
-	StrikeCount           string
-	Strategy              string
-	FromDate              string
-	ToDate                string
-	IncludeUnderlyingQuote bool
-	Interval              string
-	Strike                string
-	StrikeRange           string
-	Volatility            string
-	UnderlyingPrice       string
-	InterestRate          string
-	DaysToExpiration      string
+	Type                  string `flag:"type" flagdescr:"Contract type: CALL, PUT, or ALL"`
+	StrikeCount           string `flag:"strike-count" flagdescr:"Number of strikes to return"`
+	Strategy              string `flag:"strategy" flagdescr:"Option pricing strategy"`
+	FromDate              string `flag:"from-date" flagdescr:"Start date (YYYY-MM-DD)"`
+	ToDate                string `flag:"to-date" flagdescr:"End date (YYYY-MM-DD)"`
+	IncludeUnderlyingQuote bool   `flag:"include-underlying-quote" flagdescr:"Include underlying quote data in response"`
+	Interval              string `flag:"interval" flagdescr:"Strike interval for spread strategy chains"`
+	Strike                string `flag:"strike" flagdescr:"Filter to a specific strike price"`
+	StrikeRange           string `flag:"strike-range" flagdescr:"Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL"`
+	Volatility            string `flag:"volatility" flagdescr:"Volatility for theoretical pricing calculations"`
+	UnderlyingPrice       string `flag:"underlying-price" flagdescr:"Override underlying price for theoretical calculations"`
+	InterestRate          string `flag:"interest-rate" flagdescr:"Interest rate for theoretical pricing calculations"`
+	DaysToExpiration      string `flag:"days-to-expiration" flagdescr:"Days to expiration for theoretical pricing calculations"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *chainGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewChainCmd returns the Cobra command for option chain operations.
 func NewChainCmd(c *client.Ref, w io.Writer) *cobra.Command {
@@ -46,11 +50,23 @@ func NewChainCmd(c *client.Ref, w io.Writer) *cobra.Command {
 func newChainGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &chainGetOpts{}
 	cmd := &cobra.Command{
-		Use:     "get <symbol>",
-		Short:   "Get option chain for a symbol",
-		Example: "schwab-agent chain get AAPL\nschwab-agent chain get AAPL --type CALL --strike-count 5\nschwab-agent chain get AAPL --from-date 2025-06-01 --to-date 2025-07-31 --type PUT",
+		Use:   "get <symbol>",
+		Short: "Get option chain for a symbol",
+		Long: `Get the full option chain for a symbol with optional filtering by contract type,
+strike range, expiration dates, and strategy. Use --strategy ANALYTICAL with
+--volatility and --days-to-expiration for theoretical pricing. Filter to
+specific moneyness with --strike-range (ITM, NTM, OTM, ALL).`,
+		Example: `  schwab-agent chain get AAPL
+  schwab-agent chain get AAPL --type CALL --strike-count 5
+  schwab-agent chain get AAPL --from-date 2025-06-01 --to-date 2025-07-31 --type PUT
+  schwab-agent chain get AAPL --strategy ANALYTICAL --volatility 30.5 --days-to-expiration 45
+  schwab-agent chain get AAPL --strike-range NTM --include-underlying-quote`,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			symbol := args[0]
 
 			// Convert the bool flag to a string for the query param builder.
@@ -85,19 +101,9 @@ func newChainGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Type, "type", "", "Contract type: CALL, PUT, or ALL")
-	cmd.Flags().StringVar(&opts.StrikeCount, "strike-count", "", "Number of strikes to return")
-	cmd.Flags().StringVar(&opts.Strategy, "strategy", "", "Option pricing strategy")
-	cmd.Flags().StringVar(&opts.FromDate, "from-date", "", "Start date (YYYY-MM-DD)")
-	cmd.Flags().StringVar(&opts.ToDate, "to-date", "", "End date (YYYY-MM-DD)")
-	cmd.Flags().BoolVar(&opts.IncludeUnderlyingQuote, "include-underlying-quote", false, "Include underlying quote data in response")
-	cmd.Flags().StringVar(&opts.Interval, "interval", "", "Strike interval for spread strategy chains")
-	cmd.Flags().StringVar(&opts.Strike, "strike", "", "Filter to a specific strike price")
-	cmd.Flags().StringVar(&opts.StrikeRange, "strike-range", "", "Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL")
-	cmd.Flags().StringVar(&opts.Volatility, "volatility", "", "Volatility for theoretical pricing calculations")
-	cmd.Flags().StringVar(&opts.UnderlyingPrice, "underlying-price", "", "Override underlying price for theoretical calculations")
-	cmd.Flags().StringVar(&opts.InterestRate, "interest-rate", "", "Interest rate for theoretical pricing calculations")
-	cmd.Flags().StringVar(&opts.DaysToExpiration, "days-to-expiration", "", "Days to expiration for theoretical pricing calculations")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -105,9 +111,12 @@ func newChainGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 // newChainExpirationCmd returns the Cobra subcommand for retrieving option expiration dates.
 func newChainExpirationCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:     "expiration <symbol>",
-		Short:   "Get expiration dates for a symbol",
-		Example: "schwab-agent chain expiration AAPL",
+		Use:   "expiration <symbol>",
+		Short: "Get expiration dates for a symbol",
+		Long: `Get available option expiration dates for a symbol without fetching the full
+chain data. Useful for discovering valid expirations before requesting a
+detailed chain.`,
+		Example: "  schwab-agent chain expiration AAPL",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			symbol := args[0]
