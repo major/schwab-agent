@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -113,10 +114,10 @@ func NewRootCmd(
 			if auth.IsAccessTokenExpired(token) {
 				refreshed, err := auth.RefreshAccessToken(cfg, token, deps.TokenRefreshEndpoint(cfg))
 				if err != nil {
-					return err
+					return fmt.Errorf("refreshing access token: %w", err)
 				}
 				if err := auth.SaveToken(resolvedTokenPath, refreshed); err != nil {
-					return err
+					return fmt.Errorf("saving refreshed token to %s: %w", resolvedTokenPath, err)
 				}
 				token = refreshed
 			}

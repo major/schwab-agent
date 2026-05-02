@@ -2,6 +2,7 @@
 package commands
 
 import (
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -355,7 +356,9 @@ func newAccountTransactionGetCmd(c *client.Ref, configPath string, w io.Writer) 
 
 			txnID, err := strconv.ParseInt(txnIDStr, 10, 64)
 			if err != nil {
-				return apperr.NewValidationError("transaction ID must be a number", nil)
+				return apperr.NewValidationError(
+					fmt.Sprintf("transaction ID must be a number: %q", txnIDStr), err,
+				)
 			}
 
 			accountFlag, err := cmd.Flags().GetString("account")

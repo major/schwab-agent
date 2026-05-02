@@ -494,7 +494,7 @@ func TestUnknownCommand_SuggestsClosestMatch(t *testing.T) {
 func TestUnknownCommand_WithUnknownFlags(t *testing.T) {
 	// When an unknown command is used with flags not defined on the root
 	// command, Cobra produces a misleading flag error. The flag error handler
-	// handler should intercept this and report the unknown command instead.
+	// should intercept this and report the unknown command instead.
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	_, err := runApp(t, "schwab-agent", "price-history", "get", "AAPL", "--period-type", "month")
