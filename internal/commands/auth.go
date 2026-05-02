@@ -85,8 +85,11 @@ type authDefaultAccountData struct {
 
 // authLoginOpts holds the options for the auth login subcommand.
 type authLoginOpts struct {
-	NoBrowser bool
+	NoBrowser bool `flag:"no-browser" flagdescr:"Print the authorization URL in the JSON response instead of opening a browser"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *authLoginOpts) Attach(_ *cobra.Command) error { return nil }
 
 // requireAuthConfig returns a valid auth config or loads it from disk.
 func requireAuthConfig(cfg *auth.Config, configPath string) (*auth.Config, error) {
@@ -219,6 +222,10 @@ func newAuthLoginCmd(tokenPath string, w io.Writer, deps AuthDeps) *cobra.Comman
 		Use:   "login",
 		Short: "Run the OAuth login flow",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			defaultConfigPath := deps.ConfigPath()
 			resolvedConfigPath := cobraResolveConfigPath(cmd, defaultConfigPath)
 			resolvedTokenPath := cobraResolveTokenPath(cmd, tokenPath)
@@ -272,7 +279,9 @@ func newAuthLoginCmd(tokenPath string, w io.Writer, deps AuthDeps) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.NoBrowser, "no-browser", false, "Print the authorization URL in the JSON response instead of opening a browser")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
