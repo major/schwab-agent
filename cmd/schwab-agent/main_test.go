@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	stderrors "errors"
 	"net/http"
 	"net/http/httptest"
@@ -140,6 +142,22 @@ func TestBeforeHook_SkipsAuthForCompletionCommand(t *testing.T) {
 	stdout, err := runApp(t, "schwab-agent", "completion", "bash")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "bash completion")
+}
+
+func TestSkipAuth_Schema(t *testing.T) {
+	// schema command must bypass PersistentPreRunE (no token/config needed).
+	var buf bytes.Buffer
+	app := buildAppWithDeps(&buf, commands.RootDeps{})
+	app.SetArgs([]string{"schema"})
+	err := app.Execute()
+	require.NoError(t, err)
+
+	// Verify output is valid JSON with expected keys.
+	var raw map[string]json.RawMessage
+	err = json.Unmarshal(buf.Bytes(), &raw)
+	require.NoError(t, err)
+	assert.Contains(t, raw, "commands")
+	assert.Contains(t, raw, "global_flags")
 }
 
 func TestBeforeHook_ReturnsAuthErrorForAPICommand(t *testing.T) {

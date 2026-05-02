@@ -57,6 +57,7 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 	root.AddCommand(commands.NewAuthCmd(configPath, tokenPath, w, commands.DefaultAuthDeps()))
 	root.AddCommand(commands.NewOrderCmd(ref, configPath, w))
 	root.AddCommand(commands.NewCompletionCmd(w))
+	root.AddCommand(commands.NewSchemaCmd(root, w))
 
 	return root
 }
