@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/spf13/cobra"
 	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -137,4 +138,62 @@ func visibleSubcommandNames(cmd *cli.Command) []string {
 // newValidationError creates a consistent validation error for command parsing.
 func newValidationError(message string) error {
 	return apperr.NewValidationError(message, nil)
+}
+
+// cobraRequireSubcommand returns a cobra.RunE that rejects direct invocation of
+// a parent command with a clear error. Without this, cobra produces a confusing
+// "no subcommands available" message when the user omits the subcommand
+// (e.g. "quote AAPL" instead of "quote get AAPL").
+func cobraRequireSubcommand(cmd *cobra.Command, args []string) error {
+	list := strings.Join(cobraVisibleSubcommandNames(cmd), ", ")
+
+	if len(args) > 0 {
+		return apperr.NewValidationError(
+			fmt.Sprintf("unknown command %q for %q; available subcommands: %s", args[0], cmd.Name(), list),
+			nil,
+		)
+	}
+
+	return apperr.NewValidationError(
+		fmt.Sprintf("%q requires a subcommand: %s", cmd.Name(), list),
+		nil,
+	)
+}
+
+// cobraSuggestSubcommands handles usage errors that happen before RunE runs. This
+// is most useful for parent commands whose subcommands own distinct flags: an
+// unknown flag on the parent usually means the user skipped the subcommand.
+func cobraSuggestSubcommands(cmd *cobra.Command, args []string, err error) error {
+	if !strings.Contains(err.Error(), "unknown flag") && !strings.Contains(err.Error(), "flag provided but not defined") {
+		return err
+	}
+
+	names := cobraVisibleSubcommandNames(cmd)
+	if len(names) == 0 {
+		return err
+	}
+
+	return apperr.NewValidationError(
+		fmt.Sprintf(
+			"%q requires a subcommand: %s (%s)",
+			cmd.CommandPath(),
+			strings.Join(names, ", "),
+			err.Error(),
+		),
+		err,
+	)
+}
+
+// cobraVisibleSubcommandNames returns only invokable subcommands for user-facing
+// errors, omitting hidden commands.
+func cobraVisibleSubcommandNames(cmd *cobra.Command) []string {
+	names := make([]string, 0, len(cmd.Commands()))
+	for _, sub := range cmd.Commands() {
+		if sub.Hidden {
+			continue
+		}
+		names = append(names, sub.Name())
+	}
+
+	return names
 }
