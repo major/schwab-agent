@@ -742,7 +742,6 @@ schwab-agent ta hv AAPL --period 20 --interval daily`,
 
 	cmd.Flags().Int("period", 20, "Indicator period")
 	cmd.Flags().String("interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
-	cmd.Flags().Int("points", 1, "Number of output points (0 = all)")
 
 	return cmd
 }

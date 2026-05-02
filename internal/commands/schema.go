@@ -10,6 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 // SchemaOutput is the top-level schema introspection structure.
@@ -57,7 +59,7 @@ func NewSchemaCmd(root *cobra.Command, w io.Writer) *cobra.Command {
 			if filter != "" {
 				cs, ok := allCommands[filter]
 				if !ok {
-					return fmt.Errorf("command %q not found", filter)
+					return apperr.NewValidationError(fmt.Sprintf("command %q not found", filter), nil)
 				}
 				allCommands = map[string]CommandSchema{filter: cs}
 			}
@@ -85,7 +87,11 @@ func walkCommands(cmd *cobra.Command, prefix string, commands map[string]Command
 		}
 
 		// Cobra's Use string may contain positional args, so keep only the command name.
-		name := strings.Fields(sub.Use)[0]
+		fields := strings.Fields(sub.Use)
+		if len(fields) == 0 {
+			continue
+		}
+		name := fields[0]
 		path := name
 		if prefix != "" {
 			path = prefix + " " + name

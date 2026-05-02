@@ -65,7 +65,7 @@ func newSymbolBuildCmd(w io.Writer) *cobra.Command {
 
 			expirationTime, err := time.Parse("2006-01-02", strings.TrimSpace(expiration))
 			if err != nil {
-				return apperr.NewValidationError("expiration must use YYYY-MM-DD format", nil)
+				return apperr.NewValidationError("expiration must use YYYY-MM-DD format", err)
 			}
 
 			underlying = strings.TrimSpace(underlying)
@@ -101,7 +101,7 @@ func newSymbolParseCmd(w io.Writer) *cobra.Command {
 			symbol := args[0]
 			components, err := orderbuilder.ParseOCCSymbol(symbol)
 			if err != nil {
-				return apperr.NewValidationError(err.Error(), nil)
+				return apperr.NewValidationError(err.Error(), err)
 			}
 
 			// Map putCall string back to the canonical models constant for consistent
