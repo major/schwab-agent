@@ -172,8 +172,8 @@ func maxPeriod(periods []int) int {
 // (cfg.defaultPeriod) and structcli tags require static defaults.
 type simpleTAOpts struct {
 	Period   []int
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
-	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -181,11 +181,11 @@ func (o *simpleTAOpts) Attach(_ *cobra.Command) error { return nil }
 
 // macdOpts holds CLI flags for the MACD subcommand.
 type macdOpts struct {
-	Fast     int    `flag:"fast" flagdescr:"Fast EMA period" default:"12"`
-	Slow     int    `flag:"slow" flagdescr:"Slow EMA period" default:"26"`
-	Signal   int    `flag:"signal" flagdescr:"Signal EMA period" default:"9"`
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
-	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
+	Fast     int    `flag:"fast" flagdescr:"Fast EMA period" default:"12" flaggroup:"indicator"`
+	Slow     int    `flag:"slow" flagdescr:"Slow EMA period" default:"26" flaggroup:"indicator"`
+	Signal   int    `flag:"signal" flagdescr:"Signal EMA period" default:"9" flaggroup:"indicator"`
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -193,9 +193,9 @@ func (o *macdOpts) Attach(_ *cobra.Command) error { return nil }
 
 // atrOpts holds CLI flags for the ATR subcommand.
 type atrOpts struct {
-	Period   int    `flag:"period" flagdescr:"Indicator period" default:"14"`
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
-	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
+	Period   int    `flag:"period" flagdescr:"Indicator period" default:"14" flaggroup:"indicator"`
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -203,10 +203,10 @@ func (o *atrOpts) Attach(_ *cobra.Command) error { return nil }
 
 // bbandsOpts holds CLI flags for the Bollinger Bands subcommand.
 type bbandsOpts struct {
-	Period   int     `flag:"period" flagdescr:"BBands period" default:"20"`
-	StdDev   float64 `flag:"std-dev" flagdescr:"Standard deviations" default:"2.0"`
-	Interval string  `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
-	Points   int     `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
+	Period   int     `flag:"period" flagdescr:"BBands period" default:"20" flaggroup:"indicator"`
+	StdDev   float64 `flag:"std-dev" flagdescr:"Standard deviations" default:"2.0" flaggroup:"indicator"`
+	Interval string  `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int     `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -214,11 +214,11 @@ func (o *bbandsOpts) Attach(_ *cobra.Command) error { return nil }
 
 // stochOpts holds CLI flags for the Stochastic Oscillator subcommand.
 type stochOpts struct {
-	KPeriod  int    `flag:"k-period" flagdescr:"Fast %K lookback period" default:"14"`
-	SmoothK  int    `flag:"smooth-k" flagdescr:"Slow %K smoothing period" default:"3"`
-	DPeriod  int    `flag:"d-period" flagdescr:"Slow %D period" default:"3"`
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
-	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
+	KPeriod  int    `flag:"k-period" flagdescr:"Fast %K lookback period" default:"14" flaggroup:"indicator"`
+	SmoothK  int    `flag:"smooth-k" flagdescr:"Slow %K smoothing period" default:"3" flaggroup:"indicator"`
+	DPeriod  int    `flag:"d-period" flagdescr:"Slow %D period" default:"3" flaggroup:"indicator"`
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -226,9 +226,9 @@ func (o *stochOpts) Attach(_ *cobra.Command) error { return nil }
 
 // adxOpts holds CLI flags for the ADX subcommand.
 type adxOpts struct {
-	Period   int    `flag:"period" flagdescr:"Indicator period" default:"14"`
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
-	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
+	Period   int    `flag:"period" flagdescr:"Indicator period" default:"14" flaggroup:"indicator"`
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -236,8 +236,8 @@ func (o *adxOpts) Attach(_ *cobra.Command) error { return nil }
 
 // vwapOpts holds CLI flags for the VWAP subcommand.
 type vwapOpts struct {
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
-	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -245,8 +245,8 @@ func (o *vwapOpts) Attach(_ *cobra.Command) error { return nil }
 
 // hvOpts holds CLI flags for the Historical Volatility subcommand.
 type hvOpts struct {
-	Period   int    `flag:"period" flagdescr:"Indicator period" default:"20"`
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
+	Period   int    `flag:"period" flagdescr:"Indicator period" default:"20" flaggroup:"indicator"`
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -254,7 +254,7 @@ func (o *hvOpts) Attach(_ *cobra.Command) error { return nil }
 
 // expectedMoveOpts holds CLI flags for the Expected Move subcommand.
 type expectedMoveOpts struct {
-	DTE int `flag:"dte" flagdescr:"Target days to expiration" default:"30"`
+	DTE int `flag:"dte" flagdescr:"Target days to expiration" default:"30" flaggroup:"indicator"`
 }
 
 // Attach implements structcli.Options interface.
