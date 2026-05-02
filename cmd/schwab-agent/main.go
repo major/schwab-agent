@@ -13,6 +13,7 @@ import (
 
 	"github.com/leodido/structcli"
 	"github.com/leodido/structcli/debug"
+	structclimcp "github.com/leodido/structcli/mcp"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -46,6 +47,45 @@ func buildApp(w io.Writer) *cobra.Command {
 
 // buildAppWithDeps constructs the CLI root command with the given dependencies.
 func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
+	root := buildCommandTree(w, deps)
+
+	if err := structcli.Setup(root,
+		structcli.WithJSONSchema(),
+		structcli.WithHelpTopics(),
+		structcli.WithFlagErrors(),
+		structcli.WithAppName("schwab-agent"),
+		structcli.WithDebug(debug.Options{Exit: true}),
+		structcli.WithMCP(structclimcp.Options{
+			Name:    "schwab-agent",
+			Version: version,
+			Exclude: []string{
+				// Interactive browser-based OAuth flow, not usable from MCP clients.
+				"auth-login",
+				// Shell completion generators are irrelevant in MCP mode.
+				"completion-bash",
+				"completion-zsh",
+				"completion-fish",
+				"completion-powershell",
+			},
+			// CommandFactory builds a fresh command tree per MCP tool call so that
+			// PersistentPreRunE (auth lifecycle) runs for each invocation. Without
+			// this, MCP mode skips PersistentPreRunE entirely and commands that
+			// need an authenticated API client would fail.
+			CommandFactory: func(_ []string, stdout io.Writer, _ io.Writer) (*cobra.Command, error) {
+				return buildCommandTree(stdout, deps), nil
+			},
+		}),
+	); err != nil {
+		panic(err)
+	}
+
+	return root
+}
+
+// buildCommandTree constructs the full command tree without calling structcli.Setup.
+// Used by buildAppWithDeps for the main CLI and by the MCP CommandFactory for
+// per-tool-call fresh command trees (each with its own client.Ref and auth lifecycle).
+func buildCommandTree(w io.Writer, deps commands.RootDeps) *cobra.Command {
 	configPath := defaultConfigPath()
 	tokenPath := defaultTokenPath()
 
@@ -66,10 +106,6 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 	root.AddCommand(commands.NewAuthCmd(configPath, tokenPath, w, commands.DefaultAuthDeps()))
 	root.AddCommand(commands.NewOrderCmd(ref, configPath, w))
 	root.AddCommand(commands.NewCompletionCmd(w))
-
-	if err := structcli.Setup(root, structcli.WithJSONSchema(), structcli.WithHelpTopics(), structcli.WithFlagErrors(), structcli.WithAppName("schwab-agent"), structcli.WithDebug(debug.Options{Exit: true})); err != nil {
-		panic(err)
-	}
 
 	return root
 }
