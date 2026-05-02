@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -64,7 +65,10 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 	root.AddCommand(commands.NewAuthCmd(configPath, tokenPath, w, commands.DefaultAuthDeps()))
 	root.AddCommand(commands.NewOrderCmd(ref, configPath, w))
 	root.AddCommand(commands.NewCompletionCmd(w))
-	root.AddCommand(commands.NewSchemaCmd(root, w))
+
+	if err := structcli.Setup(root, structcli.WithJSONSchema(), structcli.WithHelpTopics()); err != nil {
+		panic(err)
+	}
 
 	return root
 }

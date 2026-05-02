@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	stderrors "errors"
 	"net/http"
 	"net/http/httptest"
@@ -144,20 +143,17 @@ func TestBeforeHook_SkipsAuthForCompletionCommand(t *testing.T) {
 	assert.Contains(t, stdout, "bash completion")
 }
 
-func TestSkipAuth_Schema(t *testing.T) {
-	// schema command must bypass PersistentPreRunE (no token/config needed).
+func TestSkipAuth_HelpTopic(t *testing.T) {
+	// env-vars help topic must bypass PersistentPreRunE (no token/config needed).
 	var buf bytes.Buffer
 	app := buildAppWithDeps(&buf, commands.RootDeps{})
-	app.SetArgs([]string{"schema"})
+	app.SetArgs([]string{"env-vars"})
 	err := app.Execute()
 	require.NoError(t, err)
 
-	// Verify output is valid JSON with expected keys.
-	var raw map[string]json.RawMessage
-	err = json.Unmarshal(buf.Bytes(), &raw)
-	require.NoError(t, err)
-	assert.Contains(t, raw, "commands")
-	assert.Contains(t, raw, "global_flags")
+	// Verify output contains help topic content.
+	output := buf.String()
+	assert.Contains(t, output, "Environment Variables")
 }
 
 func TestBeforeHook_ReturnsAuthErrorForAPICommand(t *testing.T) {
