@@ -39,21 +39,30 @@ type transactionGetData struct {
 
 // accountListOpts holds the options for the account list subcommand.
 type accountListOpts struct {
-	Positions bool
+	Positions bool `flag:"positions" flagdescr:"Include current positions for each account"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *accountListOpts) Attach(_ *cobra.Command) error { return nil }
 
 // accountGetOpts holds the options for the account get subcommand.
 type accountGetOpts struct {
-	Positions bool
+	Positions bool `flag:"positions" flagdescr:"Include current positions in the account response"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *accountGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 // accountTransactionListOpts holds the options for the account transaction list subcommand.
 type accountTransactionListOpts struct {
-	Types  string
-	From   string
-	To     string
-	Symbol string
+	Types  string `flag:"types" flagdescr:"Transaction type filter (TRADE, DIVIDEND, etc.)"`
+	From   string `flag:"from" flagdescr:"Start date (YYYY-MM-DDTHH:MM:SSZ)"`
+	To     string `flag:"to" flagdescr:"End date (YYYY-MM-DDTHH:MM:SSZ)"`
+	Symbol string `flag:"symbol" flagdescr:"Filter by symbol"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *accountTransactionListOpts) Attach(_ *cobra.Command) error { return nil }
 
 // resolveAccount determines the account hash from multiple sources.
 // Priority: flag > positional args (if provided) > config default > error.
@@ -158,6 +167,10 @@ func newAccountListCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		Example: "schwab-agent account list\n" +
 			"schwab-agent account list --positions",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			var fields []string
 			if opts.Positions {
 				fields = append(fields, "positions")
@@ -179,7 +192,9 @@ func newAccountListCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.Positions, "positions", false, "Include current positions for each account")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -193,6 +208,10 @@ func newAccountGetCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comm
 		Example: "schwab-agent account get\n" +
 			"schwab-agent account get --positions",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			accountFlag, err := cmd.Flags().GetString("account")
 			if err != nil {
 				return err
@@ -226,7 +245,9 @@ func newAccountGetCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comm
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.Positions, "positions", false, "Include current positions in the account response")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -305,6 +326,10 @@ func newAccountTransactionListCmd(c *client.Ref, configPath string, w io.Writer)
 			"schwab-agent account transaction list --types TRADE --symbol AAPL\n" +
 			"schwab-agent account transaction list --from 2025-01-01T00:00:00Z --to 2025-01-31T23:59:59Z",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			accountFlag, err := cmd.Flags().GetString("account")
 			if err != nil {
 				return err
@@ -331,10 +356,9 @@ func newAccountTransactionListCmd(c *client.Ref, configPath string, w io.Writer)
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Types, "types", "", "Transaction type filter (TRADE, DIVIDEND, etc.)")
-	cmd.Flags().StringVar(&opts.From, "from", "", "Start date (YYYY-MM-DDTHH:MM:SSZ)")
-	cmd.Flags().StringVar(&opts.To, "to", "", "End date (YYYY-MM-DDTHH:MM:SSZ)")
-	cmd.Flags().StringVar(&opts.Symbol, "symbol", "", "Filter by symbol")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
