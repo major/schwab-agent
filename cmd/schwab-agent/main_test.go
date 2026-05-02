@@ -1,9 +1,7 @@
 package main
 
 import (
-	"context"
 	stderrors "errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,11 +13,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
+	"github.com/major/schwab-agent/internal/commands"
 )
 
 func TestMain(m *testing.M) {
@@ -56,34 +54,43 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-// runApp builds and executes the root command without allowing urfave/cli to call os.Exit.
+// runApp builds and executes the root command without allowing Cobra to call os.Exit.
 func runApp(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
 	var stdout strings.Builder
 	app := buildApp(&stdout)
-	app.Writer = &stdout
-	app.ErrWriter = io.Discard
-	app.ExitErrHandler = func(_ context.Context, _ *cli.Command, _ error) {}
+	app.SetOut(&stdout)
+	app.SetErr(&stdout)
+	app.SetArgs(cobraArgs(args))
 
-	err := app.Run(context.Background(), args)
+	err := app.Execute()
 
 	return stdout.String(), err
 }
 
 // runAppWithDeps is like runApp but uses the given deps for dependency overrides.
-func runAppWithDeps(t *testing.T, deps appDeps, args ...string) (string, error) {
+func runAppWithDeps(t *testing.T, deps commands.RootDeps, args ...string) (string, error) {
 	t.Helper()
 
 	var stdout strings.Builder
 	app := buildAppWithDeps(&stdout, deps)
-	app.Writer = &stdout
-	app.ErrWriter = io.Discard
-	app.ExitErrHandler = func(_ context.Context, _ *cli.Command, _ error) {}
+	app.SetOut(&stdout)
+	app.SetErr(&stdout)
+	app.SetArgs(cobraArgs(args))
 
-	err := app.Run(context.Background(), args)
+	err := app.Execute()
 
 	return stdout.String(), err
+}
+
+// cobraArgs strips the binary name used by the legacy urfave/cli test table.
+func cobraArgs(args []string) []string {
+	if len(args) > 0 && args[0] == "schwab-agent" {
+		return args[1:]
+	}
+
+	return args
 }
 
 // writeTestConfig persists a valid auth config for Before hook tests.
@@ -109,7 +116,7 @@ func TestBuildApp_AllCommandsPresent(t *testing.T) {
 	stdout, err := runApp(t, "schwab-agent", "--help")
 	require.NoError(t, err)
 
-	for _, name := range []string{"auth", "account", "order", "quote", "chain", "history", "market", "instrument", "schema"} {
+	for _, name := range []string{"auth", "account", "order", "quote", "chain", "history", "market", "instrument", "completion", "symbol"} {
 		assert.Contains(t, stdout, name)
 	}
 }
@@ -127,13 +134,12 @@ func TestBeforeHook_SkipsAuthForAuthCommand(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestBeforeHook_SkipsAuthForSchemaCommand(t *testing.T) {
+func TestBeforeHook_SkipsAuthForCompletionCommand(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	stdout, err := runApp(t, "schwab-agent", "schema")
+	stdout, err := runApp(t, "schwab-agent", "completion", "bash")
 	require.NoError(t, err)
-	assert.Contains(t, stdout, `"global_flags"`)
-	assert.Contains(t, stdout, `"auth"`)
+	assert.Contains(t, stdout, "bash completion")
 }
 
 func TestBeforeHook_ReturnsAuthErrorForAPICommand(t *testing.T) {
@@ -275,9 +281,9 @@ func TestBeforeHook_RefreshesExpiredToken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	deps := defaultAppDeps()
-	deps.tokenRefreshEndpoint = func(_ *auth.Config) string { return server.URL + "/oauth/token" }
-	deps.newClient = func(token string, _ ...client.Option) *client.Client {
+	deps := commands.DefaultRootDeps()
+	deps.TokenRefreshEndpoint = func(_ *auth.Config) string { return server.URL + "/oauth/token" }
+	deps.NewClient = func(token string, _ ...client.Option) *client.Client {
 		return client.NewClient(token, client.WithBaseURL(server.URL))
 	}
 
@@ -333,7 +339,7 @@ func TestBeforeHook_UsesConfiguredProxyForRefreshAndAPIRequests(t *testing.T) {
 		BaseURLInsecure: true,
 	}))
 
-	_, err := runAppWithDeps(t, defaultAppDeps(), "schwab-agent", "--config", configPath, "--token", tokenPath, "account", "numbers")
+	_, err := runAppWithDeps(t, commands.DefaultRootDeps(), "schwab-agent", "--config", configPath, "--token", tokenPath, "account", "numbers")
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), refreshCalls.Load())
 
@@ -380,8 +386,8 @@ func TestIntegration_ValidToken_QuoteGet(t *testing.T) {
 	}))
 	defer server.Close()
 
-	deps := defaultAppDeps()
-	deps.newClient = func(token string, _ ...client.Option) *client.Client {
+	deps := commands.DefaultRootDeps()
+	deps.NewClient = func(token string, _ ...client.Option) *client.Client {
 		return client.NewClient(token, client.WithBaseURL(server.URL))
 	}
 
@@ -412,8 +418,6 @@ func TestIntegration_OrderConfirmGate(t *testing.T) {
 
 	_, err := runApp(t,
 		"schwab-agent",
-		"--config", configPath,
-		"--token", tokenPath,
 		"order", "place", "equity",
 		"--symbol", "AAPL",
 		"--action", "BUY",
@@ -437,15 +441,13 @@ func TestIntegration_OrderConfirmGate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	deps := defaultAppDeps()
-	deps.newClient = func(token string, _ ...client.Option) *client.Client {
+	deps := commands.DefaultRootDeps()
+	deps.NewClient = func(token string, _ ...client.Option) *client.Client {
 		return client.NewClient(token, client.WithBaseURL(server.URL))
 	}
 
 	stdout, err := runAppWithDeps(t, deps,
 		"schwab-agent",
-		"--config", configPath,
-		"--token", tokenPath,
 		"order", "place", "equity",
 		"--symbol", "AAPL",
 		"--action", "BUY",
@@ -465,10 +467,9 @@ func TestUnknownCommand_SuggestsClosestMatch(t *testing.T) {
 	_, err := runApp(t, "schwab-agent", "price-history")
 	require.Error(t, err)
 
-	var valErr *apperr.ValidationError
-	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), `unknown command "price-history"`)
-	assert.Contains(t, err.Error(), `Did you mean "history"?`)
+	assert.Contains(t, err.Error(), "Did you mean this?")
+	assert.Contains(t, err.Error(), "history")
 	assert.Equal(t, 1, apperr.ExitCodeFor(err))
 }
 
@@ -481,10 +482,9 @@ func TestUnknownCommand_WithUnknownFlags(t *testing.T) {
 	_, err := runApp(t, "schwab-agent", "price-history", "get", "AAPL", "--period-type", "month")
 	require.Error(t, err)
 
-	var valErr *apperr.ValidationError
-	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), `unknown command "price-history"`)
-	assert.Contains(t, err.Error(), `Did you mean "history"?`)
+	assert.Contains(t, err.Error(), "Did you mean this?")
+	assert.Contains(t, err.Error(), "history")
 	assert.Equal(t, 1, apperr.ExitCodeFor(err))
 }
 
@@ -496,8 +496,6 @@ func TestUnknownCommand_CompletelyWrongName(t *testing.T) {
 	_, err := runApp(t, "schwab-agent", "frobnicate")
 	require.Error(t, err)
 
-	var valErr *apperr.ValidationError
-	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), `unknown command "frobnicate"`)
 	assert.Equal(t, 1, apperr.ExitCodeFor(err))
 }

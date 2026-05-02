@@ -78,10 +78,11 @@ schwab-agent history get AAPL --from 1735689600000 --to 1743379200000`,
 // NewHistoryCmd returns the Cobra command for price history lookups.
 func NewHistoryCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "history",
-		Short:   "Retrieve price history for a symbol",
-		GroupID: "market-data",
-		RunE:    cobraRequireSubcommand,
+		Use:        "history",
+		Short:      "Retrieve price history for a symbol",
+		SuggestFor: []string{"price-history"},
+		GroupID:    "market-data",
+		RunE:       cobraRequireSubcommand,
 	}
 
 	getCmd := &cobra.Command{

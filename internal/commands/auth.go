@@ -14,8 +14,8 @@ import (
 
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
-	"github.com/major/schwab-agent/internal/output"
 	"github.com/major/schwab-agent/internal/models"
+	"github.com/major/schwab-agent/internal/output"
 )
 
 const refreshTokenMaxAgeSeconds int64 = 561600
@@ -120,9 +120,9 @@ func AccountSetDefaultCommand(configPath string, w io.Writer) *cli.Command {
 				return err
 			}
 
-		return output.WriteSuccess(w, authDefaultAccountData{
-			DefaultAccount: hash,
-		}, output.NewMetadata())
+			return output.WriteSuccess(w, authDefaultAccountData{
+				DefaultAccount: hash,
+			}, output.NewMetadata())
 		},
 	}
 }
@@ -378,6 +378,19 @@ type AuthDeps struct {
 	RefreshAccessToken func(*auth.Config, *auth.TokenFile, string) (*auth.TokenFile, error)
 	RunLogin           func(*auth.Config, string, string, bool, io.Writer) error
 	NewAccountClient   func(string, *auth.Config) accountNumbersClient
+}
+
+// DefaultAuthDeps returns the production dependency set for Cobra auth commands.
+func DefaultAuthDeps() AuthDeps {
+	defaults := defaultAuthDeps()
+
+	return AuthDeps{
+		ConfigPath:         defaults.configPath,
+		OAuthTokenEndpoint: defaults.oauthTokenEndpoint,
+		RefreshAccessToken: defaults.refreshAccessToken,
+		RunLogin:           defaults.runLogin,
+		NewAccountClient:   defaults.newAccountClient,
+	}
 }
 
 // NewAuthCmd returns the Cobra auth parent command with login, status, and
