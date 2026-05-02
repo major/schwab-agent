@@ -405,13 +405,14 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 		},
 	}
 
+	// Period uses IntSliceVar because its default varies per indicator (cfg.defaultPeriod)
+	// and structcli struct tags require static defaults.
+	// Register BEFORE Define so structcli's schema generator handles it correctly.
+	cmd.Flags().IntSliceVar(&opts.Period, "period", []int{cfg.defaultPeriod}, "Indicator period (repeatable or comma-separated)")
+
 	if err := structcli.Define(cmd, opts, structcli.WithExclusions("period")); err != nil {
 		panic(err)
 	}
-
-	// Period uses IntSliceVar because its default varies per indicator (cfg.defaultPeriod)
-	// and structcli struct tags require static defaults.
-	cmd.Flags().IntSliceVar(&opts.Period, "period", []int{cfg.defaultPeriod}, "Indicator period (repeatable or comma-separated)")
 
 	return cmd
 }
