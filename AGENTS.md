@@ -151,7 +151,7 @@ Empty sections are omitted automatically.
 
 1. **Shared client ref**: `client.Ref` (embedding `*Client`) is pre-allocated and shared by all commands; the Before hook populates `ref.Client` after auth
 2. **Env vars override config**: Priority is env vars > config file > defaults
-3. **Schema introspection**: `schema` command auto-generates from CLI definitions, not manually maintained
+3. **Schema introspection**: `--jsonschema` flag auto-generates JSON Schema from CLI definitions via structcli, not manually maintained
 4. **Workflow knowledge in help text**: Command Long descriptions and Example fields embed the workflow knowledge that was previously in separate skill files
 5. **No testdata/**: All test data generated inline or via helper functions
 6. **TLSConfig over HTTPClient**: `Config.TLSConfig()` returns a `*tls.Config` instead of the old `*http.Client` factory. Both the API client (`WithTLSConfig`) and auth token exchange (`newOAuthClient`) use this to support insecure proxy setups. The callback server still uses raw net/http (server-side code).

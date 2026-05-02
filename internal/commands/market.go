@@ -3,6 +3,7 @@ package commands
 import (
 	"io"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -21,9 +22,12 @@ type moversData struct {
 
 // marketMoversOpts holds the options for the market movers subcommand.
 type marketMoversOpts struct {
-	Sort      string
-	Frequency string
+	Sort      string `flag:"sort" flagdescr:"Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)"`
+	Frequency string `flag:"frequency" flagdescr:"Minimum percent change magnitude (0, 1, 5, 10, 30, 60)"`
 }
+
+// Attach implements structcli.Attachable.
+func (o *marketMoversOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewMarketCmd returns the Cobra command for market hours and movers lookups.
 func NewMarketCmd(c *client.Ref, w io.Writer) *cobra.Command {
@@ -93,6 +97,10 @@ names (e.g. '$SPX').`,
   schwab-agent market movers '$DJI' --sort VOLUME --frequency 5
   schwab-agent market movers EQUITY_ALL --sort PERCENT_CHANGE_UP`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			index := ""
 			if len(args) > 0 {
 				index = args[0]
@@ -115,8 +123,9 @@ names (e.g. '$SPX').`,
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Sort, "sort", "", "Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)")
-	cmd.Flags().StringVar(&opts.Frequency, "frequency", "", "Minimum percent change magnitude (0, 1, 5, 10, 30, 60)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
