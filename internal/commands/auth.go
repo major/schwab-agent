@@ -82,6 +82,11 @@ type authDefaultAccountData struct {
 	DefaultAccount string `json:"default_account"`
 }
 
+// authLoginOpts holds the options for the auth login subcommand.
+type authLoginOpts struct {
+	NoBrowser bool
+}
+
 // requireAuthConfig returns a valid auth config or loads it from disk.
 func requireAuthConfig(cfg *auth.Config, configPath string) (*auth.Config, error) {
 	if cfg != nil && cfg.ClientID != "" && cfg.ClientSecret != "" {
@@ -197,6 +202,7 @@ func NewAuthCmd(configPath, tokenPath string, w io.Writer, deps AuthDeps) *cobra
 		GroupID:     "account-mgmt",
 		RunE:        requireSubcommand,
 	}
+	cmd.SetFlagErrorFunc(suggestSubcommands)
 
 	cmd.AddCommand(newAuthLoginCmd(tokenPath, w, deps))
 	cmd.AddCommand(newAuthStatusCmd(tokenPath, w, deps))
@@ -207,6 +213,7 @@ func NewAuthCmd(configPath, tokenPath string, w io.Writer, deps AuthDeps) *cobra
 
 // newAuthLoginCmd returns the Cobra login subcommand.
 func newAuthLoginCmd(tokenPath string, w io.Writer, deps AuthDeps) *cobra.Command {
+	opts := &authLoginOpts{}
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Run the OAuth login flow",
@@ -222,7 +229,7 @@ func newAuthLoginCmd(tokenPath string, w io.Writer, deps AuthDeps) *cobra.Comman
 			}
 
 			var loginOutput strings.Builder
-			openBrowser := !flagBool(cmd, "no-browser")
+			openBrowser := !opts.NoBrowser
 
 			if err := deps.RunLogin(loginConfig, resolvedTokenPath, deps.OAuthTokenEndpoint(), openBrowser, &loginOutput); err != nil {
 				return err
@@ -264,7 +271,7 @@ func newAuthLoginCmd(tokenPath string, w io.Writer, deps AuthDeps) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().Bool("no-browser", false, "Print the authorization URL in the JSON response instead of opening a browser")
+	cmd.Flags().BoolVar(&opts.NoBrowser, "no-browser", false, "Print the authorization URL in the JSON response instead of opening a browser")
 
 	return cmd
 }
