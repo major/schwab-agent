@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/leodido/structcli"
+	"github.com/leodido/structcli/debug"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -66,7 +67,7 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 	root.AddCommand(commands.NewOrderCmd(ref, configPath, w))
 	root.AddCommand(commands.NewCompletionCmd(w))
 
-	if err := structcli.Setup(root, structcli.WithJSONSchema(), structcli.WithHelpTopics(), structcli.WithFlagErrors(), structcli.WithAppName("schwab-agent")); err != nil {
+	if err := structcli.Setup(root, structcli.WithJSONSchema(), structcli.WithHelpTopics(), structcli.WithFlagErrors(), structcli.WithAppName("schwab-agent"), structcli.WithDebug(debug.Options{Exit: true})); err != nil {
 		panic(err)
 	}
 
