@@ -12,19 +12,19 @@ import (
 
 // chainGetOpts holds the options for the chain get subcommand.
 type chainGetOpts struct {
-	Type                   string `flag:"type" flagdescr:"Contract type: CALL, PUT, or ALL" flaggroup:"contract"`
-	StrikeCount            string `flag:"strike-count" flagdescr:"Number of strikes to return" flaggroup:"filtering"`
-	Strategy               string `flag:"strategy" flagdescr:"Option pricing strategy" flaggroup:"contract"`
-	FromDate               string `flag:"from-date" flagdescr:"Start date (YYYY-MM-DD)" flaggroup:"filtering"`
-	ToDate                 string `flag:"to-date" flagdescr:"End date (YYYY-MM-DD)" flaggroup:"filtering"`
-	IncludeUnderlyingQuote bool   `flag:"include-underlying-quote" flagdescr:"Include underlying quote data in response" flaggroup:"filtering"`
-	Interval               string `flag:"interval" flagdescr:"Strike interval for spread strategy chains" flaggroup:"filtering"`
-	Strike                 string `flag:"strike" flagdescr:"Filter to a specific strike price" flaggroup:"filtering"`
-	StrikeRange            string `flag:"strike-range" flagdescr:"Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL" flaggroup:"filtering"`
-	Volatility             string `flag:"volatility" flagdescr:"Volatility for theoretical pricing calculations" flaggroup:"pricing"`
-	UnderlyingPrice        string `flag:"underlying-price" flagdescr:"Override underlying price for theoretical calculations" flaggroup:"pricing"`
-	InterestRate           string `flag:"interest-rate" flagdescr:"Interest rate for theoretical pricing calculations" flaggroup:"pricing"`
-	DaysToExpiration       string `flag:"days-to-expiration" flagdescr:"Days to expiration for theoretical pricing calculations" flaggroup:"pricing"`
+	Type                   chainContractType `flag:"type" flagdescr:"Contract type: CALL, PUT, or ALL" flaggroup:"contract"`
+	StrikeCount            string            `flag:"strike-count" flagdescr:"Number of strikes to return" flaggroup:"filtering"`
+	Strategy               chainStrategy     `flag:"strategy" flagdescr:"Option pricing strategy" flaggroup:"contract"`
+	FromDate               string            `flag:"from-date" flagdescr:"Start date (YYYY-MM-DD)" flaggroup:"filtering"`
+	ToDate                 string            `flag:"to-date" flagdescr:"End date (YYYY-MM-DD)" flaggroup:"filtering"`
+	IncludeUnderlyingQuote bool              `flag:"include-underlying-quote" flagdescr:"Include underlying quote data in response" flaggroup:"filtering"`
+	Interval               string            `flag:"interval" flagdescr:"Strike interval for spread strategy chains" flaggroup:"filtering"`
+	Strike                 string            `flag:"strike" flagdescr:"Filter to a specific strike price" flaggroup:"filtering"`
+	StrikeRange            strikeRange       `flag:"strike-range" flagdescr:"Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL" flaggroup:"filtering"`
+	Volatility             string            `flag:"volatility" flagdescr:"Volatility for theoretical pricing calculations" flaggroup:"pricing"`
+	UnderlyingPrice        string            `flag:"underlying-price" flagdescr:"Override underlying price for theoretical calculations" flaggroup:"pricing"`
+	InterestRate           string            `flag:"interest-rate" flagdescr:"Interest rate for theoretical pricing calculations" flaggroup:"pricing"`
+	DaysToExpiration       string            `flag:"days-to-expiration" flagdescr:"Days to expiration for theoretical pricing calculations" flaggroup:"pricing"`
 }
 
 // Attach implements structcli.Options interface.
@@ -78,15 +78,15 @@ specific moneyness with --strike-range (ITM, NTM, OTM, ALL).`,
 			}
 
 			params := client.ChainParams{
-				ContractType:           opts.Type,
+				ContractType:           string(opts.Type),
 				StrikeCount:            opts.StrikeCount,
-				Strategy:               opts.Strategy,
+				Strategy:               string(opts.Strategy),
 				FromDate:               opts.FromDate,
 				ToDate:                 opts.ToDate,
 				IncludeUnderlyingQuote: includeUnderlying,
 				Interval:               opts.Interval,
 				Strike:                 opts.Strike,
-				StrikeRange:            opts.StrikeRange,
+				StrikeRange:            string(opts.StrikeRange),
 				Volatility:             opts.Volatility,
 				UnderlyingPrice:        opts.UnderlyingPrice,
 				InterestRate:           opts.InterestRate,
@@ -104,6 +104,7 @@ specific moneyness with --strike-range (ITM, NTM, OTM, ALL).`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }

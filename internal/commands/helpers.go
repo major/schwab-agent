@@ -62,6 +62,17 @@ func requireEnum[T ~string](raw string, valid []T, label string) (T, error) {
 	)
 }
 
+// requireTypedEnum validates that a typed enum flag with no useful zero value
+// was provided. Structcli validates explicit values, but omitted flags still
+// arrive as the enum type's zero value.
+func requireTypedEnum[T ~string](value T, label string) error {
+	if strings.TrimSpace(string(value)) == "" {
+		return newValidationError(label + " is required")
+	}
+
+	return nil
+}
+
 // validEnumString joins valid enum values into a comma-separated string for
 // error messages. Example: "BUY, SELL, BUY_TO_COVER".
 func validEnumString[T ~string](valid []T) string {
@@ -120,6 +131,31 @@ func suggestSubcommands(cmd *cobra.Command, err error) error {
 		),
 		err,
 	)
+}
+
+// normalizeFlagValidationError keeps enum flag errors consistent with the older
+// command-level validation messages while still letting structcli/pflag reject
+// invalid enum values before RunE starts.
+func normalizeFlagValidationError(err error) error {
+	message := err.Error()
+	if !strings.Contains(message, "invalid value") || !strings.Contains(message, " for \"--") {
+		return err
+	}
+
+	_, after, ok := strings.Cut(message, " for \"--")
+	if !ok {
+		return err
+	}
+	flagName, _, ok := strings.Cut(after, "\" flag")
+	if !ok || flagName == "" {
+		return err
+	}
+
+	return newValidationError("invalid " + flagName)
+}
+
+func normalizeFlagValidationErrorFunc(_ *cobra.Command, err error) error {
+	return normalizeFlagValidationError(err)
 }
 
 // visibleSubcommandNames returns only invokable subcommands for user-facing

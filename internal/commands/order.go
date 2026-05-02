@@ -55,6 +55,9 @@ type orderReplaceData struct {
 
 // orderListOpts holds local flags for the order list subcommand.
 type orderListOpts struct {
+	// Keep status as []string because structcli v0.17 does not support slices of
+	// registered custom enum types. RunE still validates values against the same
+	// registered enum set after expanding comma-separated repeatable input.
 	Status []string `flag:"status" flagdescr:"Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc."`
 	From   string   `flag:"from" flagdescr:"Filter by entered time lower bound"`
 	To     string   `flag:"to" flagdescr:"Filter by entered time upper bound"`
@@ -108,23 +111,23 @@ func (o *orderReplaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // equityPlaceOpts holds flags shared by equity place, build, and replace flows.
 type equityPlaceOpts struct {
-	Symbol             string  `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
-	Action             string  `flag:"action" flagdescr:"Order action" flagrequired:"true" flaggroup:"order"`
-	Quantity           float64 `flag:"quantity" flagdescr:"Share quantity" flagrequired:"true" flaggroup:"execution"`
-	Type               string  `flag:"type" flagdescr:"Order type" flaggroup:"order"`
-	Price              float64 `flag:"price" flagdescr:"Limit price" flaggroup:"pricing"`
-	StopPrice          float64 `flag:"stop-price" flagdescr:"Stop price" flaggroup:"pricing"`
-	StopOffset         float64 `flag:"stop-offset" flagdescr:"Trailing stop offset amount" flaggroup:"pricing"`
-	StopLinkBasis      string  `flag:"stop-link-basis" flagdescr:"Trailing stop reference price (LAST, BID, ASK, MARK)" flaggroup:"pricing"`
-	StopLinkType       string  `flag:"stop-link-type" flagdescr:"Trailing stop offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
-	StopType           string  `flag:"stop-type" flagdescr:"Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)" flaggroup:"pricing"`
-	ActivationPrice    float64 `flag:"activation-price" flagdescr:"Price that activates the trailing stop" flaggroup:"pricing"`
-	Duration           string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session            string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
-	SpecialInstruction string  `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)" flaggroup:"execution"`
-	Destination        string  `flag:"destination" flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)" flaggroup:"execution"`
-	PriceLinkBasis     string  `flag:"price-link-basis" flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)" flaggroup:"pricing"`
-	PriceLinkType      string  `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
+	Symbol             string                      `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
+	Action             models.Instruction          `flag:"action" flagdescr:"Order action" flagrequired:"true" flaggroup:"order"`
+	Quantity           float64                     `flag:"quantity" flagdescr:"Share quantity" flagrequired:"true" flaggroup:"execution"`
+	Type               models.OrderType            `flag:"type" flagdescr:"Order type" flaggroup:"order"`
+	Price              float64                     `flag:"price" flagdescr:"Limit price" flaggroup:"pricing"`
+	StopPrice          float64                     `flag:"stop-price" flagdescr:"Stop price" flaggroup:"pricing"`
+	StopOffset         float64                     `flag:"stop-offset" flagdescr:"Trailing stop offset amount" flaggroup:"pricing"`
+	StopLinkBasis      models.StopPriceLinkBasis   `flag:"stop-link-basis" flagdescr:"Trailing stop reference price (LAST, BID, ASK, MARK)" flaggroup:"pricing"`
+	StopLinkType       models.StopPriceLinkType    `flag:"stop-link-type" flagdescr:"Trailing stop offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
+	StopType           models.StopType             `flag:"stop-type" flagdescr:"Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)" flaggroup:"pricing"`
+	ActivationPrice    float64                     `flag:"activation-price" flagdescr:"Price that activates the trailing stop" flaggroup:"pricing"`
+	Duration           models.Duration             `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session            models.Session              `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	SpecialInstruction models.SpecialInstruction   `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)" flaggroup:"execution"`
+	Destination        models.RequestedDestination `flag:"destination" flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)" flaggroup:"execution"`
+	PriceLinkBasis     models.PriceLinkBasis       `flag:"price-link-basis" flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)" flaggroup:"pricing"`
+	PriceLinkType      models.PriceLinkType        `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
 }
 
 // Attach implements structcli.Options interface.
@@ -132,21 +135,21 @@ func (o *equityPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // optionPlaceOpts holds flags shared by option place and build flows.
 type optionPlaceOpts struct {
-	Underlying         string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration         string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	Strike             float64 `flag:"strike" flagdescr:"Strike price" flagrequired:"true" flaggroup:"contract"`
-	Call               bool    `flag:"call" flagdescr:"Call option" flaggroup:"contract"`
-	Put                bool    `flag:"put" flagdescr:"Put option" flaggroup:"contract"`
-	Action             string  `flag:"action" flagdescr:"Order action" flagrequired:"true" flaggroup:"order"`
-	Quantity           float64 `flag:"quantity" flagdescr:"Contract quantity" flagrequired:"true" flaggroup:"execution"`
-	Type               string  `flag:"type" flagdescr:"Order type" flaggroup:"order"`
-	Price              float64 `flag:"price" flagdescr:"Limit price" flaggroup:"pricing"`
-	Duration           string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session            string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
-	SpecialInstruction string  `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)" flaggroup:"execution"`
-	Destination        string  `flag:"destination" flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)" flaggroup:"execution"`
-	PriceLinkBasis     string  `flag:"price-link-basis" flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)" flaggroup:"pricing"`
-	PriceLinkType      string  `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
+	Underlying         string                      `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration         string                      `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	Strike             float64                     `flag:"strike" flagdescr:"Strike price" flagrequired:"true" flaggroup:"contract"`
+	Call               bool                        `flag:"call" flagdescr:"Call option" flaggroup:"contract"`
+	Put                bool                        `flag:"put" flagdescr:"Put option" flaggroup:"contract"`
+	Action             models.Instruction          `flag:"action" flagdescr:"Order action" flagrequired:"true" flaggroup:"order"`
+	Quantity           float64                     `flag:"quantity" flagdescr:"Contract quantity" flagrequired:"true" flaggroup:"execution"`
+	Type               models.OrderType            `flag:"type" flagdescr:"Order type" flaggroup:"order"`
+	Price              float64                     `flag:"price" flagdescr:"Limit price" flaggroup:"pricing"`
+	Duration           models.Duration             `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session            models.Session              `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	SpecialInstruction models.SpecialInstruction   `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)" flaggroup:"execution"`
+	Destination        models.RequestedDestination `flag:"destination" flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)" flaggroup:"execution"`
+	PriceLinkBasis     models.PriceLinkBasis       `flag:"price-link-basis" flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)" flaggroup:"pricing"`
+	PriceLinkType      models.PriceLinkType        `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
 }
 
 // Attach implements structcli.Options interface.
@@ -154,15 +157,15 @@ func (o *optionPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // bracketPlaceOpts holds flags shared by bracket place and build flows.
 type bracketPlaceOpts struct {
-	Symbol     string  `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
-	Action     string  `flag:"action" flagdescr:"Order action" flagrequired:"true" flaggroup:"order"`
-	Quantity   float64 `flag:"quantity" flagdescr:"Share quantity" flagrequired:"true" flaggroup:"execution"`
-	Type       string  `flag:"type" flagdescr:"Entry order type" flaggroup:"order"`
-	Price      float64 `flag:"price" flagdescr:"Entry price" flaggroup:"pricing"`
-	TakeProfit float64 `flag:"take-profit" flagdescr:"Take-profit exit price" flaggroup:"pricing"`
-	StopLoss   float64 `flag:"stop-loss" flagdescr:"Stop-loss exit price" flaggroup:"pricing"`
-	Duration   string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session    string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Symbol     string             `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
+	Action     models.Instruction `flag:"action" flagdescr:"Order action" flagrequired:"true" flaggroup:"order"`
+	Quantity   float64            `flag:"quantity" flagdescr:"Share quantity" flagrequired:"true" flaggroup:"execution"`
+	Type       models.OrderType   `flag:"type" flagdescr:"Entry order type" flaggroup:"order"`
+	Price      float64            `flag:"price" flagdescr:"Entry price" flaggroup:"pricing"`
+	TakeProfit float64            `flag:"take-profit" flagdescr:"Take-profit exit price" flaggroup:"pricing"`
+	StopLoss   float64            `flag:"stop-loss" flagdescr:"Stop-loss exit price" flaggroup:"pricing"`
+	Duration   models.Duration    `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session    models.Session     `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -170,13 +173,13 @@ func (o *bracketPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // ocoPlaceOpts holds flags shared by OCO place and build flows.
 type ocoPlaceOpts struct {
-	Symbol     string  `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
-	Action     string  `flag:"action" flagdescr:"Exit action (SELL to close long, BUY to close short)" flagrequired:"true" flaggroup:"order"`
-	Quantity   float64 `flag:"quantity" flagdescr:"Share quantity" flagrequired:"true" flaggroup:"execution"`
-	TakeProfit float64 `flag:"take-profit" flagdescr:"Take-profit exit price (limit order)" flaggroup:"pricing"`
-	StopLoss   float64 `flag:"stop-loss" flagdescr:"Stop-loss exit price (stop order)" flaggroup:"pricing"`
-	Duration   string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session    string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Symbol     string             `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
+	Action     models.Instruction `flag:"action" flagdescr:"Exit action (SELL to close long, BUY to close short)" flagrequired:"true" flaggroup:"order"`
+	Quantity   float64            `flag:"quantity" flagdescr:"Share quantity" flagrequired:"true" flaggroup:"execution"`
+	TakeProfit float64            `flag:"take-profit" flagdescr:"Take-profit exit price (limit order)" flaggroup:"pricing"`
+	StopLoss   float64            `flag:"stop-loss" flagdescr:"Stop-loss exit price (stop order)" flaggroup:"pricing"`
+	Duration   models.Duration    `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session    models.Session     `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -184,18 +187,18 @@ func (o *ocoPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // verticalBuildOpts holds flags for vertical spread build flows.
 type verticalBuildOpts struct {
-	Underlying  string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration  string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	LongStrike  float64 `flag:"long-strike" flagdescr:"Strike price of the option being bought" flagrequired:"true" flaggroup:"contract"`
-	ShortStrike float64 `flag:"short-strike" flagdescr:"Strike price of the option being sold" flagrequired:"true" flaggroup:"contract"`
-	Call        bool    `flag:"call" flagdescr:"Call spread" flaggroup:"contract"`
-	Put         bool    `flag:"put" flagdescr:"Put spread" flaggroup:"contract"`
-	Open        bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close       bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity    float64 `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
-	Price       float64 `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration    string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session     string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying  string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration  string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	LongStrike  float64         `flag:"long-strike" flagdescr:"Strike price of the option being bought" flagrequired:"true" flaggroup:"contract"`
+	ShortStrike float64         `flag:"short-strike" flagdescr:"Strike price of the option being sold" flagrequired:"true" flaggroup:"contract"`
+	Call        bool            `flag:"call" flagdescr:"Call spread" flaggroup:"contract"`
+	Put         bool            `flag:"put" flagdescr:"Put spread" flaggroup:"contract"`
+	Open        bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close       bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity    float64         `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
+	Price       float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration    models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session     models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -203,18 +206,18 @@ func (o *verticalBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // ironCondorBuildOpts holds flags for iron condor build flows.
 type ironCondorBuildOpts struct {
-	Underlying      string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration      string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	PutLongStrike   float64 `flag:"put-long-strike" flagdescr:"Lowest strike: put being bought (protection)" flagrequired:"true" flaggroup:"contract"`
-	PutShortStrike  float64 `flag:"put-short-strike" flagdescr:"Put being sold (premium)" flagrequired:"true" flaggroup:"contract"`
-	CallShortStrike float64 `flag:"call-short-strike" flagdescr:"Call being sold (premium)" flagrequired:"true" flaggroup:"contract"`
-	CallLongStrike  float64 `flag:"call-long-strike" flagdescr:"Highest strike: call being bought (protection)" flagrequired:"true" flaggroup:"contract"`
-	Open            bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close           bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity        float64 `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
-	Price           float64 `flag:"price" flagdescr:"Net credit or debit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration        string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session         string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying      string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration      string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	PutLongStrike   float64         `flag:"put-long-strike" flagdescr:"Lowest strike: put being bought (protection)" flagrequired:"true" flaggroup:"contract"`
+	PutShortStrike  float64         `flag:"put-short-strike" flagdescr:"Put being sold (premium)" flagrequired:"true" flaggroup:"contract"`
+	CallShortStrike float64         `flag:"call-short-strike" flagdescr:"Call being sold (premium)" flagrequired:"true" flaggroup:"contract"`
+	CallLongStrike  float64         `flag:"call-long-strike" flagdescr:"Highest strike: call being bought (protection)" flagrequired:"true" flaggroup:"contract"`
+	Open            bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close           bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity        float64         `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
+	Price           float64         `flag:"price" flagdescr:"Net credit or debit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration        models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session         models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -222,18 +225,18 @@ func (o *ironCondorBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // strangleBuildOpts holds flags for strangle build flows.
 type strangleBuildOpts struct {
-	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	CallStrike float64 `flag:"call-strike" flagdescr:"Strike price for the call leg" flagrequired:"true" flaggroup:"contract"`
-	PutStrike  float64 `flag:"put-strike" flagdescr:"Strike price for the put leg" flagrequired:"true" flaggroup:"contract"`
-	Buy        bool    `flag:"buy" flagdescr:"Buy the strangle (long, net debit)" flaggroup:"execution"`
-	Sell       bool    `flag:"sell" flagdescr:"Sell the strangle (short, net credit)" flaggroup:"execution"`
-	Open       bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close      bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
-	Price      float64 `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration   string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session    string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	CallStrike float64         `flag:"call-strike" flagdescr:"Strike price for the call leg" flagrequired:"true" flaggroup:"contract"`
+	PutStrike  float64         `flag:"put-strike" flagdescr:"Strike price for the put leg" flagrequired:"true" flaggroup:"contract"`
+	Buy        bool            `flag:"buy" flagdescr:"Buy the strangle (long, net debit)" flaggroup:"execution"`
+	Sell       bool            `flag:"sell" flagdescr:"Sell the strangle (short, net credit)" flaggroup:"execution"`
+	Open       bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close      bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity   float64         `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
+	Price      float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration   models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session    models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -241,17 +244,17 @@ func (o *strangleBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // straddleBuildOpts holds flags for straddle build flows.
 type straddleBuildOpts struct {
-	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	Strike     float64 `flag:"strike" flagdescr:"Strike price (shared by call and put legs)" flagrequired:"true" flaggroup:"contract"`
-	Buy        bool    `flag:"buy" flagdescr:"Buy the straddle (long, net debit)" flaggroup:"execution"`
-	Sell       bool    `flag:"sell" flagdescr:"Sell the straddle (short, net credit)" flaggroup:"execution"`
-	Open       bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close      bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
-	Price      float64 `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration   string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session    string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	Strike     float64         `flag:"strike" flagdescr:"Strike price (shared by call and put legs)" flagrequired:"true" flaggroup:"contract"`
+	Buy        bool            `flag:"buy" flagdescr:"Buy the straddle (long, net debit)" flaggroup:"execution"`
+	Sell       bool            `flag:"sell" flagdescr:"Sell the straddle (short, net credit)" flaggroup:"execution"`
+	Open       bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close      bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity   float64         `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
+	Price      float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration   models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session    models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -259,13 +262,13 @@ func (o *straddleBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // coveredCallBuildOpts holds flags for covered call build flows.
 type coveredCallBuildOpts struct {
-	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	Strike     float64 `flag:"strike" flagdescr:"Call strike price" flagrequired:"true" flaggroup:"contract"`
-	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts (1 contract = 100 shares)" flagrequired:"true" flaggroup:"execution"`
-	Price      float64 `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration   string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session    string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	Strike     float64         `flag:"strike" flagdescr:"Call strike price" flagrequired:"true" flaggroup:"contract"`
+	Quantity   float64         `flag:"quantity" flagdescr:"Number of contracts (1 contract = 100 shares)" flagrequired:"true" flaggroup:"execution"`
+	Price      float64         `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration   models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session    models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -273,16 +276,16 @@ func (o *coveredCallBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // collarBuildOpts holds flags for collar-with-stock build flows.
 type collarBuildOpts struct {
-	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	PutStrike  float64 `flag:"put-strike" flagdescr:"Protective put strike price" flagrequired:"true" flaggroup:"contract"`
-	CallStrike float64 `flag:"call-strike" flagdescr:"Covered call strike price" flagrequired:"true" flaggroup:"contract"`
-	Expiration string  `flag:"expiration" flagdescr:"Expiration date for both options (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	Quantity   float64 `flag:"quantity" flagdescr:"Number of contracts (1 contract = 100 shares)" flagrequired:"true" flaggroup:"execution"`
-	Open       bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close      bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Price      float64 `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration   string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session    string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	PutStrike  float64         `flag:"put-strike" flagdescr:"Protective put strike price" flagrequired:"true" flaggroup:"contract"`
+	CallStrike float64         `flag:"call-strike" flagdescr:"Covered call strike price" flagrequired:"true" flaggroup:"contract"`
+	Expiration string          `flag:"expiration" flagdescr:"Expiration date for both options (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	Quantity   float64         `flag:"quantity" flagdescr:"Number of contracts (1 contract = 100 shares)" flagrequired:"true" flaggroup:"execution"`
+	Open       bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close      bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Price      float64         `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration   models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session    models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -290,18 +293,18 @@ func (o *collarBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // calendarBuildOpts holds flags for calendar spread build flows.
 type calendarBuildOpts struct {
-	Underlying     string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	NearExpiration string  `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	FarExpiration  string  `flag:"far-expiration" flagdescr:"Far-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	Strike         float64 `flag:"strike" flagdescr:"Strike price (shared by both legs)" flagrequired:"true" flaggroup:"contract"`
-	Call           bool    `flag:"call" flagdescr:"Call calendar spread" flaggroup:"contract"`
-	Put            bool    `flag:"put" flagdescr:"Put calendar spread" flaggroup:"contract"`
-	Open           bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close          bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity       float64 `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
-	Price          float64 `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration       string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session        string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying     string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	NearExpiration string          `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	FarExpiration  string          `flag:"far-expiration" flagdescr:"Far-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	Strike         float64         `flag:"strike" flagdescr:"Strike price (shared by both legs)" flagrequired:"true" flaggroup:"contract"`
+	Call           bool            `flag:"call" flagdescr:"Call calendar spread" flaggroup:"contract"`
+	Put            bool            `flag:"put" flagdescr:"Put calendar spread" flaggroup:"contract"`
+	Open           bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close          bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity       float64         `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
+	Price          float64         `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration       models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session        models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -309,19 +312,19 @@ func (o *calendarBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // diagonalBuildOpts holds flags for diagonal spread build flows.
 type diagonalBuildOpts struct {
-	Underlying     string  `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	NearExpiration string  `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	FarExpiration  string  `flag:"far-expiration" flagdescr:"Far-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	NearStrike     float64 `flag:"near-strike" flagdescr:"Strike price for the near-term (sold) leg" flagrequired:"true" flaggroup:"contract"`
-	FarStrike      float64 `flag:"far-strike" flagdescr:"Strike price for the far-term (bought) leg" flagrequired:"true" flaggroup:"contract"`
-	Call           bool    `flag:"call" flagdescr:"Call diagonal spread" flaggroup:"contract"`
-	Put            bool    `flag:"put" flagdescr:"Put diagonal spread" flaggroup:"contract"`
-	Open           bool    `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close          bool    `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity       float64 `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
-	Price          float64 `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration       string  `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session        string  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying     string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	NearExpiration string          `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	FarExpiration  string          `flag:"far-expiration" flagdescr:"Far-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	NearStrike     float64         `flag:"near-strike" flagdescr:"Strike price for the near-term (sold) leg" flagrequired:"true" flaggroup:"contract"`
+	FarStrike      float64         `flag:"far-strike" flagdescr:"Strike price for the far-term (bought) leg" flagrequired:"true" flaggroup:"contract"`
+	Call           bool            `flag:"call" flagdescr:"Call diagonal spread" flaggroup:"contract"`
+	Put            bool            `flag:"put" flagdescr:"Put diagonal spread" flaggroup:"contract"`
+	Open           bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close          bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity       float64         `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
+	Price          float64         `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration       models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session        models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
 // Attach implements structcli.Options interface.
@@ -414,6 +417,10 @@ merged, deduplicated results.`,
 
 			showAll := false
 			for _, s := range statuses {
+				if err := validateOrderStatusFilter(s); err != nil {
+					return err
+				}
+
 				if strings.EqualFold(s, "all") {
 					showAll = true
 					break
@@ -706,6 +713,7 @@ func makeCobraPlaceOrderCommand[O any, P any](
 			return output.WriteSuccess(w, orderPlaceData{OrderID: response.OrderID}, output.NewMetadata())
 		},
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	if flagSetup != nil {
 		flagSetup(cmd, opts)
@@ -902,6 +910,7 @@ REPLACED after the new order is created.`,
 			return output.WriteSuccess(w, orderReplaceData{OrderID: orderID, Replaced: true}, output.NewMetadata())
 		},
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	equityOrderFlagSetup(cmd, equityOpts)
 	if err := structcli.Define(cmd, opts); err != nil {
@@ -943,24 +952,18 @@ func ocoOrderFlagSetup(cmd *cobra.Command, opts *ocoPlaceOpts) {
 
 // parseOCOParams converts command flags into standalone OCO builder params.
 func parseOCOParams(opts *ocoPlaceOpts, _ []string) (*orderbuilder.OCOParams, error) {
-	action, err := parseInstruction(opts.Action)
-	if err != nil {
-		return nil, err
-	}
-
-	duration, session, err := parseDurationSession(opts.Duration, opts.Session)
-	if err != nil {
+	if err := requireTypedEnum(opts.Action, "action"); err != nil {
 		return nil, err
 	}
 
 	return &orderbuilder.OCOParams{
 		Symbol:     strings.TrimSpace(opts.Symbol),
-		Action:     action,
+		Action:     opts.Action,
 		Quantity:   opts.Quantity,
 		TakeProfit: opts.TakeProfit,
 		StopLoss:   opts.StopLoss,
-		Duration:   duration,
-		Session:    session,
+		Duration:   normalizeDuration(opts.Duration),
+		Session:    opts.Session,
 	}, nil
 }
 
@@ -996,11 +999,6 @@ func parseIronCondorParams(opts *ironCondorBuildOpts, _ []string) (*orderbuilder
 		return nil, err
 	}
 
-	duration, session, err := parseDurationSession(opts.Duration, opts.Session)
-	if err != nil {
-		return nil, err
-	}
-
 	return &orderbuilder.IronCondorParams{
 		Underlying:      strings.TrimSpace(opts.Underlying),
 		Expiration:      expiration,
@@ -1011,98 +1009,41 @@ func parseIronCondorParams(opts *ironCondorBuildOpts, _ []string) (*orderbuilder
 		Open:            isOpen,
 		Quantity:        opts.Quantity,
 		Price:           opts.Price,
-		Duration:        duration,
-		Session:         session,
+		Duration:        normalizeDuration(opts.Duration),
+		Session:         opts.Session,
 	}, nil
 }
 
 // parseEquityParams converts command flags into equity order builder params.
 func parseEquityParams(opts *equityPlaceOpts, _ []string) (*orderbuilder.EquityParams, error) {
-	action, err := parseInstruction(opts.Action)
-	if err != nil {
-		return nil, err
-	}
-
-	orderType, err := parseOrderType(opts.Type, models.OrderTypeMarket)
-	if err != nil {
-		return nil, err
-	}
-
-	duration, session, err := parseDurationSession(opts.Duration, opts.Session)
-	if err != nil {
-		return nil, err
-	}
-
-	stopLinkBasis, err := parseStopPriceLinkBasis(opts.StopLinkBasis)
-	if err != nil {
-		return nil, err
-	}
-
-	stopLinkType, err := parseStopPriceLinkType(opts.StopLinkType)
-	if err != nil {
-		return nil, err
-	}
-
-	stopType, err := parseStopType(opts.StopType)
-	if err != nil {
-		return nil, err
-	}
-
-	specialInstruction, err := parseSpecialInstruction(opts.SpecialInstruction)
-	if err != nil {
-		return nil, err
-	}
-
-	destination, err := parseDestination(opts.Destination)
-	if err != nil {
-		return nil, err
-	}
-
-	priceLinkBasis, err := parsePriceLinkBasis(opts.PriceLinkBasis)
-	if err != nil {
-		return nil, err
-	}
-
-	priceLinkType, err := parsePriceLinkType(opts.PriceLinkType)
-	if err != nil {
+	if err := requireTypedEnum(opts.Action, "action"); err != nil {
 		return nil, err
 	}
 
 	return &orderbuilder.EquityParams{
 		Symbol:             strings.TrimSpace(opts.Symbol),
-		Action:             action,
+		Action:             opts.Action,
 		Quantity:           opts.Quantity,
-		OrderType:          orderType,
+		OrderType:          normalizeOrderType(opts.Type, models.OrderTypeMarket),
 		Price:              opts.Price,
 		StopPrice:          opts.StopPrice,
 		StopPriceOffset:    opts.StopOffset,
-		StopPriceLinkBasis: stopLinkBasis,
-		StopPriceLinkType:  stopLinkType,
-		StopType:           stopType,
+		StopPriceLinkBasis: defaultStopPriceLinkBasis(opts.StopLinkBasis),
+		StopPriceLinkType:  defaultStopPriceLinkType(opts.StopLinkType),
+		StopType:           defaultStopType(opts.StopType),
 		ActivationPrice:    opts.ActivationPrice,
-		SpecialInstruction: specialInstruction,
-		Destination:        destination,
-		PriceLinkBasis:     priceLinkBasis,
-		PriceLinkType:      priceLinkType,
-		Duration:           duration,
-		Session:            session,
+		SpecialInstruction: opts.SpecialInstruction,
+		Destination:        opts.Destination,
+		PriceLinkBasis:     opts.PriceLinkBasis,
+		PriceLinkType:      opts.PriceLinkType,
+		Duration:           normalizeDuration(opts.Duration),
+		Session:            opts.Session,
 	}, nil
 }
 
 // parseOptionParams converts command flags into option order builder params.
 func parseOptionParams(opts *optionPlaceOpts, _ []string) (*orderbuilder.OptionParams, error) {
-	action, err := parseInstruction(opts.Action)
-	if err != nil {
-		return nil, err
-	}
-
-	orderType, err := parseOrderType(opts.Type, models.OrderTypeMarket)
-	if err != nil {
-		return nil, err
-	}
-
-	duration, session, err := parseDurationSession(opts.Duration, opts.Session)
-	if err != nil {
+	if err := requireTypedEnum(opts.Action, "action"); err != nil {
 		return nil, err
 	}
 
@@ -1116,71 +1057,40 @@ func parseOptionParams(opts *optionPlaceOpts, _ []string) (*orderbuilder.OptionP
 		return nil, err
 	}
 
-	specialInstruction, err := parseSpecialInstruction(opts.SpecialInstruction)
-	if err != nil {
-		return nil, err
-	}
-
-	destination, err := parseDestination(opts.Destination)
-	if err != nil {
-		return nil, err
-	}
-
-	priceLinkBasis, err := parsePriceLinkBasis(opts.PriceLinkBasis)
-	if err != nil {
-		return nil, err
-	}
-
-	priceLinkType, err := parsePriceLinkType(opts.PriceLinkType)
-	if err != nil {
-		return nil, err
-	}
-
 	return &orderbuilder.OptionParams{
 		Underlying:         strings.TrimSpace(opts.Underlying),
 		Expiration:         expiration,
 		Strike:             opts.Strike,
 		PutCall:            putCall,
-		Action:             action,
+		Action:             opts.Action,
 		Quantity:           opts.Quantity,
-		OrderType:          orderType,
+		OrderType:          normalizeOrderType(opts.Type, models.OrderTypeMarket),
 		Price:              opts.Price,
-		SpecialInstruction: specialInstruction,
-		Destination:        destination,
-		PriceLinkBasis:     priceLinkBasis,
-		PriceLinkType:      priceLinkType,
-		Duration:           duration,
-		Session:            session,
+		SpecialInstruction: opts.SpecialInstruction,
+		Destination:        opts.Destination,
+		PriceLinkBasis:     opts.PriceLinkBasis,
+		PriceLinkType:      opts.PriceLinkType,
+		Duration:           normalizeDuration(opts.Duration),
+		Session:            opts.Session,
 	}, nil
 }
 
 // parseBracketParams converts command flags into bracket order builder params.
 func parseBracketParams(opts *bracketPlaceOpts, _ []string) (*orderbuilder.BracketParams, error) {
-	action, err := parseInstruction(opts.Action)
-	if err != nil {
-		return nil, err
-	}
-
-	orderType, err := parseOrderType(opts.Type, models.OrderTypeMarket)
-	if err != nil {
-		return nil, err
-	}
-
-	duration, session, err := parseDurationSession(opts.Duration, opts.Session)
-	if err != nil {
+	if err := requireTypedEnum(opts.Action, "action"); err != nil {
 		return nil, err
 	}
 
 	return &orderbuilder.BracketParams{
 		Symbol:     strings.TrimSpace(opts.Symbol),
-		Action:     action,
+		Action:     opts.Action,
 		Quantity:   opts.Quantity,
-		OrderType:  orderType,
+		OrderType:  normalizeOrderType(opts.Type, models.OrderTypeMarket),
 		Price:      opts.Price,
 		TakeProfit: opts.TakeProfit,
 		StopLoss:   opts.StopLoss,
-		Duration:   duration,
-		Session:    session,
+		Duration:   normalizeDuration(opts.Duration),
+		Session:    opts.Session,
 	}, nil
 }
 
@@ -1416,7 +1326,93 @@ var (
 		models.PriceLinkTypePercent,
 		models.PriceLinkTypeTick,
 	}
+
+	validOrderStatusFilters = []orderStatusFilter{
+		orderStatusFilterAll,
+		orderStatusFilter(models.OrderStatusAwaitingParentOrder),
+		orderStatusFilter(models.OrderStatusAwaitingCondition),
+		orderStatusFilter(models.OrderStatusAwaitingStopCondition),
+		orderStatusFilter(models.OrderStatusAwaitingManualReview),
+		orderStatusFilter(models.OrderStatusAccepted),
+		orderStatusFilter(models.OrderStatusAwaitingUROut),
+		orderStatusFilter(models.OrderStatusPendingActivation),
+		orderStatusFilter(models.OrderStatusQueued),
+		orderStatusFilter(models.OrderStatusWorking),
+		orderStatusFilter(models.OrderStatusRejected),
+		orderStatusFilter(models.OrderStatusPendingCancel),
+		orderStatusFilter(models.OrderStatusCanceled),
+		orderStatusFilter(models.OrderStatusPendingReplace),
+		orderStatusFilter(models.OrderStatusReplaced),
+		orderStatusFilter(models.OrderStatusFilled),
+		orderStatusFilter(models.OrderStatusExpired),
+		orderStatusFilter(models.OrderStatusNew),
+		orderStatusFilter(models.OrderStatusAwaitingReleaseTime),
+		orderStatusFilter(models.OrderStatusPendingAcknowledgement),
+		orderStatusFilter(models.OrderStatusPendingRecall),
+		orderStatusFilter(models.OrderStatusUnknown),
+	}
 )
+
+// normalizeOrderType preserves legacy CLI aliases after structcli has already
+// validated the typed enum flag value.
+func normalizeOrderType(orderType, fallback models.OrderType) models.OrderType {
+	switch orderType {
+	case "":
+		return fallback
+	case models.OrderType("MOC"):
+		return models.OrderTypeMarketOnClose
+	case models.OrderType("LOC"):
+		return models.OrderTypeLimitOnClose
+	default:
+		return orderType
+	}
+}
+
+// normalizeDuration preserves common trading abbreviations after structcli
+// validation so order builders still receive canonical API enum values.
+func normalizeDuration(duration models.Duration) models.Duration {
+	switch duration {
+	case models.Duration("GTC"):
+		return models.DurationGoodTillCancel
+	case models.Duration("FOK"):
+		return models.DurationFillOrKill
+	case models.Duration("IOC"):
+		return models.DurationImmediateOrCancel
+	default:
+		return duration
+	}
+}
+
+func defaultStopPriceLinkBasis(value models.StopPriceLinkBasis) models.StopPriceLinkBasis {
+	if value == "" {
+		return models.StopPriceLinkBasisLast
+	}
+	return value
+}
+
+func defaultStopPriceLinkType(value models.StopPriceLinkType) models.StopPriceLinkType {
+	if value == "" {
+		return models.StopPriceLinkTypeValue
+	}
+	return value
+}
+
+func defaultStopType(value models.StopType) models.StopType {
+	if value == "" {
+		return models.StopTypeStandard
+	}
+	return value
+}
+
+func validateOrderStatusFilter(raw string) error {
+	for _, valid := range validOrderStatusFilters {
+		if strings.EqualFold(raw, string(valid)) {
+			return nil
+		}
+	}
+
+	return newValidationError("invalid status")
+}
 
 // parseInstruction converts CLI input to an instruction enum.
 func parseInstruction(raw string) (models.Instruction, error) {
@@ -1439,14 +1435,11 @@ func parseOrderType(raw string, fallback models.OrderType) (models.OrderType, er
 	return parseEnum(raw, validOrderTypes, fallback, "type")
 }
 
-// parseDuration converts CLI input to a duration enum.
-// Supports standard trading abbreviations: GTC (GOOD_TILL_CANCEL),
-// FOK (FILL_OR_KILL), and IOC (IMMEDIATE_OR_CANCEL).
+// parseDuration converts CLI input to a duration enum for focused unit tests and
+// legacy helper coverage. Runtime flag decoding is handled by structcli enums.
 func parseDuration(raw string) (models.Duration, error) {
 	upper := strings.ToUpper(strings.TrimSpace(raw))
 
-	// Resolve common trading abbreviations before standard enum validation.
-	// These are universal across brokers and trading platforms.
 	switch upper {
 	case "GTC":
 		return models.DurationGoodTillCancel, nil
@@ -1457,11 +1450,6 @@ func parseDuration(raw string) (models.Duration, error) {
 	}
 
 	return parseEnum(raw, validDurations, "", "duration")
-}
-
-// parseSession converts CLI input to a session enum.
-func parseSession(raw string) (models.Session, error) {
-	return parseEnum(raw, validSessions, "", "session")
 }
 
 // parseVerticalParams converts command flags into vertical spread builder params.
@@ -1481,11 +1469,6 @@ func parseVerticalParams(opts *verticalBuildOpts, _ []string) (*orderbuilder.Ver
 		return nil, err
 	}
 
-	duration, session, err := parseDurationSession(opts.Duration, opts.Session)
-	if err != nil {
-		return nil, err
-	}
-
 	return &orderbuilder.VerticalParams{
 		Underlying:  strings.TrimSpace(opts.Underlying),
 		Expiration:  expiration,
@@ -1495,8 +1478,8 @@ func parseVerticalParams(opts *verticalBuildOpts, _ []string) (*orderbuilder.Ver
 		Open:        isOpen,
 		Quantity:    opts.Quantity,
 		Price:       opts.Price,
-		Duration:    duration,
-		Session:     session,
+		Duration:    normalizeDuration(opts.Duration),
+		Session:     opts.Session,
 	}, nil
 }
 
@@ -1528,11 +1511,6 @@ func parseStrangleParams(opts *strangleBuildOpts, _ []string) (*orderbuilder.Str
 		return nil, err
 	}
 
-	duration, session, err := parseDurationSession(opts.Duration, opts.Session)
-	if err != nil {
-		return nil, err
-	}
-
 	return &orderbuilder.StrangleParams{
 		Underlying: strings.TrimSpace(opts.Underlying),
 		Expiration: expiration,
@@ -1542,8 +1520,8 @@ func parseStrangleParams(opts *strangleBuildOpts, _ []string) (*orderbuilder.Str
 		Open:       isOpen,
 		Quantity:   opts.Quantity,
 		Price:      opts.Price,
-		Duration:   duration,
-		Session:    session,
+		Duration:   normalizeDuration(opts.Duration),
+		Session:    opts.Session,
 	}, nil
 }
 
@@ -1575,11 +1553,6 @@ func parseStraddleParams(opts *straddleBuildOpts, _ []string) (*orderbuilder.Str
 		return nil, err
 	}
 
-	duration, session, err := parseDurationSession(opts.Duration, opts.Session)
-	if err != nil {
-		return nil, err
-	}
-
 	return &orderbuilder.StraddleParams{
 		Underlying: strings.TrimSpace(opts.Underlying),
 		Expiration: expiration,
@@ -1588,8 +1561,8 @@ func parseStraddleParams(opts *straddleBuildOpts, _ []string) (*orderbuilder.Str
 		Open:       isOpen,
 		Quantity:   opts.Quantity,
 		Price:      opts.Price,
-		Duration:   duration,
-		Session:    session,
+		Duration:   normalizeDuration(opts.Duration),
+		Session:    opts.Session,
 	}, nil
 }
 
@@ -1607,19 +1580,14 @@ func parseCoveredCallParams(opts *coveredCallBuildOpts, _ []string) (*orderbuild
 		return nil, err
 	}
 
-	duration, session, err := parseDurationSession(opts.Duration, opts.Session)
-	if err != nil {
-		return nil, err
-	}
-
 	return &orderbuilder.CoveredCallParams{
 		Underlying: strings.TrimSpace(opts.Underlying),
 		Expiration: expiration,
 		Strike:     opts.Strike,
 		Quantity:   opts.Quantity,
 		Price:      opts.Price,
-		Duration:   duration,
-		Session:    session,
+		Duration:   normalizeDuration(opts.Duration),
+		Session:    opts.Session,
 	}, nil
 }
 
@@ -1644,11 +1612,6 @@ func parseCollarParams(opts *collarBuildOpts, _ []string) (*orderbuilder.CollarP
 		return nil, err
 	}
 
-	duration, session, err := parseDurationSession(opts.Duration, opts.Session)
-	if err != nil {
-		return nil, err
-	}
-
 	return &orderbuilder.CollarParams{
 		Underlying: strings.TrimSpace(opts.Underlying),
 		PutStrike:  opts.PutStrike,
@@ -1657,8 +1620,8 @@ func parseCollarParams(opts *collarBuildOpts, _ []string) (*orderbuilder.CollarP
 		Quantity:   opts.Quantity,
 		Open:       isOpen,
 		Price:      opts.Price,
-		Duration:   duration,
-		Session:    session,
+		Duration:   normalizeDuration(opts.Duration),
+		Session:    opts.Session,
 	}, nil
 }
 
@@ -1695,11 +1658,6 @@ func parseCalendarParams(opts *calendarBuildOpts, _ []string) (*orderbuilder.Cal
 		return nil, err
 	}
 
-	duration, session, err := parseDurationSession(opts.Duration, opts.Session)
-	if err != nil {
-		return nil, err
-	}
-
 	return &orderbuilder.CalendarParams{
 		Underlying:     strings.TrimSpace(opts.Underlying),
 		NearExpiration: nearExpiration,
@@ -1709,8 +1667,8 @@ func parseCalendarParams(opts *calendarBuildOpts, _ []string) (*orderbuilder.Cal
 		Open:           isOpen,
 		Quantity:       opts.Quantity,
 		Price:          opts.Price,
-		Duration:       duration,
-		Session:        session,
+		Duration:       normalizeDuration(opts.Duration),
+		Session:        opts.Session,
 	}, nil
 }
 
@@ -1747,11 +1705,6 @@ func parseDiagonalParams(opts *diagonalBuildOpts, _ []string) (*orderbuilder.Dia
 		return nil, err
 	}
 
-	duration, session, err := parseDurationSession(opts.Duration, opts.Session)
-	if err != nil {
-		return nil, err
-	}
-
 	return &orderbuilder.DiagonalParams{
 		Underlying:     strings.TrimSpace(opts.Underlying),
 		NearExpiration: nearExpiration,
@@ -1762,8 +1715,8 @@ func parseDiagonalParams(opts *diagonalBuildOpts, _ []string) (*orderbuilder.Dia
 		Open:           isOpen,
 		Quantity:       opts.Quantity,
 		Price:          opts.Price,
-		Duration:       duration,
-		Session:        session,
+		Duration:       normalizeDuration(opts.Duration),
+		Session:        opts.Session,
 	}, nil
 }
 
@@ -1787,22 +1740,6 @@ func parseExpiration(raw string) (time.Time, error) {
 	}
 
 	return expiration, nil
-}
-
-// parseDurationSession parses the --duration and --session flags together.
-// Every order parse function needs both, so this eliminates the repeated pair.
-func parseDurationSession(rawDuration, rawSession string) (models.Duration, models.Session, error) {
-	duration, err := parseDuration(rawDuration)
-	if err != nil {
-		return "", "", err
-	}
-
-	session, err := parseSession(rawSession)
-	if err != nil {
-		return "", "", err
-	}
-
-	return duration, session, nil
 }
 
 // parseBuySell validates mutually exclusive buy/sell flags.
@@ -1834,46 +1771,4 @@ func parsePutCall(call, put bool) (models.PutCall, error) {
 	}
 
 	return models.PutCallPut, nil
-}
-
-// parseStopPriceLinkBasis converts CLI input to a stop price link basis enum.
-// Defaults to LAST when empty, which is the most common trailing stop reference.
-func parseStopPriceLinkBasis(raw string) (models.StopPriceLinkBasis, error) {
-	return parseEnum(raw, validStopPriceLinkBases, models.StopPriceLinkBasisLast, "stop-link-basis")
-}
-
-// parseStopPriceLinkType converts CLI input to a stop price link type enum.
-// Defaults to VALUE when empty, which means the offset is a dollar amount.
-func parseStopPriceLinkType(raw string) (models.StopPriceLinkType, error) {
-	return parseEnum(raw, validStopPriceLinkTypes, models.StopPriceLinkTypeValue, "stop-link-type")
-}
-
-// parseStopType converts CLI input to a stop type enum.
-// Defaults to STANDARD when empty.
-func parseStopType(raw string) (models.StopType, error) {
-	return parseEnum(raw, validStopTypes, models.StopTypeStandard, "stop-type")
-}
-
-// parseSpecialInstruction converts a CLI flag value into a SpecialInstruction constant.
-// Returns an empty value when the flag is not set.
-func parseSpecialInstruction(raw string) (models.SpecialInstruction, error) {
-	return parseEnum(raw, validSpecialInstructions, "", "special-instruction")
-}
-
-// parseDestination converts CLI input to a requested destination enum.
-// Returns empty when not set (optional field).
-func parseDestination(raw string) (models.RequestedDestination, error) {
-	return parseEnum(raw, validDestinations, "", "destination")
-}
-
-// parsePriceLinkBasis converts CLI input to a price link basis enum.
-// Returns empty when not set (optional field).
-func parsePriceLinkBasis(raw string) (models.PriceLinkBasis, error) {
-	return parseEnum(raw, validPriceLinkBases, "", "price-link-basis")
-}
-
-// parsePriceLinkType converts CLI input to a price link type enum.
-// Returns empty when not set (optional field).
-func parsePriceLinkType(raw string) (models.PriceLinkType, error) {
-	return parseEnum(raw, validPriceLinkTypes, "", "price-link-type")
 }
