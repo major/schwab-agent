@@ -16,7 +16,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/commands"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -46,7 +45,11 @@ func buildApp(w io.Writer) *cobra.Command {
 
 // buildAppWithDeps constructs the CLI root command with the given dependencies.
 func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
-	root := buildCommandTree(w, deps)
+	configPath := defaultConfigPath()
+	tokenPath := defaultTokenPath()
+	authDeps := commands.DefaultAuthDeps()
+
+	root := commands.BuildCommandTree(w, configPath, tokenPath, version, deps, authDeps)
 
 	if err := structcli.Setup(root,
 		structcli.WithJSONSchema(),
@@ -70,40 +73,12 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 			// this, MCP mode skips PersistentPreRunE entirely and commands that
 			// need an authenticated API client would fail.
 			CommandFactory: func(_ []string, stdout io.Writer, _ io.Writer) (*cobra.Command, error) {
-				return buildCommandTree(stdout, deps), nil
+				return commands.BuildCommandTree(stdout, configPath, tokenPath, version, deps, authDeps), nil
 			},
 		}),
 	); err != nil {
 		panic(err)
 	}
-
-	return root
-}
-
-// buildCommandTree constructs the full command tree without calling structcli.Setup.
-// Used by buildAppWithDeps for the main CLI and by the MCP CommandFactory for
-// per-tool-call fresh command trees (each with its own client.Ref and auth lifecycle).
-func buildCommandTree(w io.Writer, deps commands.RootDeps) *cobra.Command {
-	configPath := defaultConfigPath()
-	tokenPath := defaultTokenPath()
-
-	// Pre-allocate the client ref so command closures always share the live
-	// client. The root command's PersistentPreRunE populates ref.Client after authentication.
-	ref := &client.Ref{}
-
-	root := commands.NewRootCmd(ref, configPath, tokenPath, version, w, deps)
-	root.AddCommand(commands.NewSymbolCmd(w))
-	root.AddCommand(commands.NewQuoteCmd(ref, w))
-	root.AddCommand(commands.NewHistoryCmd(ref, w))
-	root.AddCommand(commands.NewInstrumentCmd(ref, w))
-	root.AddCommand(commands.NewChainCmd(ref, w))
-	root.AddCommand(commands.NewMarketCmd(ref, w))
-	root.AddCommand(commands.NewTACmd(ref, w))
-	root.AddCommand(commands.NewAccountCmd(ref, configPath, w))
-	root.AddCommand(commands.NewPositionCmd(ref, configPath, w))
-	root.AddCommand(commands.NewAuthCmd(configPath, tokenPath, w, commands.DefaultAuthDeps()))
-	root.AddCommand(commands.NewOrderCmd(ref, configPath, w))
-	root.AddCommand(commands.NewCompletionCmd(w))
 
 	return root
 }

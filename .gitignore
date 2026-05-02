@@ -33,6 +33,7 @@ go.work.sum
 
 # schwab-agent binary and build artifacts
 /schwab-agent
+/generate-docs
 dist/
 coverage.out
 token.json
