@@ -15,7 +15,7 @@ func NewCompletionCmd(w io.Writer) *cobra.Command {
 		Long:        "Generate shell completion scripts for bash, zsh, fish, or powershell.",
 		Annotations: map[string]string{"skipAuth": "true"},
 		GroupID:     "tools",
-		RunE:        cobraRequireSubcommand,
+		RunE:        requireSubcommand,
 	}
 
 	cmd.AddCommand(newBashCompletionCmd(w))

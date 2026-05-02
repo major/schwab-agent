@@ -2,7 +2,6 @@ package commands
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -108,7 +107,7 @@ func TestNewAuthCmd_StatusWritesExpectedEnvelope(t *testing.T) {
 	var stdout bytes.Buffer
 	cmd := NewAuthCmd(configPath, tokenPath, &stdout, AuthDeps{})
 
-	_, err := runCobraCommand(t, cmd, "status")
+	_, err := runTestCommand(t, cmd, "status")
 	require.NoError(t, err)
 
 	envelope := decodeAuthEnvelope(t, stdout.Bytes())
@@ -167,7 +166,7 @@ func TestNewAuthCmd_RefreshCallsRefresh(t *testing.T) {
 	var stdout bytes.Buffer
 	cmd := NewAuthCmd(configPath, tokenPath, &stdout, deps)
 
-	_, err := runCobraCommand(t, cmd, "refresh")
+	_, err := runTestCommand(t, cmd, "refresh")
 	require.NoError(t, err)
 	assert.True(t, called)
 
@@ -236,7 +235,7 @@ func TestNewAuthCmd_LoginAutoSetsDefaultAccount(t *testing.T) {
 
 			return auth.SaveToken(targetTokenPath, &auth.TokenFile{
 				CreationTimestamp: time.Now().UTC().Add(-1 * time.Hour).Unix(),
-				Token:            token,
+				Token:             token,
 			})
 		},
 	}
@@ -244,7 +243,7 @@ func TestNewAuthCmd_LoginAutoSetsDefaultAccount(t *testing.T) {
 	var stdout bytes.Buffer
 	cmd := NewAuthCmd(configPath, tokenPath, &stdout, deps)
 
-	_, err := runCobraCommand(t, cmd, "login", "--no-browser")
+	_, err := runTestCommand(t, cmd, "login", "--no-browser")
 	require.NoError(t, err)
 
 	savedConfig, err := auth.LoadConfig(configPath)
@@ -311,7 +310,7 @@ func TestNewAuthCmd_LoginUsesConfiguredProxy(t *testing.T) {
 	var stdout bytes.Buffer
 	cmd := NewAuthCmd(configPath, tokenPath, &stdout, deps)
 
-	_, err := runCobraCommand(t, cmd, "login", "--no-browser")
+	_, err := runTestCommand(t, cmd, "login", "--no-browser")
 	require.NoError(t, err)
 
 	savedConfig, err := auth.LoadConfig(configPath)
@@ -337,9 +336,9 @@ func TestAuthAccountSetDefaultCommand_WritesSuccess(t *testing.T) {
 	}))
 
 	var stdout bytes.Buffer
-	cmd := AccountSetDefaultCommand(configPath, &stdout)
+	cmd := newAccountSetDefaultCmd(configPath, &stdout)
 
-	err := cmd.Run(context.Background(), []string{"set-default", "hash-xyz"})
+	_, err := runTestCommand(t, cmd, "hash-xyz")
 	require.NoError(t, err)
 
 	savedConfig, err := auth.LoadConfig(configPath)
@@ -543,7 +542,7 @@ func TestNewAuthCmd_RefreshMissingConfig(t *testing.T) {
 	var stdout bytes.Buffer
 	cmd := NewAuthCmd("/nonexistent/config.json", "/nonexistent/token.json", &stdout, AuthDeps{})
 
-	_, err := runCobraCommand(t, cmd, "refresh")
+	_, err := runTestCommand(t, cmd, "refresh")
 	require.Error(t, err)
 }
 
@@ -560,7 +559,7 @@ func TestNewAuthCmd_RefreshMissingToken(t *testing.T) {
 	var stdout bytes.Buffer
 	cmd := NewAuthCmd(configPath, "/nonexistent/token.json", &stdout, AuthDeps{})
 
-	_, err := runCobraCommand(t, cmd, "refresh")
+	_, err := runTestCommand(t, cmd, "refresh")
 	require.Error(t, err)
 }
 
@@ -592,16 +591,16 @@ func TestNewAuthCmd_RefreshFails(t *testing.T) {
 	var stdout bytes.Buffer
 	cmd := NewAuthCmd(configPath, tokenPath, &stdout, deps)
 
-	_, err := runCobraCommand(t, cmd, "refresh")
+	_, err := runTestCommand(t, cmd, "refresh")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "refresh failed")
 }
 
 func TestAccountSetDefaultCommand_MissingHash(t *testing.T) {
 	var stdout bytes.Buffer
-	cmd := AccountSetDefaultCommand("/whatever/config.json", &stdout)
+	cmd := newAccountSetDefaultCmd("/whatever/config.json", &stdout)
 
-	err := runTestCommand(t, cmd, "set-default")
+	_, err := runTestCommand(t, cmd)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "account hash is required")

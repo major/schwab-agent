@@ -31,7 +31,7 @@ func TestNewMarketCmd_Hours_AllMarkets(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewMarketCmd(testClient(t, srv), &buf)
-	_, err := runCobraCommand(t, cmd, "hours")
+	_, err := runTestCommand(t, cmd, "hours")
 
 	// Assert
 	require.NoError(t, err)
@@ -56,7 +56,7 @@ func TestNewMarketCmd_Hours_SpecificMarket(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewMarketCmd(testClient(t, srv), &buf)
-	_, err := runCobraCommand(t, cmd, "hours", "equity")
+	_, err := runTestCommand(t, cmd, "hours", "equity")
 
 	// Assert
 	require.NoError(t, err)
@@ -77,7 +77,7 @@ func TestNewMarketCmd_Hours_APIError(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewMarketCmd(testClient(t, srv), &buf)
-	_, err := runCobraCommand(t, cmd, "hours")
+	_, err := runTestCommand(t, cmd, "hours")
 
 	// Assert
 	require.Error(t, err)
@@ -94,7 +94,7 @@ func TestNewMarketCmd_Hours_SpecificMarketAPIError(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewMarketCmd(testClient(t, srv), &buf)
-	_, err := runCobraCommand(t, cmd, "hours", "invalid")
+	_, err := runTestCommand(t, cmd, "hours", "invalid")
 
 	// Assert
 	require.Error(t, err)
@@ -114,7 +114,7 @@ func TestNewMarketCmd_Movers_Success(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewMarketCmd(testClient(t, srv), &buf)
-	_, err := runCobraCommand(t, cmd, "movers", "$SPX")
+	_, err := runTestCommand(t, cmd, "movers", "$SPX")
 
 	// Assert
 	require.NoError(t, err)
@@ -139,7 +139,7 @@ func TestNewMarketCmd_Movers_WithFlags(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewMarketCmd(testClient(t, srv), &buf)
-	_, err := runCobraCommand(t, cmd,
+	_, err := runTestCommand(t, cmd,
 		"movers",
 		"--sort", "VOLUME",
 		"--frequency", "5",
@@ -161,7 +161,7 @@ func TestNewMarketCmd_Movers_MissingIndex(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewMarketCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "movers")
+	_, err := runTestCommand(t, cmd, "movers")
 
 	// Assert
 	require.Error(t, err)
@@ -180,7 +180,7 @@ func TestNewMarketCmd_Movers_APIError(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewMarketCmd(testClient(t, srv), &buf)
-	_, err := runCobraCommand(t, cmd, "movers", "$SPX")
+	_, err := runTestCommand(t, cmd, "movers", "$SPX")
 
 	// Assert
 	require.Error(t, err)
@@ -194,7 +194,7 @@ func TestNewMarketCmd_NoSubcommand(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewMarketCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd)
+	_, err := runTestCommand(t, cmd)
 
 	// Assert
 	require.Error(t, err)

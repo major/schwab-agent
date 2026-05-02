@@ -46,7 +46,7 @@ func runSchemaCommand(t *testing.T, root *cobra.Command, w *bytes.Buffer, args .
 
 	schemaCmd := NewSchemaCmd(root, w)
 	root.AddCommand(schemaCmd)
-	_, err := runCobraCommand(t, root, args...)
+	_, err := runTestCommand(t, root, args...)
 	return err
 }
 

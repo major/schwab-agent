@@ -86,7 +86,7 @@ func runAppWithDeps(t *testing.T, deps commands.RootDeps, args ...string) (strin
 	return stdout.String(), err
 }
 
-// cobraArgs strips the binary name used by the legacy urfave/cli test table.
+// cobraArgs strips the binary name used by the shared test table.
 func cobraArgs(args []string) []string {
 	if len(args) > 0 && args[0] == "schwab-agent" {
 		return args[1:]
@@ -493,7 +493,7 @@ func TestUnknownCommand_SuggestsClosestMatch(t *testing.T) {
 
 func TestUnknownCommand_WithUnknownFlags(t *testing.T) {
 	// When an unknown command is used with flags not defined on the root
-	// command, urfave/cli produces a misleading flag error. The OnUsageError
+	// command, Cobra produces a misleading flag error. The flag error handler
 	// handler should intercept this and report the unknown command instead.
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 

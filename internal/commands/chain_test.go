@@ -28,7 +28,7 @@ func TestNewChainCmd(t *testing.T) {
 
 		var buf bytes.Buffer
 		cmd := NewChainCmd(testClient(t, server), &buf)
-		_, err := runCobraCommand(t, cmd, "get", "AAPL")
+		_, err := runTestCommand(t, cmd, "get", "AAPL")
 		require.NoError(t, err)
 
 		var envelope output.Envelope
@@ -59,7 +59,7 @@ func TestNewChainCmd(t *testing.T) {
 
 		var buf bytes.Buffer
 		cmd := NewChainCmd(testClient(t, server), &buf)
-		_, err := runCobraCommand(t, cmd, "get", "AAPL",
+		_, err := runTestCommand(t, cmd, "get", "AAPL",
 			"--type", "CALL",
 			"--strike-count", "10",
 			"--strategy", "SINGLE",
@@ -98,7 +98,7 @@ func TestNewChainCmd(t *testing.T) {
 
 		var buf bytes.Buffer
 		cmd := NewChainCmd(testClient(t, server), &buf)
-		_, err := runCobraCommand(t, cmd, "get", "AAPL",
+		_, err := runTestCommand(t, cmd, "get", "AAPL",
 			"--strategy", "ANALYTICAL",
 			"--include-underlying-quote",
 			"--interval", "5.0",
@@ -130,7 +130,7 @@ func TestNewChainCmd(t *testing.T) {
 
 		var buf bytes.Buffer
 		cmd := NewChainCmd(testClient(t, server), &buf)
-		_, err := runCobraCommand(t, cmd, "expiration", "AAPL")
+		_, err := runTestCommand(t, cmd, "expiration", "AAPL")
 		require.NoError(t, err)
 
 		var envelope output.Envelope
@@ -149,7 +149,7 @@ func TestNewChainCmd(t *testing.T) {
 
 		var buf bytes.Buffer
 		cmd := NewChainCmd(testClient(t, server), &buf)
-		_, err := runCobraCommand(t, cmd, "get")
+		_, err := runTestCommand(t, cmd, "get")
 		require.Error(t, err)
 
 		var valErr *apperr.ValidationError
@@ -162,7 +162,7 @@ func TestNewChainCmd(t *testing.T) {
 
 		var buf bytes.Buffer
 		cmd := NewChainCmd(testClient(t, server), &buf)
-		_, err := runCobraCommand(t, cmd, "expiration")
+		_, err := runTestCommand(t, cmd, "expiration")
 		require.Error(t, err)
 
 		var valErr *apperr.ValidationError
@@ -175,7 +175,7 @@ func TestNewChainCmd(t *testing.T) {
 
 		var buf bytes.Buffer
 		cmd := NewChainCmd(testClient(t, server), &buf)
-		_, err := runCobraCommand(t, cmd)
+		_, err := runTestCommand(t, cmd)
 		require.Error(t, err)
 
 		var valErr *apperr.ValidationError

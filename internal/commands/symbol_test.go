@@ -16,11 +16,11 @@ func TestNewSymbolCmdBuild(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		args       []string
-		wantSymbol string
+		name        string
+		args        []string
+		wantSymbol  string
 		wantPutCall string
-		wantStrike float64
+		wantStrike  float64
 	}{
 		{
 			name:        "aapl call",
@@ -50,7 +50,7 @@ func TestNewSymbolCmdBuild(t *testing.T) {
 			buf := &bytes.Buffer{}
 			cmd := NewSymbolCmd(buf)
 
-			_, err := runCobraCommand(t, cmd, tt.args...)
+			_, err := runTestCommand(t, cmd, tt.args...)
 			require.NoError(t, err)
 
 			var env output.Envelope
@@ -98,7 +98,7 @@ func TestNewSymbolCmdBuildValidation(t *testing.T) {
 			buf := &bytes.Buffer{}
 			cmd := NewSymbolCmd(buf)
 
-			_, err := runCobraCommand(t, cmd, tt.args...)
+			_, err := runTestCommand(t, cmd, tt.args...)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantMsg)
 		})
@@ -148,7 +148,7 @@ func TestNewSymbolCmdParse(t *testing.T) {
 			buf := &bytes.Buffer{}
 			cmd := NewSymbolCmd(buf)
 
-			_, err := runCobraCommand(t, cmd, "parse", tt.symbol)
+			_, err := runTestCommand(t, cmd, "parse", tt.symbol)
 			require.NoError(t, err)
 
 			var env output.Envelope
@@ -198,7 +198,7 @@ func TestNewSymbolCmdParseValidation(t *testing.T) {
 			buf := &bytes.Buffer{}
 			cmd := NewSymbolCmd(buf)
 
-			_, err := runCobraCommand(t, cmd, tt.args...)
+			_, err := runTestCommand(t, cmd, tt.args...)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantMsg)
 		})
@@ -211,7 +211,7 @@ func TestNewSymbolCmdParseRoundTrip(t *testing.T) {
 	buildCmd := NewSymbolCmd(buildBuf)
 
 	// Build
-	_, err := runCobraCommand(t, buildCmd, "build",
+	_, err := runTestCommand(t, buildCmd, "build",
 		"--underlying", "TSLA", "--expiration", "2026-01-16", "--strike", "275.50", "--put")
 	require.NoError(t, err)
 
@@ -225,7 +225,7 @@ func TestNewSymbolCmdParseRoundTrip(t *testing.T) {
 	parseBuf := &bytes.Buffer{}
 	parseCmd := NewSymbolCmd(parseBuf)
 
-	_, err = runCobraCommand(t, parseCmd, "parse", symbol)
+	_, err = runTestCommand(t, parseCmd, "parse", symbol)
 	require.NoError(t, err)
 
 	var parseEnv output.Envelope

@@ -55,7 +55,7 @@ func TestNewQuoteCmd(t *testing.T) {
 
 			var buf bytes.Buffer
 			cmd := NewQuoteCmd(testClient(t, server), &buf)
-			_, err := runCobraCommand(t, cmd, tt.args...)
+			_, err := runTestCommand(t, cmd, tt.args...)
 			require.NoError(t, err)
 
 			var envelope output.Envelope
@@ -86,7 +86,7 @@ func TestNewQuoteGetPartialSuccess(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewQuoteCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "get", "AAPL", "INVALID")
+	_, err := runTestCommand(t, cmd, "get", "AAPL", "INVALID")
 	require.NoError(t, err)
 
 	var envelope output.Envelope
@@ -114,7 +114,7 @@ func TestNewQuoteGetSingleNotFound(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewQuoteCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "get", "INVALID")
+	_, err := runTestCommand(t, cmd, "get", "INVALID")
 	require.Error(t, err)
 
 	var symErr *apperr.SymbolNotFoundError
@@ -128,7 +128,7 @@ func TestNewQuoteGetNoArgs(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewQuoteCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "get")
+	_, err := runTestCommand(t, cmd, "get")
 	require.Error(t, err)
 
 	// Cobra's MinimumNArgs(1) produces a usage error, not a ValidationError
@@ -143,7 +143,7 @@ func TestNewQuoteNoSubcommand(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewQuoteCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd)
+	_, err := runTestCommand(t, cmd)
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
@@ -170,7 +170,7 @@ func TestNewQuoteGetWithFields(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewQuoteCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "get",
+	_, err := runTestCommand(t, cmd, "get",
 		"--fields", "quote",
 		"--fields", "fundamental",
 		"AAPL",
@@ -204,7 +204,7 @@ func TestNewQuoteGetMultiWithFields(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewQuoteCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "get",
+	_, err := runTestCommand(t, cmd, "get",
 		"--fields", "extended",
 		"AAPL", "MSFT",
 	)
@@ -236,7 +236,7 @@ func TestNewQuoteGetWithIndicative(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewQuoteCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "get",
+	_, err := runTestCommand(t, cmd, "get",
 		"--indicative",
 		"AAPL",
 	)
@@ -253,7 +253,7 @@ func TestNewQuoteGetInvalidField(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewQuoteCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "get",
+	_, err := runTestCommand(t, cmd, "get",
 		"--fields", "bogus",
 		"AAPL",
 	)
@@ -285,7 +285,7 @@ func TestNewQuoteGetNoFlagsNoExtraParams(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewQuoteCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "get", "AAPL")
+	_, err := runTestCommand(t, cmd, "get", "AAPL")
 	require.NoError(t, err)
 
 	var envelope output.Envelope
@@ -312,7 +312,7 @@ func TestNewQuoteGetCommaSeparatedFields(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewQuoteCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "get",
+	_, err := runTestCommand(t, cmd, "get",
 		"--fields", "QUOTE,FUNDAMENTAL",
 		"AAPL",
 	)
@@ -346,7 +346,7 @@ func TestNewQuoteGetFieldsCaseInsensitive(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewQuoteCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "get",
+	_, err := runTestCommand(t, cmd, "get",
 		"--fields", "Quote",
 		"--fields", "REFERENCE",
 		"AAPL",

@@ -28,7 +28,7 @@ func TestNewInstrumentCmd_Search_Success(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewInstrumentCmd(testClient(t, srv), &buf)
-	_, err := runCobraCommand(t, cmd, "search", "AAPL")
+	_, err := runTestCommand(t, cmd, "search", "AAPL")
 	require.NoError(t, err)
 
 	var envelope output.Envelope
@@ -48,7 +48,7 @@ func TestNewInstrumentCmd_Search_WithProjection(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewInstrumentCmd(testClient(t, srv), &buf)
-	_, err := runCobraCommand(t, cmd, "search", "--projection", "fundamental", "AAPL")
+	_, err := runTestCommand(t, cmd, "search", "--projection", "fundamental", "AAPL")
 	require.NoError(t, err)
 
 	var envelope output.Envelope
@@ -62,7 +62,7 @@ func TestNewInstrumentCmd_Search_MissingQuery(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewInstrumentCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "search")
+	_, err := runTestCommand(t, cmd, "search")
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
@@ -82,7 +82,7 @@ func TestNewInstrumentCmd_Get_Success(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewInstrumentCmd(testClient(t, srv), &buf)
-	_, err := runCobraCommand(t, cmd, "get", "037833100")
+	_, err := runTestCommand(t, cmd, "get", "037833100")
 	require.NoError(t, err)
 
 	var envelope output.Envelope
@@ -97,7 +97,7 @@ func TestNewInstrumentCmd_Get_MissingCUSIP(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewInstrumentCmd(testClient(t, server), &buf)
-	_, err := runCobraCommand(t, cmd, "get")
+	_, err := runTestCommand(t, cmd, "get")
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
@@ -113,6 +113,6 @@ func TestNewInstrumentCmd_Get_APIError(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewInstrumentCmd(testClient(t, srv), &buf)
-	_, err := runCobraCommand(t, cmd, "get", "000000000")
+	_, err := runTestCommand(t, cmd, "get", "000000000")
 	require.Error(t, err)
 }

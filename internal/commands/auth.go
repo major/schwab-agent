@@ -1,4 +1,4 @@
-// Package commands provides urfave/cli command builders for schwab-agent.
+// Package commands provides CLI command builders for schwab-agent.
 package commands
 
 import (
@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
@@ -81,214 +80,6 @@ type authRefreshData struct {
 // authDefaultAccountData is the success payload for set-default responses.
 type authDefaultAccountData struct {
 	DefaultAccount string `json:"default_account"`
-}
-
-// AuthCommand returns the parent auth command with setup, login, status, and refresh subcommands.
-func AuthCommand(cfg *auth.Config, tokenPath string, w io.Writer) *cli.Command {
-	return newAuthCommand(cfg, tokenPath, w, defaultAuthDeps())
-}
-
-// newAuthCommand builds the auth command tree with the given dependencies.
-// Tests call this directly with custom deps; production goes through AuthCommand.
-func newAuthCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps authDeps) *cli.Command {
-	return &cli.Command{
-		Name:   "auth",
-		Usage:  "Authentication commands",
-		Action: requireSubcommand(),
-		Commands: []*cli.Command{
-			authLoginCommand(cfg, tokenPath, w, deps),
-			authStatusCommand(cfg, tokenPath, w, deps),
-			authRefreshCommand(cfg, tokenPath, w, deps),
-		},
-	}
-}
-
-// AccountSetDefaultCommand returns the account set-default subcommand.
-func AccountSetDefaultCommand(configPath string, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:      "set-default",
-		Usage:     "Set the default account hash",
-		ArgsUsage: "<hash>",
-		UsageText: "schwab-agent account set-default ABCDEF1234567890",
-		Action: func(_ context.Context, cmd *cli.Command) error {
-			hash := strings.TrimSpace(cmd.Args().First())
-			if err := requireArg(hash, "account hash"); err != nil {
-				return err
-			}
-
-			if err := auth.SetDefaultAccount(configPath, hash); err != nil {
-				return err
-			}
-
-			return output.WriteSuccess(w, authDefaultAccountData{
-				DefaultAccount: hash,
-			}, output.NewMetadata())
-		},
-	}
-}
-
-// authLoginCommand returns the auth login command.
-func authLoginCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps authDeps) *cli.Command {
-	return &cli.Command{
-		Name:  "login",
-		Usage: "Run the OAuth login flow",
-		UsageText: `schwab-agent auth login
-schwab-agent auth login --no-browser`,
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  "no-browser",
-				Usage: "Print the authorization URL in the JSON response instead of opening a browser",
-			},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			defaultConfigPath := deps.configPath()
-			resolvedConfigPath := resolveAuthConfigPath(cmd, defaultConfigPath)
-			resolvedTokenPath := resolveAuthTokenPath(cmd, tokenPath)
-			effectiveConfig := runtimeAuthConfig(cfg, resolvedConfigPath, defaultConfigPath)
-
-			loginConfig, err := requireAuthConfig(effectiveConfig, resolvedConfigPath)
-			if err != nil {
-				return err
-			}
-
-			var loginOutput strings.Builder
-			openBrowser := !cmd.Bool("no-browser")
-			if err := deps.runLogin(loginConfig, resolvedTokenPath, deps.oauthTokenEndpoint(), openBrowser, &loginOutput); err != nil {
-				return err
-			}
-
-			tokenFile, err := auth.LoadToken(resolvedTokenPath)
-			if err != nil {
-				return err
-			}
-
-			defaultAccount := configDefaultAccount(loginConfig)
-			autoSetDefault := false
-			accounts, err := deps.newAccountClient(tokenFile.Token.AccessToken, loginConfig).AccountNumbers(ctx)
-			if err != nil {
-				return err
-			}
-
-			if len(accounts) == 1 {
-				defaultAccount = accounts[0].HashValue
-				if err := auth.SetDefaultAccount(resolvedConfigPath, defaultAccount); err != nil {
-					return err
-				}
-				autoSetDefault = true
-			}
-
-			data := authLoginData{
-				Valid:            !auth.IsAccessTokenExpired(tokenFile),
-				ExpiresAt:        unixSecondsToRFC3339(tokenFile.Token.ExpiresAt),
-				RefreshExpiresAt: refreshExpiryRFC3339(tokenFile),
-				DefaultAccount:   defaultAccount,
-				AuthorizationURL: strings.TrimSpace(loginOutput.String()),
-				AutoSetDefault:   autoSetDefault,
-			}
-
-			return output.WriteSuccess(w, data, output.NewMetadata())
-		},
-	}
-}
-
-// authStatusCommand returns the auth status command.
-func authStatusCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps authDeps) *cli.Command {
-	return &cli.Command{
-		Name:      "status",
-		Usage:     "Show token and config status",
-		UsageText: "schwab-agent auth status",
-		Action: func(_ context.Context, cmd *cli.Command) error {
-			defaultConfigPath := deps.configPath()
-			resolvedConfigPath := resolveAuthConfigPath(cmd, defaultConfigPath)
-			resolvedTokenPath := resolveAuthTokenPath(cmd, tokenPath)
-			effectiveConfig := runtimeAuthConfig(cfg, resolvedConfigPath, defaultConfigPath)
-
-			tokenFile, err := auth.LoadToken(resolvedTokenPath)
-			if err != nil {
-				return err
-			}
-
-			statusConfig := optionalAuthConfig(effectiveConfig, resolvedConfigPath)
-			data := authStatusData{
-				Valid:            !auth.IsAccessTokenExpired(tokenFile),
-				ExpiresAt:        unixSecondsToRFC3339(tokenFile.Token.ExpiresAt),
-				RefreshExpiresAt: refreshExpiryRFC3339(tokenFile),
-				DefaultAccount:   configDefaultAccount(statusConfig),
-				ClientID:         redactClientID(statusConfig.ClientID),
-			}
-
-			return output.WriteSuccess(w, data, output.NewMetadata())
-		},
-	}
-}
-
-// authRefreshCommand returns the auth refresh command.
-func authRefreshCommand(cfg *auth.Config, tokenPath string, w io.Writer, deps authDeps) *cli.Command {
-	return &cli.Command{
-		Name:      "refresh",
-		Usage:     "Refresh the current access token",
-		UsageText: "schwab-agent auth refresh",
-		Action: func(_ context.Context, cmd *cli.Command) error {
-			defaultConfigPath := deps.configPath()
-			resolvedConfigPath := resolveAuthConfigPath(cmd, defaultConfigPath)
-			resolvedTokenPath := resolveAuthTokenPath(cmd, tokenPath)
-			effectiveConfig := runtimeAuthConfig(cfg, resolvedConfigPath, defaultConfigPath)
-
-			refreshConfig, err := requireAuthConfig(effectiveConfig, resolvedConfigPath)
-			if err != nil {
-				return err
-			}
-
-			tokenFile, err := auth.LoadToken(resolvedTokenPath)
-			if err != nil {
-				return err
-			}
-
-			refreshedToken, err := deps.refreshAccessToken(refreshConfig, tokenFile, deps.oauthTokenEndpoint())
-			if err != nil {
-				return err
-			}
-
-			if err := auth.SaveToken(resolvedTokenPath, refreshedToken); err != nil {
-				return err
-			}
-
-			return output.WriteSuccess(w, authRefreshData{
-				ExpiresAt: unixSecondsToRFC3339(refreshedToken.Token.ExpiresAt),
-			}, output.NewMetadata())
-		},
-	}
-}
-
-// resolveAuthConfigPath returns the runtime config path for auth subcommands.
-func resolveAuthConfigPath(cmd *cli.Command, fallback string) string {
-	if path := strings.TrimSpace(cmd.String("config")); path != "" {
-		return path
-	}
-
-	return fallback
-}
-
-// resolveAuthTokenPath returns the runtime token path for auth subcommands.
-func resolveAuthTokenPath(cmd *cli.Command, fallback string) string {
-	if path := strings.TrimSpace(cmd.String("token")); path != "" {
-		return path
-	}
-
-	return fallback
-}
-
-// runtimeAuthConfig returns the captured config only when the command is using
-// the same config path that buildApp() used to construct the command tree.
-// If the user supplies a different --config path at runtime, we must ignore the
-// captured config and reload from disk so auth subcommands see the same proxy
-// and credential settings as the rest of the CLI.
-func runtimeAuthConfig(cfg *auth.Config, resolvedConfigPath, defaultConfigPath string) *auth.Config {
-	if resolvedConfigPath != defaultConfigPath {
-		return nil
-	}
-
-	return cfg
 }
 
 // requireAuthConfig returns a valid auth config or loads it from disk.
@@ -404,7 +195,7 @@ func NewAuthCmd(configPath, tokenPath string, w io.Writer, deps AuthDeps) *cobra
 		Short:       "Authentication commands",
 		Annotations: map[string]string{"skipAuth": "true"},
 		GroupID:     "account-mgmt",
-		RunE:        cobraRequireSubcommand,
+		RunE:        requireSubcommand,
 	}
 
 	cmd.AddCommand(newAuthLoginCmd(tokenPath, w, deps))

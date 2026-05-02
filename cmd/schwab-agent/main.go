@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -25,6 +26,12 @@ func main() {
 	root := buildApp(os.Stdout)
 
 	if err := root.Execute(); err != nil {
+		// Cobra returns plain fmt.Errorf errors for unknown commands. Wrap them
+		// in ValidationError so the JSON output uses VALIDATION_ERROR instead of
+		// UNKNOWN, which is more useful for agents parsing the output.
+		if strings.HasPrefix(err.Error(), "unknown command") {
+			err = apperr.NewValidationError(err.Error(), err)
+		}
 		_ = output.WriteError(os.Stdout, err)
 		os.Exit(apperr.ExitCodeFor(err))
 	}

@@ -2,7 +2,6 @@ package commands
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -16,10 +15,6 @@ import (
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
-
-// ---------------------------------------------------------------------------
-// Urfave/cli tests (existing, preserved until T18 cleanup)
-// ---------------------------------------------------------------------------
 
 func TestPositionListSingleAccount(t *testing.T) {
 	account := map[string]any{
@@ -60,10 +55,9 @@ func TestPositionListSingleAccount(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--account", "HASH123"})
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123")
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -116,11 +110,10 @@ func TestPositionListSingleAccount_UsesConfigDefault(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "DEFAULT_HASH")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
 	// No --account flag: should use config default.
-	err := cmd.Run(context.Background(), []string{"position", "list"})
+	_, err := runTestCommand(t, cmd, "list")
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -186,10 +179,9 @@ func TestPositionListAllAccounts(t *testing.T) {
 	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, "", &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, "", &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--all-accounts"})
+	_, err := runTestCommand(t, cmd, "list", "--all-accounts")
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -259,10 +251,9 @@ func TestPositionListAllAccounts_PreferencesFailure(t *testing.T) {
 	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, "", &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, "", &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--all-accounts"})
+	_, err := runTestCommand(t, cmd, "list", "--all-accounts")
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -299,10 +290,9 @@ func TestPositionListNoPositions(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--account", "HASH123"})
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123")
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -324,10 +314,9 @@ func TestPositionListMutuallyExclusiveFlags(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "HASH123")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--all-accounts", "--account", "HASH456"})
+	_, err := runTestCommand(t, cmd, "list", "--all-accounts", "--account", "HASH456")
 	require.Error(t, err)
 
 	var ve *apperr.ValidationError
@@ -344,10 +333,9 @@ func TestPositionListNoAccountConfigured(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list"})
+	_, err := runTestCommand(t, cmd, "list")
 	require.Error(t, err, "should error when no account is specified or configured")
 }
 
@@ -380,10 +368,9 @@ func TestPositionListRequestsPositionsField(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--account", "HASH123"})
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123")
 	require.NoError(t, err)
 	assert.Equal(t, "positions", capturedFields)
 }
@@ -416,10 +403,9 @@ func TestPositionListComputedFieldsInOutput(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--account", "HASH123"})
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123")
 	require.NoError(t, err)
 
 	// Decode the raw JSON to verify computed fields are present.
@@ -451,9 +437,9 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("long position with P&L", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice:       new(150.0),
-				LongQuantity:       new(100.0),
-				LongOpenProfitLoss: new(1000.0),
+				AveragePrice:       &testFloat150,
+				LongQuantity:       &testFloat100,
+				LongOpenProfitLoss: &testFloat1000,
 			},
 		}
 		computePositionFields(&entry)
@@ -471,9 +457,9 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("short position with P&L", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice:        new(300.0),
-				ShortQuantity:       new(10.0),
-				ShortOpenProfitLoss: new(-500.0),
+				AveragePrice:        &testFloat300,
+				ShortQuantity:       &testFloat10,
+				ShortOpenProfitLoss: &testFloatNeg500,
 			},
 		}
 		computePositionFields(&entry)
@@ -491,11 +477,11 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("both long and short P&L", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice:        new(100.0),
-				LongQuantity:        new(50.0),
-				ShortQuantity:       new(10.0),
-				LongOpenProfitLoss:  new(500.0),
-				ShortOpenProfitLoss: new(-200.0),
+				AveragePrice:        &testFloat100,
+				LongQuantity:        &testFloat50,
+				ShortQuantity:       &testFloat10,
+				LongOpenProfitLoss:  &testFloat500,
+				ShortOpenProfitLoss: &testFloatNeg200,
 			},
 		}
 		computePositionFields(&entry)
@@ -513,8 +499,8 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("nil averagePrice skips cost basis", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				LongQuantity:       new(100.0),
-				LongOpenProfitLoss: new(500.0),
+				LongQuantity:       &testFloat100,
+				LongOpenProfitLoss: &testFloat500,
 			},
 		}
 		computePositionFields(&entry)
@@ -529,7 +515,7 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("zero quantity skips cost basis", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice: new(150.0),
+				AveragePrice: &testFloat150,
 				// No quantity fields set (both nil, default to 0).
 			},
 		}
@@ -541,8 +527,8 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("no P&L fields", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice: new(150.0),
-				LongQuantity: new(100.0),
+				AveragePrice: &testFloat150,
+				LongQuantity: &testFloat100,
 			},
 		}
 		computePositionFields(&entry)
@@ -563,20 +549,40 @@ func TestComputePositionFields(t *testing.T) {
 	})
 }
 
+var (
+	testFloat5      = 5.0
+	testFloat10     = 10.0
+	testFloat50     = 50.0
+	testFloat100    = 100.0
+	testFloat150    = 150.0
+	testFloat200    = 200.0
+	testFloat300    = 300.0
+	testFloat500    = 500.0
+	testFloat1000   = 1000.0
+	testFloatNeg200 = -200.0
+	testFloatNeg500 = -500.0
+
+	testString11111   = "11111"
+	testString22222   = "22222"
+	testStringAAPL    = "AAPL"
+	testStringTSLA    = "TSLA"
+	testStringTrading = "Trading"
+)
+
 func TestFlattenAccountPositions(t *testing.T) {
 	accounts := []models.Account{
 		{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				AccountNumber: new("11111"),
+				AccountNumber: &testString11111,
 				Positions: []models.Position{
 					{
-						LongQuantity: new(100.0),
-						AveragePrice: new(50.0),
-						Instrument:   &models.AccountsInstrument{Symbol: new("AAPL")},
+						LongQuantity: &testFloat100,
+						AveragePrice: &testFloat50,
+						Instrument:   &models.AccountsInstrument{Symbol: &testStringAAPL},
 					},
 				},
 			},
-			NickName: new("Trading"),
+			NickName: &testStringTrading,
 		},
 		{
 			// Account with no SecuritiesAccount: should be skipped.
@@ -584,12 +590,12 @@ func TestFlattenAccountPositions(t *testing.T) {
 		},
 		{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				AccountNumber: new("22222"),
+				AccountNumber: &testString22222,
 				Positions: []models.Position{
 					{
-						ShortQuantity: new(5.0),
-						AveragePrice:  new(200.0),
-						Instrument:    &models.AccountsInstrument{Symbol: new("TSLA")},
+						ShortQuantity: &testFloat5,
+						AveragePrice:  &testFloat200,
+						Instrument:    &models.AccountsInstrument{Symbol: &testStringTSLA},
 					},
 				},
 			},
@@ -670,7 +676,7 @@ func TestNewPositionCmd_ListSingleAccount(t *testing.T) {
 	cmd := NewPositionCmd(testClient(t, srv), configPath, &buf)
 
 	// Act
-	_, err := runCobraCommand(t, cmd, "list", "--account", "HASH123")
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123")
 
 	// Assert
 	require.NoError(t, err)
@@ -728,7 +734,7 @@ func TestNewPositionCmd_ListUsesConfigDefault(t *testing.T) {
 	cmd := NewPositionCmd(testClient(t, srv), configPath, &buf)
 
 	// Act - no --account flag: should use config default.
-	_, err := runCobraCommand(t, cmd, "list")
+	_, err := runTestCommand(t, cmd, "list")
 
 	// Assert
 	require.NoError(t, err)
@@ -798,7 +804,7 @@ func TestNewPositionCmd_ListAllAccounts(t *testing.T) {
 	cmd := NewPositionCmd(testClient(t, srv), "", &buf)
 
 	// Act
-	_, err := runCobraCommand(t, cmd, "list", "--all-accounts")
+	_, err := runTestCommand(t, cmd, "list", "--all-accounts")
 
 	// Assert
 	require.NoError(t, err)
@@ -872,7 +878,7 @@ func TestNewPositionCmd_ListAllAccounts_PreferencesFailure(t *testing.T) {
 	cmd := NewPositionCmd(testClient(t, srv), "", &buf)
 
 	// Act
-	_, err := runCobraCommand(t, cmd, "list", "--all-accounts")
+	_, err := runTestCommand(t, cmd, "list", "--all-accounts")
 
 	// Assert
 	require.NoError(t, err)
@@ -913,7 +919,7 @@ func TestNewPositionCmd_ListNoPositions(t *testing.T) {
 	cmd := NewPositionCmd(testClient(t, srv), configPath, &buf)
 
 	// Act
-	_, err := runCobraCommand(t, cmd, "list", "--account", "HASH123")
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123")
 
 	// Assert
 	require.NoError(t, err)
@@ -939,7 +945,7 @@ func TestNewPositionCmd_MutuallyExclusiveFlags(t *testing.T) {
 	cmd := NewPositionCmd(testClient(t, srv), configPath, &buf)
 
 	// Act
-	_, err := runCobraCommand(t, cmd, "list", "--all-accounts", "--account", "HASH456")
+	_, err := runTestCommand(t, cmd, "list", "--all-accounts", "--account", "HASH456")
 
 	// Assert
 	require.Error(t, err)
@@ -961,7 +967,7 @@ func TestNewPositionCmd_NoAccountConfigured(t *testing.T) {
 	cmd := NewPositionCmd(testClient(t, srv), configPath, &buf)
 
 	// Act
-	_, err := runCobraCommand(t, cmd, "list")
+	_, err := runTestCommand(t, cmd, "list")
 
 	// Assert
 	require.Error(t, err, "should error when no account is specified or configured")
@@ -998,7 +1004,7 @@ func TestNewPositionCmd_RequestsPositionsField(t *testing.T) {
 	cmd := NewPositionCmd(testClient(t, srv), configPath, &buf)
 
 	// Act
-	_, err := runCobraCommand(t, cmd, "list", "--account", "HASH123")
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123")
 
 	// Assert
 	require.NoError(t, err)
@@ -1035,7 +1041,7 @@ func TestNewPositionCmd_ComputedFieldsInOutput(t *testing.T) {
 	cmd := NewPositionCmd(testClient(t, srv), configPath, &buf)
 
 	// Act
-	_, err := runCobraCommand(t, cmd, "list", "--account", "HASH123")
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123")
 
 	// Assert
 	require.NoError(t, err)

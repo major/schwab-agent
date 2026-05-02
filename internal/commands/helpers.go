@@ -1,13 +1,11 @@
 package commands
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/apperr"
 )
@@ -75,77 +73,17 @@ func validEnumString[T ~string](valid []T) string {
 	return strings.Join(s, ", ")
 }
 
-// requireSubcommand returns a cli.ActionFunc that rejects direct invocation of
-// a parent command with a clear error. Without this, urfave/cli produces a
-// confusing "No help topic for '<arg>'" message when the user omits the
-// subcommand (e.g. "quote AAPL" instead of "quote get AAPL").
-func requireSubcommand() cli.ActionFunc {
-	return func(_ context.Context, cmd *cli.Command) error {
-		list := strings.Join(visibleSubcommandNames(cmd), ", ")
-
-		if arg := cmd.Args().First(); arg != "" {
-			return apperr.NewValidationError(
-				fmt.Sprintf("unknown command %q for %q; available subcommands: %s", arg, cmd.Name, list),
-				nil,
-			)
-		}
-
-		return apperr.NewValidationError(
-			fmt.Sprintf("%q requires a subcommand: %s", cmd.Name, list),
-			nil,
-		)
-	}
-}
-
-// suggestSubcommands handles usage errors that happen before Action runs. This
-// is most useful for parent commands whose subcommands own distinct flags: an
-// unknown flag on the parent usually means the user skipped the subcommand.
-func suggestSubcommands(_ context.Context, cmd *cli.Command, err error, _ bool) error {
-	if !strings.Contains(err.Error(), "flag provided but not defined") {
-		return err
-	}
-
-	names := visibleSubcommandNames(cmd)
-	if len(names) == 0 {
-		return err
-	}
-
-	return apperr.NewValidationError(
-		fmt.Sprintf(
-			"%q requires a subcommand: %s (%s)",
-			cmd.FullName(),
-			strings.Join(names, ", "),
-			err.Error(),
-		),
-		err,
-	)
-}
-
-// visibleSubcommandNames returns only invokable subcommands for user-facing
-// errors, omitting hidden commands and urfave/cli's built-in help command.
-func visibleSubcommandNames(cmd *cli.Command) []string {
-	names := make([]string, 0, len(cmd.Commands))
-	for _, sub := range cmd.Commands {
-		if sub.Hidden || sub.Name == "help" {
-			continue
-		}
-		names = append(names, sub.Name)
-	}
-
-	return names
-}
-
 // newValidationError creates a consistent validation error for command parsing.
 func newValidationError(message string) error {
 	return apperr.NewValidationError(message, nil)
 }
 
-// cobraRequireSubcommand returns a cobra.RunE that rejects direct invocation of
+// requireSubcommand returns a cobra.RunE that rejects direct invocation of
 // a parent command with a clear error. Without this, cobra produces a confusing
 // "no subcommands available" message when the user omits the subcommand
 // (e.g. "quote AAPL" instead of "quote get AAPL").
-func cobraRequireSubcommand(cmd *cobra.Command, args []string) error {
-	list := strings.Join(cobraVisibleSubcommandNames(cmd), ", ")
+func requireSubcommand(cmd *cobra.Command, args []string) error {
+	list := strings.Join(visibleSubcommandNames(cmd), ", ")
 
 	if len(args) > 0 {
 		return apperr.NewValidationError(
@@ -160,15 +98,15 @@ func cobraRequireSubcommand(cmd *cobra.Command, args []string) error {
 	)
 }
 
-// cobraSuggestSubcommands handles usage errors that happen before RunE runs. This
+// suggestSubcommands handles usage errors that happen before RunE runs. This
 // is most useful for parent commands whose subcommands own distinct flags: an
 // unknown flag on the parent usually means the user skipped the subcommand.
-func cobraSuggestSubcommands(cmd *cobra.Command, _ []string, err error) error {
+func suggestSubcommands(cmd *cobra.Command, err error) error {
 	if !strings.Contains(err.Error(), "unknown flag") && !strings.Contains(err.Error(), "flag provided but not defined") {
 		return err
 	}
 
-	names := cobraVisibleSubcommandNames(cmd)
+	names := visibleSubcommandNames(cmd)
 	if len(names) == 0 {
 		return err
 	}
@@ -184,13 +122,9 @@ func cobraSuggestSubcommands(cmd *cobra.Command, _ []string, err error) error {
 	)
 }
 
-// Keep the Cobra usage-error helper live while individual command migrations
-// are still being wired into native Cobra trees.
-var _ = cobraSuggestSubcommands
-
-// cobraVisibleSubcommandNames returns only invokable subcommands for user-facing
+// visibleSubcommandNames returns only invokable subcommands for user-facing
 // errors, omitting hidden commands.
-func cobraVisibleSubcommandNames(cmd *cobra.Command) []string {
+func visibleSubcommandNames(cmd *cobra.Command) []string {
 	names := make([]string, 0, len(cmd.Commands()))
 	for _, sub := range cmd.Commands() {
 		if sub.Hidden {

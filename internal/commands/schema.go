@@ -10,9 +10,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/urfave/cli/v3"
-
-	"github.com/major/schwab-agent/internal/client"
 )
 
 // SchemaOutput is the top-level schema introspection structure.
@@ -51,7 +48,6 @@ func NewSchemaCmd(root *cobra.Command, w io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			allCommands := make(map[string]CommandSchema)
 			walkCommands(root, "", allCommands)
-			augmentLegacyBridgeSchemas(root, allCommands)
 			// Match the legacy schema contract: report the application command tree,
 			// not the schema command that is currently producing the introspection output.
 			delete(allCommands, cmd.Name())
@@ -78,75 +74,6 @@ func NewSchemaCmd(root *cobra.Command, w io.Writer) *cobra.Command {
 	}
 	cmd.Flags().String("command", "", `Filter to a single command path (e.g., "order place equity")`)
 	return cmd
-}
-
-// augmentLegacyBridgeSchemas adds nested schema metadata for command groups that
-// are still exposed through Cobra compatibility shims. Those shims intentionally
-// disable Cobra flag parsing, so their mature legacy subcommand trees are not
-// visible to a pure Cobra walk yet.
-func augmentLegacyBridgeSchemas(root *cobra.Command, commands map[string]CommandSchema) {
-	orderCmd, _, err := root.Find([]string{"order"})
-	if err != nil || orderCmd == nil || !orderCmd.DisableFlagParsing || len(orderCmd.Commands()) > 0 {
-		return
-	}
-
-	legacyOrder := OrderCommand(&client.Ref{}, "", io.Discard)
-	walkLegacyCommands(legacyOrder, "order", commands)
-}
-
-// walkLegacyCommands mirrors walkCommands for temporary urfave/cli bridge trees.
-func walkLegacyCommands(cmd *cli.Command, prefix string, commands map[string]CommandSchema) {
-	for _, sub := range cmd.Commands {
-		path := sub.Name
-		if prefix != "" {
-			path = prefix + " " + sub.Name
-		}
-		commands[path] = CommandSchema{
-			Description: sub.Usage,
-			Flags:       extractLegacyFlags(sub.Flags),
-			Args:        map[string]any{},
-			Examples:    parseExamples(sub.UsageText),
-		}
-		walkLegacyCommands(sub, path, commands)
-	}
-}
-
-// extractLegacyFlags converts urfave/cli bridge flags to schema flag descriptions.
-func extractLegacyFlags(flags []cli.Flag) map[string]FlagSchema {
-	result := make(map[string]FlagSchema)
-	for _, f := range flags {
-		name, schema := classifyLegacyFlag(f)
-		if name != "" {
-			result["--"+name] = schema
-		}
-	}
-	return result
-}
-
-// classifyLegacyFlag preserves schema coverage for temporary legacy bridge flags.
-func classifyLegacyFlag(f cli.Flag) (string, FlagSchema) {
-	switch tf := f.(type) {
-	case *cli.StringFlag:
-		return tf.Name, FlagSchema{Type: "string", Default: tf.Value, Description: tf.Usage}
-	case *cli.IntFlag:
-		return tf.Name, FlagSchema{Type: "int", Default: tf.Value, Description: tf.Usage}
-	case *cli.Int64Flag:
-		return tf.Name, FlagSchema{Type: "int64", Default: tf.Value, Description: tf.Usage}
-	case *cli.Float64Flag:
-		return tf.Name, FlagSchema{Type: "float64", Default: tf.Value, Description: tf.Usage}
-	case *cli.BoolFlag:
-		return tf.Name, FlagSchema{Type: "bool", Default: tf.Value, Description: tf.Usage}
-	case *cli.StringSliceFlag:
-		return tf.Name, FlagSchema{Type: "stringSlice", Description: tf.Usage}
-	case *cli.IntSliceFlag:
-		return tf.Name, FlagSchema{Type: "intSlice", Description: tf.Usage}
-	default:
-		names := f.Names()
-		if len(names) == 0 {
-			return "", FlagSchema{}
-		}
-		return names[0], FlagSchema{Type: "string"}
-	}
 }
 
 // walkCommands recursively traverses the command tree and populates the commands

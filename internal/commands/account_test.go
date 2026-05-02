@@ -2,7 +2,6 @@ package commands
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -13,17 +12,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
-
-// noopExitHandler prevents urfave/cli from calling os.Exit on returned errors.
-// Kept for use by other test files (e.g. position_test.go) that still test urfave commands.
-func noopExitHandler(_ context.Context, _ *cli.Command, _ error) {}
 
 // accountMockServer creates an httptest.Server that routes requests by path.
 func accountMockServer(t *testing.T, routes map[string]any) *httptest.Server {
@@ -90,7 +84,7 @@ func TestNewAccountCmd_List_Success(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
-	_, err := runCobraCommand(t, cmd, "list")
+	_, err := runTestCommand(t, cmd, "list")
 
 	// Assert
 	require.NoError(t, err)
@@ -148,7 +142,7 @@ func TestNewAccountCmd_List_WithPositionsFlag(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
-	_, err := runCobraCommand(t, cmd, "list", "--positions")
+	_, err := runTestCommand(t, cmd, "list", "--positions")
 
 	// Assert
 	require.NoError(t, err)
@@ -191,7 +185,7 @@ func TestNewAccountCmd_List_WithoutPositionsFlag_NoFieldsParam(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
-	_, err := runCobraCommand(t, cmd, "list")
+	_, err := runTestCommand(t, cmd, "list")
 
 	// Assert
 	require.NoError(t, err)
@@ -212,7 +206,7 @@ func TestNewAccountCmd_List_PreferencesFailure_StillReturnsAccounts(t *testing.T
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
-	_, err := runCobraCommand(t, cmd, "list")
+	_, err := runTestCommand(t, cmd, "list")
 
 	// Assert
 	require.NoError(t, err)
@@ -242,7 +236,7 @@ func TestNewAccountCmd_List_APIError(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
-	_, err := runCobraCommand(t, cmd, "list")
+	_, err := runTestCommand(t, cmd, "list")
 
 	// Assert
 	require.Error(t, err)
@@ -264,7 +258,7 @@ func TestNewAccountCmd_Numbers_Success(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
-	_, err := runCobraCommand(t, cmd, "numbers")
+	_, err := runTestCommand(t, cmd, "numbers")
 
 	// Assert
 	require.NoError(t, err)
@@ -309,7 +303,7 @@ func TestNewAccountCmd_Get_WithPositionsFlag(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
-	_, err := runCobraCommand(t, cmd, "get", "--positions", "MY_HASH")
+	_, err := runTestCommand(t, cmd, "get", "--positions", "MY_HASH")
 
 	// Assert
 	require.NoError(t, err)
@@ -346,7 +340,7 @@ func TestNewAccountCmd_Get_FlagOverridesAll(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), configPath, &buf)
 	// Persistent --account flag on parent should override both positional arg and config default
-	_, err := runCobraCommand(t, cmd, "--account", "FLAG_HASH", "get", "ARG_HASH")
+	_, err := runTestCommand(t, cmd, "--account", "FLAG_HASH", "get", "ARG_HASH")
 
 	// Assert
 	require.NoError(t, err)
@@ -368,7 +362,7 @@ func TestNewAccountCmd_Get_PositionalArg(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
-	_, err := runCobraCommand(t, cmd, "get", "ARG_HASH")
+	_, err := runTestCommand(t, cmd, "get", "ARG_HASH")
 
 	// Assert
 	require.NoError(t, err)
@@ -392,7 +386,7 @@ func TestNewAccountCmd_Get_ConfigDefault(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), configPath, &buf)
-	_, err := runCobraCommand(t, cmd, "get")
+	_, err := runTestCommand(t, cmd, "get")
 
 	// Assert
 	require.NoError(t, err)
@@ -409,7 +403,7 @@ func TestNewAccountCmd_Get_NoAccount_Error(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
-	_, err := runCobraCommand(t, cmd, "get")
+	_, err := runTestCommand(t, cmd, "get")
 
 	// Assert
 	require.Error(t, err)
@@ -434,7 +428,7 @@ func TestNewAccountCmd_Get_MetadataContainsHash(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
-	_, err := runCobraCommand(t, cmd, "get", "MY_HASH")
+	_, err := runTestCommand(t, cmd, "get", "MY_HASH")
 
 	// Assert
 	require.NoError(t, err)
@@ -455,7 +449,7 @@ func TestNewAccountCmd_Get_APIError(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
-	_, err := runCobraCommand(t, cmd, "get", "BAD_HASH")
+	_, err := runTestCommand(t, cmd, "get", "BAD_HASH")
 
 	// Assert
 	require.Error(t, err)
@@ -473,7 +467,7 @@ func TestNewAccountCmd_SetDefault_Success(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, jsonServer(`{}`)), configPath, &buf)
-	_, err := runCobraCommand(t, cmd, "set-default", "NEW_HASH")
+	_, err := runTestCommand(t, cmd, "set-default", "NEW_HASH")
 
 	// Assert
 	require.NoError(t, err)
@@ -497,7 +491,7 @@ func TestNewAccountCmd_SetDefault_MissingHash(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, jsonServer(`{}`)), configPath, &buf)
-	_, err := runCobraCommand(t, cmd, "set-default")
+	_, err := runTestCommand(t, cmd, "set-default")
 
 	// Assert
 	require.Error(t, err)
@@ -515,7 +509,7 @@ func TestNewAccountCmd_SetDefault_NoSafetyGuard(t *testing.T) {
 	// Act - no "i-also-like-to-live-dangerously" in config, should still succeed
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, jsonServer(`{}`)), configPath, &buf)
-	_, err := runCobraCommand(t, cmd, "set-default", "SOME_HASH")
+	_, err := runTestCommand(t, cmd, "set-default", "SOME_HASH")
 
 	// Assert
 	require.NoError(t, err)
@@ -625,7 +619,7 @@ func TestNewAccountCmd_Transaction_List_WithAccountFlag(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "/nonexistent/config.json", &buf)
-	_, err := runCobraCommand(t, cmd, "transaction", "list", "--account", "abc123")
+	_, err := runTestCommand(t, cmd, "transaction", "list", "--account", "abc123")
 
 	// Assert
 	require.NoError(t, err)
@@ -652,7 +646,7 @@ func TestNewAccountCmd_Transaction_List_WithFilters(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "/nonexistent/config.json", &buf)
-	_, err := runCobraCommand(t, cmd,
+	_, err := runTestCommand(t, cmd,
 		"transaction", "list",
 		"--account", "abc123",
 		"--types", "TRADE",
@@ -682,7 +676,7 @@ func TestNewAccountCmd_Transaction_List_DefaultAccount(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), configPath, &buf)
-	_, err := runCobraCommand(t, cmd, "transaction", "list")
+	_, err := runTestCommand(t, cmd, "transaction", "list")
 
 	// Assert
 	require.NoError(t, err)
@@ -696,7 +690,7 @@ func TestNewAccountCmd_Transaction_List_NoAccount(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, server), "/nonexistent/config.json", &buf)
-	_, err := runCobraCommand(t, cmd, "transaction", "list")
+	_, err := runTestCommand(t, cmd, "transaction", "list")
 
 	// Assert
 	require.Error(t, err)
@@ -719,7 +713,7 @@ func TestNewAccountCmd_Transaction_Get_Success(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, srv), "/nonexistent/config.json", &buf)
-	_, err := runCobraCommand(t, cmd,
+	_, err := runTestCommand(t, cmd,
 		"transaction", "get", "--account", "abc123", "1001",
 	)
 
@@ -740,7 +734,7 @@ func TestNewAccountCmd_Transaction_Get_MissingTxnID(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, server), "/nonexistent/config.json", &buf)
-	_, err := runCobraCommand(t, cmd, "transaction", "get", "--account", "abc123")
+	_, err := runTestCommand(t, cmd, "transaction", "get", "--account", "abc123")
 
 	// Assert
 	require.Error(t, err)
@@ -757,7 +751,7 @@ func TestNewAccountCmd_Transaction_Get_InvalidTxnID(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, server), "/nonexistent/config.json", &buf)
-	_, err := runCobraCommand(t, cmd, "transaction", "get", "--account", "abc123", "not-a-number")
+	_, err := runTestCommand(t, cmd, "transaction", "get", "--account", "abc123", "not-a-number")
 
 	// Assert
 	require.Error(t, err)
@@ -774,7 +768,7 @@ func TestNewAccountCmd_Transaction_Get_NoAccount(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, server), "/nonexistent/config.json", &buf)
-	_, err := runCobraCommand(t, cmd, "transaction", "get", "1001")
+	_, err := runTestCommand(t, cmd, "transaction", "get", "1001")
 
 	// Assert
 	require.Error(t, err)
@@ -791,7 +785,7 @@ func TestNewAccountCmd_NoSubcommand(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAccountCmd(testClient(t, server), "", &buf)
-	_, err := runCobraCommand(t, cmd)
+	_, err := runTestCommand(t, cmd)
 
 	// Assert
 	require.Error(t, err)
