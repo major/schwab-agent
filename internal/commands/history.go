@@ -4,6 +4,7 @@ package commands
 import (
 	"io"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -18,13 +19,16 @@ type priceHistoryData struct {
 
 // historyGetOpts holds the options for the history get subcommand.
 type historyGetOpts struct {
-	PeriodType    string
-	Period        string
-	FrequencyType string
-	Frequency     string
-	From          string
-	To            string
+	PeriodType    string `flag:"period-type" flagdescr:"Period type (day, month, year, ytd)"`
+	Period        string `flag:"period" flagdescr:"Number of periods"`
+	FrequencyType string `flag:"frequency-type" flagdescr:"Frequency type (minute, daily, weekly, monthly)"`
+	Frequency     string `flag:"frequency" flagdescr:"Frequency value"`
+	From          string `flag:"from" flagdescr:"Start date (milliseconds since epoch)"`
+	To            string `flag:"to" flagdescr:"End date (milliseconds since epoch)"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *historyGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewHistoryCmd returns the Cobra command for price history lookups.
 func NewHistoryCmd(c *client.Ref, w io.Writer) *cobra.Command {
@@ -55,6 +59,10 @@ Examples:
   schwab-agent history get AAPL --from 1735689600000 --to 1743379200000`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			symbol := args[0]
 
 			params := client.HistoryParams{
@@ -75,12 +83,9 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.PeriodType, "period-type", "", "Period type (day, month, year, ytd)")
-	cmd.Flags().StringVar(&opts.Period, "period", "", "Number of periods")
-	cmd.Flags().StringVar(&opts.FrequencyType, "frequency-type", "", "Frequency type (minute, daily, weekly, monthly)")
-	cmd.Flags().StringVar(&opts.Frequency, "frequency", "", "Frequency value")
-	cmd.Flags().StringVar(&opts.From, "from", "", "Start date (milliseconds since epoch)")
-	cmd.Flags().StringVar(&opts.To, "to", "", "End date (milliseconds since epoch)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
