@@ -140,6 +140,7 @@ func NewRootCmd(
 
 	root.SetOut(w)
 	root.SetErr(os.Stderr)
+	root.SetFlagErrorFunc(suggestSubcommands)
 	root.PersistentFlags().StringP("account", "a", "", "Override default account hash")
 	root.PersistentFlags().BoolP("verbose", "v", false, "Enable debug logging to stderr")
 	root.PersistentFlags().String("config", defaultConfigPath, "Path to config file")
