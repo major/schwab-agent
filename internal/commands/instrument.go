@@ -3,6 +3,7 @@ package commands
 import (
 	"io"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -22,8 +23,11 @@ type instrumentGetData struct {
 
 // instrumentSearchOpts holds the options for the instrument search subcommand.
 type instrumentSearchOpts struct {
-	Projection string
+	Projection string `flag:"projection" flagdescr:"Search projection (symbol-search, symbol-regex, desc-search, desc-regex, search, fundamental)" default:"symbol-search"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *instrumentSearchOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewInstrumentCmd returns the Cobra command for instrument search and lookup.
 func NewInstrumentCmd(c *client.Ref, w io.Writer) *cobra.Command {
@@ -50,6 +54,10 @@ func newInstrumentSearchCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		Example: "schwab-agent instrument search AAPL\nschwab-agent instrument search Apple --projection desc-search",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			query := args[0]
 
 			result, err := c.SearchInstruments(cmd.Context(), query, opts.Projection)
@@ -61,7 +69,9 @@ func newInstrumentSearchCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Projection, "projection", "symbol-search", "Search projection (symbol-search, symbol-regex, desc-search, desc-regex, search, fundamental)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
