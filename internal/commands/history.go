@@ -19,12 +19,12 @@ type priceHistoryData struct {
 
 // historyGetOpts holds the options for the history get subcommand.
 type historyGetOpts struct {
-	PeriodType    string `flag:"period-type" flagdescr:"Period type (day, month, year, ytd)" flaggroup:"period"`
-	Period        string `flag:"period" flagdescr:"Number of periods" flaggroup:"period"`
-	FrequencyType string `flag:"frequency-type" flagdescr:"Frequency type (minute, daily, weekly, monthly)" flaggroup:"frequency"`
-	Frequency     string `flag:"frequency" flagdescr:"Frequency value" flaggroup:"frequency"`
-	From          string `flag:"from" flagdescr:"Start date (milliseconds since epoch)" flaggroup:"range"`
-	To            string `flag:"to" flagdescr:"End date (milliseconds since epoch)" flaggroup:"range"`
+	PeriodType    historyPeriodType    `flag:"period-type" flagdescr:"Period type (day, month, year, ytd)" flaggroup:"period"`
+	Period        string               `flag:"period" flagdescr:"Number of periods" flaggroup:"period"`
+	FrequencyType historyFrequencyType `flag:"frequency-type" flagdescr:"Frequency type (minute, daily, weekly, monthly)" flaggroup:"frequency"`
+	Frequency     historyFrequency     `flag:"frequency" flagdescr:"Frequency value" flaggroup:"frequency"`
+	From          string               `flag:"from" flagdescr:"Start date (milliseconds since epoch)" flaggroup:"range"`
+	To            string               `flag:"to" flagdescr:"End date (milliseconds since epoch)" flaggroup:"range"`
 }
 
 // Attach implements structcli.Options interface.
@@ -67,10 +67,10 @@ date ranges via epoch milliseconds. Returns OHLCV candle data.`,
 			symbol := args[0]
 
 			params := client.HistoryParams{
-				PeriodType:    opts.PeriodType,
+				PeriodType:    string(opts.PeriodType),
 				Period:        opts.Period,
-				FrequencyType: opts.FrequencyType,
-				Frequency:     opts.Frequency,
+				FrequencyType: string(opts.FrequencyType),
+				Frequency:     string(opts.Frequency),
 				StartDate:     opts.From,
 				EndDate:       opts.To,
 			}
@@ -87,6 +87,7 @@ date ranges via epoch milliseconds. Returns OHLCV candle data.`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }

@@ -58,6 +58,7 @@ func makeCobraBuildOrderCommand[O any, P any](
 			return writeOrderRequestJSON(w, order)
 		},
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	if flagSetup != nil {
 		flagSetup(cmd, opts)

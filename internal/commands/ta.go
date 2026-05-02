@@ -172,8 +172,8 @@ func maxPeriod(periods []int) int {
 // (cfg.defaultPeriod) and structcli tags require static defaults.
 type simpleTAOpts struct {
 	Period   []int
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -181,11 +181,11 @@ func (o *simpleTAOpts) Attach(_ *cobra.Command) error { return nil }
 
 // macdOpts holds CLI flags for the MACD subcommand.
 type macdOpts struct {
-	Fast     int    `flag:"fast" flagdescr:"Fast EMA period" default:"12" flaggroup:"indicator"`
-	Slow     int    `flag:"slow" flagdescr:"Slow EMA period" default:"26" flaggroup:"indicator"`
-	Signal   int    `flag:"signal" flagdescr:"Signal EMA period" default:"9" flaggroup:"indicator"`
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Fast     int        `flag:"fast" flagdescr:"Fast EMA period" default:"12" flaggroup:"indicator"`
+	Slow     int        `flag:"slow" flagdescr:"Slow EMA period" default:"26" flaggroup:"indicator"`
+	Signal   int        `flag:"signal" flagdescr:"Signal EMA period" default:"9" flaggroup:"indicator"`
+	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -193,9 +193,9 @@ func (o *macdOpts) Attach(_ *cobra.Command) error { return nil }
 
 // atrOpts holds CLI flags for the ATR subcommand.
 type atrOpts struct {
-	Period   int    `flag:"period" flagdescr:"Indicator period" default:"14" flaggroup:"indicator"`
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Period   int        `flag:"period" flagdescr:"Indicator period" default:"14" flaggroup:"indicator"`
+	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -203,10 +203,10 @@ func (o *atrOpts) Attach(_ *cobra.Command) error { return nil }
 
 // bbandsOpts holds CLI flags for the Bollinger Bands subcommand.
 type bbandsOpts struct {
-	Period   int     `flag:"period" flagdescr:"BBands period" default:"20" flaggroup:"indicator"`
-	StdDev   float64 `flag:"std-dev" flagdescr:"Standard deviations" default:"2.0" flaggroup:"indicator"`
-	Interval string  `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int     `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Period   int        `flag:"period" flagdescr:"BBands period" default:"20" flaggroup:"indicator"`
+	StdDev   float64    `flag:"std-dev" flagdescr:"Standard deviations" default:"2.0" flaggroup:"indicator"`
+	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -214,11 +214,11 @@ func (o *bbandsOpts) Attach(_ *cobra.Command) error { return nil }
 
 // stochOpts holds CLI flags for the Stochastic Oscillator subcommand.
 type stochOpts struct {
-	KPeriod  int    `flag:"k-period" flagdescr:"Fast %K lookback period" default:"14" flaggroup:"indicator"`
-	SmoothK  int    `flag:"smooth-k" flagdescr:"Slow %K smoothing period" default:"3" flaggroup:"indicator"`
-	DPeriod  int    `flag:"d-period" flagdescr:"Slow %D period" default:"3" flaggroup:"indicator"`
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	KPeriod  int        `flag:"k-period" flagdescr:"Fast %K lookback period" default:"14" flaggroup:"indicator"`
+	SmoothK  int        `flag:"smooth-k" flagdescr:"Slow %K smoothing period" default:"3" flaggroup:"indicator"`
+	DPeriod  int        `flag:"d-period" flagdescr:"Slow %D period" default:"3" flaggroup:"indicator"`
+	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -226,9 +226,9 @@ func (o *stochOpts) Attach(_ *cobra.Command) error { return nil }
 
 // adxOpts holds CLI flags for the ADX subcommand.
 type adxOpts struct {
-	Period   int    `flag:"period" flagdescr:"Indicator period" default:"14" flaggroup:"indicator"`
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Period   int        `flag:"period" flagdescr:"Indicator period" default:"14" flaggroup:"indicator"`
+	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -236,8 +236,8 @@ func (o *adxOpts) Attach(_ *cobra.Command) error { return nil }
 
 // vwapOpts holds CLI flags for the VWAP subcommand.
 type vwapOpts struct {
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -245,8 +245,8 @@ func (o *vwapOpts) Attach(_ *cobra.Command) error { return nil }
 
 // hvOpts holds CLI flags for the Historical Volatility subcommand.
 type hvOpts struct {
-	Period   int    `flag:"period" flagdescr:"Indicator period" default:"20" flaggroup:"indicator"`
-	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Period   int        `flag:"period" flagdescr:"Indicator period" default:"20" flaggroup:"indicator"`
+	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -378,7 +378,8 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 			}
 			period := maxPeriod(periods)
 
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, opts.Interval, period*cfg.multiplier, cfg.name)
+			interval := string(opts.Interval)
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, period*cfg.multiplier, cfg.name)
 			if err != nil {
 				return err
 			}
@@ -398,10 +399,10 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 			}
 
 			if len(periods) == 1 {
-				return writeTAOutput(w, cfg.name, symbol, opts.Interval, periods[0], opts.Points, timestamps, valuesByPeriod[periods[0]])
+				return writeTAOutput(w, cfg.name, symbol, interval, periods[0], opts.Points, timestamps, valuesByPeriod[periods[0]])
 			}
 
-			return writeMultiTAOutput(w, cfg.name, symbol, opts.Interval, periods, opts.Points, timestamps, valuesByPeriod)
+			return writeMultiTAOutput(w, cfg.name, symbol, interval, periods, opts.Points, timestamps, valuesByPeriod)
 		},
 	}
 
@@ -419,6 +420,7 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 	if err := structcli.Define(cmd, opts, structcli.WithExclusions("period")); err != nil {
 		panic(err)
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }
@@ -444,7 +446,8 @@ slow=26, signal=9.`,
 			symbol := args[0]
 
 			// MACD layers slow EMA + signal EMA; 2x the combined period provides convergence.
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, opts.Interval, (opts.Slow+opts.Signal)*2, "macd")
+			interval := string(opts.Interval)
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, (opts.Slow+opts.Signal)*2, "macd")
 			if err != nil {
 				return err
 			}
@@ -479,7 +482,7 @@ slow=26, signal=9.`,
 			data := macdOutput{
 				Indicator: "macd",
 				Symbol:    symbol,
-				Interval:  opts.Interval,
+				Interval:  interval,
 				Fast:      opts.Fast,
 				Slow:      opts.Slow,
 				Signal:    opts.Signal,
@@ -492,6 +495,7 @@ slow=26, signal=9.`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }
@@ -515,7 +519,8 @@ data with Wilder smoothing. Default period is 14.`,
 			symbol := args[0]
 
 			// ATR uses Wilder smoothing; 3x period provides convergence stability.
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, opts.Interval, opts.Period*3, "atr")
+			interval := string(opts.Interval)
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, opts.Period*3, "atr")
 			if err != nil {
 				return err
 			}
@@ -538,13 +543,14 @@ data with Wilder smoothing. Default period is 14.`,
 				return err
 			}
 
-			return writeTAOutput(w, "atr", symbol, opts.Interval, opts.Period, opts.Points, timestamps, values)
+			return writeTAOutput(w, "atr", symbol, interval, opts.Period, opts.Points, timestamps, values)
 		},
 	}
 
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }
@@ -568,7 +574,8 @@ relatively low. Use --std-dev to widen or narrow the bands (default 2.0).`,
 
 			symbol := args[0]
 
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, opts.Interval, opts.Period, "bbands")
+			interval := string(opts.Interval)
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, opts.Period, "bbands")
 			if err != nil {
 				return err
 			}
@@ -603,7 +610,7 @@ relatively low. Use --std-dev to widen or narrow the bands (default 2.0).`,
 			data := bbandsOutput{
 				Indicator: "bbands",
 				Symbol:    symbol,
-				Interval:  opts.Interval,
+				Interval:  interval,
 				Period:    opts.Period,
 				StdDev:    opts.StdDev,
 				Values:    out,
@@ -615,6 +622,7 @@ relatively low. Use --std-dev to widen or narrow the bands (default 2.0).`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }
@@ -639,7 +647,8 @@ Configurable via --k-period, --smooth-k, and --d-period.`,
 
 			// Stochastic chains three windowed ops (raw %K, smoothed %K, %D);
 			// total depth is the sum of all window sizes.
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, opts.Interval, opts.KPeriod+opts.SmoothK+opts.DPeriod, "stoch")
+			interval := string(opts.Interval)
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, opts.KPeriod+opts.SmoothK+opts.DPeriod, "stoch")
 			if err != nil {
 				return err
 			}
@@ -681,7 +690,7 @@ Configurable via --k-period, --smooth-k, and --d-period.`,
 			data := stochOutput{
 				Indicator: "stoch",
 				Symbol:    symbol,
-				Interval:  opts.Interval,
+				Interval:  interval,
 				KPeriod:   opts.KPeriod,
 				SmoothK:   opts.SmoothK,
 				DPeriod:   opts.DPeriod,
@@ -694,6 +703,7 @@ Configurable via --k-period, --smooth-k, and --d-period.`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }
@@ -717,7 +727,8 @@ plus_di, and minus_di for directional bias. Default period is 14.`,
 			symbol := args[0]
 
 			// ADX double-smooths (DI pass + ADX pass); 4x period ensures both converge.
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, opts.Interval, opts.Period*4, "adx")
+			interval := string(opts.Interval)
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, opts.Period*4, "adx")
 			if err != nil {
 				return err
 			}
@@ -760,7 +771,7 @@ plus_di, and minus_di for directional bias. Default period is 14.`,
 			data := adxOutput{
 				Indicator: "adx",
 				Symbol:    symbol,
-				Interval:  opts.Interval,
+				Interval:  interval,
 				Period:    opts.Period,
 				Values:    out,
 			}
@@ -771,6 +782,7 @@ plus_di, and minus_di for directional bias. Default period is 14.`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }
@@ -797,7 +809,8 @@ suggests bearish.`,
 
 			// Use 20 as minimum candle count - VWAP works with any count >= 1
 			// but 20 gives meaningful output for typical use cases.
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, opts.Interval, 20, "vwap")
+			interval := string(opts.Interval)
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, 20, "vwap")
 			if err != nil {
 				return err
 			}
@@ -825,13 +838,14 @@ suggests bearish.`,
 			}
 
 			// period=0 because VWAP is cumulative (no windowed period)
-			return writeTAOutput(w, "vwap", symbol, opts.Interval, 0, opts.Points, timestamps, values)
+			return writeTAOutput(w, "vwap", symbol, interval, 0, opts.Points, timestamps, values)
 		},
 	}
 
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }
@@ -857,7 +871,8 @@ monthly volatility breakdowns.`,
 
 			// Need period+1 closes for N returns, plus extra for rolling window warmup.
 			// period+21 provides a safety margin for the rolling window.
-			candles, _, err := fetchAndValidateCandles(cmd.Context(), c, symbol, opts.Interval, opts.Period+21, "hv")
+			interval := string(opts.Interval)
+			candles, _, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, opts.Period+21, "hv")
 			if err != nil {
 				return err
 			}
@@ -877,7 +892,7 @@ monthly volatility breakdowns.`,
 			data := hvOutput{
 				Indicator:      "hv",
 				Symbol:         symbol,
-				Interval:       opts.Interval,
+				Interval:       interval,
 				Period:         opts.Period,
 				DailyVol:       result.DailyVol,
 				WeeklyVol:      result.WeeklyVol,
@@ -896,6 +911,7 @@ monthly volatility breakdowns.`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }

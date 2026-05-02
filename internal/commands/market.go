@@ -22,8 +22,8 @@ type moversData struct {
 
 // marketMoversOpts holds the options for the market movers subcommand.
 type marketMoversOpts struct {
-	Sort      string `flag:"sort" flagdescr:"Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)"`
-	Frequency string `flag:"frequency" flagdescr:"Minimum percent change magnitude (0, 1, 5, 10, 30, 60)"`
+	Sort      moversSort      `flag:"sort" flagdescr:"Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)"`
+	Frequency moversFrequency `flag:"frequency" flagdescr:"Minimum percent change magnitude (0, 1, 5, 10, 30, 60)"`
 }
 
 // Attach implements structcli.Attachable.
@@ -110,8 +110,8 @@ names (e.g. '$SPX').`,
 			}
 
 			params := client.MoversParams{
-				Sort:      opts.Sort,
-				Frequency: opts.Frequency,
+				Sort:      string(opts.Sort),
+				Frequency: string(opts.Frequency),
 			}
 
 			result, err := c.Movers(cmd.Context(), index, params)
@@ -126,6 +126,7 @@ names (e.g. '$SPX').`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }

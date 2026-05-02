@@ -23,7 +23,7 @@ type instrumentGetData struct {
 
 // instrumentSearchOpts holds the options for the instrument search subcommand.
 type instrumentSearchOpts struct {
-	Projection string `flag:"projection" flagdescr:"Search projection (symbol-search, symbol-regex, desc-search, desc-regex, search, fundamental)" default:"symbol-search"`
+	Projection instrumentProjection `flag:"projection" flagdescr:"Search projection (symbol-search, symbol-regex, desc-search, desc-regex, search, fundamental)" default:"symbol-search"`
 }
 
 // Attach implements structcli.Options interface.
@@ -57,7 +57,7 @@ desc-regex, search, or fundamental.`,
 		Example: `  schwab-agent instrument search AAPL
   schwab-agent instrument search "Apple" --projection desc-search
   schwab-agent instrument search AAPL --projection fundamental`,
-		Args:    cobra.ExactArgs(1),
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
@@ -65,7 +65,7 @@ desc-regex, search, or fundamental.`,
 
 			query := args[0]
 
-			result, err := c.SearchInstruments(cmd.Context(), query, opts.Projection)
+			result, err := c.SearchInstruments(cmd.Context(), query, string(opts.Projection))
 			if err != nil {
 				return err
 			}
@@ -77,6 +77,7 @@ desc-regex, search, or fundamental.`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }
