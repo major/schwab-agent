@@ -6,24 +6,41 @@ CLI command handlers for schwab-agent. Each file defines one command group (e.g.
 
 ## Command Pattern
 
-Every command group exports one public constructor that returns `*cli.Command`:
+Every command group exports one public constructor that returns `*cobra.Command`:
 
 ```go
-func QuoteCommand(c *client.Ref, w io.Writer) *cli.Command {
-    return &cli.Command{
-        Name:  "quote",
-        Usage: "Stock quote operations",
-        Commands: []*cli.Command{
-            quoteGetCommand(c, w),
-        },
+func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
+    cmd := &cobra.Command{
+        Use:   "quote",
+        Short: "Stock quote operations",
     }
+    cmd.AddCommand(newQuoteGetCmd(c, w))
+    return cmd
 }
 ```
 
-- Public function returns the parent command (registered in `main.go`'s `buildApp()`)
+- Public function returns the parent command (registered in `main.go`'s `buildAppWithDeps()`)
 - Private functions return subcommands
 - All commands accept `*client.Ref` and `io.Writer` (some also take `configPath string`), except `symbol` which only takes `io.Writer` (no API client needed)
-- Action functions use `context.Context` and `*cli.Command` from urfave/cli v3
+- RunE functions use `*cobra.Command` and `[]string` args from spf13/cobra
+
+### Struct Tag Flag Pattern
+
+Command flags are defined using structcli struct tags:
+
+```go
+type quoteGetOpts struct {
+    Symbols []string `flag:"symbol" flagdescr:"Symbol(s) to quote" flagshort:"s"`
+    Fields  bool     `flag:"fields" flagdescr:"Include all quote fields"`
+}
+
+func (o *quoteGetOpts) Attach(_ *cobra.Command) error { return nil }
+```
+
+- `structcli.Define(cmd, opts)` in command setup replaces manual `cmd.Flags()` calls
+- `structcli.Unmarshal(cmd, opts)` at top of RunE before reading option fields
+- `MarkFlagsMutuallyExclusive`/`MarkFlagsOneRequired` stay as raw Cobra after `Define()`
+- Root persistent flags (--account, --verbose, --config, --token) remain as manual Cobra registrations
 
 ## Adding a New Command
 
@@ -40,7 +57,7 @@ All command output goes through `internal/output` envelopes:
 - Return typed errors from `internal/apperr` for failures (the Before hook handles formatting)
 - `output.WritePartial(w, data, missing, meta)` when some results succeed and some fail (e.g., multi-symbol quote)
 
-Exception: `schema` and `order build` commands write raw JSON (not envelope-wrapped).
+Exception: `order build` commands write raw JSON (not envelope-wrapped).
 
 ## Safety Guards
 
@@ -48,7 +65,7 @@ Mutable commands (order place/cancel/replace) enforce two safety checks:
 
 ```go
 if err := requireMutableEnabled(configPath); err != nil { return err }
-if err := requireConfirm(cmd.Bool("confirm")); err != nil { return err }
+if err := requireConfirm(cmd); err != nil { return err }
 ```
 
 - `requireMutableEnabled`: Checks `i-also-like-to-live-dangerously` in config
@@ -115,4 +132,4 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 | instrument.go | instrument | search, get |
 | market.go | market | hours, movers |
 | symbol.go | symbol | build, parse |
-| schema.go | schema | (direct) |
+| ta.go | ta | sma, ema, rsi, macd, atr, bbands, stoch, adx, vwap, hv, expected-move |

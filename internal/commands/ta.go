@@ -275,7 +275,7 @@ output to the N most recent values.`,
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
 	cmd.AddCommand(
-		makeCobraSimpleTACommand(simpleTAConfig{
+		makeCobraSimpleTACommand(&simpleTAConfig{
 			name:  "sma",
 			usage: "Simple Moving Average",
 			long: `Compute Simple Moving Average for a symbol. The --period flag sets the lookback
@@ -289,7 +289,7 @@ with keys like sma_21, sma_50, sma_200.`,
 			multiplier:    1,
 			compute:       ta.SMA,
 		}, c, w),
-		makeCobraSimpleTACommand(simpleTAConfig{
+		makeCobraSimpleTACommand(&simpleTAConfig{
 			name:  "ema",
 			usage: "Exponential Moving Average",
 			long: `Compute Exponential Moving Average for a symbol. EMA gives more weight to
@@ -303,7 +303,7 @@ analysis).`,
 			multiplier:    3,
 			compute:       ta.EMA,
 		}, c, w),
-		makeCobraSimpleTACommand(simpleTAConfig{
+		makeCobraSimpleTACommand(&simpleTAConfig{
 			name:  "rsi",
 			usage: "Relative Strength Index",
 			long: `Compute Relative Strength Index for a symbol. RSI ranges 0-100: values above
@@ -357,7 +357,7 @@ func cobraParseTAPeriods(opts *simpleTAOpts) ([]int, error) {
 // makeCobraSimpleTACommand builds a Cobra command for a closes-only indicator.
 // The returned command fetches candles, extracts close prices, runs the
 // indicator's compute function, and writes the result envelope.
-func makeCobraSimpleTACommand(cfg simpleTAConfig, c *client.Ref, w io.Writer) *cobra.Command {
+func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &simpleTAOpts{}
 	cmd := &cobra.Command{
 		Use:     cfg.name + " SYMBOL",

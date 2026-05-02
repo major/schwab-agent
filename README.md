@@ -148,7 +148,6 @@ schwab-agent order place --spec @order.json --confirm
 | `market` | Market hours and top movers |
 | `symbol` | Build and parse OCC option symbols (no auth required) |
 | `instrument` | Search instruments |
-| `schema` | CLI schema introspection (auto-generated) |
 
 ### Global flags
 
@@ -170,10 +169,17 @@ Both are required. This prevents accidental trades from misconfigured agents.
 
 ## Agent integration
 
-Every command includes detailed `--help` output with usage descriptions and concrete examples that agents can reference. The `schema` command provides machine-readable CLI introspection:
+Every command includes detailed `--help` output with usage descriptions and concrete examples that agents can reference. The `--jsonschema` flag provides machine-readable CLI introspection:
 
 ```bash
-schwab-agent schema
+# Full JSON Schema for the entire CLI
+schwab-agent --jsonschema
+
+# Tree view showing all commands with their flags
+schwab-agent --jsonschema=tree
+
+# Schema for a specific subcommand
+schwab-agent quote --jsonschema
 ```
 
 ## Development
@@ -196,7 +202,7 @@ internal/
   auth/                 OAuth2 flow, token lifecycle, config
   client/               Schwab API HTTP client
   commands/             CLI command handlers
-  errors/               Typed error hierarchy with exit codes
+  apperr/               Typed error hierarchy with exit codes
   models/               API data structures
   orderbuilder/         Order construction and validation
   output/               JSON envelope output
