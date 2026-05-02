@@ -53,17 +53,27 @@ func NewRootCmd(
 				return nil
 			}
 
-			if flagBool(cmd, "verbose") {
+			verbose, err := cmd.Flags().GetBool("verbose")
+			if err != nil {
+				return err
+			}
+			if verbose {
 				logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 				slog.SetDefault(logger)
 			}
 
-			resolvedConfigPath := flagString(cmd, "config")
+			resolvedConfigPath, err := cmd.Flags().GetString("config")
+			if err != nil {
+				return err
+			}
 			if resolvedConfigPath == "" {
 				resolvedConfigPath = defaultConfigPath
 			}
 
-			resolvedTokenPath := flagString(cmd, "token")
+			resolvedTokenPath, err := cmd.Flags().GetString("token")
+			if err != nil {
+				return err
+			}
 			if resolvedTokenPath == "" {
 				resolvedTokenPath = defaultTokenPath
 			}

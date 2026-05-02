@@ -18,6 +18,8 @@ func NewCompletionCmd(w io.Writer) *cobra.Command {
 		RunE:        requireSubcommand,
 	}
 
+	cmd.SetFlagErrorFunc(suggestSubcommands)
+
 	cmd.AddCommand(newBashCompletionCmd(w))
 	cmd.AddCommand(newZshCompletionCmd(w))
 	cmd.AddCommand(newFishCompletionCmd(w))
