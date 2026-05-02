@@ -19,6 +19,12 @@ type moversData struct {
 	Movers *models.ScreenerResponse `json:"movers"`
 }
 
+// marketMoversOpts holds the options for the market movers subcommand.
+type marketMoversOpts struct {
+	Sort      string
+	Frequency string
+}
+
 // NewMarketCmd returns the Cobra command for market hours and movers lookups.
 func NewMarketCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -27,6 +33,7 @@ func NewMarketCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		GroupID: "market-data",
 		RunE:    requireSubcommand,
 	}
+	cmd.SetFlagErrorFunc(suggestSubcommands)
 
 	cmd.AddCommand(
 		newMarketHoursCmd(c, w),
@@ -69,6 +76,7 @@ func newMarketHoursCmd(c *client.Ref, w io.Writer) *cobra.Command {
 
 // newMarketMoversCmd returns the Cobra subcommand for market movers.
 func newMarketMoversCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	opts := &marketMoversOpts{}
 	cmd := &cobra.Command{
 		Use:     "movers <index>",
 		Short:   "Get top movers for an index ($SPX, $DJI, $COMPX, NYSE, NASDAQ, OTCBB, INDEX_ALL, EQUITY_ALL, OPTION_ALL, OPTION_PUT, OPTION_CALL)",
@@ -83,8 +91,8 @@ func newMarketMoversCmd(c *client.Ref, w io.Writer) *cobra.Command {
 			}
 
 			params := client.MoversParams{
-				Sort:      flagString(cmd, "sort"),
-				Frequency: flagString(cmd, "frequency"),
+				Sort:      opts.Sort,
+				Frequency: opts.Frequency,
 			}
 
 			result, err := c.Movers(cmd.Context(), index, params)
@@ -96,8 +104,8 @@ func newMarketMoversCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().String("sort", "", "Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)")
-	cmd.Flags().String("frequency", "", "Minimum percent change magnitude (0, 1, 5, 10, 30, 60)")
+	cmd.Flags().StringVar(&opts.Sort, "sort", "", "Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)")
+	cmd.Flags().StringVar(&opts.Frequency, "frequency", "", "Minimum percent change magnitude (0, 1, 5, 10, 30, 60)")
 
 	return cmd
 }
