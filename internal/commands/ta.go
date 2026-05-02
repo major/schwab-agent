@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -166,68 +167,97 @@ func maxPeriod(periods []int) int {
 }
 
 // simpleTAOpts holds CLI flags for factory-generated indicator commands (SMA, EMA, RSI).
+// Period is excluded from struct tags because its default varies per indicator
+// (cfg.defaultPeriod) and structcli tags require static defaults.
 type simpleTAOpts struct {
 	Period   []int
-	Interval string
-	Points   int
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
+	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *simpleTAOpts) Attach(_ *cobra.Command) error { return nil }
 
 // macdOpts holds CLI flags for the MACD subcommand.
 type macdOpts struct {
-	Fast     int
-	Slow     int
-	Signal   int
-	Interval string
-	Points   int
+	Fast     int    `flag:"fast" flagdescr:"Fast EMA period" default:"12"`
+	Slow     int    `flag:"slow" flagdescr:"Slow EMA period" default:"26"`
+	Signal   int    `flag:"signal" flagdescr:"Signal EMA period" default:"9"`
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
+	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *macdOpts) Attach(_ *cobra.Command) error { return nil }
 
 // atrOpts holds CLI flags for the ATR subcommand.
 type atrOpts struct {
-	Period   int
-	Interval string
-	Points   int
+	Period   int    `flag:"period" flagdescr:"Indicator period" default:"14"`
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
+	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *atrOpts) Attach(_ *cobra.Command) error { return nil }
 
 // bbandsOpts holds CLI flags for the Bollinger Bands subcommand.
 type bbandsOpts struct {
-	Period   int
-	StdDev   float64
-	Interval string
-	Points   int
+	Period   int     `flag:"period" flagdescr:"BBands period" default:"20"`
+	StdDev   float64 `flag:"std-dev" flagdescr:"Standard deviations" default:"2.0"`
+	Interval string  `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
+	Points   int     `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *bbandsOpts) Attach(_ *cobra.Command) error { return nil }
 
 // stochOpts holds CLI flags for the Stochastic Oscillator subcommand.
 type stochOpts struct {
-	KPeriod  int
-	SmoothK  int
-	DPeriod  int
-	Interval string
-	Points   int
+	KPeriod  int    `flag:"k-period" flagdescr:"Fast %K lookback period" default:"14"`
+	SmoothK  int    `flag:"smooth-k" flagdescr:"Slow %K smoothing period" default:"3"`
+	DPeriod  int    `flag:"d-period" flagdescr:"Slow %D period" default:"3"`
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
+	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *stochOpts) Attach(_ *cobra.Command) error { return nil }
 
 // adxOpts holds CLI flags for the ADX subcommand.
 type adxOpts struct {
-	Period   int
-	Interval string
-	Points   int
+	Period   int    `flag:"period" flagdescr:"Indicator period" default:"14"`
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
+	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *adxOpts) Attach(_ *cobra.Command) error { return nil }
 
 // vwapOpts holds CLI flags for the VWAP subcommand.
 type vwapOpts struct {
-	Interval string
-	Points   int
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
+	Points   int    `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *vwapOpts) Attach(_ *cobra.Command) error { return nil }
 
 // hvOpts holds CLI flags for the Historical Volatility subcommand.
 type hvOpts struct {
-	Period   int
-	Interval string
+	Period   int    `flag:"period" flagdescr:"Indicator period" default:"20"`
+	Interval string `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *hvOpts) Attach(_ *cobra.Command) error { return nil }
 
 // expectedMoveOpts holds CLI flags for the Expected Move subcommand.
 type expectedMoveOpts struct {
-	DTE int
+	DTE int `flag:"dte" flagdescr:"Target days to expiration" default:"30"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *expectedMoveOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewTACmd returns the Cobra command for technical analysis indicators.
 func NewTACmd(c *client.Ref, w io.Writer) *cobra.Command {
@@ -318,6 +348,10 @@ func makeCobraSimpleTACommand(cfg simpleTAConfig, c *client.Ref, w io.Writer) *c
 		Long:  cfg.usageText,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			symbol := args[0]
 
 			periods, err := cobraParseTAPeriods(opts)
@@ -353,9 +387,13 @@ func makeCobraSimpleTACommand(cfg simpleTAConfig, c *client.Ref, w io.Writer) *c
 		},
 	}
 
+	if err := structcli.Define(cmd, opts, structcli.WithExclusions("period")); err != nil {
+		panic(err)
+	}
+
+	// Period uses IntSliceVar because its default varies per indicator (cfg.defaultPeriod)
+	// and structcli struct tags require static defaults.
 	cmd.Flags().IntSliceVar(&opts.Period, "period", []int{cfg.defaultPeriod}, "Indicator period (repeatable or comma-separated)")
-	cmd.Flags().StringVar(&opts.Interval, "interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
-	cmd.Flags().IntVar(&opts.Points, "points", 1, "Number of output points (0 = all)")
 
 	return cmd
 }
@@ -369,6 +407,10 @@ func cobraTAMACDCommand(c *client.Ref, w io.Writer) *cobra.Command {
 schwab-agent ta macd AAPL --fast 12 --slow 26 --signal 9 --interval daily --points 10`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			symbol := args[0]
 
 			// MACD layers slow EMA + signal EMA; 2x the combined period provides convergence.
@@ -417,11 +459,9 @@ schwab-agent ta macd AAPL --fast 12 --slow 26 --signal 9 --interval daily --poin
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.Fast, "fast", 12, "Fast EMA period")
-	cmd.Flags().IntVar(&opts.Slow, "slow", 26, "Slow EMA period")
-	cmd.Flags().IntVar(&opts.Signal, "signal", 9, "Signal EMA period")
-	cmd.Flags().StringVar(&opts.Interval, "interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
-	cmd.Flags().IntVar(&opts.Points, "points", 1, "Number of output points (0 = all)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -435,6 +475,10 @@ func cobraTAATRCommand(c *client.Ref, w io.Writer) *cobra.Command {
 schwab-agent ta atr AAPL --period 14 --interval daily --points 10`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			symbol := args[0]
 
 			// ATR uses Wilder smoothing; 3x period provides convergence stability.
@@ -465,9 +509,9 @@ schwab-agent ta atr AAPL --period 14 --interval daily --points 10`,
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.Period, "period", 14, "Indicator period")
-	cmd.Flags().StringVar(&opts.Interval, "interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
-	cmd.Flags().IntVar(&opts.Points, "points", 1, "Number of output points (0 = all)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -481,6 +525,10 @@ func cobraTABBandsCommand(c *client.Ref, w io.Writer) *cobra.Command {
 schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --interval daily --points 10`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			symbol := args[0]
 
 			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, opts.Interval, opts.Period, "bbands")
@@ -527,10 +575,9 @@ schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --interval daily --points 
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.Period, "period", 20, "BBands period")
-	cmd.Flags().Float64Var(&opts.StdDev, "std-dev", 2.0, "Standard deviations")
-	cmd.Flags().StringVar(&opts.Interval, "interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
-	cmd.Flags().IntVar(&opts.Points, "points", 1, "Number of output points (0 = all)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -544,6 +591,10 @@ func cobraTAStochCommand(c *client.Ref, w io.Writer) *cobra.Command {
 schwab-agent ta stoch AAPL --k-period 14 --smooth-k 3 --d-period 3 --interval daily --points 10`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			symbol := args[0]
 
 			// Stochastic chains three windowed ops (raw %K, smoothed %K, %D);
@@ -600,11 +651,9 @@ schwab-agent ta stoch AAPL --k-period 14 --smooth-k 3 --d-period 3 --interval da
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.KPeriod, "k-period", 14, "Fast %K lookback period")
-	cmd.Flags().IntVar(&opts.SmoothK, "smooth-k", 3, "Slow %K smoothing period")
-	cmd.Flags().IntVar(&opts.DPeriod, "d-period", 3, "Slow %D period")
-	cmd.Flags().StringVar(&opts.Interval, "interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
-	cmd.Flags().IntVar(&opts.Points, "points", 1, "Number of output points (0 = all)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -618,6 +667,10 @@ func cobraTAADXCommand(c *client.Ref, w io.Writer) *cobra.Command {
 schwab-agent ta adx AAPL --period 14 --interval daily --points 10`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			symbol := args[0]
 
 			// ADX double-smooths (DI pass + ADX pass); 4x period ensures both converge.
@@ -672,9 +725,9 @@ schwab-agent ta adx AAPL --period 14 --interval daily --points 10`,
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.Period, "period", 14, "Indicator period")
-	cmd.Flags().StringVar(&opts.Interval, "interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
-	cmd.Flags().IntVar(&opts.Points, "points", 1, "Number of output points (0 = all)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -689,6 +742,10 @@ schwab-agent ta vwap AAPL --interval 5min --points 10`,
 		Args: cobra.ExactArgs(1),
 		// VWAP is cumulative - no --period flag. Only --interval and --points.
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			symbol := args[0]
 
 			// Use 20 as minimum candle count - VWAP works with any count >= 1
@@ -725,8 +782,9 @@ schwab-agent ta vwap AAPL --interval 5min --points 10`,
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Interval, "interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
-	cmd.Flags().IntVar(&opts.Points, "points", 1, "Number of output points (0 = all)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -740,6 +798,10 @@ func cobraTAHVCommand(c *client.Ref, w io.Writer) *cobra.Command {
 schwab-agent ta hv AAPL --period 20 --interval daily`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			symbol := args[0]
 
 			// Need period+1 closes for N returns, plus extra for rolling window warmup.
@@ -780,8 +842,9 @@ schwab-agent ta hv AAPL --period 20 --interval daily`,
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.Period, "period", 20, "Indicator period")
-	cmd.Flags().StringVar(&opts.Interval, "interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
@@ -795,6 +858,10 @@ func cobraTAExpectedMoveCommand(c *client.Ref, w io.Writer) *cobra.Command {
 schwab-agent ta expected-move AAPL --dte 45`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			symbol := args[0]
 
 			// Expected Move needs the underlying quote and near-the-money contracts in one response.
@@ -920,7 +987,9 @@ schwab-agent ta expected-move AAPL --dte 45`,
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.DTE, "dte", 30, "Target days to expiration")
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
 	return cmd
 }
