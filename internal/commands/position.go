@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/spf13/cobra"
 	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -268,4 +269,108 @@ func computePositionFields(e *positionEntry) {
 		pct := *e.UnrealizedPnL / *e.TotalCostBasis * 100
 		e.UnrealizedPnLPct = &pct
 	}
+}
+
+// NewPositionCmd returns the Cobra command for position operations.
+func NewPositionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "position",
+		Short:   "View positions across accounts",
+		GroupID: "account-mgmt",
+		RunE:    cobraRequireSubcommand,
+	}
+
+	cmd.AddCommand(newPositionListCmd(c, configPath, w))
+
+	return cmd
+}
+
+// newPositionListCmd returns the Cobra subcommand for listing positions.
+// Default: single account (resolved via --account flag or config default).
+// With --all-accounts: flattens positions from all linked accounts into a
+// single list with account identifiers on each entry.
+func newPositionListCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List positions for one or all accounts",
+		Long: `List positions for one or all accounts.
+
+Default: single account (resolved via --account flag or config default).
+With --all-accounts: flattens positions from all linked accounts into a
+single list with account identifiers on each entry.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			allAccounts := flagBool(cmd, "all-accounts")
+			account := flagString(cmd, "account")
+
+			if allAccounts && account != "" {
+				return apperr.NewValidationError("--all-accounts and --account are mutually exclusive", nil)
+			}
+
+			if allAccounts {
+				return listAllAccountPositions(cmd.Context(), c, w)
+			}
+
+			return cobraListSingleAccountPositions(cmd.Context(), c, configPath, account, w)
+		},
+	}
+
+	cmd.Flags().Bool("all-accounts", false, "Show positions across all linked accounts")
+	cmd.Flags().String("account", "", "Account hash (overrides config default)")
+
+	return cmd
+}
+
+// cobraListSingleAccountPositions fetches positions for a single resolved
+// account. Cobra-specific variant that accepts the account flag value directly
+// instead of extracting it from a urfave/cli command.
+func cobraListSingleAccountPositions(
+	ctx context.Context,
+	c *client.Ref,
+	configPath, accountFlag string,
+	w io.Writer,
+) error {
+	hash, err := resolveAccount(accountFlag, configPath, nil)
+	if err != nil {
+		return err
+	}
+
+	account, err := c.Account(ctx, hash, "positions")
+	if err != nil {
+		return err
+	}
+
+	// Enrich with nickname from user preferences (best-effort).
+	prefs, prefsErr := c.UserPreference(ctx)
+	if prefsErr == nil {
+		enrichAccountWithPreferences(account, prefs)
+	}
+
+	acctNum := ""
+	acctNick := ""
+
+	if account.SecuritiesAccount != nil && account.SecuritiesAccount.AccountNumber != nil {
+		acctNum = *account.SecuritiesAccount.AccountNumber
+	}
+
+	if account.NickName != nil {
+		acctNick = *account.NickName
+	}
+
+	var entries []positionEntry
+
+	if account.SecuritiesAccount != nil {
+		for i := range account.SecuritiesAccount.Positions {
+			entries = append(entries, newPositionEntry(acctNum, hash, acctNick, &account.SecuritiesAccount.Positions[i]))
+		}
+	}
+
+	if entries == nil {
+		entries = []positionEntry{}
+	}
+
+	meta := output.NewMetadata()
+	meta.Account = hash
+	meta.Returned = len(entries)
+
+	return output.WriteSuccess(w, positionListData{Positions: entries}, meta)
 }

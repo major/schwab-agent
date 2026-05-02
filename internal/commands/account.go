@@ -7,11 +7,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/spf13/cobra"
 	"github.com/urfave/cli/v3"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/auth"
 	"github.com/major/schwab-agent/internal/client"
-	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -225,6 +226,242 @@ func enrichAccountsWithPreferences(accounts []models.Account, prefs *models.User
 	}
 }
 
+// NewAccountCmd returns the Cobra parent command for account operations.
+// Subcommands: list, get, numbers, set-default, transaction.
+// The --account persistent flag overrides the default account hash for all subcommands.
+func NewAccountCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "account",
+		Short:   "Manage Schwab trading accounts",
+		GroupID: "account-mgmt",
+		RunE:    cobraRequireSubcommand,
+	}
+
+	cmd.PersistentFlags().String("account", "", "Account hash to use (overrides config default)")
+
+	cmd.AddCommand(
+		newAccountListCmd(c, w),
+		newAccountGetCmd(c, configPath, w),
+		newAccountNumbersCmd(c, w),
+		newAccountSetDefaultCmd(configPath, w),
+		newAccountTransactionCmd(c, configPath, w),
+	)
+
+	return cmd
+}
+
+// newAccountListCmd returns the Cobra subcommand for listing all accounts.
+func newAccountListCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all accounts with nicknames and settings",
+		Example: "schwab-agent account list\n" +
+			"schwab-agent account list --positions",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			var fields []string
+			if flagBool(cmd, "positions") {
+				fields = append(fields, "positions")
+			}
+
+			accounts, err := c.Accounts(cmd.Context(), fields...)
+			if err != nil {
+				return err
+			}
+
+			// Enrich accounts with nicknames from user preferences.
+			// Best-effort: if preferences fail, return accounts without nicknames.
+			prefs, prefsErr := c.UserPreference(cmd.Context())
+			if prefsErr == nil {
+				enrichAccountsWithPreferences(accounts, prefs)
+			}
+
+			return output.WriteSuccess(w, accountListData{Accounts: accounts}, output.NewMetadata())
+		},
+	}
+
+	cmd.Flags().Bool("positions", false, "Include current positions for each account")
+
+	return cmd
+}
+
+// newAccountGetCmd returns the Cobra subcommand for getting a specific account.
+func newAccountGetCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get [hash]",
+		Short: "Get account details by hash value",
+		Example: "schwab-agent account get\n" +
+			"schwab-agent account get --positions",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			hash, err := resolveAccount(flagString(cmd, "account"), configPath, args)
+			if err != nil {
+				return err
+			}
+
+			var fields []string
+			if flagBool(cmd, "positions") {
+				fields = append(fields, "positions")
+			}
+
+			account, err := c.Account(cmd.Context(), hash, fields...)
+			if err != nil {
+				return err
+			}
+
+			// Enrich with nickname from user preferences (best-effort).
+			prefs, prefsErr := c.UserPreference(cmd.Context())
+			if prefsErr == nil {
+				enrichAccountWithPreferences(account, prefs)
+			}
+
+			meta := output.NewMetadata()
+			meta.Account = hash
+
+			return output.WriteSuccess(w, account, meta)
+		},
+	}
+
+	cmd.Flags().Bool("positions", false, "Include current positions in the account response")
+
+	return cmd
+}
+
+// newAccountNumbersCmd returns the Cobra subcommand for listing account numbers and hash values.
+func newAccountNumbersCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:     "numbers",
+		Short:   "List account numbers and hash values",
+		Example: "schwab-agent account numbers",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			numbers, err := c.AccountNumbers(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			return output.WriteSuccess(w, accountNumbersData{Accounts: numbers}, output.NewMetadata())
+		},
+	}
+}
+
+// newAccountSetDefaultCmd returns the Cobra subcommand for setting the default account hash.
+// This command has no safety guard (no requireMutableEnabled) - matches existing behavior.
+func newAccountSetDefaultCmd(configPath string, w io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:     "set-default <hash>",
+		Short:   "Set the default account hash",
+		Example: "schwab-agent account set-default ABCDEF1234567890",
+		RunE: func(_ *cobra.Command, args []string) error {
+			hash := ""
+			if len(args) > 0 {
+				hash = strings.TrimSpace(args[0])
+			}
+
+			if err := requireArg(hash, "account hash"); err != nil {
+				return err
+			}
+
+			if err := auth.SetDefaultAccount(configPath, hash); err != nil {
+				return err
+			}
+
+			return output.WriteSuccess(w, authDefaultAccountData{
+				DefaultAccount: hash,
+			}, output.NewMetadata())
+		},
+	}
+}
+
+// newAccountTransactionCmd returns the Cobra subcommand for transaction queries.
+// Transactions are account-scoped, so they live under the account parent command
+// and inherit the --account persistent flag.
+func newAccountTransactionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "transaction",
+		Short: "List and look up account transactions",
+		RunE:  cobraRequireSubcommand,
+	}
+
+	cmd.AddCommand(
+		newAccountTransactionListCmd(c, configPath, w),
+		newAccountTransactionGetCmd(c, configPath, w),
+	)
+
+	return cmd
+}
+
+// newAccountTransactionListCmd returns the Cobra subcommand for listing transactions.
+func newAccountTransactionListCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List transactions for an account",
+		Example: "schwab-agent account transaction list\n" +
+			"schwab-agent account transaction list --types TRADE --symbol AAPL\n" +
+			"schwab-agent account transaction list --from 2025-01-01T00:00:00Z --to 2025-01-31T23:59:59Z",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			account, err := resolveAccount(flagString(cmd, "account"), configPath, nil)
+			if err != nil {
+				return err
+			}
+
+			params := client.TransactionParams{
+				Types:     flagString(cmd, "types"),
+				StartDate: flagString(cmd, "from"),
+				EndDate:   flagString(cmd, "to"),
+				Symbol:    flagString(cmd, "symbol"),
+			}
+
+			result, err := c.Transactions(cmd.Context(), account, params)
+			if err != nil {
+				return err
+			}
+
+			return output.WriteSuccess(w, transactionListData{Transactions: result}, output.NewMetadata())
+		},
+	}
+
+	cmd.Flags().String("types", "", "Transaction type filter (TRADE, DIVIDEND, etc.)")
+	cmd.Flags().String("from", "", "Start date (YYYY-MM-DDTHH:MM:SSZ)")
+	cmd.Flags().String("to", "", "End date (YYYY-MM-DDTHH:MM:SSZ)")
+	cmd.Flags().String("symbol", "", "Filter by symbol")
+
+	return cmd
+}
+
+// newAccountTransactionGetCmd returns the Cobra subcommand for getting a specific transaction.
+func newAccountTransactionGetCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:     "get <transaction-id>",
+		Short:   "Get a specific transaction by ID",
+		Example: "schwab-agent account transaction get 98765432101",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			txnIDStr := ""
+			if len(args) > 0 {
+				txnIDStr = args[0]
+			}
+
+			if err := requireArg(txnIDStr, "transaction ID"); err != nil {
+				return err
+			}
+
+			txnID, err := strconv.ParseInt(txnIDStr, 10, 64)
+			if err != nil {
+				return apperr.NewValidationError("transaction ID must be a number", nil)
+			}
+
+			account, err := resolveAccount(flagString(cmd, "account"), configPath, nil)
+			if err != nil {
+				return err
+			}
+
+			result, err := c.Transaction(cmd.Context(), account, txnID)
+			if err != nil {
+				return err
+			}
+
+			return output.WriteSuccess(w, transactionGetData{Transaction: result}, output.NewMetadata())
+		},
+	}
+}
+
 // accountTransactionCommand returns the CLI subcommand for transaction queries.
 // Transactions are account-scoped, so they live under the account parent command
 // and inherit the --account flag.
@@ -298,5 +535,3 @@ schwab-agent account transaction list --from 2025-01-01T00:00:00Z --to 2025-01-3
 		},
 	}
 }
-
-

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 
+	"github.com/spf13/cobra"
 	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/models"
@@ -48,6 +49,49 @@ func makeBuildOrderCommand[P any](
 		},
 	}
 }
+
+// makeCobraBuildOrderCommand creates a Cobra build subcommand that parses
+// flags, validates params, and writes raw order request JSON without API calls.
+func makeCobraBuildOrderCommand[P any](
+	w io.Writer,
+	name, usage string,
+	flagSetup func(*cobra.Command),
+	parse func(*cobra.Command, []string) (P, error),
+	validate func(*P) error,
+	build func(*P) (*models.OrderRequest, error),
+) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   name,
+		Short: usage,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			params, err := parse(cmd, args)
+			if err != nil {
+				return err
+			}
+
+			if err := validate(&params); err != nil {
+				return err
+			}
+
+			order, err := build(&params)
+			if err != nil {
+				return err
+			}
+
+			return writeOrderRequestJSON(w, order)
+		},
+	}
+
+	if flagSetup != nil {
+		flagSetup(cmd)
+	}
+
+	return cmd
+}
+
+// Compile-time guard for the Cobra generic factory while the order build tree
+// remains bridged through the legacy command during the migration wave.
+var _ = makeCobraBuildOrderCommand[orderbuilder.EquityParams]
 
 // orderBuildCommand returns the parent build command for offline order construction.
 func orderBuildCommand(w io.Writer) *cli.Command {

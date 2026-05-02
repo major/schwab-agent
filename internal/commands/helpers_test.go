@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
@@ -96,9 +96,7 @@ func TestCobraRequireSubcommand(t *testing.T) {
 	parent := &cobra.Command{
 		Use:   "parent",
 		Short: "parent command",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cobraRequireSubcommand(cmd, args)
-		},
+		RunE:  cobraRequireSubcommand,
 	}
 	parent.AddCommand(&cobra.Command{
 		Use:   "alpha",

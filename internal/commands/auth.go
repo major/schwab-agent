@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/auth"
@@ -366,4 +367,220 @@ func configDefaultAccount(cfg *auth.Config) string {
 	}
 
 	return strings.TrimSpace(cfg.DefaultAccount)
+}
+
+// AuthDeps holds injectable dependencies for Cobra auth commands. Production
+// code passes AuthDeps{} and relies on completeAuthDeps to fill defaults;
+// tests override specific fields.
+type AuthDeps struct {
+	ConfigPath         func() string
+	OAuthTokenEndpoint func() string
+	RefreshAccessToken func(*auth.Config, *auth.TokenFile, string) (*auth.TokenFile, error)
+	RunLogin           func(*auth.Config, string, string, bool, io.Writer) error
+	NewAccountClient   func(string, *auth.Config) accountNumbersClient
+}
+
+// NewAuthCmd returns the Cobra auth parent command with login, status, and
+// refresh subcommands. Auth commands bypass PersistentPreRunE (via skipAuth
+// annotation) and load config from disk in each subcommand's RunE.
+func NewAuthCmd(configPath, tokenPath string, w io.Writer, deps AuthDeps) *cobra.Command {
+	deps = completeAuthDeps(deps, configPath)
+
+	cmd := &cobra.Command{
+		Use:         "auth",
+		Short:       "Authentication commands",
+		Annotations: map[string]string{"skipAuth": "true"},
+		GroupID:     "account-mgmt",
+		RunE:        cobraRequireSubcommand,
+	}
+
+	cmd.AddCommand(newAuthLoginCmd(tokenPath, w, deps))
+	cmd.AddCommand(newAuthStatusCmd(tokenPath, w, deps))
+	cmd.AddCommand(newAuthRefreshCmd(tokenPath, w, deps))
+
+	return cmd
+}
+
+// newAuthLoginCmd returns the Cobra login subcommand.
+func newAuthLoginCmd(tokenPath string, w io.Writer, deps AuthDeps) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "login",
+		Short: "Run the OAuth login flow",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			defaultConfigPath := deps.ConfigPath()
+			resolvedConfigPath := cobraResolveConfigPath(cmd, defaultConfigPath)
+			resolvedTokenPath := cobraResolveTokenPath(cmd, tokenPath)
+
+			// Load config from disk since PersistentPreRunE is skipped.
+			loginConfig, err := requireAuthConfig(nil, resolvedConfigPath)
+			if err != nil {
+				return err
+			}
+
+			var loginOutput strings.Builder
+			openBrowser := !flagBool(cmd, "no-browser")
+
+			if err := deps.RunLogin(loginConfig, resolvedTokenPath, deps.OAuthTokenEndpoint(), openBrowser, &loginOutput); err != nil {
+				return err
+			}
+
+			tokenFile, err := auth.LoadToken(resolvedTokenPath)
+			if err != nil {
+				return err
+			}
+
+			defaultAccount := configDefaultAccount(loginConfig)
+			autoSetDefault := false
+
+			accounts, err := deps.NewAccountClient(tokenFile.Token.AccessToken, loginConfig).AccountNumbers(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			if len(accounts) == 1 {
+				defaultAccount = accounts[0].HashValue
+
+				if err := auth.SetDefaultAccount(resolvedConfigPath, defaultAccount); err != nil {
+					return err
+				}
+
+				autoSetDefault = true
+			}
+
+			data := authLoginData{
+				Valid:            !auth.IsAccessTokenExpired(tokenFile),
+				ExpiresAt:        unixSecondsToRFC3339(tokenFile.Token.ExpiresAt),
+				RefreshExpiresAt: refreshExpiryRFC3339(tokenFile),
+				DefaultAccount:   defaultAccount,
+				AuthorizationURL: strings.TrimSpace(loginOutput.String()),
+				AutoSetDefault:   autoSetDefault,
+			}
+
+			return output.WriteSuccess(w, data, output.NewMetadata())
+		},
+	}
+
+	cmd.Flags().Bool("no-browser", false, "Print the authorization URL in the JSON response instead of opening a browser")
+
+	return cmd
+}
+
+// newAuthStatusCmd returns the Cobra status subcommand.
+func newAuthStatusCmd(tokenPath string, w io.Writer, deps AuthDeps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Show token and config status",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			defaultConfigPath := deps.ConfigPath()
+			resolvedConfigPath := cobraResolveConfigPath(cmd, defaultConfigPath)
+			resolvedTokenPath := cobraResolveTokenPath(cmd, tokenPath)
+
+			tokenFile, err := auth.LoadToken(resolvedTokenPath)
+			if err != nil {
+				return err
+			}
+
+			// Load config best-effort since PersistentPreRunE is skipped.
+			statusConfig := optionalAuthConfig(nil, resolvedConfigPath)
+			data := authStatusData{
+				Valid:            !auth.IsAccessTokenExpired(tokenFile),
+				ExpiresAt:        unixSecondsToRFC3339(tokenFile.Token.ExpiresAt),
+				RefreshExpiresAt: refreshExpiryRFC3339(tokenFile),
+				DefaultAccount:   configDefaultAccount(statusConfig),
+				ClientID:         redactClientID(statusConfig.ClientID),
+			}
+
+			return output.WriteSuccess(w, data, output.NewMetadata())
+		},
+	}
+}
+
+// newAuthRefreshCmd returns the Cobra refresh subcommand.
+func newAuthRefreshCmd(tokenPath string, w io.Writer, deps AuthDeps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "refresh",
+		Short: "Refresh the current access token",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			defaultConfigPath := deps.ConfigPath()
+			resolvedConfigPath := cobraResolveConfigPath(cmd, defaultConfigPath)
+			resolvedTokenPath := cobraResolveTokenPath(cmd, tokenPath)
+
+			// Load config from disk since PersistentPreRunE is skipped.
+			refreshConfig, err := requireAuthConfig(nil, resolvedConfigPath)
+			if err != nil {
+				return err
+			}
+
+			tokenFile, err := auth.LoadToken(resolvedTokenPath)
+			if err != nil {
+				return err
+			}
+
+			refreshedToken, err := deps.RefreshAccessToken(refreshConfig, tokenFile, deps.OAuthTokenEndpoint())
+			if err != nil {
+				return err
+			}
+
+			if err := auth.SaveToken(resolvedTokenPath, refreshedToken); err != nil {
+				return err
+			}
+
+			return output.WriteSuccess(w, authRefreshData{
+				ExpiresAt: unixSecondsToRFC3339(refreshedToken.Token.ExpiresAt),
+			}, output.NewMetadata())
+		},
+	}
+}
+
+// completeAuthDeps fills nil dependency fields with production defaults.
+// The configPath parameter becomes the default ConfigPath when not overridden.
+func completeAuthDeps(deps AuthDeps, configPath string) AuthDeps {
+	if deps.ConfigPath == nil {
+		deps.ConfigPath = func() string { return configPath }
+	}
+
+	if deps.OAuthTokenEndpoint == nil {
+		deps.OAuthTokenEndpoint = func() string { return "" }
+	}
+
+	if deps.RefreshAccessToken == nil {
+		deps.RefreshAccessToken = auth.RefreshAccessToken
+	}
+
+	if deps.RunLogin == nil {
+		deps.RunLogin = auth.RunLogin
+	}
+
+	if deps.NewAccountClient == nil {
+		defaults := defaultAuthDeps()
+		deps.NewAccountClient = defaults.newAccountClient
+	}
+
+	return deps
+}
+
+// cobraResolveConfigPath resolves the config path for Cobra auth commands.
+// It checks the --config persistent flag inherited from root and falls back
+// to the default when the flag is absent (standalone test mode) or unchanged.
+func cobraResolveConfigPath(cmd *cobra.Command, fallback string) string {
+	if f := cmd.Flag("config"); f != nil && f.Changed {
+		if path := strings.TrimSpace(f.Value.String()); path != "" {
+			return path
+		}
+	}
+
+	return fallback
+}
+
+// cobraResolveTokenPath resolves the token path for Cobra auth commands.
+// It checks the --token persistent flag inherited from root and falls back
+// to the default when the flag is absent (standalone test mode) or unchanged.
+func cobraResolveTokenPath(cmd *cobra.Command, fallback string) string {
+	if f := cmd.Flag("token"); f != nil && f.Changed {
+		if path := strings.TrimSpace(f.Value.String()); path != "" {
+			return path
+		}
+	}
+
+	return fallback
 }

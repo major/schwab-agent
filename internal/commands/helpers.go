@@ -163,7 +163,7 @@ func cobraRequireSubcommand(cmd *cobra.Command, args []string) error {
 // cobraSuggestSubcommands handles usage errors that happen before RunE runs. This
 // is most useful for parent commands whose subcommands own distinct flags: an
 // unknown flag on the parent usually means the user skipped the subcommand.
-func cobraSuggestSubcommands(cmd *cobra.Command, args []string, err error) error {
+func cobraSuggestSubcommands(cmd *cobra.Command, _ []string, err error) error {
 	if !strings.Contains(err.Error(), "unknown flag") && !strings.Contains(err.Error(), "flag provided but not defined") {
 		return err
 	}
@@ -183,6 +183,10 @@ func cobraSuggestSubcommands(cmd *cobra.Command, args []string, err error) error
 		err,
 	)
 }
+
+// Keep the Cobra usage-error helper live while individual command migrations
+// are still being wired into native Cobra trees.
+var _ = cobraSuggestSubcommands
 
 // cobraVisibleSubcommandNames returns only invokable subcommands for user-facing
 // errors, omitting hidden commands.

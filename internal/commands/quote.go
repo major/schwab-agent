@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/spf13/cobra"
 	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -37,6 +38,78 @@ func QuoteCommand(c *client.Ref, w io.Writer) *cli.Command {
 			quoteGetCommand(c, w),
 		},
 	}
+}
+
+// NewQuoteCmd returns the Cobra command for stock quote operations.
+// The parent command requires a subcommand (no DefaultCommand behavior).
+func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "quote",
+		Short:   "Stock quote operations",
+		Long:    "Get quotes for one or more symbols",
+		RunE:    cobraRequireSubcommand,
+		GroupID: "market-data",
+	}
+
+	cmd.AddCommand(newQuoteGetCmd(c, w))
+
+	return cmd
+}
+
+// newQuoteGetCmd returns the Cobra subcommand for retrieving quotes.
+func newQuoteGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get",
+		Short: "Get quotes for one or more symbols",
+		Long:  "Get quotes for one or more symbols with optional field filtering and indicative quotes",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			params, err := buildCobraQuoteParams(cmd)
+			if err != nil {
+				return err
+			}
+
+			if len(args) == 1 {
+				return quoteSingle(cmd.Context(), c, w, args[0], params)
+			}
+			return quoteMulti(cmd.Context(), c, w, args, params)
+		},
+	}
+
+	cmd.Flags().StringSlice("fields", nil, "Quote fields to return (repeatable): quote, fundamental, extended, reference, regular")
+	cmd.Flags().Bool("indicative", false, "Request indicative (non-tradeable) quotes")
+
+	return cmd
+}
+
+// buildCobraQuoteParams constructs a QuoteParams from Cobra flags, validating
+// field values against the allowed set (case-insensitive).
+func buildCobraQuoteParams(cmd *cobra.Command) (client.QuoteParams, error) {
+	raw := flagStringSlice(cmd, "fields")
+	fields := make([]string, 0, len(raw))
+	for _, f := range raw {
+		// Support both repeatable (--fields QUOTE --fields FUNDAMENTAL)
+		// and comma-separated (--fields QUOTE,FUNDAMENTAL) forms.
+		parts := strings.SplitSeq(f, ",")
+		for part := range parts {
+			trimmed := strings.TrimSpace(part)
+			if trimmed == "" {
+				continue
+			}
+			lower := strings.ToLower(trimmed)
+			if !validQuoteFields[lower] {
+				return client.QuoteParams{}, apperr.NewValidationError(
+					fmt.Sprintf("invalid field %q: must be one of %s", trimmed, sortedQuoteFieldNames()),
+					nil,
+				)
+			}
+			fields = append(fields, lower)
+		}
+	}
+	return client.QuoteParams{
+		Fields:     fields,
+		Indicative: flagBool(cmd, "indicative"),
+	}, nil
 }
 
 // quoteGetCommand returns the subcommand for retrieving quotes.

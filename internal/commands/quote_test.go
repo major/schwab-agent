@@ -13,11 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestQuoteGetSymbols(t *testing.T) {
+func TestNewQuoteCmd(t *testing.T) {
 	// Table-driven test covering both explicit ("quote get") and shorthand
 	// ("quote") invocation paths for single and multi-symbol lookups.
-	// Keeping them in one table ensures the two routing paths stay in sync.
-	// Single-symbol responses are now normalized to match multi-symbol shape
+	// Single-symbol responses are normalized to match multi-symbol shape
 	// (keyed by symbol), so all cases use the same expectKeys assertion.
 	tests := []struct {
 		name       string
@@ -30,28 +29,14 @@ func TestQuoteGetSymbols(t *testing.T) {
 			name:       "explicit single symbol",
 			serverPath: "/marketdata/v1/AAPL/quotes",
 			serverBody: `{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`,
-			args:       []string{"quote", "get", "AAPL"},
-			expectKeys: []string{"AAPL"},
-		},
-		{
-			name:       "shorthand single symbol",
-			serverPath: "/marketdata/v1/AAPL/quotes",
-			serverBody: `{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`,
-			args:       []string{"quote", "AAPL"},
+			args:       []string{"get", "AAPL"},
 			expectKeys: []string{"AAPL"},
 		},
 		{
 			name:       "explicit multiple symbols",
 			serverPath: "/marketdata/v1/quotes",
 			serverBody: `{"AAPL":{"symbol":"AAPL","lastPrice":150.0},"MSFT":{"symbol":"MSFT","lastPrice":400.0}}`,
-			args:       []string{"quote", "get", "AAPL", "MSFT"},
-			expectKeys: []string{"AAPL", "MSFT"},
-		},
-		{
-			name:       "shorthand multiple symbols",
-			serverPath: "/marketdata/v1/quotes",
-			serverBody: `{"AAPL":{"symbol":"AAPL","lastPrice":150.0},"MSFT":{"symbol":"MSFT","lastPrice":400.0}}`,
-			args:       []string{"quote", "AAPL", "MSFT"},
+			args:       []string{"get", "AAPL", "MSFT"},
 			expectKeys: []string{"AAPL", "MSFT"},
 		},
 	}
@@ -69,8 +54,9 @@ func TestQuoteGetSymbols(t *testing.T) {
 			defer server.Close()
 
 			var buf bytes.Buffer
-			cmd := QuoteCommand(testClient(t, server), &buf)
-			require.NoError(t, runTestCommand(t, cmd, tt.args...))
+			cmd := NewQuoteCmd(testClient(t, server), &buf)
+			_, err := runCobraCommand(t, cmd, tt.args...)
+			require.NoError(t, err)
 
 			var envelope output.Envelope
 			require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
@@ -86,7 +72,7 @@ func TestQuoteGetSymbols(t *testing.T) {
 	}
 }
 
-func TestQuoteGetPartialSuccess(t *testing.T) {
+func TestNewQuoteGetPartialSuccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/marketdata/v1/quotes" {
@@ -99,8 +85,9 @@ func TestQuoteGetPartialSuccess(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := QuoteCommand(testClient(t, server), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "quote", "get", "AAPL", "INVALID"))
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runCobraCommand(t, cmd, "get", "AAPL", "INVALID")
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
@@ -117,7 +104,7 @@ func TestQuoteGetPartialSuccess(t *testing.T) {
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
-func TestQuoteGetSingleNotFound(t *testing.T) {
+func TestNewQuoteGetSingleNotFound(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
@@ -126,8 +113,8 @@ func TestQuoteGetSingleNotFound(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := QuoteCommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "quote", "get", "INVALID")
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runCobraCommand(t, cmd, "get", "INVALID")
 	require.Error(t, err)
 
 	var symErr *apperr.SymbolNotFoundError
@@ -135,21 +122,37 @@ func TestQuoteGetSingleNotFound(t *testing.T) {
 	assert.Empty(t, buf.String())
 }
 
-func TestQuoteGetNoArgs(t *testing.T) {
+func TestNewQuoteGetNoArgs(t *testing.T) {
 	server := jsonServer(`{}`)
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := QuoteCommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "quote", "get")
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runCobraCommand(t, cmd, "get")
+	require.Error(t, err)
+
+	// Cobra's MinimumNArgs(1) produces a usage error, not a ValidationError
+	// The error message should indicate at least 1 argument is required
+	assert.Contains(t, err.Error(), "requires at least 1 arg")
+	assert.Empty(t, buf.String())
+}
+
+func TestNewQuoteNoSubcommand(t *testing.T) {
+	server := jsonServer(`{}`)
+	defer server.Close()
+
+	var buf bytes.Buffer
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runCobraCommand(t, cmd)
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
-	assert.Empty(t, buf.String())
+	assert.Contains(t, err.Error(), "requires a subcommand")
+	assert.Contains(t, err.Error(), "get")
 }
 
-func TestQuoteGetWithFields(t *testing.T) {
+func TestNewQuoteGetWithFields(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -166,12 +169,13 @@ func TestQuoteGetWithFields(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := QuoteCommand(testClient(t, server), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "quote", "get",
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runCobraCommand(t, cmd, "get",
 		"--fields", "quote",
 		"--fields", "fundamental",
 		"AAPL",
-	))
+	)
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
@@ -183,7 +187,7 @@ func TestQuoteGetWithFields(t *testing.T) {
 	assert.Equal(t, "AAPL", aapl["symbol"])
 }
 
-func TestQuoteGetMultiWithFields(t *testing.T) {
+func TestNewQuoteGetMultiWithFields(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -199,11 +203,12 @@ func TestQuoteGetMultiWithFields(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := QuoteCommand(testClient(t, server), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "quote", "get",
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runCobraCommand(t, cmd, "get",
 		"--fields", "extended",
 		"AAPL", "MSFT",
-	))
+	)
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
@@ -213,7 +218,7 @@ func TestQuoteGetMultiWithFields(t *testing.T) {
 	assert.Contains(t, data, "MSFT")
 }
 
-func TestQuoteGetWithIndicative(t *testing.T) {
+func TestNewQuoteGetWithIndicative(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -230,24 +235,25 @@ func TestQuoteGetWithIndicative(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := QuoteCommand(testClient(t, server), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "quote", "get",
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runCobraCommand(t, cmd, "get",
 		"--indicative",
 		"AAPL",
-	))
+	)
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
 }
 
-func TestQuoteGetInvalidField(t *testing.T) {
+func TestNewQuoteGetInvalidField(t *testing.T) {
 	server := jsonServer(`{}`)
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := QuoteCommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "quote", "get",
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runCobraCommand(t, cmd, "get",
 		"--fields", "bogus",
 		"AAPL",
 	)
@@ -259,7 +265,7 @@ func TestQuoteGetInvalidField(t *testing.T) {
 	assert.Empty(t, buf.String())
 }
 
-func TestQuoteGetNoFlagsNoExtraParams(t *testing.T) {
+func TestNewQuoteGetNoFlagsNoExtraParams(t *testing.T) {
 	// When no --fields or --indicative flags are provided, no extra
 	// query parameters should appear in the request URL.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -278,15 +284,16 @@ func TestQuoteGetNoFlagsNoExtraParams(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := QuoteCommand(testClient(t, server), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "quote", "get", "AAPL"))
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runCobraCommand(t, cmd, "get", "AAPL")
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
 }
 
-func TestQuoteGetCommaSeparatedFields(t *testing.T) {
+func TestNewQuoteGetCommaSeparatedFields(t *testing.T) {
 	// --fields QUOTE,FUNDAMENTAL should be split and normalized to lowercase,
 	// producing the same result as --fields QUOTE --fields FUNDAMENTAL.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -304,11 +311,12 @@ func TestQuoteGetCommaSeparatedFields(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := QuoteCommand(testClient(t, server), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "quote", "get",
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runCobraCommand(t, cmd, "get",
 		"--fields", "QUOTE,FUNDAMENTAL",
 		"AAPL",
-	))
+	)
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
@@ -320,7 +328,7 @@ func TestQuoteGetCommaSeparatedFields(t *testing.T) {
 	assert.Equal(t, "AAPL", aapl["symbol"])
 }
 
-func TestQuoteGetFieldsCaseInsensitive(t *testing.T) {
+func TestNewQuoteGetFieldsCaseInsensitive(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -337,12 +345,13 @@ func TestQuoteGetFieldsCaseInsensitive(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := QuoteCommand(testClient(t, server), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "quote", "get",
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runCobraCommand(t, cmd, "get",
 		"--fields", "Quote",
 		"--fields", "REFERENCE",
 		"AAPL",
-	))
+	)
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))

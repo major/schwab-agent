@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -87,6 +88,44 @@ func OrderCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
 			orderRepeatCommand(c, configPath, w),
 		},
 	}
+}
+
+// NewOrderCmd returns the Cobra parent order command and all nested order workflows.
+//
+// The order command tree is intentionally migrated behind a thin compatibility
+// bridge first because it is the largest command surface in the CLI. Cobra owns
+// stdin via InOrStdin(), output via the injected writer, and command grouping;
+// the existing urfave implementation still owns the mature order parsing and
+// safety pipeline until the legacy tree is removed in the final migration wave.
+func NewOrderCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:                "order",
+		Short:              "List, build, preview, place, cancel, and replace orders",
+		GroupID:            "trading",
+		SilenceUsage:       true,
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var errOut strings.Builder
+			legacy := &cli.Command{
+				Name:      "schwab-agent",
+				Writer:    w,
+				ErrWriter: &errOut,
+				Reader:    cmd.InOrStdin(),
+				ExitErrHandler: func(_ context.Context, _ *cli.Command, _ error) {
+					// Cobra callers expect RunE to return errors without the legacy
+					// root command printing or exiting. The returned error is still
+					// propagated below for normal command handling.
+				},
+				Commands: []*cli.Command{
+					OrderCommand(c, configPath, w),
+				},
+			}
+
+			return legacy.Run(cmd.Context(), append([]string{"schwab-agent", "order"}, args...))
+		},
+	}
+
+	return cmd
 }
 
 // terminalOrderStatuses are order statuses that represent completed/final states.
@@ -356,6 +395,71 @@ func makePlaceOrderCommand[P any](
 		},
 	}
 }
+
+// makeCobraPlaceOrderCommand creates a Cobra place subcommand with the same
+// parse/validate/build/place pipeline as the legacy generic factory.
+func makeCobraPlaceOrderCommand[P any](
+	c *client.Ref,
+	configPath string,
+	w io.Writer,
+	name, usage string,
+	flagSetup func(*cobra.Command),
+	parse func(*cobra.Command, []string) (P, error),
+	validate func(*P) error,
+	build func(*P) (*models.OrderRequest, error),
+) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   name,
+		Short: usage,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := requireMutableEnabled(configPath); err != nil {
+				return err
+			}
+
+			if err := requireConfirm(flagBool(cmd, "confirm")); err != nil {
+				return err
+			}
+
+			account, err := resolveAccount(flagString(cmd, "account"), configPath, nil)
+			if err != nil {
+				return err
+			}
+
+			params, err := parse(cmd, args)
+			if err != nil {
+				return err
+			}
+
+			if err := validate(&params); err != nil {
+				return err
+			}
+
+			order, err := build(&params)
+			if err != nil {
+				return err
+			}
+
+			response, err := c.PlaceOrder(cmd.Context(), account, order)
+			if err != nil {
+				return err
+			}
+
+			return output.WriteSuccess(w, orderPlaceData{OrderID: response.OrderID}, output.NewMetadata())
+		},
+	}
+
+	if flagSetup != nil {
+		flagSetup(cmd)
+	}
+	cmd.Flags().Bool("confirm", false, "Confirm order placement")
+	cmd.Flags().String("account", "", "Account hash value")
+
+	return cmd
+}
+
+// Compile-time guard for the Cobra generic factory while the order tree keeps
+// the legacy bridge active during the multi-task migration.
+var _ = makeCobraPlaceOrderCommand[orderbuilder.EquityParams]
 
 // orderPreviewCommand previews an order from a JSON spec.
 func orderPreviewCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
@@ -936,7 +1040,7 @@ func parseSpecOrder(cmd *cli.Command, spec string) (*models.OrderRequest, error)
 // readSpecSource resolves inline, file, and stdin JSON inputs.
 // All three source types (stdin, @file, inline) share a single json.Valid check
 // after the raw bytes are resolved.
-func readSpecSource(cmd *cli.Command, spec string) ([]byte, error) {
+func readSpecSource(cmd any, spec string) ([]byte, error) {
 	trimmed := strings.TrimSpace(spec)
 	if trimmed == "" {
 		return nil, newValidationError("spec is required")
@@ -946,7 +1050,7 @@ func readSpecSource(cmd *cli.Command, spec string) ([]byte, error) {
 
 	switch {
 	case trimmed == "-":
-		reader := cmd.Root().Reader
+		reader := specInputReader(cmd)
 		if reader == nil {
 			reader = strings.NewReader("")
 		}
@@ -980,6 +1084,27 @@ func readSpecSource(cmd *cli.Command, spec string) ([]byte, error) {
 	}
 
 	return payload, nil
+}
+
+// specInputReader returns the command stdin reader for either CLI framework.
+// Cobra commands expose InOrStdin(); the legacy urfave command keeps stdin on
+// the root command's Reader field. Supporting both here keeps spec handling
+// identical while the command tree is in the temporary dual-framework state.
+func specInputReader(cmd any) io.Reader {
+	if cobraCmd, ok := cmd.(interface{ InOrStdin() io.Reader }); ok {
+		return cobraCmd.InOrStdin()
+	}
+
+	if cliCmd, ok := cmd.(*cli.Command); ok {
+		root := cliCmd.Root()
+		if root == nil {
+			return nil
+		}
+
+		return root.Reader
+	}
+
+	return nil
 }
 
 // requireMutableEnabled checks that mutable operations are explicitly enabled in config.
