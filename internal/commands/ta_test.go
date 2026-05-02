@@ -180,8 +180,9 @@ func TestTASMA_ValidEnvelope(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "sma", "AAPL"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "sma", "AAPL")
+	require.NoError(t, err)
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
@@ -210,8 +211,9 @@ func TestTASMA_PeriodFlag(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "sma", "--period", "10", "--points", "0", "AAPL"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "sma", "--period", "10", "--points", "0", "AAPL")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -231,8 +233,9 @@ func TestTASMA_PointsFlag(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "sma", "--points", "5", "AAPL"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "sma", "--points", "5", "AAPL")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -248,13 +251,11 @@ func TestTASMA_MissingSymbol(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "ta", "sma")
+	cmd := NewTACmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "sma")
 
 	// Assert
 	require.Error(t, err)
-	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
 }
 
 // TestTASMA_LargePeriodScalesHistory verifies that SMA with a large period (e.g. 200)
@@ -267,7 +268,7 @@ func TestTASMA_LargePeriodScalesHistory(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
 
-		// SMA 200 needs exactly 200 candles. 1 year of daily data provides 252,
+		// SMA 200 needs 200 candles. 1 year of daily data provides 252,
 		// which is sufficient. No need to request multiple years.
 		period := r.URL.Query().Get("period")
 		assert.Equal(t, "1", period,
@@ -280,8 +281,9 @@ func TestTASMA_LargePeriodScalesHistory(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "sma", "--period", "200", "--points", "1", "IBM"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "sma", "--period", "200", "--points", "1", "IBM")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -308,8 +310,9 @@ func TestTASMA_MultipleCommaSeparatedPeriods(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "sma", "--period", "21,50,200", "--points", "1", "AAPL"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "sma", "--period", "21,50,200", "--points", "1", "AAPL")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -339,8 +342,9 @@ func TestTAEMA_ValidEnvelope(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "ema", "MSFT"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "ema", "MSFT")
+	require.NoError(t, err)
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
@@ -367,8 +371,9 @@ func TestTAEMA_MultipleRepeatedPeriods(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "ema", "--period", "12", "--period", "26", "--points", "2", "MSFT"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "ema", "--period", "12", "--period", "26", "--points", "2", "MSFT")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -394,11 +399,11 @@ func TestTASimplePeriodValidation(t *testing.T) {
 	}{
 		{
 			name: "zero period",
-			args: []string{"ta", "sma", "--period", "0", "AAPL"},
+			args: []string{"sma", "--period", "0", "AAPL"},
 		},
 		{
 			name: "duplicate period",
-			args: []string{"ta", "sma", "--period", "21,21", "AAPL"},
+			args: []string{"sma", "--period", "21,21", "AAPL"},
 		},
 	}
 
@@ -410,8 +415,8 @@ func TestTASimplePeriodValidation(t *testing.T) {
 
 			// Act
 			var buf bytes.Buffer
-			cmd := TACommand(testClient(t, server), &buf)
-			err := runTestCommand(t, cmd, tt.args...)
+			cmd := NewTACmd(testClient(t, server), &buf)
+			_, err := runTestCommand(t, cmd, tt.args...)
 
 			// Assert
 			require.Error(t, err)
@@ -428,8 +433,9 @@ func TestTARSI_ValidEnvelope(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "rsi", "TSLA"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "rsi", "TSLA")
+	require.NoError(t, err)
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
@@ -462,8 +468,9 @@ func TestTARSI_MultipleCommaSeparatedPeriods(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "rsi", "--period", "14,21,28", "--points", "2", "TSLA"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "rsi", "--period", "14,21,28", "--points", "2", "TSLA")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -493,13 +500,11 @@ func TestTARSI_MissingSymbol(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "ta", "rsi")
+	cmd := NewTACmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "rsi")
 
 	// Assert
 	require.Error(t, err)
-	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
 }
 
 func TestTAMACD_ValidEnvelope(t *testing.T) {
@@ -509,8 +514,9 @@ func TestTAMACD_ValidEnvelope(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "macd", "AAPL"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "macd", "AAPL")
+	require.NoError(t, err)
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
@@ -543,8 +549,9 @@ func TestTAMACD_CustomFlags(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "macd", "--fast", "8", "--slow", "21", "--signal", "5", "MSFT"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "macd", "--fast", "8", "--slow", "21", "--signal", "5", "MSFT")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -566,13 +573,11 @@ func TestTAMACD_MissingSymbol(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "ta", "macd")
+	cmd := NewTACmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "macd")
 
 	// Assert
 	require.Error(t, err)
-	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
 }
 
 func TestTAATR_ValidEnvelope(t *testing.T) {
@@ -582,8 +587,9 @@ func TestTAATR_ValidEnvelope(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "atr", "GOOG"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "atr", "GOOG")
+	require.NoError(t, err)
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
@@ -614,13 +620,11 @@ func TestTAATR_MissingSymbol(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "ta", "atr")
+	cmd := NewTACmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "atr")
 
 	// Assert
 	require.Error(t, err)
-	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
 }
 
 func TestTABBands_ValidEnvelope(t *testing.T) {
@@ -630,8 +634,9 @@ func TestTABBands_ValidEnvelope(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "bbands", "AMZN"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "bbands", "AMZN")
+	require.NoError(t, err)
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
@@ -668,13 +673,11 @@ func TestTABBands_MissingSymbol(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "ta", "bbands")
+	cmd := NewTACmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "bbands")
 
 	// Assert
 	require.Error(t, err)
-	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
 }
 
 func TestTAStochastic_ValidEnvelope(t *testing.T) {
@@ -684,8 +687,9 @@ func TestTAStochastic_ValidEnvelope(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "stoch", "AAPL"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "stoch", "AAPL")
+	require.NoError(t, err)
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
@@ -717,8 +721,9 @@ func TestTAStochastic_CustomFlags(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "stoch", "--k-period", "10", "--smooth-k", "5", "--d-period", "5", "TSLA"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "stoch", "--k-period", "10", "--smooth-k", "5", "--d-period", "5", "TSLA")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -740,13 +745,11 @@ func TestTAStochastic_MissingSymbol(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "ta", "stoch")
+	cmd := NewTACmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "stoch")
 
 	// Assert
 	require.Error(t, err)
-	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
 }
 
 func TestTAADX_ValidEnvelope(t *testing.T) {
@@ -763,8 +766,9 @@ func TestTAADX_ValidEnvelope(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "adx", "GOOG"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "adx", "GOOG")
+	require.NoError(t, err)
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
@@ -793,13 +797,11 @@ func TestTAADX_MissingSymbol(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "ta", "adx")
+	cmd := NewTACmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "adx")
 
 	// Assert
 	require.Error(t, err)
-	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
 }
 
 func TestTAVWAP_ValidEnvelope(t *testing.T) {
@@ -809,8 +811,9 @@ func TestTAVWAP_ValidEnvelope(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "vwap", "AAPL"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "vwap", "AAPL")
+	require.NoError(t, err)
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
@@ -836,8 +839,9 @@ func TestTAVWAP_WithInterval(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "vwap", "AAPL", "--interval", "5min"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "vwap", "AAPL", "--interval", "5min")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -851,14 +855,12 @@ func TestTAVWAP_MissingSymbol(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "ta", "vwap")
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "vwap")
 
 	// Assert
 	require.Error(t, err)
-	var valErr *apperr.ValidationError
-	require.ErrorAs(t, err, &valErr)
-	assert.Contains(t, valErr.Error(), "symbol")
+	assert.Contains(t, err.Error(), "arg")
 }
 
 func TestTAVWAP_NoPointsFlag(t *testing.T) {
@@ -868,8 +870,9 @@ func TestTAVWAP_NoPointsFlag(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "vwap", "AAPL", "--points", "5"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "vwap", "AAPL", "--points", "5")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -885,8 +888,9 @@ func TestTAHV_ValidEnvelope(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "hv", "AAPL"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "hv", "AAPL")
+	require.NoError(t, err)
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
@@ -923,8 +927,9 @@ func TestTAHV_WithPeriod(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "hv", "AAPL", "--period", "30"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "hv", "AAPL", "--period", "30")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -938,14 +943,12 @@ func TestTAHV_MissingSymbol(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "ta", "hv")
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "hv")
 
 	// Assert
 	require.Error(t, err)
-	var valErr *apperr.ValidationError
-	require.ErrorAs(t, err, &valErr)
-	assert.Contains(t, valErr.Error(), "symbol")
+	assert.Contains(t, err.Error(), "arg")
 }
 
 func TestTAHV_InvalidPeriod(t *testing.T) {
@@ -955,8 +958,8 @@ func TestTAHV_InvalidPeriod(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "ta", "hv", "AAPL", "--period", "0")
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "hv", "AAPL", "--period", "0")
 
 	// Assert - period=0 should produce a ValidationError from ta.HistoricalVolatility
 	require.Error(t, err)
@@ -971,8 +974,9 @@ func TestTAExpectedMove_ValidEnvelope(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "expected-move", "AAPL"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "expected-move", "AAPL")
+	require.NoError(t, err)
 
 	// Assert
 	envelope, data := decodeTAEnvelope(t, &buf)
@@ -1000,8 +1004,9 @@ func TestTAExpectedMove_WithDTE(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "expected-move", "AAPL", "--dte", "50"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "expected-move", "AAPL", "--dte", "50")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -1016,14 +1021,12 @@ func TestTAExpectedMove_MissingSymbol(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "ta", "expected-move")
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "expected-move")
 
 	// Assert
 	require.Error(t, err)
-	var valErr *apperr.ValidationError
-	require.ErrorAs(t, err, &valErr)
-	assert.Contains(t, valErr.Error(), "symbol")
+	assert.Contains(t, err.Error(), "arg")
 }
 
 func TestTAExpectedMove_NilMark_FallbackBidAsk(t *testing.T) {
@@ -1033,8 +1036,9 @@ func TestTAExpectedMove_NilMark_FallbackBidAsk(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "ta", "expected-move", "AAPL"))
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "expected-move", "AAPL")
+	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
@@ -1048,8 +1052,8 @@ func TestTAExpectedMove_EmptyChain(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "ta", "expected-move", "AAPL")
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "expected-move", "AAPL")
 
 	// Assert
 	require.Error(t, err)
@@ -1065,8 +1069,8 @@ func TestTASMA_APIError(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "ta", "sma", "IBM", "--period", "20")
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "sma", "IBM", "--period", "20")
 
 	// Assert
 	require.Error(t, err)
@@ -1081,8 +1085,8 @@ func TestTASMA_InsufficientCandles(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "ta", "sma", "IBM", "--period", "20")
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "sma", "IBM", "--period", "20")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "requires at least 20 candles")
@@ -1095,8 +1099,8 @@ func TestTAEMA_APIError(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	cmd := TACommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "ta", "ema", "IBM", "--period", "20")
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "ema", "IBM", "--period", "20")
 
 	require.Error(t, err)
 

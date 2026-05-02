@@ -2,7 +2,6 @@ package commands
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -13,11 +12,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/auth"
-	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -54,9 +51,6 @@ func writeAccountTestConfig(t *testing.T, dir, defaultAccount string) string {
 	return configPath
 }
 
-// noopExitHandler prevents urfave/cli from calling os.Exit on returned errors.
-func noopExitHandler(_ context.Context, _ *cli.Command, _ error) {}
-
 // decodeAccountEnvelope unmarshals test output into an Envelope.
 func decodeAccountEnvelope(t *testing.T, data []byte) output.Envelope {
 	t.Helper()
@@ -67,7 +61,10 @@ func decodeAccountEnvelope(t *testing.T, data []byte) output.Envelope {
 	return env
 }
 
-func TestAccountList_Success(t *testing.T) {
+// --- NewAccountCmd (Cobra) tests ---
+
+func TestNewAccountCmd_List_Success(t *testing.T) {
+	// Arrange
 	accounts := []map[string]any{
 		{"securitiesAccount": map[string]any{"type": "MARGIN", "accountNumber": "12345"}},
 		{"securitiesAccount": map[string]any{"type": "CASH", "accountNumber": "67890"}},
@@ -84,13 +81,12 @@ func TestAccountList_Success(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
-
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(c, "", &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "list")
 
-	err := cmd.Run(context.Background(), []string{"account", "list"})
+	// Assert
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -115,7 +111,8 @@ func TestAccountList_Success(t *testing.T) {
 	assert.Equal(t, false, second["primaryAccount"])
 }
 
-func TestAccountList_WithPositionsFlag(t *testing.T) {
+func TestNewAccountCmd_List_WithPositionsFlag(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/trader/v1/accounts" {
 			// Verify the positions field is requested.
@@ -142,9 +139,13 @@ func TestAccountList_WithPositionsFlag(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(testClient(t, srv), "", &buf)
-	require.NoError(t, runTestCommand(t, cmd, "account", "list", "--positions"))
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "list", "--positions")
+
+	// Assert
+	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
 	dataMap, ok := env.Data.(map[string]any)
@@ -164,7 +165,8 @@ func TestAccountList_WithPositionsFlag(t *testing.T) {
 	assert.Len(t, positions, 1)
 }
 
-func TestAccountList_WithoutPositionsFlag_NoFieldsParam(t *testing.T) {
+func TestNewAccountCmd_List_WithoutPositionsFlag_NoFieldsParam(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/trader/v1/accounts" {
 			// No fields param when --positions is not passed.
@@ -180,13 +182,17 @@ func TestAccountList_WithoutPositionsFlag_NoFieldsParam(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(testClient(t, srv), "", &buf)
-	require.NoError(t, runTestCommand(t, cmd, "account", "list"))
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "list")
+
+	// Assert
+	require.NoError(t, err)
 }
 
-func TestAccountList_PreferencesFailure_StillReturnsAccounts(t *testing.T) {
-	// Preferences endpoint returns 500, but account list should still succeed
+func TestNewAccountCmd_List_PreferencesFailure_StillReturnsAccounts(t *testing.T) {
+	// Preferences endpoint returns 404, but account list should still succeed
 	// without nicknames.
 	accounts := []map[string]any{
 		{"securitiesAccount": map[string]any{"type": "MARGIN", "accountNumber": "12345"}},
@@ -197,13 +203,12 @@ func TestAccountList_PreferencesFailure_StillReturnsAccounts(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
-
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(c, "", &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "list")
 
-	err := cmd.Run(context.Background(), []string{"account", "list"})
+	// Assert
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -220,27 +225,27 @@ func TestAccountList_PreferencesFailure_StillReturnsAccounts(t *testing.T) {
 	assert.NotContains(t, first, "nickName")
 }
 
-func TestAccountList_APIError(t *testing.T) {
+func TestNewAccountCmd_List_APIError(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error":"server error"}`))
 	}))
 	defer srv.Close()
 
-	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
-
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(c, "", &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "list")
 
-	err := cmd.Run(context.Background(), []string{"account", "list"})
+	// Assert
 	require.Error(t, err)
-
 	_, ok := errors.AsType[*apperr.HTTPError](err)
 	assert.True(t, ok)
 }
 
-func TestAccountNumbers_Success(t *testing.T) {
+func TestNewAccountCmd_Numbers_Success(t *testing.T) {
+	// Arrange
 	numbers := []map[string]any{
 		{"accountNumber": "12345", "hashValue": "HASH_ABC"},
 		{"accountNumber": "67890", "hashValue": "HASH_DEF"},
@@ -250,13 +255,12 @@ func TestAccountNumbers_Success(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
-
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(c, "", &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "numbers")
 
-	err := cmd.Run(context.Background(), []string{"account", "numbers"})
+	// Assert
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -270,7 +274,8 @@ func TestAccountNumbers_Success(t *testing.T) {
 	assert.Len(t, accountList, 2)
 }
 
-func TestAccountGet_WithPositionsFlag(t *testing.T) {
+func TestNewAccountCmd_Get_WithPositionsFlag(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/trader/v1/accounts/MY_HASH" {
 			assert.Equal(t, "positions", r.URL.Query().Get("fields"))
@@ -295,9 +300,13 @@ func TestAccountGet_WithPositionsFlag(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(testClient(t, srv), "", &buf)
-	require.NoError(t, runTestCommand(t, cmd, "account", "get", "--positions", "MY_HASH"))
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "get", "--positions", "MY_HASH")
+
+	// Assert
+	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
 	assert.Equal(t, "MY_HASH", env.Metadata.Account)
@@ -311,8 +320,8 @@ func TestAccountGet_WithPositionsFlag(t *testing.T) {
 	assert.Len(t, positions, 1)
 }
 
-func TestAccountGet_FlagOverridesAll(t *testing.T) {
-	// Mock server only responds to FLAG_HASH, proving the flag was used
+func TestNewAccountCmd_Get_FlagOverridesAll(t *testing.T) {
+	// Arrange - mock server only responds to FLAG_HASH, proving the flag was used
 	srv := accountMockServer(t, map[string]any{
 		"/trader/v1/accounts/FLAG_HASH": map[string]any{
 			"securitiesAccount": map[string]any{"type": "MARGIN", "accountNumber": "11111"},
@@ -326,23 +335,22 @@ func TestAccountGet_FlagOverridesAll(t *testing.T) {
 	defer srv.Close()
 
 	configPath := writeAccountTestConfig(t, t.TempDir(), "CONFIG_HASH")
-	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewAccountCmd(testClient(t, srv), configPath, &buf)
+	// Persistent --account flag on parent should override both positional arg and config default
+	_, err := runTestCommand(t, cmd, "--account", "FLAG_HASH", "get", "ARG_HASH")
 
-	// Flag should override both positional arg and config default
-	err := cmd.Run(context.Background(), []string{
-		"account", "--account", "FLAG_HASH", "get", "ARG_HASH",
-	})
+	// Assert
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
 	assert.Equal(t, "FLAG_HASH", env.Metadata.Account)
 }
 
-func TestAccountGet_PositionalArg(t *testing.T) {
+func TestNewAccountCmd_Get_PositionalArg(t *testing.T) {
+	// Arrange
 	srv := accountMockServer(t, map[string]any{
 		"/trader/v1/accounts/ARG_HASH": map[string]any{
 			"securitiesAccount": map[string]any{"type": "MARGIN", "accountNumber": "22222"},
@@ -351,20 +359,20 @@ func TestAccountGet_PositionalArg(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
-
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(c, "", &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "get", "ARG_HASH")
 
-	err := cmd.Run(context.Background(), []string{"account", "get", "ARG_HASH"})
+	// Assert
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
 	assert.Equal(t, "ARG_HASH", env.Metadata.Account)
 }
 
-func TestAccountGet_ConfigDefault(t *testing.T) {
+func TestNewAccountCmd_Get_ConfigDefault(t *testing.T) {
+	// Arrange
 	srv := accountMockServer(t, map[string]any{
 		"/trader/v1/accounts/CONFIG_HASH": map[string]any{
 			"securitiesAccount": map[string]any{"type": "CASH", "accountNumber": "33333"},
@@ -374,30 +382,30 @@ func TestAccountGet_ConfigDefault(t *testing.T) {
 	defer srv.Close()
 
 	configPath := writeAccountTestConfig(t, t.TempDir(), "CONFIG_HASH")
-	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewAccountCmd(testClient(t, srv), configPath, &buf)
+	_, err := runTestCommand(t, cmd, "get")
 
-	err := cmd.Run(context.Background(), []string{"account", "get"})
+	// Assert
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
 	assert.Equal(t, "CONFIG_HASH", env.Metadata.Account)
 }
 
-func TestAccountGet_NoAccount_Error(t *testing.T) {
+func TestNewAccountCmd_Get_NoAccount_Error(t *testing.T) {
+	// Arrange
 	srv := accountMockServer(t, map[string]any{})
 	defer srv.Close()
 
-	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
-
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(c, "", &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "get")
 
-	err := cmd.Run(context.Background(), []string{"account", "get"})
+	// Assert
 	require.Error(t, err)
 
 	notFoundErr, ok := errors.AsType[*apperr.AccountNotFoundError](err)
@@ -407,7 +415,8 @@ func TestAccountGet_NoAccount_Error(t *testing.T) {
 	assert.Contains(t, notFoundErr.Details(), "schwab-agent account set-default")
 }
 
-func TestAccountGet_MetadataContainsHash(t *testing.T) {
+func TestNewAccountCmd_Get_MetadataContainsHash(t *testing.T) {
+	// Arrange
 	srv := accountMockServer(t, map[string]any{
 		"/trader/v1/accounts/MY_HASH": map[string]any{
 			"securitiesAccount": map[string]any{"type": "MARGIN"},
@@ -416,13 +425,12 @@ func TestAccountGet_MetadataContainsHash(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
-
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(c, "", &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "get", "MY_HASH")
 
-	err := cmd.Run(context.Background(), []string{"account", "get", "MY_HASH"})
+	// Assert
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -430,26 +438,84 @@ func TestAccountGet_MetadataContainsHash(t *testing.T) {
 	assert.NotEmpty(t, env.Metadata.Timestamp)
 }
 
-func TestAccountGet_APIError(t *testing.T) {
-	// 404 from Account method becomes AccountNotFoundError
+func TestNewAccountCmd_Get_APIError(t *testing.T) {
+	// Arrange - 404 from Account method becomes AccountNotFoundError
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`{"error":"not found"}`))
 	}))
 	defer srv.Close()
 
-	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
-
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(c, "", &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "get", "BAD_HASH")
 
-	err := cmd.Run(context.Background(), []string{"account", "get", "BAD_HASH"})
+	// Assert
 	require.Error(t, err)
-
 	_, ok := errors.AsType[*apperr.AccountNotFoundError](err)
 	assert.True(t, ok)
 }
+
+// --- SetDefault subcommand tests ---
+
+func TestNewAccountCmd_SetDefault_Success(t *testing.T) {
+	// Arrange - write a config so SetDefaultAccount has a file to update
+	tmpDir := t.TempDir()
+	configPath := writeAccountTestConfig(t, tmpDir, "OLD_HASH")
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAccountCmd(testClient(t, jsonServer(`{}`)), configPath, &buf)
+	_, err := runTestCommand(t, cmd, "set-default", "NEW_HASH")
+
+	// Assert
+	require.NoError(t, err)
+
+	env := decodeAccountEnvelope(t, buf.Bytes())
+	dataMap, ok := env.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "NEW_HASH", dataMap["default_account"])
+
+	// Verify the config file was updated
+	cfg, loadErr := auth.LoadConfig(configPath)
+	require.NoError(t, loadErr)
+	assert.Equal(t, "NEW_HASH", cfg.DefaultAccount)
+}
+
+func TestNewAccountCmd_SetDefault_MissingHash(t *testing.T) {
+	// Arrange
+	tmpDir := t.TempDir()
+	configPath := writeAccountTestConfig(t, tmpDir, "")
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAccountCmd(testClient(t, jsonServer(`{}`)), configPath, &buf)
+	_, err := runTestCommand(t, cmd, "set-default")
+
+	// Assert
+	require.Error(t, err)
+	var valErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &valErr)
+}
+
+func TestNewAccountCmd_SetDefault_NoSafetyGuard(t *testing.T) {
+	// Verify that set-default works without requireMutableEnabled.
+	// This is intentional: setting a default account is a config change,
+	// not a trading operation.
+	tmpDir := t.TempDir()
+	configPath := writeAccountTestConfig(t, tmpDir, "")
+
+	// Act - no "i-also-like-to-live-dangerously" in config, should still succeed
+	var buf bytes.Buffer
+	cmd := NewAccountCmd(testClient(t, jsonServer(`{}`)), configPath, &buf)
+	_, err := runTestCommand(t, cmd, "set-default", "SOME_HASH")
+
+	// Assert
+	require.NoError(t, err)
+}
+
+// --- Enrichment helper tests (framework-agnostic) ---
 
 func TestEnrichAccountsWithPreferences(t *testing.T) {
 	acctNum1 := "12345"
@@ -539,7 +605,8 @@ func TestEnrichAccountWithPreferences_SingleAccount(t *testing.T) {
 
 // --- Transaction subcommand tests ---
 
-func TestAccountTransaction_List_WithAccountFlag(t *testing.T) {
+func TestNewAccountCmd_Transaction_List_WithAccountFlag(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Contains(t, r.URL.Path, "/trader/v1/accounts/abc123/transactions")
@@ -549,11 +616,13 @@ func TestAccountTransaction_List_WithAccountFlag(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(testClient(t, srv), "/nonexistent/config.json", &buf)
-	require.NoError(t, runTestCommand(t, cmd,
-		"account", "transaction", "list", "--account", "abc123",
-	))
+	cmd := NewAccountCmd(testClient(t, srv), "/nonexistent/config.json", &buf)
+	_, err := runTestCommand(t, cmd, "transaction", "list", "--account", "abc123")
+
+	// Assert
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
@@ -561,7 +630,8 @@ func TestAccountTransaction_List_WithAccountFlag(t *testing.T) {
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
-func TestAccountTransaction_List_WithFilters(t *testing.T) {
+func TestNewAccountCmd_Transaction_List_WithFilters(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		assert.Equal(t, "TRADE", q.Get("types"))
@@ -573,18 +643,23 @@ func TestAccountTransaction_List_WithFilters(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(testClient(t, srv), "/nonexistent/config.json", &buf)
-	require.NoError(t, runTestCommand(t, cmd,
-		"account", "transaction", "list",
+	cmd := NewAccountCmd(testClient(t, srv), "/nonexistent/config.json", &buf)
+	_, err := runTestCommand(t, cmd,
+		"transaction", "list",
 		"--account", "abc123",
 		"--types", "TRADE",
 		"--from", "2024-01-01",
 		"--to", "2024-01-31",
-	))
+	)
+
+	// Assert
+	require.NoError(t, err)
 }
 
-func TestAccountTransaction_List_DefaultAccount(t *testing.T) {
+func TestNewAccountCmd_Transaction_List_DefaultAccount(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Contains(t, r.URL.Path, "/trader/v1/accounts/default-hash-123/transactions")
 
@@ -598,25 +673,34 @@ func TestAccountTransaction_List_DefaultAccount(t *testing.T) {
 	configData := []byte(`{"client_id":"test","client_secret":"test","default_account":"default-hash-123"}`)
 	require.NoError(t, os.WriteFile(configPath, configData, 0o600))
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(testClient(t, srv), configPath, &buf)
-	require.NoError(t, runTestCommand(t, cmd, "account", "transaction", "list"))
+	cmd := NewAccountCmd(testClient(t, srv), configPath, &buf)
+	_, err := runTestCommand(t, cmd, "transaction", "list")
+
+	// Assert
+	require.NoError(t, err)
 }
 
-func TestAccountTransaction_List_NoAccount(t *testing.T) {
+func TestNewAccountCmd_Transaction_List_NoAccount(t *testing.T) {
+	// Arrange
 	server := jsonServer(`[]`)
 	defer server.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(testClient(t, server), "/nonexistent/config.json", &buf)
-	err := runTestCommand(t, cmd, "account", "transaction", "list")
+	cmd := NewAccountCmd(testClient(t, server), "/nonexistent/config.json", &buf)
+	_, err := runTestCommand(t, cmd, "transaction", "list")
+
+	// Assert
 	require.Error(t, err)
 
 	var accountErr *apperr.AccountNotFoundError
 	assert.ErrorAs(t, err, &accountErr)
 }
 
-func TestAccountTransaction_Get_Success(t *testing.T) {
+func TestNewAccountCmd_Transaction_Get_Success(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/trader/v1/accounts/abc123/transactions/1001", r.URL.Path)
@@ -626,11 +710,15 @@ func TestAccountTransaction_Get_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(testClient(t, srv), "/nonexistent/config.json", &buf)
-	require.NoError(t, runTestCommand(t, cmd,
-		"account", "transaction", "get", "--account", "abc123", "1001",
-	))
+	cmd := NewAccountCmd(testClient(t, srv), "/nonexistent/config.json", &buf)
+	_, err := runTestCommand(t, cmd,
+		"transaction", "get", "--account", "abc123", "1001",
+	)
+
+	// Assert
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
@@ -638,44 +726,75 @@ func TestAccountTransaction_Get_Success(t *testing.T) {
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
-func TestAccountTransaction_Get_MissingTxnID(t *testing.T) {
+func TestNewAccountCmd_Transaction_Get_MissingTxnID(t *testing.T) {
+	// Arrange
 	server := jsonServer(`{}`)
 	defer server.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(testClient(t, server), "/nonexistent/config.json", &buf)
-	err := runTestCommand(t, cmd, "account", "transaction", "get", "--account", "abc123")
+	cmd := NewAccountCmd(testClient(t, server), "/nonexistent/config.json", &buf)
+	_, err := runTestCommand(t, cmd, "transaction", "get", "--account", "abc123")
+
+	// Assert
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
-func TestAccountTransaction_Get_InvalidTxnID(t *testing.T) {
+func TestNewAccountCmd_Transaction_Get_InvalidTxnID(t *testing.T) {
+	// Arrange
 	server := jsonServer(`{}`)
 	defer server.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(testClient(t, server), "/nonexistent/config.json", &buf)
-	err := runTestCommand(t, cmd, "account", "transaction", "get", "--account", "abc123", "not-a-number")
+	cmd := NewAccountCmd(testClient(t, server), "/nonexistent/config.json", &buf)
+	_, err := runTestCommand(t, cmd, "transaction", "get", "--account", "abc123", "not-a-number")
+
+	// Assert
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
-func TestAccountTransaction_Get_NoAccount(t *testing.T) {
+func TestNewAccountCmd_Transaction_Get_NoAccount(t *testing.T) {
+	// Arrange
 	server := jsonServer(`{}`)
 	defer server.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := AccountCommand(testClient(t, server), "/nonexistent/config.json", &buf)
-	err := runTestCommand(t, cmd, "account", "transaction", "get", "1001")
+	cmd := NewAccountCmd(testClient(t, server), "/nonexistent/config.json", &buf)
+	_, err := runTestCommand(t, cmd, "transaction", "get", "1001")
+
+	// Assert
 	require.Error(t, err)
 
 	var accountErr *apperr.AccountNotFoundError
 	assert.ErrorAs(t, err, &accountErr)
 }
+
+func TestNewAccountCmd_NoSubcommand(t *testing.T) {
+	// Arrange
+	server := jsonServer(`{}`)
+	defer server.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAccountCmd(testClient(t, server), "", &buf)
+	_, err := runTestCommand(t, cmd)
+
+	// Assert
+	require.Error(t, err)
+	var valErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), "requires a subcommand")
+}
+
+// --- resolveAccount tests (framework-agnostic) ---
 
 func TestResolveAccount_FlagTakesPriority(t *testing.T) {
 	account, err := resolveAccount("flag-account", "/nonexistent/config.json", nil)

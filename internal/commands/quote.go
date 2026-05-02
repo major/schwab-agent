@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/urfave/cli/v3"
+	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
@@ -26,61 +26,52 @@ var validQuoteFields = map[string]bool{
 	"regular":     true,
 }
 
-// QuoteCommand returns the CLI command for stock quote operations.
-func QuoteCommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:           "quote",
-		Usage:          "Stock quote operations",
-		UsageText:      "schwab-agent quote AAPL\nschwab-agent quote AAPL MSFT NVDA\nschwab-agent quote get AAPL",
-		DefaultCommand: "get",
-		Commands: []*cli.Command{
-			quoteGetCommand(c, w),
-		},
+// NewQuoteCmd returns the Cobra command for stock quote operations.
+// The parent command requires a subcommand (no DefaultCommand behavior).
+func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "quote",
+		Short:   "Stock quote operations",
+		Long:    "Get quotes for one or more symbols",
+		RunE:    requireSubcommand,
+		GroupID: "market-data",
 	}
+
+	cmd.AddCommand(newQuoteGetCmd(c, w))
+
+	return cmd
 }
 
-// quoteGetCommand returns the subcommand for retrieving quotes.
-func quoteGetCommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:      "get",
-		Usage:     "Get quotes for one or more symbols",
-		ArgsUsage: "<symbol> [symbol...]",
-		UsageText: `schwab-agent quote get AAPL
-schwab-agent quote get AAPL MSFT NVDA
-schwab-agent quote get AAPL --fields quote,fundamental --indicative`,
-		Flags: []cli.Flag{
-			&cli.StringSliceFlag{
-				Name:  "fields",
-				Usage: "Quote fields to return (repeatable): quote, fundamental, extended, reference, regular",
-			},
-			&cli.BoolFlag{
-				Name:  "indicative",
-				Usage: "Request indicative (non-tradeable) quotes",
-			},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			args := cmd.Args().Slice()
-			if len(args) == 0 {
-				return apperr.NewValidationError("at least one symbol is required", nil)
-			}
-
-			params, err := buildQuoteParams(cmd)
+// newQuoteGetCmd returns the Cobra subcommand for retrieving quotes.
+func newQuoteGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get",
+		Short: "Get quotes for one or more symbols",
+		Long:  "Get quotes for one or more symbols with optional field filtering and indicative quotes",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			params, err := buildCobraQuoteParams(cmd)
 			if err != nil {
 				return err
 			}
 
 			if len(args) == 1 {
-				return quoteSingle(ctx, c, w, args[0], params)
+				return quoteSingle(cmd.Context(), c, w, args[0], params)
 			}
-			return quoteMulti(ctx, c, w, args, params)
+			return quoteMulti(cmd.Context(), c, w, args, params)
 		},
 	}
+
+	cmd.Flags().StringSlice("fields", nil, "Quote fields to return (repeatable): quote, fundamental, extended, reference, regular")
+	cmd.Flags().Bool("indicative", false, "Request indicative (non-tradeable) quotes")
+
+	return cmd
 }
 
-// buildQuoteParams constructs a QuoteParams from CLI flags, validating
+// buildCobraQuoteParams constructs a QuoteParams from Cobra flags, validating
 // field values against the allowed set (case-insensitive).
-func buildQuoteParams(cmd *cli.Command) (client.QuoteParams, error) {
-	raw := cmd.StringSlice("fields")
+func buildCobraQuoteParams(cmd *cobra.Command) (client.QuoteParams, error) {
+	raw := flagStringSlice(cmd, "fields")
 	fields := make([]string, 0, len(raw))
 	for _, f := range raw {
 		// Support both repeatable (--fields QUOTE --fields FUNDAMENTAL)
@@ -103,7 +94,7 @@ func buildQuoteParams(cmd *cli.Command) (client.QuoteParams, error) {
 	}
 	return client.QuoteParams{
 		Fields:     fields,
-		Indicative: cmd.Bool("indicative"),
+		Indicative: flagBool(cmd, "indicative"),
 	}, nil
 }
 

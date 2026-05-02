@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/urfave/cli/v3"
+	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
@@ -30,53 +30,6 @@ type positionEntry struct {
 // positionListData wraps the position list response.
 type positionListData struct {
 	Positions []positionEntry `json:"positions"`
-}
-
-// PositionCommand returns the parent CLI command for position operations.
-func PositionCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:   "position",
-		Usage:  "View positions across accounts",
-		Action: requireSubcommand(),
-		Commands: []*cli.Command{
-			positionListCommand(c, configPath, w),
-		},
-	}
-}
-
-// positionListCommand returns the CLI command for listing positions.
-// Default: single account (resolved via --account flag or config default).
-// With --all-accounts: flattens positions from all linked accounts into a
-// single list with account identifiers on each entry.
-func positionListCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "list",
-		Usage: "List positions for one or all accounts",
-		UsageText: `schwab-agent position list
-schwab-agent position list --all-accounts
-schwab-agent position list --account HASH`,
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  "all-accounts",
-				Usage: "Show positions across all linked accounts",
-			},
-			&cli.StringFlag{
-				Name:  "account",
-				Usage: "Account hash (overrides config default)",
-			},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if cmd.Bool("all-accounts") && cmd.String("account") != "" {
-				return apperr.NewValidationError("--all-accounts and --account are mutually exclusive", nil)
-			}
-
-			if cmd.Bool("all-accounts") {
-				return listAllAccountPositions(ctx, c, w)
-			}
-
-			return listSingleAccountPositions(ctx, c, configPath, cmd, w)
-		},
-	}
 }
 
 // listAllAccountPositions fetches positions from all linked accounts and
@@ -109,60 +62,6 @@ func listAllAccountPositions(ctx context.Context, c *client.Ref, w io.Writer) er
 	entries := flattenAccountPositions(accounts, numberToHash)
 
 	meta := output.NewMetadata()
-	meta.Returned = len(entries)
-
-	return output.WriteSuccess(w, positionListData{Positions: entries}, meta)
-}
-
-// listSingleAccountPositions fetches positions for a single resolved account.
-func listSingleAccountPositions(
-	ctx context.Context,
-	c *client.Ref,
-	configPath string,
-	cmd *cli.Command,
-	w io.Writer,
-) error {
-	hash, err := resolveAccount(cmd.String("account"), configPath, nil)
-	if err != nil {
-		return err
-	}
-
-	account, err := c.Account(ctx, hash, "positions")
-	if err != nil {
-		return err
-	}
-
-	// Enrich with nickname from user preferences (best-effort).
-	prefs, prefsErr := c.UserPreference(ctx)
-	if prefsErr == nil {
-		enrichAccountWithPreferences(account, prefs)
-	}
-
-	acctNum := ""
-	acctNick := ""
-
-	if account.SecuritiesAccount != nil && account.SecuritiesAccount.AccountNumber != nil {
-		acctNum = *account.SecuritiesAccount.AccountNumber
-	}
-
-	if account.NickName != nil {
-		acctNick = *account.NickName
-	}
-
-	var entries []positionEntry
-
-	if account.SecuritiesAccount != nil {
-		for i := range account.SecuritiesAccount.Positions {
-			entries = append(entries, newPositionEntry(acctNum, hash, acctNick, &account.SecuritiesAccount.Positions[i]))
-		}
-	}
-
-	if entries == nil {
-		entries = []positionEntry{}
-	}
-
-	meta := output.NewMetadata()
-	meta.Account = hash
 	meta.Returned = len(entries)
 
 	return output.WriteSuccess(w, positionListData{Positions: entries}, meta)
@@ -268,4 +167,107 @@ func computePositionFields(e *positionEntry) {
 		pct := *e.UnrealizedPnL / *e.TotalCostBasis * 100
 		e.UnrealizedPnLPct = &pct
 	}
+}
+
+// NewPositionCmd returns the Cobra command for position operations.
+func NewPositionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "position",
+		Short:   "View positions across accounts",
+		GroupID: "account-mgmt",
+		RunE:    requireSubcommand,
+	}
+
+	cmd.AddCommand(newPositionListCmd(c, configPath, w))
+
+	return cmd
+}
+
+// newPositionListCmd returns the Cobra subcommand for listing positions.
+// Default: single account (resolved via --account flag or config default).
+// With --all-accounts: flattens positions from all linked accounts into a
+// single list with account identifiers on each entry.
+func newPositionListCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List positions for one or all accounts",
+		Long: `List positions for one or all accounts.
+
+Default: single account (resolved via --account flag or config default).
+With --all-accounts: flattens positions from all linked accounts into a
+single list with account identifiers on each entry.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			allAccounts := flagBool(cmd, "all-accounts")
+			account := flagString(cmd, "account")
+
+			if allAccounts && account != "" {
+				return apperr.NewValidationError("--all-accounts and --account are mutually exclusive", nil)
+			}
+
+			if allAccounts {
+				return listAllAccountPositions(cmd.Context(), c, w)
+			}
+
+			return cobraListSingleAccountPositions(cmd.Context(), c, configPath, account, w)
+		},
+	}
+
+	cmd.Flags().Bool("all-accounts", false, "Show positions across all linked accounts")
+	cmd.Flags().String("account", "", "Account hash (overrides config default)")
+
+	return cmd
+}
+
+// cobraListSingleAccountPositions fetches positions for a single resolved
+// account. Cobra-specific variant that accepts the account flag value directly.
+func cobraListSingleAccountPositions(
+	ctx context.Context,
+	c *client.Ref,
+	configPath, accountFlag string,
+	w io.Writer,
+) error {
+	hash, err := resolveAccount(accountFlag, configPath, nil)
+	if err != nil {
+		return err
+	}
+
+	account, err := c.Account(ctx, hash, "positions")
+	if err != nil {
+		return err
+	}
+
+	// Enrich with nickname from user preferences (best-effort).
+	prefs, prefsErr := c.UserPreference(ctx)
+	if prefsErr == nil {
+		enrichAccountWithPreferences(account, prefs)
+	}
+
+	acctNum := ""
+	acctNick := ""
+
+	if account.SecuritiesAccount != nil && account.SecuritiesAccount.AccountNumber != nil {
+		acctNum = *account.SecuritiesAccount.AccountNumber
+	}
+
+	if account.NickName != nil {
+		acctNick = *account.NickName
+	}
+
+	var entries []positionEntry
+
+	if account.SecuritiesAccount != nil {
+		for i := range account.SecuritiesAccount.Positions {
+			entries = append(entries, newPositionEntry(acctNum, hash, acctNick, &account.SecuritiesAccount.Positions[i]))
+		}
+	}
+
+	if entries == nil {
+		entries = []positionEntry{}
+	}
+
+	meta := output.NewMetadata()
+	meta.Account = hash
+	meta.Returned = len(entries)
+
+	return output.WriteSuccess(w, positionListData{Positions: entries}, meta)
 }

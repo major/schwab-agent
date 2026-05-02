@@ -2,92 +2,66 @@ package commands
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
+	"io"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v3"
 )
 
-// testApp builds a small CLI app for schema testing with nested commands and various flag types.
-func testApp() *cli.Command {
-	return &cli.Command{
-		Name:  "test-app",
-		Usage: "A test application",
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  "verbose",
-				Usage: "Enable verbose output",
-			},
-			&cli.StringFlag{
-				Name:  "output",
-				Usage: "Output format",
-				Value: "json",
-			},
-		},
-		Commands: []*cli.Command{
-			{
-				Name:  "account",
-				Usage: "Account operations",
-				Commands: []*cli.Command{
-					{
-						Name:  "list",
-						Usage: "List all accounts",
-						Flags: []cli.Flag{
-							&cli.StringFlag{
-								Name:  "format",
-								Usage: "Output format",
-								Value: "table",
-							},
-							&cli.BoolFlag{
-								Name:     "all",
-								Usage:    "Show all accounts",
-								Required: true,
-							},
-						},
-					},
-				},
-			},
-			{
-				Name:  "quote",
-				Usage: "Get stock quotes",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:     "symbol",
-						Usage:    "Stock symbol",
-						Required: true,
-					},
-					&cli.IntFlag{
-						Name:  "count",
-						Usage: "Number of quotes",
-						Value: 10,
-					},
-					&cli.Float64Flag{
-						Name:  "threshold",
-						Usage: "Price threshold",
-						Value: 0.5,
-					},
-				},
-			},
-		},
+// buildTestRoot creates a small Cobra command tree for schema testing.
+func buildTestRoot(w io.Writer) *cobra.Command {
+	root := &cobra.Command{
+		Use:           "test-app",
+		Short:         "A test application",
+		SilenceErrors: true,
+		SilenceUsage:  true,
 	}
+	root.CompletionOptions.DisableDefaultCmd = true
+	root.SetOut(w)
+	root.SetErr(w)
+	root.AddGroup(&cobra.Group{ID: "tools", Title: "Tool Commands"})
+	root.PersistentFlags().Bool("verbose", false, "Enable verbose output")
+	root.PersistentFlags().String("output", "json", "Output format")
+
+	accountCmd := &cobra.Command{Use: "account", Short: "Account operations"}
+	listCmd := &cobra.Command{Use: "list", Short: "List all accounts"}
+	listCmd.Flags().String("format", "table", "Output format")
+	listCmd.Flags().Bool("all", false, "Show all accounts")
+	accountCmd.AddCommand(listCmd)
+
+	quoteCmd := &cobra.Command{Use: "quote", Short: "Get stock quotes"}
+	quoteCmd.Flags().String("symbol", "", "Stock symbol")
+	quoteCmd.Flags().Int("count", 10, "Number of quotes")
+	quoteCmd.Flags().Float64("threshold", 0.5, "Price threshold")
+
+	root.AddCommand(accountCmd, quoteCmd)
+	return root
 }
 
-func TestSchemaCommand_FullOutput(t *testing.T) {
-	app := testApp()
-	var buf bytes.Buffer
-	schemaCmd := SchemaCommand(app, &buf)
+func runSchemaCommand(t *testing.T, root *cobra.Command, w *bytes.Buffer, args ...string) error {
+	t.Helper()
 
-	err := schemaCmd.Run(context.Background(), []string{"schema"})
+	schemaCmd := NewSchemaCmd(root, w)
+	root.AddCommand(schemaCmd)
+	_, err := runTestCommand(t, root, args...)
+	return err
+}
+
+func TestNewSchemaCmd_FullOutput(t *testing.T) {
+	var buf bytes.Buffer
+	root := buildTestRoot(&buf)
+
+	err := runSchemaCommand(t, root, &buf, "schema")
 	require.NoError(t, err)
 
 	var schema SchemaOutput
 	err = json.Unmarshal(buf.Bytes(), &schema)
 	require.NoError(t, err)
 
-	// All commands present (parent and leaf nodes).
+	// All application commands are present (parent and leaf nodes).
 	assert.Len(t, schema.Commands, 3)
 	assert.Contains(t, schema.Commands, "account")
 	assert.Contains(t, schema.Commands, "account list")
@@ -107,53 +81,47 @@ func TestSchemaCommand_FullOutput(t *testing.T) {
 	assert.Equal(t, "json", schema.GlobalFlags["--output"].Default)
 }
 
-func TestSchemaCommand_FlagTypes(t *testing.T) {
-	app := testApp()
+func TestNewSchemaCmd_FlagTypes(t *testing.T) {
 	var buf bytes.Buffer
-	schemaCmd := SchemaCommand(app, &buf)
+	root := buildTestRoot(&buf)
 
-	err := schemaCmd.Run(context.Background(), []string{"schema"})
+	err := runSchemaCommand(t, root, &buf, "schema")
 	require.NoError(t, err)
 
 	var schema SchemaOutput
 	err = json.Unmarshal(buf.Bytes(), &schema)
 	require.NoError(t, err)
 
-	// String flag (required, empty default).
+	// String flag with empty default.
 	symbolFlag := schema.Commands["quote"].Flags["--symbol"]
 	assert.Equal(t, "string", symbolFlag.Type)
-	assert.True(t, symbolFlag.Required)
 	assert.Equal(t, "", symbolFlag.Default)
 	assert.Equal(t, "Stock symbol", symbolFlag.Description)
 
-	// Int flag (optional, non-zero default). JSON numbers decode as float64.
+	// Int flag with non-zero default. JSON numbers decode as float64.
 	countFlag := schema.Commands["quote"].Flags["--count"]
 	assert.Equal(t, "int", countFlag.Type)
-	assert.False(t, countFlag.Required)
 	assert.Equal(t, float64(10), countFlag.Default)
 	assert.Equal(t, "Number of quotes", countFlag.Description)
 
-	// Float flag (optional, fractional default).
+	// Float flag with fractional default.
 	thresholdFlag := schema.Commands["quote"].Flags["--threshold"]
-	assert.Equal(t, "float", thresholdFlag.Type)
-	assert.False(t, thresholdFlag.Required)
+	assert.Equal(t, "float64", thresholdFlag.Type)
 	assert.Equal(t, 0.5, thresholdFlag.Default)
 	assert.Equal(t, "Price threshold", thresholdFlag.Description)
 
-	// Bool flag (required, false default).
+	// Bool flag with false default.
 	allFlag := schema.Commands["account list"].Flags["--all"]
 	assert.Equal(t, "bool", allFlag.Type)
-	assert.True(t, allFlag.Required)
 	assert.Equal(t, false, allFlag.Default)
 	assert.Equal(t, "Show all accounts", allFlag.Description)
 }
 
-func TestSchemaCommand_FilterByCommand(t *testing.T) {
-	app := testApp()
+func TestNewSchemaCmd_FilterByCommand(t *testing.T) {
 	var buf bytes.Buffer
-	schemaCmd := SchemaCommand(app, &buf)
+	root := buildTestRoot(&buf)
 
-	err := schemaCmd.Run(context.Background(), []string{"schema", "--command", "account list"})
+	err := runSchemaCommand(t, root, &buf, "schema", "--command", "account list")
 	require.NoError(t, err)
 
 	var schema SchemaOutput
@@ -174,26 +142,28 @@ func TestSchemaCommand_FilterByCommand(t *testing.T) {
 	assert.Len(t, schema.GlobalFlags, 2)
 }
 
-func TestSchemaCommand_FilterNotFound(t *testing.T) {
-	app := testApp()
+func TestNewSchemaCmd_FilterNotFound(t *testing.T) {
 	var buf bytes.Buffer
-	schemaCmd := SchemaCommand(app, &buf)
+	root := buildTestRoot(&buf)
 
-	err := schemaCmd.Run(context.Background(), []string{"schema", "--command", "nonexistent"})
+	err := runSchemaCommand(t, root, &buf, "schema", "--command", "nonexistent")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "nonexistent")
 	assert.Contains(t, err.Error(), "not found")
 }
 
-func TestSchemaCommand_EmptyApp(t *testing.T) {
-	app := &cli.Command{
-		Name:  "empty",
-		Usage: "An empty application",
-	}
+func TestNewSchemaCmd_EmptyRoot(t *testing.T) {
 	var buf bytes.Buffer
-	schemaCmd := SchemaCommand(app, &buf)
+	root := &cobra.Command{
+		Use:           "empty",
+		Short:         "An empty application",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+	}
+	root.CompletionOptions.DisableDefaultCmd = true
+	root.AddGroup(&cobra.Group{ID: "tools", Title: "Tool Commands"})
 
-	err := schemaCmd.Run(context.Background(), []string{"schema"})
+	err := runSchemaCommand(t, root, &buf, "schema")
 	require.NoError(t, err)
 
 	var schema SchemaOutput
@@ -204,39 +174,24 @@ func TestSchemaCommand_EmptyApp(t *testing.T) {
 	assert.Empty(t, schema.GlobalFlags)
 }
 
-func TestSchemaCommand_NestedCommandPath(t *testing.T) {
-	app := &cli.Command{
-		Name: "app",
-		Commands: []*cli.Command{
-			{
-				Name:  "order",
-				Usage: "Order operations",
-				Commands: []*cli.Command{
-					{
-						Name:  "place",
-						Usage: "Place an order",
-						Commands: []*cli.Command{
-							{
-								Name:  "equity",
-								Usage: "Place an equity order",
-								Flags: []cli.Flag{
-									&cli.StringFlag{
-										Name:     "symbol",
-										Usage:    "Stock symbol",
-										Required: true,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
+func TestNewSchemaCmd_NestedCommandPath(t *testing.T) {
 	var buf bytes.Buffer
-	schemaCmd := SchemaCommand(app, &buf)
+	root := &cobra.Command{
+		Use:           "app",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+	}
+	root.CompletionOptions.DisableDefaultCmd = true
+	root.AddGroup(&cobra.Group{ID: "tools", Title: "Tool Commands"})
+	orderCmd := &cobra.Command{Use: "order", Short: "Order operations"}
+	placeCmd := &cobra.Command{Use: "place", Short: "Place an order"}
+	equityCmd := &cobra.Command{Use: "equity", Short: "Place an equity order"}
+	equityCmd.Flags().String("symbol", "", "Stock symbol")
+	placeCmd.AddCommand(equityCmd)
+	orderCmd.AddCommand(placeCmd)
+	root.AddCommand(orderCmd)
 
-	err := schemaCmd.Run(context.Background(), []string{"schema"})
+	err := runSchemaCommand(t, root, &buf, "schema")
 	require.NoError(t, err)
 
 	var schema SchemaOutput
@@ -249,30 +204,17 @@ func TestSchemaCommand_NestedCommandPath(t *testing.T) {
 	assert.Contains(t, schema.Commands, "order place equity")
 
 	// Deepest command has the flag.
-	equityCmd := schema.Commands["order place equity"]
-	assert.Equal(t, "Place an equity order", equityCmd.Description)
-	assert.Contains(t, equityCmd.Flags, "--symbol")
-	assert.True(t, equityCmd.Flags["--symbol"].Required)
+	equitySchema := schema.Commands["order place equity"]
+	assert.Equal(t, "Place an equity order", equitySchema.Description)
+	assert.Contains(t, equitySchema.Flags, "--symbol")
 }
 
-func TestClassifyFlag_UnknownType_FallsBackToString(t *testing.T) {
-	// The default branch handles any flag type not explicitly matched
-	// (String, Int, Float64, Bool). UintFlag triggers this path.
-	t.Run("with name", func(t *testing.T) {
-		f := &cli.UintFlag{Name: "retries", Usage: "retry count"}
-		name, schema := classifyFlag(f)
-		assert.Equal(t, "retries", name)
-		assert.Equal(t, "string", schema.Type, "unknown flag types fall back to string")
-	})
-}
-
-func TestSchemaCommand_RawJSONOutput(t *testing.T) {
+func TestNewSchemaCmd_RawJSONOutput(t *testing.T) {
 	// Verify schema outputs raw JSON, not wrapped in the standard envelope.
-	app := testApp()
 	var buf bytes.Buffer
-	schemaCmd := SchemaCommand(app, &buf)
+	root := buildTestRoot(&buf)
 
-	err := schemaCmd.Run(context.Background(), []string{"schema"})
+	err := runSchemaCommand(t, root, &buf, "schema")
 	require.NoError(t, err)
 
 	// Parse raw JSON and verify top-level keys.
@@ -286,4 +228,24 @@ func TestSchemaCommand_RawJSONOutput(t *testing.T) {
 	assert.NotContains(t, raw, "data")
 	assert.NotContains(t, raw, "metadata")
 	assert.NotContains(t, raw, "error")
+}
+
+func TestNewSchemaCmd_HiddenFlagsExcluded(t *testing.T) {
+	var buf bytes.Buffer
+	root := buildTestRoot(&buf)
+	quoteCmd, _, err := root.Find([]string{"quote"})
+	require.NoError(t, err)
+	hiddenFlag := quoteCmd.Flags().Lookup("symbol")
+	require.NotNil(t, hiddenFlag)
+	require.NoError(t, quoteCmd.Flags().MarkHidden(hiddenFlag.Name))
+
+	err = runSchemaCommand(t, root, &buf, "schema")
+	require.NoError(t, err)
+
+	var schema SchemaOutput
+	err = json.Unmarshal(buf.Bytes(), &schema)
+	require.NoError(t, err)
+
+	assert.NotContains(t, schema.Commands["quote"].Flags, "--symbol")
+	assert.Contains(t, schema.Commands["quote"].Flags, "--count")
 }

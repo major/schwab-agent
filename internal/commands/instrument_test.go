@@ -14,7 +14,7 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-func TestInstrumentCommand_Search_Success(t *testing.T) {
+func TestNewInstrumentCmd_Search_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/marketdata/v1/instruments", r.URL.Path)
@@ -27,8 +27,9 @@ func TestInstrumentCommand_Search_Success(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	cmd := InstrumentCommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "instrument", "search", "AAPL"))
+	cmd := NewInstrumentCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "search", "AAPL")
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
@@ -36,7 +37,7 @@ func TestInstrumentCommand_Search_Success(t *testing.T) {
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
-func TestInstrumentCommand_Search_WithProjection(t *testing.T) {
+func TestNewInstrumentCmd_Search_WithProjection(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "fundamental", r.URL.Query().Get("projection"))
 
@@ -46,32 +47,29 @@ func TestInstrumentCommand_Search_WithProjection(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	cmd := InstrumentCommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd,
-		"instrument", "search",
-		"--projection", "fundamental",
-		"AAPL",
-	))
+	cmd := NewInstrumentCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "search", "--projection", "fundamental", "AAPL")
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
 }
 
-func TestInstrumentCommand_Search_MissingQuery(t *testing.T) {
+func TestNewInstrumentCmd_Search_MissingQuery(t *testing.T) {
 	server := jsonServer(`{}`)
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := InstrumentCommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "instrument", "search")
+	cmd := NewInstrumentCmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "search")
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
-func TestInstrumentCommand_Get_Success(t *testing.T) {
+func TestNewInstrumentCmd_Get_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/marketdata/v1/instruments/037833100", r.URL.Path)
@@ -83,8 +81,9 @@ func TestInstrumentCommand_Get_Success(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	cmd := InstrumentCommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "instrument", "get", "037833100"))
+	cmd := NewInstrumentCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "get", "037833100")
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
@@ -92,20 +91,20 @@ func TestInstrumentCommand_Get_Success(t *testing.T) {
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
-func TestInstrumentCommand_Get_MissingCUSIP(t *testing.T) {
+func TestNewInstrumentCmd_Get_MissingCUSIP(t *testing.T) {
 	server := jsonServer(`{}`)
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := InstrumentCommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "instrument", "get")
+	cmd := NewInstrumentCmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "get")
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
-func TestInstrumentCommand_Get_APIError(t *testing.T) {
+func TestNewInstrumentCmd_Get_APIError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`{"error":"not found"}`))
@@ -113,7 +112,7 @@ func TestInstrumentCommand_Get_APIError(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	cmd := InstrumentCommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "instrument", "get", "000000000")
+	cmd := NewInstrumentCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "get", "000000000")
 	require.Error(t, err)
 }

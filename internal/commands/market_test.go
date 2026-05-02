@@ -14,7 +14,8 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-func TestMarketCommand_Hours_AllMarkets(t *testing.T) {
+func TestNewMarketCmd_Hours_AllMarkets(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/marketdata/v1/markets", r.URL.Path)
@@ -27,17 +28,21 @@ func TestMarketCommand_Hours_AllMarkets(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := MarketCommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "market", "hours"))
+	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "hours")
 
+	// Assert
+	require.NoError(t, err)
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
-func TestMarketCommand_Hours_SpecificMarket(t *testing.T) {
+func TestNewMarketCmd_Hours_SpecificMarket(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/marketdata/v1/markets/equity", r.URL.Path)
@@ -48,45 +53,55 @@ func TestMarketCommand_Hours_SpecificMarket(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := MarketCommand(testClient(t, srv), &buf)
-	// Positional arg instead of --market flag.
-	require.NoError(t, runTestCommand(t, cmd, "market", "hours", "equity"))
+	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "hours", "equity")
 
+	// Assert
+	require.NoError(t, err)
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
-func TestMarketCommand_Hours_APIError(t *testing.T) {
+func TestNewMarketCmd_Hours_APIError(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error":"server error"}`))
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := MarketCommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "market", "hours")
+	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "hours")
+
+	// Assert
 	require.Error(t, err)
 }
 
-func TestMarketCommand_Hours_SpecificMarketAPIError(t *testing.T) {
+func TestNewMarketCmd_Hours_SpecificMarketAPIError(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`{"error":"not found"}`))
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := MarketCommand(testClient(t, srv), &buf)
-	// Positional arg instead of --market flag.
-	err := runTestCommand(t, cmd, "market", "hours", "invalid")
+	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "hours", "invalid")
+
+	// Assert
 	require.Error(t, err)
 }
 
-func TestMarketCommand_Movers_Success(t *testing.T) {
+func TestNewMarketCmd_Movers_Success(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Contains(t, r.URL.Path, "/marketdata/v1/movers/")
@@ -96,17 +111,21 @@ func TestMarketCommand_Movers_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := MarketCommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "market", "movers", "$SPX"))
+	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "movers", "$SPX")
 
+	// Assert
+	require.NoError(t, err)
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
-func TestMarketCommand_Movers_WithFlags(t *testing.T) {
+func TestNewMarketCmd_Movers_WithFlags(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		assert.Equal(t, "VOLUME", q.Get("sort"))
@@ -117,42 +136,71 @@ func TestMarketCommand_Movers_WithFlags(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := MarketCommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd,
-		"market", "movers",
+	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd,
+		"movers",
 		"--sort", "VOLUME",
 		"--frequency", "5",
 		"$DJI",
-	))
+	)
 
+	// Assert
+	require.NoError(t, err)
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
 }
 
-func TestMarketCommand_Movers_MissingIndex(t *testing.T) {
+func TestNewMarketCmd_Movers_MissingIndex(t *testing.T) {
+	// Arrange
 	server := jsonServer(`{}`)
 	defer server.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := MarketCommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "market", "movers")
-	require.Error(t, err)
+	cmd := NewMarketCmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "movers")
 
+	// Assert
+	require.Error(t, err)
 	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
 
-func TestMarketCommand_Movers_APIError(t *testing.T) {
+func TestNewMarketCmd_Movers_APIError(t *testing.T) {
+	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error":"server error"}`))
 	}))
 	defer srv.Close()
 
+	// Act
 	var buf bytes.Buffer
-	cmd := MarketCommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "market", "movers", "$SPX")
+	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "movers", "$SPX")
+
+	// Assert
 	require.Error(t, err)
+}
+
+func TestNewMarketCmd_NoSubcommand(t *testing.T) {
+	// Arrange
+	server := jsonServer(`{}`)
+	defer server.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewMarketCmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd)
+
+	// Assert
+	require.Error(t, err)
+	var valErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), "requires a subcommand")
+	assert.Contains(t, err.Error(), "hours")
+	assert.Contains(t, err.Error(), "movers")
 }

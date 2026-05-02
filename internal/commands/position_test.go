@@ -2,7 +2,6 @@ package commands
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +13,6 @@ import (
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/output"
 )
 
 func TestPositionListSingleAccount(t *testing.T) {
@@ -56,10 +54,9 @@ func TestPositionListSingleAccount(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--account", "HASH123"})
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123")
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -112,11 +109,10 @@ func TestPositionListSingleAccount_UsesConfigDefault(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "DEFAULT_HASH")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
 	// No --account flag: should use config default.
-	err := cmd.Run(context.Background(), []string{"position", "list"})
+	_, err := runTestCommand(t, cmd, "list")
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -182,10 +178,9 @@ func TestPositionListAllAccounts(t *testing.T) {
 	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, "", &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, "", &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--all-accounts"})
+	_, err := runTestCommand(t, cmd, "list", "--all-accounts")
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -255,10 +250,9 @@ func TestPositionListAllAccounts_PreferencesFailure(t *testing.T) {
 	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, "", &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, "", &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--all-accounts"})
+	_, err := runTestCommand(t, cmd, "list", "--all-accounts")
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -295,10 +289,9 @@ func TestPositionListNoPositions(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--account", "HASH123"})
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123")
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -320,10 +313,9 @@ func TestPositionListMutuallyExclusiveFlags(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "HASH123")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--all-accounts", "--account", "HASH456"})
+	_, err := runTestCommand(t, cmd, "list", "--all-accounts", "--account", "HASH456")
 	require.Error(t, err)
 
 	var ve *apperr.ValidationError
@@ -340,10 +332,9 @@ func TestPositionListNoAccountConfigured(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list"})
+	_, err := runTestCommand(t, cmd, "list")
 	require.Error(t, err, "should error when no account is specified or configured")
 }
 
@@ -376,186 +367,11 @@ func TestPositionListRequestsPositionsField(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--account", "HASH123"})
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123")
 	require.NoError(t, err)
 	assert.Equal(t, "positions", capturedFields)
-}
-
-func TestComputePositionFields(t *testing.T) {
-	t.Run("long position with P&L", func(t *testing.T) {
-		entry := positionEntry{
-			Position: models.Position{
-				AveragePrice:       new(150.0),
-				LongQuantity:       new(100.0),
-				LongOpenProfitLoss: new(1000.0),
-			},
-		}
-		computePositionFields(&entry)
-
-		require.NotNil(t, entry.TotalCostBasis)
-		assert.Equal(t, 15000.0, *entry.TotalCostBasis)
-
-		require.NotNil(t, entry.UnrealizedPnL)
-		assert.Equal(t, 1000.0, *entry.UnrealizedPnL)
-
-		require.NotNil(t, entry.UnrealizedPnLPct)
-		assert.InDelta(t, 6.6667, *entry.UnrealizedPnLPct, 0.001)
-	})
-
-	t.Run("short position with P&L", func(t *testing.T) {
-		entry := positionEntry{
-			Position: models.Position{
-				AveragePrice:        new(300.0),
-				ShortQuantity:       new(10.0),
-				ShortOpenProfitLoss: new(-500.0),
-			},
-		}
-		computePositionFields(&entry)
-
-		require.NotNil(t, entry.TotalCostBasis)
-		assert.Equal(t, 3000.0, *entry.TotalCostBasis)
-
-		require.NotNil(t, entry.UnrealizedPnL)
-		assert.Equal(t, -500.0, *entry.UnrealizedPnL)
-
-		require.NotNil(t, entry.UnrealizedPnLPct)
-		assert.InDelta(t, -16.6667, *entry.UnrealizedPnLPct, 0.001)
-	})
-
-	t.Run("both long and short P&L", func(t *testing.T) {
-		entry := positionEntry{
-			Position: models.Position{
-				AveragePrice:        new(100.0),
-				LongQuantity:        new(50.0),
-				ShortQuantity:       new(10.0),
-				LongOpenProfitLoss:  new(500.0),
-				ShortOpenProfitLoss: new(-200.0),
-			},
-		}
-		computePositionFields(&entry)
-
-		require.NotNil(t, entry.TotalCostBasis)
-		assert.Equal(t, 6000.0, *entry.TotalCostBasis) // 100 * (50 + 10)
-
-		require.NotNil(t, entry.UnrealizedPnL)
-		assert.Equal(t, 300.0, *entry.UnrealizedPnL) // 500 + (-200)
-
-		require.NotNil(t, entry.UnrealizedPnLPct)
-		assert.InDelta(t, 5.0, *entry.UnrealizedPnLPct, 0.001) // 300/6000*100
-	})
-
-	t.Run("nil averagePrice skips cost basis", func(t *testing.T) {
-		entry := positionEntry{
-			Position: models.Position{
-				LongQuantity:       new(100.0),
-				LongOpenProfitLoss: new(500.0),
-			},
-		}
-		computePositionFields(&entry)
-
-		assert.Nil(t, entry.TotalCostBasis)
-		require.NotNil(t, entry.UnrealizedPnL)
-		assert.Equal(t, 500.0, *entry.UnrealizedPnL)
-		// No P&L pct because no cost basis.
-		assert.Nil(t, entry.UnrealizedPnLPct)
-	})
-
-	t.Run("zero quantity skips cost basis", func(t *testing.T) {
-		entry := positionEntry{
-			Position: models.Position{
-				AveragePrice: new(150.0),
-				// No quantity fields set (both nil, default to 0).
-			},
-		}
-		computePositionFields(&entry)
-
-		assert.Nil(t, entry.TotalCostBasis)
-	})
-
-	t.Run("no P&L fields", func(t *testing.T) {
-		entry := positionEntry{
-			Position: models.Position{
-				AveragePrice: new(150.0),
-				LongQuantity: new(100.0),
-			},
-		}
-		computePositionFields(&entry)
-
-		require.NotNil(t, entry.TotalCostBasis)
-		assert.Equal(t, 15000.0, *entry.TotalCostBasis)
-		assert.Nil(t, entry.UnrealizedPnL)
-		assert.Nil(t, entry.UnrealizedPnLPct)
-	})
-
-	t.Run("all fields nil", func(t *testing.T) {
-		entry := positionEntry{}
-		computePositionFields(&entry)
-
-		assert.Nil(t, entry.TotalCostBasis)
-		assert.Nil(t, entry.UnrealizedPnL)
-		assert.Nil(t, entry.UnrealizedPnLPct)
-	})
-}
-
-func TestFlattenAccountPositions(t *testing.T) {
-	accounts := []models.Account{
-		{
-			SecuritiesAccount: &models.SecuritiesAccount{
-				AccountNumber: new("11111"),
-				Positions: []models.Position{
-					{
-						LongQuantity: new(100.0),
-						AveragePrice: new(50.0),
-						Instrument:   &models.AccountsInstrument{Symbol: new("AAPL")},
-					},
-				},
-			},
-			NickName: new("Trading"),
-		},
-		{
-			// Account with no SecuritiesAccount: should be skipped.
-			SecuritiesAccount: nil,
-		},
-		{
-			SecuritiesAccount: &models.SecuritiesAccount{
-				AccountNumber: new("22222"),
-				Positions: []models.Position{
-					{
-						ShortQuantity: new(5.0),
-						AveragePrice:  new(200.0),
-						Instrument:    &models.AccountsInstrument{Symbol: new("TSLA")},
-					},
-				},
-			},
-		},
-	}
-
-	numberToHash := map[string]string{
-		"11111": "HASH_A",
-		"22222": "HASH_B",
-	}
-
-	entries := flattenAccountPositions(accounts, numberToHash)
-	require.Len(t, entries, 2)
-
-	assert.Equal(t, "11111", entries[0].AccountNumber)
-	assert.Equal(t, "HASH_A", entries[0].AccountHash)
-	assert.Equal(t, "Trading", entries[0].AccountNickName)
-	assert.Equal(t, "AAPL", *entries[0].Instrument.Symbol)
-
-	assert.Equal(t, "22222", entries[1].AccountNumber)
-	assert.Equal(t, "HASH_B", entries[1].AccountHash)
-	assert.Empty(t, entries[1].AccountNickName)
-	assert.Equal(t, "TSLA", *entries[1].Instrument.Symbol)
-}
-
-func TestFlattenAccountPositions_Empty(t *testing.T) {
-	entries := flattenAccountPositions(nil, nil)
-	require.NotNil(t, entries, "should return empty slice, not nil")
-	assert.Empty(t, entries)
 }
 
 func TestPositionListComputedFieldsInOutput(t *testing.T) {
@@ -586,10 +402,9 @@ func TestPositionListComputedFieldsInOutput(t *testing.T) {
 	configPath := writeAccountTestConfig(t, t.TempDir(), "")
 
 	var buf bytes.Buffer
-	cmd := PositionCommand(c, configPath, &buf)
-	cmd.ExitErrHandler = noopExitHandler
+	cmd := NewPositionCmd(c, configPath, &buf)
 
-	err := cmd.Run(context.Background(), []string{"position", "list", "--account", "HASH123"})
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123")
 	require.NoError(t, err)
 
 	// Decode the raw JSON to verify computed fields are present.
@@ -613,5 +428,200 @@ func TestPositionListComputedFieldsInOutput(t *testing.T) {
 	assert.Equal(t, 16500.0, pos["marketValue"])
 }
 
-// Suppress unused import warnings for output package.
-var _ = output.Envelope{}
+// ---------------------------------------------------------------------------
+// Pure unit tests (framework-agnostic, no migration needed)
+// ---------------------------------------------------------------------------
+
+func TestComputePositionFields(t *testing.T) {
+	t.Run("long position with P&L", func(t *testing.T) {
+		entry := positionEntry{
+			Position: models.Position{
+				AveragePrice:       &testFloat150,
+				LongQuantity:       &testFloat100,
+				LongOpenProfitLoss: &testFloat1000,
+			},
+		}
+		computePositionFields(&entry)
+
+		require.NotNil(t, entry.TotalCostBasis)
+		assert.Equal(t, 15000.0, *entry.TotalCostBasis)
+
+		require.NotNil(t, entry.UnrealizedPnL)
+		assert.Equal(t, 1000.0, *entry.UnrealizedPnL)
+
+		require.NotNil(t, entry.UnrealizedPnLPct)
+		assert.InDelta(t, 6.6667, *entry.UnrealizedPnLPct, 0.001)
+	})
+
+	t.Run("short position with P&L", func(t *testing.T) {
+		entry := positionEntry{
+			Position: models.Position{
+				AveragePrice:        &testFloat300,
+				ShortQuantity:       &testFloat10,
+				ShortOpenProfitLoss: &testFloatNeg500,
+			},
+		}
+		computePositionFields(&entry)
+
+		require.NotNil(t, entry.TotalCostBasis)
+		assert.Equal(t, 3000.0, *entry.TotalCostBasis)
+
+		require.NotNil(t, entry.UnrealizedPnL)
+		assert.Equal(t, -500.0, *entry.UnrealizedPnL)
+
+		require.NotNil(t, entry.UnrealizedPnLPct)
+		assert.InDelta(t, -16.6667, *entry.UnrealizedPnLPct, 0.001)
+	})
+
+	t.Run("both long and short P&L", func(t *testing.T) {
+		entry := positionEntry{
+			Position: models.Position{
+				AveragePrice:        &testFloat100,
+				LongQuantity:        &testFloat50,
+				ShortQuantity:       &testFloat10,
+				LongOpenProfitLoss:  &testFloat500,
+				ShortOpenProfitLoss: &testFloatNeg200,
+			},
+		}
+		computePositionFields(&entry)
+
+		require.NotNil(t, entry.TotalCostBasis)
+		assert.Equal(t, 6000.0, *entry.TotalCostBasis) // 100 * (50 + 10)
+
+		require.NotNil(t, entry.UnrealizedPnL)
+		assert.Equal(t, 300.0, *entry.UnrealizedPnL) // 500 + (-200)
+
+		require.NotNil(t, entry.UnrealizedPnLPct)
+		assert.InDelta(t, 5.0, *entry.UnrealizedPnLPct, 0.001) // 300/6000*100
+	})
+
+	t.Run("nil averagePrice skips cost basis", func(t *testing.T) {
+		entry := positionEntry{
+			Position: models.Position{
+				LongQuantity:       &testFloat100,
+				LongOpenProfitLoss: &testFloat500,
+			},
+		}
+		computePositionFields(&entry)
+
+		assert.Nil(t, entry.TotalCostBasis)
+		require.NotNil(t, entry.UnrealizedPnL)
+		assert.Equal(t, 500.0, *entry.UnrealizedPnL)
+		// No P&L pct because no cost basis.
+		assert.Nil(t, entry.UnrealizedPnLPct)
+	})
+
+	t.Run("zero quantity skips cost basis", func(t *testing.T) {
+		entry := positionEntry{
+			Position: models.Position{
+				AveragePrice: &testFloat150,
+				// No quantity fields set (both nil, default to 0).
+			},
+		}
+		computePositionFields(&entry)
+
+		assert.Nil(t, entry.TotalCostBasis)
+	})
+
+	t.Run("no P&L fields", func(t *testing.T) {
+		entry := positionEntry{
+			Position: models.Position{
+				AveragePrice: &testFloat150,
+				LongQuantity: &testFloat100,
+			},
+		}
+		computePositionFields(&entry)
+
+		require.NotNil(t, entry.TotalCostBasis)
+		assert.Equal(t, 15000.0, *entry.TotalCostBasis)
+		assert.Nil(t, entry.UnrealizedPnL)
+		assert.Nil(t, entry.UnrealizedPnLPct)
+	})
+
+	t.Run("all fields nil", func(t *testing.T) {
+		entry := positionEntry{}
+		computePositionFields(&entry)
+
+		assert.Nil(t, entry.TotalCostBasis)
+		assert.Nil(t, entry.UnrealizedPnL)
+		assert.Nil(t, entry.UnrealizedPnLPct)
+	})
+}
+
+var (
+	testFloat5      = 5.0
+	testFloat10     = 10.0
+	testFloat50     = 50.0
+	testFloat100    = 100.0
+	testFloat150    = 150.0
+	testFloat200    = 200.0
+	testFloat300    = 300.0
+	testFloat500    = 500.0
+	testFloat1000   = 1000.0
+	testFloatNeg200 = -200.0
+	testFloatNeg500 = -500.0
+
+	testString11111   = "11111"
+	testString22222   = "22222"
+	testStringAAPL    = "AAPL"
+	testStringTSLA    = "TSLA"
+	testStringTrading = "Trading"
+)
+
+func TestFlattenAccountPositions(t *testing.T) {
+	accounts := []models.Account{
+		{
+			SecuritiesAccount: &models.SecuritiesAccount{
+				AccountNumber: &testString11111,
+				Positions: []models.Position{
+					{
+						LongQuantity: &testFloat100,
+						AveragePrice: &testFloat50,
+						Instrument:   &models.AccountsInstrument{Symbol: &testStringAAPL},
+					},
+				},
+			},
+			NickName: &testStringTrading,
+		},
+		{
+			// Account with no SecuritiesAccount: should be skipped.
+			SecuritiesAccount: nil,
+		},
+		{
+			SecuritiesAccount: &models.SecuritiesAccount{
+				AccountNumber: &testString22222,
+				Positions: []models.Position{
+					{
+						ShortQuantity: &testFloat5,
+						AveragePrice:  &testFloat200,
+						Instrument:    &models.AccountsInstrument{Symbol: &testStringTSLA},
+					},
+				},
+			},
+		},
+	}
+
+	numberToHash := map[string]string{
+		"11111": "HASH_A",
+		"22222": "HASH_B",
+	}
+
+	entries := flattenAccountPositions(accounts, numberToHash)
+	require.Len(t, entries, 2)
+
+	assert.Equal(t, "11111", entries[0].AccountNumber)
+	assert.Equal(t, "HASH_A", entries[0].AccountHash)
+	assert.Equal(t, "Trading", entries[0].AccountNickName)
+	assert.Equal(t, "AAPL", *entries[0].Instrument.Symbol)
+
+	assert.Equal(t, "22222", entries[1].AccountNumber)
+	assert.Equal(t, "HASH_B", entries[1].AccountHash)
+	assert.Empty(t, entries[1].AccountNickName)
+	assert.Equal(t, "TSLA", *entries[1].Instrument.Symbol)
+}
+
+func TestFlattenAccountPositions_Empty(t *testing.T) {
+	entries := flattenAccountPositions(nil, nil)
+	require.NotNil(t, entries, "should return empty slice, not nil")
+	assert.Empty(t, entries)
+}

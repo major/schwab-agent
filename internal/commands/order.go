@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/urfave/cli/v3"
+	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/auth"
@@ -53,40 +52,29 @@ type orderReplaceData struct {
 	Replaced bool  `json:"replaced"`
 }
 
-// orderRepeatPlaceData wraps a successful order repeat placement response.
-type orderRepeatPlaceData struct {
-	OrderID         int64 `json:"orderId"`
-	OriginalOrderID int64 `json:"originalOrderId"`
-}
-
-// orderRepeatPreviewData wraps an order repeat preview response.
-type orderRepeatPreviewData struct {
-	Preview         *models.PreviewOrder `json:"preview"`
-	OriginalOrderID int64                `json:"originalOrderId"`
-}
-
 const confirmOrderMessage = "Add --confirm to execute this order"
 
 const mutableDisabledMessage = `Mutable operations are disabled by default. ` +
 	`Set "i-also-like-to-live-dangerously": true in your config file to enable order placement, cancellation, and replacement.`
 
-// OrderCommand returns the parent order command and all nested order workflows.
-func OrderCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:   "order",
-		Usage:  "List, build, preview, place, cancel, and replace orders",
-		Action: requireSubcommand(),
-		Commands: []*cli.Command{
-			orderListCommand(c, configPath, w),
-			orderGetCommand(c, configPath, w),
-			orderPlaceCommand(c, configPath, w),
-			orderPreviewCommand(c, configPath, w),
-			orderBuildCommand(w),
-			orderCancelCommand(c, configPath, w),
-			orderReplaceCommand(c, configPath, w),
-			orderRepeatCommand(c, configPath, w),
-		},
+// NewOrderCmd returns the Cobra command for order operations.
+func NewOrderCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "order",
+		Short:   "List, build, preview, place, cancel, and replace orders",
+		GroupID: "trading",
+		RunE:    requireSubcommand,
 	}
+
+	cmd.AddCommand(newOrderListCmd(c, configPath, w))
+	cmd.AddCommand(newOrderGetCmd(c, configPath, w))
+	cmd.AddCommand(newOrderPlaceCmd(c, configPath, w))
+	cmd.AddCommand(newOrderPreviewCmd(c, configPath, w))
+	cmd.AddCommand(newOrderBuildCmd(w))
+	cmd.AddCommand(newOrderCancelCmd(c, configPath, w))
+	cmd.AddCommand(newOrderReplaceCmd(c, configPath, w))
+
+	return cmd
 }
 
 // terminalOrderStatuses are order statuses that represent completed/final states.
@@ -112,33 +100,21 @@ func filterNonTerminalOrders(orders []models.Order) []models.Order {
 	return filtered
 }
 
-// orderListCommand lists orders for a specific account or all accounts.
-// By default, terminal statuses (FILLED, CANCELED, REJECTED, EXPIRED, REPLACED)
-// are filtered out to show only actionable orders. Use --status all to see
-// everything, or --status <STATUS> to filter by specific statuses.
-func orderListCommand(c *client.Ref, _ string, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "list",
-		Usage: "List orders (defaults to non-terminal statuses)",
-		UsageText: `schwab-agent order list
+// newOrderListCmd lists orders for a specific account or all accounts.
+// By default, terminal statuses are filtered out to show only actionable orders.
+func newOrderListCmd(c *client.Ref, _ string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List orders (defaults to non-terminal statuses)",
+		Example: `schwab-agent order list
 schwab-agent order list --status all
 schwab-agent order list --status FILLED
 schwab-agent order list --status WORKING --status PENDING_ACTIVATION
 schwab-agent order list --status WORKING,PENDING_ACTIVATION
 schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
-		Flags: []cli.Flag{
-			&cli.StringSliceFlag{Name: "status", Usage: "Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc."},
-			&cli.StringFlag{Name: "from", Usage: "Filter by entered time lower bound"},
-			&cli.StringFlag{Name: "to", Usage: "Filter by entered time upper bound"},
-			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			// Split comma-separated values and trim whitespace, matching the
-			// --fields pattern in quote.go. Supports both repeatable flags
-			// (--status WORKING --status FILLED) and comma-separated
-			// (--status WORKING,FILLED).
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			var statuses []string
-			for _, raw := range cmd.StringSlice("status") {
+			for _, raw := range flagStringSlice(cmd, "status") {
 				for part := range strings.SplitSeq(raw, ",") {
 					trimmed := strings.TrimSpace(part)
 					if trimmed != "" {
@@ -147,8 +123,6 @@ schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 				}
 			}
 
-			// "all" is a pseudo-status that disables default filtering.
-			// When present, fetch everything without any status filter.
 			showAll := false
 			for _, s := range statuses {
 				if strings.EqualFold(s, "all") {
@@ -157,8 +131,6 @@ schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 				}
 			}
 
-			// When specific statuses are requested (not "all"), pass them
-			// through to the API. When "all" or no statuses, fetch unfiltered.
 			var apiStatuses []string
 			if !showAll {
 				apiStatuses = statuses
@@ -166,26 +138,23 @@ schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 
 			params := client.OrderListParams{
 				Statuses:        apiStatuses,
-				FromEnteredTime: strings.TrimSpace(cmd.String("from")),
-				ToEnteredTime:   strings.TrimSpace(cmd.String("to")),
+				FromEnteredTime: strings.TrimSpace(flagString(cmd, "from")),
+				ToEnteredTime:   strings.TrimSpace(flagString(cmd, "to")),
 			}
 
-			account := strings.TrimSpace(cmd.String("account"))
+			account := strings.TrimSpace(flagString(cmd, "account"))
 
 			var orders []models.Order
 			var err error
 			if account == "" {
-				orders, err = c.AllOrders(ctx, params)
+				orders, err = c.AllOrders(cmd.Context(), params)
 			} else {
-				orders, err = c.ListOrders(ctx, account, params)
+				orders, err = c.ListOrders(cmd.Context(), account, params)
 			}
 			if err != nil {
 				return err
 			}
 
-			// When no statuses were explicitly requested, filter out terminal
-			// orders client-side. This avoids N API calls (one per non-terminal
-			// status) since the Schwab API only accepts one status per request.
 			if len(statuses) == 0 {
 				orders = filterNonTerminalOrders(orders)
 			}
@@ -193,32 +162,34 @@ schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 			return output.WriteSuccess(w, orderListData{Orders: orders}, output.NewMetadata())
 		},
 	}
+
+	cmd.Flags().StringSlice("status", nil, "Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc.")
+	cmd.Flags().String("from", "", "Filter by entered time lower bound")
+	cmd.Flags().String("to", "", "Filter by entered time upper bound")
+	cmd.Flags().String("account", "", "Account hash value")
+
+	return cmd
 }
 
-// orderGetCommand returns a single order by account and ID.
-func orderGetCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "get",
-		Usage: "Get an order by ID",
-		UsageText: `schwab-agent order get 1234567890
+// newOrderGetCmd returns a single order by account and ID.
+func newOrderGetCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get [order-id]",
+		Short: "Get an order by ID",
+		Example: `schwab-agent order get 1234567890
 schwab-agent order get --order-id 1234567890`,
-		ArgsUsage: "<order-id>",
-		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "order-id", Usage: "Order ID"},
-			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			orderID, err := parseRequiredOrderID(cmd)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			orderID, err := parseRequiredOrderID(cmd, args)
 			if err != nil {
 				return err
 			}
 
-			account, err := resolveAccount(cmd.String("account"), configPath, nil)
+			account, err := resolveAccount(flagString(cmd, "account"), configPath, nil)
 			if err != nil {
 				return err
 			}
 
-			order, err := c.GetOrder(ctx, account, orderID)
+			order, err := c.GetOrder(cmd.Context(), account, orderID)
 			if err != nil {
 				return err
 			}
@@ -226,28 +197,22 @@ schwab-agent order get --order-id 1234567890`,
 			return output.WriteSuccess(w, orderGetData{Order: order}, output.NewMetadata())
 		},
 	}
+
+	cmd.Flags().String("order-id", "", "Order ID")
+	cmd.Flags().String("account", "", "Account hash value")
+
+	return cmd
 }
 
-// orderPlaceCommand places new orders from either flags or a JSON spec.
-func orderPlaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "place",
-		Usage: "Place an order",
-		UsageText: `schwab-agent order place --spec @order.json --confirm
+// newOrderPlaceCmd places new orders from either flags or a JSON spec.
+func newOrderPlaceCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "place",
+		Short: "Place an order",
+		Example: `schwab-agent order place --spec @order.json --confirm
 schwab-agent order place --spec - --confirm`,
-		// OnUsageError fires when urfave/cli encounters an unknown flag during
-		// parsing. For `order place`, this typically means the user forgot to
-		// specify a subcommand (equity, option, bracket, oco) and used flags
-		// that belong to one of those subcommands. Overriding the confusing
-		// default "flag provided but not defined" with a subcommand hint.
-		OnUsageError: suggestSubcommands,
-		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "spec", Usage: "Inline JSON, @file, or - for stdin"},
-			&cli.BoolFlag{Name: "confirm", Usage: "Confirm order placement"},
-			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if strings.TrimSpace(cmd.String("spec")) == "" {
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if strings.TrimSpace(flagString(cmd, "spec")) == "" {
 				return newValidationError("spec is required for `order place` without a subcommand")
 			}
 
@@ -255,85 +220,73 @@ schwab-agent order place --spec - --confirm`,
 				return err
 			}
 
-			if err := requireConfirm(cmd.Bool("confirm")); err != nil {
+			if err := requireConfirm(flagBool(cmd, "confirm")); err != nil {
 				return err
 			}
 
-			account, err := resolveAccount(cmd.String("account"), configPath, nil)
+			account, err := resolveAccount(flagString(cmd, "account"), configPath, nil)
 			if err != nil {
 				return err
 			}
 
-			order, err := parseSpecOrder(cmd, cmd.String("spec"))
+			order, err := parseSpecOrder(cmd, flagString(cmd, "spec"))
 			if err != nil {
 				return err
 			}
 
-			response, err := c.PlaceOrder(ctx, account, order)
+			response, err := c.PlaceOrder(cmd.Context(), account, order)
 			if err != nil {
 				return err
 			}
 
 			return output.WriteSuccess(w, orderPlaceData{OrderID: response.OrderID}, output.NewMetadata())
 		},
-		Commands: []*cli.Command{
-			makePlaceOrderCommand(c, configPath, w, "equity", "Place an equity order",
-				"schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150.00 --duration DAY --confirm",
-				equityOrderFlags(), parseEquityParams,
-				orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder),
-			makePlaceOrderCommand(c, configPath, w, "option", "Place an option order",
-				`schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00 --duration DAY --confirm`,
-				optionOrderFlags(), parseOptionParams,
-				orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder),
-			makePlaceOrderCommand(c, configPath, w, "bracket", "Place a bracket order",
-				`schwab-agent order place bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150.00 --take-profit 170.00 --stop-loss 140.00 --duration DAY --confirm`,
-				bracketOrderFlags(), parseBracketParams,
-				orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder),
-			makePlaceOrderCommand(c, configPath, w, "oco", "Place a one-cancels-other order for an existing position",
-				`schwab-agent order place oco --symbol AAPL --action SELL --quantity 10 --take-profit 170.00 --stop-loss 140.00 --duration DAY --confirm`,
-				ocoOrderFlags(), parseOCOParams,
-				orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder),
-		},
 	}
+
+	cmd.SetFlagErrorFunc(suggestSubcommands)
+	cmd.Flags().String("spec", "", "Inline JSON, @file, or - for stdin")
+	cmd.Flags().Bool("confirm", false, "Confirm order placement")
+	cmd.Flags().String("account", "", "Account hash value")
+	cmd.AddCommand(
+		makeCobraPlaceOrderCommand(c, configPath, w, "equity", "Place an equity order", equityOrderFlagSetup, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder),
+		makeCobraPlaceOrderCommand(c, configPath, w, "option", "Place an option order", optionOrderFlagSetup, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder),
+		makeCobraPlaceOrderCommand(c, configPath, w, "bracket", "Place a bracket order", bracketOrderFlagSetup, parseBracketParams, orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder),
+		makeCobraPlaceOrderCommand(c, configPath, w, "oco", "Place a one-cancels-other order for an existing position", ocoOrderFlagSetup, parseOCOParams, orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder),
+	)
+
+	return cmd
 }
 
-// makePlaceOrderCommand creates a place subcommand that enforces safety guards,
-// resolves the account, then runs the parse/validate/build/place pipeline.
-// Same generic pattern as makeBuildOrderCommand but adds mutable + confirm gates
-// and the actual API call.
-func makePlaceOrderCommand[P any](
+// makeCobraPlaceOrderCommand creates a Cobra place subcommand with the same
+// parse/validate/build/place pipeline as the legacy generic factory.
+func makeCobraPlaceOrderCommand[P any](
 	c *client.Ref,
 	configPath string,
 	w io.Writer,
-	name, usage, usageText string,
-	flags []cli.Flag,
-	parse func(*cli.Command) (P, error),
+	name, usage string,
+	flagSetup func(*cobra.Command),
+	parse func(*cobra.Command, []string) (P, error),
 	validate func(*P) error,
 	build func(*P) (*models.OrderRequest, error),
-) *cli.Command {
-	return &cli.Command{
-		Name:      name,
-		Usage:     usage,
-		UsageText: usageText,
-		Flags: append(flags,
-			&cli.BoolFlag{Name: "confirm", Usage: "Confirm order placement"},
-			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
-		),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   name,
+		Short: usage,
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := requireMutableEnabled(configPath); err != nil {
 				return err
 			}
 
-			if err := requireConfirm(cmd.Bool("confirm")); err != nil {
+			if err := requireConfirm(flagBool(cmd, "confirm")); err != nil {
 				return err
 			}
 
-			account, err := resolveAccount(cmd.String("account"), configPath, nil)
+			account, err := resolveAccount(flagString(cmd, "account"), configPath, nil)
 			if err != nil {
 				return err
 			}
 
-			params, err := parse(cmd)
+			params, err := parse(cmd, args)
 			if err != nil {
 				return err
 			}
@@ -347,7 +300,7 @@ func makePlaceOrderCommand[P any](
 				return err
 			}
 
-			response, err := c.PlaceOrder(ctx, account, order)
+			response, err := c.PlaceOrder(cmd.Context(), account, order)
 			if err != nil {
 				return err
 			}
@@ -355,120 +308,120 @@ func makePlaceOrderCommand[P any](
 			return output.WriteSuccess(w, orderPlaceData{OrderID: response.OrderID}, output.NewMetadata())
 		},
 	}
+
+	if flagSetup != nil {
+		flagSetup(cmd)
+	}
+	cmd.Flags().Bool("confirm", false, "Confirm order placement")
+	cmd.Flags().String("account", "", "Account hash value")
+
+	return cmd
 }
 
-// orderPreviewCommand previews an order from a JSON spec.
-func orderPreviewCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:      "preview",
-		Usage:     "Preview an order from JSON spec",
-		UsageText: "schwab-agent order preview --spec @order.json",
-		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "spec", Usage: "Inline JSON, @file, or - for stdin"},
-			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if strings.TrimSpace(cmd.String("spec")) == "" {
+// newOrderPreviewCmd previews an order from a JSON spec.
+func newOrderPreviewCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "preview",
+		Short:   "Preview an order from JSON spec",
+		Example: "schwab-agent order preview --spec @order.json",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if strings.TrimSpace(flagString(cmd, "spec")) == "" {
 				return newValidationError("spec is required")
 			}
 
-			account, err := resolveAccount(cmd.String("account"), configPath, nil)
+			account, err := resolveAccount(flagString(cmd, "account"), configPath, nil)
 			if err != nil {
 				return err
 			}
 
-			order, err := parseSpecOrder(cmd, cmd.String("spec"))
+			order, err := parseSpecOrder(cmd, flagString(cmd, "spec"))
 			if err != nil {
 				return err
 			}
 
-			preview, err := c.PreviewOrder(ctx, account, order)
+			preview, err := c.PreviewOrder(cmd.Context(), account, order)
 			if err != nil {
 				return err
 			}
 
-			return output.WriteSuccess(w, orderPreviewData{
-				Preview: preview,
-				OrderID: preview.OrderID,
-			}, output.NewMetadata())
+			return output.WriteSuccess(w, orderPreviewData{Preview: preview, OrderID: preview.OrderID}, output.NewMetadata())
 		},
 	}
+
+	cmd.Flags().String("spec", "", "Inline JSON, @file, or - for stdin")
+	cmd.Flags().String("account", "", "Account hash value")
+
+	return cmd
 }
 
-// orderCancelCommand cancels an existing order.
-func orderCancelCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "cancel",
-		Usage: "Cancel an order",
-		UsageText: `schwab-agent order cancel 1234567890 --confirm
+// newOrderCancelCmd cancels an existing order.
+func newOrderCancelCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cancel [order-id]",
+		Short: "Cancel an order",
+		Example: `schwab-agent order cancel 1234567890 --confirm
 schwab-agent order cancel --order-id 1234567890 --confirm`,
-		ArgsUsage: "<order-id>",
-		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "order-id", Usage: "Order ID"},
-			&cli.BoolFlag{Name: "confirm", Usage: "Confirm cancellation"},
-			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := requireMutableEnabled(configPath); err != nil {
 				return err
 			}
 
-			if err := requireConfirm(cmd.Bool("confirm")); err != nil {
+			if err := requireConfirm(flagBool(cmd, "confirm")); err != nil {
 				return err
 			}
 
-			orderID, err := parseRequiredOrderID(cmd)
+			orderID, err := parseRequiredOrderID(cmd, args)
 			if err != nil {
 				return err
 			}
 
-			account, err := resolveAccount(cmd.String("account"), configPath, nil)
+			account, err := resolveAccount(flagString(cmd, "account"), configPath, nil)
 			if err != nil {
 				return err
 			}
 
-			if err := c.CancelOrder(ctx, account, orderID); err != nil {
+			if err := c.CancelOrder(cmd.Context(), account, orderID); err != nil {
 				return err
 			}
 
 			return output.WriteSuccess(w, orderCancelData{OrderID: orderID, Canceled: true}, output.NewMetadata())
 		},
 	}
+
+	cmd.Flags().String("order-id", "", "Order ID")
+	cmd.Flags().Bool("confirm", false, "Confirm cancellation")
+	cmd.Flags().String("account", "", "Account hash value")
+
+	return cmd
 }
 
-// orderReplaceCommand replaces an existing order with an equity order payload.
-func orderReplaceCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "replace",
-		Usage: "Replace an order with a new equity order spec",
-		UsageText: `schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
+// newOrderReplaceCmd replaces an existing order with a new equity order payload.
+func newOrderReplaceCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "replace [order-id]",
+		Short: "Replace an order with a new equity order spec",
+		Example: `schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
 schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm`,
-		ArgsUsage: "<order-id>",
-		Flags: append(equityOrderFlags(),
-			&cli.StringFlag{Name: "order-id", Usage: "Order ID"},
-			&cli.BoolFlag{Name: "confirm", Usage: "Confirm replacement"},
-			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
-		),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := requireMutableEnabled(configPath); err != nil {
 				return err
 			}
 
-			if err := requireConfirm(cmd.Bool("confirm")); err != nil {
+			if err := requireConfirm(flagBool(cmd, "confirm")); err != nil {
 				return err
 			}
 
-			orderID, err := parseRequiredOrderID(cmd)
+			orderID, err := parseRequiredOrderID(cmd, args)
 			if err != nil {
 				return err
 			}
 
-			account, err := resolveAccount(cmd.String("account"), configPath, nil)
+			account, err := resolveAccount(flagString(cmd, "account"), configPath, nil)
 			if err != nil {
 				return err
 			}
 
-			params, err := parseEquityParams(cmd)
+			params, err := parseEquityParams(cmd, args)
 			if err != nil {
 				return err
 			}
@@ -482,186 +435,89 @@ schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --qu
 				return err
 			}
 
-			if err := c.ReplaceOrder(ctx, account, orderID, order); err != nil {
+			if err := c.ReplaceOrder(cmd.Context(), account, orderID, order); err != nil {
 				return err
 			}
 
 			return output.WriteSuccess(w, orderReplaceData{OrderID: orderID, Replaced: true}, output.NewMetadata())
 		},
 	}
+
+	equityOrderFlagSetup(cmd)
+	cmd.Flags().String("order-id", "", "Order ID")
+	cmd.Flags().Bool("confirm", false, "Confirm replacement")
+	cmd.Flags().String("account", "", "Account hash value")
+
+	return cmd
 }
 
-// orderRepeatCommand fetches an existing order, converts it to a submittable request,
-// and either outputs the JSON (--build/default), previews it, or places it.
-func orderRepeatCommand(c *client.Ref, configPath string, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "repeat",
-		Usage: "Repeat a previous order (fetch, convert, and optionally place)",
-		UsageText: `schwab-agent order repeat 1234567890
-schwab-agent order repeat --order-id 1234567890
-schwab-agent order repeat 1234567890 --preview
-schwab-agent order repeat 1234567890 --confirm`,
-		ArgsUsage: "<order-id>",
-		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "order-id", Usage: "Order ID"},
-			&cli.BoolFlag{Name: "build", Usage: "Output reconstructed order request JSON (default)"},
-			&cli.BoolFlag{Name: "preview", Usage: "Preview the order without placing it"},
-			&cli.BoolFlag{Name: "confirm", Usage: "Place the order (requires safety guards)"},
-			&cli.StringFlag{Name: "account", Usage: "Account hash value"},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			buildMode := cmd.Bool("build")
-			previewMode := cmd.Bool("preview")
-			confirmMode := cmd.Bool("confirm")
-
-			// Reject multiple mode flags to avoid ambiguity.
-			modeCount := 0
-			if buildMode {
-				modeCount++
-			}
-			if previewMode {
-				modeCount++
-			}
-			if confirmMode {
-				modeCount++
-			}
-			if modeCount > 1 {
-				return newValidationError("specify only one of --build, --preview, or --confirm")
-			}
-
-			// Enforce safety guards early for --confirm so we fail fast
-			// before making any API calls. Note: --confirm doubles as
-			// both the mode selector and the safety gate for this command,
-			// so a separate requireConfirm check would be tautological.
-			if confirmMode {
-				if err := requireMutableEnabled(configPath); err != nil {
-					return err
-				}
-			}
-
-			orderID, err := parseRequiredOrderID(cmd)
-			if err != nil {
-				return err
-			}
-
-			account, err := resolveAccount(cmd.String("account"), configPath, nil)
-			if err != nil {
-				return err
-			}
-
-			// Fetch the original order from the API.
-			order, err := c.GetOrder(ctx, account, orderID)
-			if err != nil {
-				return err
-			}
-
-			// Convert to a submittable request (strips response-only fields).
-			request := models.OrderToRequest(order)
-
-			switch {
-			case previewMode:
-				preview, previewErr := c.PreviewOrder(ctx, account, &request)
-				if previewErr != nil {
-					return previewErr
-				}
-				return output.WriteSuccess(w, orderRepeatPreviewData{
-					Preview:         preview,
-					OriginalOrderID: orderID,
-				}, output.NewMetadata())
-
-			case confirmMode:
-				response, placeErr := c.PlaceOrder(ctx, account, &request)
-				if placeErr != nil {
-					return placeErr
-				}
-				return output.WriteSuccess(w, orderRepeatPlaceData{
-					OrderID:         response.OrderID,
-					OriginalOrderID: orderID,
-				}, output.NewMetadata())
-
-			default:
-				// --build or no flag: output raw order request JSON.
-				return writeOrderRequestJSON(w, request)
-			}
-		},
-	}
+// equityOrderFlagSetup registers equity order flags on cmd.
+func equityOrderFlagSetup(cmd *cobra.Command) {
+	cmd.Flags().String("symbol", "", "Equity symbol")
+	cmd.Flags().String("action", "", "Order action")
+	cmd.Flags().Float64("quantity", 0, "Share quantity")
+	cmd.Flags().String("type", "", "Order type")
+	cmd.Flags().Float64("price", 0, "Limit price")
+	cmd.Flags().Float64("stop-price", 0, "Stop price")
+	cmd.Flags().Float64("stop-offset", 0, "Trailing stop offset amount")
+	cmd.Flags().String("stop-link-basis", "", "Trailing stop reference price (LAST, BID, ASK, MARK)")
+	cmd.Flags().String("stop-link-type", "", "Trailing stop offset type (VALUE, PERCENT, TICK)")
+	cmd.Flags().String("stop-type", "", "Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)")
+	cmd.Flags().Float64("activation-price", 0, "Price that activates the trailing stop")
+	cmd.Flags().String("duration", "", "Order duration")
+	cmd.Flags().String("session", "", "Trading session")
+	cmd.Flags().String("special-instruction", "", "Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)")
+	cmd.Flags().String("destination", "", "Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)")
+	cmd.Flags().String("price-link-basis", "", "Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)")
+	cmd.Flags().String("price-link-type", "", "Price link offset type (VALUE, PERCENT, TICK)")
 }
 
-// equityOrderFlags returns the shared flag set for equity order workflows.
-func equityOrderFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "symbol", Usage: "Equity symbol"},
-		&cli.StringFlag{Name: "action", Usage: "Order action"},
-		&cli.Float64Flag{Name: "quantity", Usage: "Share quantity"},
-		&cli.StringFlag{Name: "type", Usage: "Order type"},
-		&cli.Float64Flag{Name: "price", Usage: "Limit price"},
-		&cli.Float64Flag{Name: "stop-price", Usage: "Stop price"},
-		&cli.Float64Flag{Name: "stop-offset", Usage: "Trailing stop offset amount"},
-		&cli.StringFlag{Name: "stop-link-basis", Usage: "Trailing stop reference price (LAST, BID, ASK, MARK)"},
-		&cli.StringFlag{Name: "stop-link-type", Usage: "Trailing stop offset type (VALUE, PERCENT, TICK)"},
-		&cli.StringFlag{Name: "stop-type", Usage: "Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)"},
-		&cli.Float64Flag{Name: "activation-price", Usage: "Price that activates the trailing stop"},
-		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
-		&cli.StringFlag{Name: "session", Usage: "Trading session"},
-		&cli.StringFlag{Name: "special-instruction", Usage: "Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"},
-		&cli.StringFlag{Name: "destination", Usage: "Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)"},
-		&cli.StringFlag{Name: "price-link-basis", Usage: "Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)"},
-		&cli.StringFlag{Name: "price-link-type", Usage: "Price link offset type (VALUE, PERCENT, TICK)"},
-	}
+// optionOrderFlagSetup registers option order flags on cmd.
+func optionOrderFlagSetup(cmd *cobra.Command) {
+	cmd.Flags().String("underlying", "", "Underlying symbol")
+	cmd.Flags().String("expiration", "", "Expiration date (YYYY-MM-DD)")
+	cmd.Flags().Float64("strike", 0, "Strike price")
+	cmd.Flags().Bool("call", false, "Call option")
+	cmd.Flags().Bool("put", false, "Put option")
+	cmd.Flags().String("action", "", "Order action")
+	cmd.Flags().Float64("quantity", 0, "Contract quantity")
+	cmd.Flags().String("type", "", "Order type")
+	cmd.Flags().Float64("price", 0, "Limit price")
+	cmd.Flags().String("duration", "", "Order duration")
+	cmd.Flags().String("session", "", "Trading session")
+	cmd.Flags().String("special-instruction", "", "Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)")
+	cmd.Flags().String("destination", "", "Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)")
+	cmd.Flags().String("price-link-basis", "", "Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)")
+	cmd.Flags().String("price-link-type", "", "Price link offset type (VALUE, PERCENT, TICK)")
 }
 
-// optionOrderFlags returns the shared flag set for option order workflows.
-func optionOrderFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
-		&cli.StringFlag{Name: "expiration", Usage: "Expiration date (YYYY-MM-DD)"},
-		&cli.Float64Flag{Name: "strike", Usage: "Strike price"},
-		&cli.BoolFlag{Name: "call", Usage: "Call option"},
-		&cli.BoolFlag{Name: "put", Usage: "Put option"},
-		&cli.StringFlag{Name: "action", Usage: "Order action"},
-		&cli.Float64Flag{Name: "quantity", Usage: "Contract quantity"},
-		&cli.StringFlag{Name: "type", Usage: "Order type"},
-		&cli.Float64Flag{Name: "price", Usage: "Limit price"},
-		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
-		&cli.StringFlag{Name: "session", Usage: "Trading session"},
-		&cli.StringFlag{Name: "special-instruction", Usage: "Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"},
-		&cli.StringFlag{Name: "destination", Usage: "Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)"},
-		&cli.StringFlag{Name: "price-link-basis", Usage: "Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)"},
-		&cli.StringFlag{Name: "price-link-type", Usage: "Price link offset type (VALUE, PERCENT, TICK)"},
-	}
+// bracketOrderFlagSetup registers bracket order flags on cmd.
+func bracketOrderFlagSetup(cmd *cobra.Command) {
+	cmd.Flags().String("symbol", "", "Equity symbol")
+	cmd.Flags().String("action", "", "Order action")
+	cmd.Flags().Float64("quantity", 0, "Share quantity")
+	cmd.Flags().String("type", "", "Entry order type")
+	cmd.Flags().Float64("price", 0, "Entry price")
+	cmd.Flags().Float64("take-profit", 0, "Take-profit exit price")
+	cmd.Flags().Float64("stop-loss", 0, "Stop-loss exit price")
+	cmd.Flags().String("duration", "", "Order duration")
+	cmd.Flags().String("session", "", "Trading session")
 }
 
-// bracketOrderFlags returns the shared flag set for bracket order workflows.
-func bracketOrderFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "symbol", Usage: "Equity symbol"},
-		&cli.StringFlag{Name: "action", Usage: "Order action"},
-		&cli.Float64Flag{Name: "quantity", Usage: "Share quantity"},
-		&cli.StringFlag{Name: "type", Usage: "Entry order type"},
-		&cli.Float64Flag{Name: "price", Usage: "Entry price"},
-		&cli.Float64Flag{Name: "take-profit", Usage: "Take-profit exit price"},
-		&cli.Float64Flag{Name: "stop-loss", Usage: "Stop-loss exit price"},
-		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
-		&cli.StringFlag{Name: "session", Usage: "Trading session"},
-	}
-}
-
-// ocoOrderFlags returns the shared flag set for standalone OCO order workflows.
-func ocoOrderFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "symbol", Usage: "Equity symbol"},
-		&cli.StringFlag{Name: "action", Usage: "Exit action (SELL to close long, BUY to close short)"},
-		&cli.Float64Flag{Name: "quantity", Usage: "Share quantity"},
-		&cli.Float64Flag{Name: "take-profit", Usage: "Take-profit exit price (limit order)"},
-		&cli.Float64Flag{Name: "stop-loss", Usage: "Stop-loss exit price (stop order)"},
-		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
-		&cli.StringFlag{Name: "session", Usage: "Trading session"},
-	}
+// ocoOrderFlagSetup registers standalone OCO order flags on cmd.
+func ocoOrderFlagSetup(cmd *cobra.Command) {
+	cmd.Flags().String("symbol", "", "Equity symbol")
+	cmd.Flags().String("action", "", "Exit action (SELL to close long, BUY to close short)")
+	cmd.Flags().Float64("quantity", 0, "Share quantity")
+	cmd.Flags().Float64("take-profit", 0, "Take-profit exit price (limit order)")
+	cmd.Flags().Float64("stop-loss", 0, "Stop-loss exit price (stop order)")
+	cmd.Flags().String("duration", "", "Order duration")
+	cmd.Flags().String("session", "", "Trading session")
 }
 
 // parseOCOParams converts command flags into standalone OCO builder params.
-func parseOCOParams(cmd *cli.Command) (orderbuilder.OCOParams, error) {
-	action, err := parseInstruction(cmd.String("action"))
+func parseOCOParams(cmd *cobra.Command, _ []string) (orderbuilder.OCOParams, error) {
+	action, err := parseInstruction(flagString(cmd, "action"))
 	if err != nil {
 		return orderbuilder.OCOParams{}, err
 	}
@@ -672,55 +528,51 @@ func parseOCOParams(cmd *cli.Command) (orderbuilder.OCOParams, error) {
 	}
 
 	return orderbuilder.OCOParams{
-		Symbol:     strings.TrimSpace(cmd.String("symbol")),
+		Symbol:     strings.TrimSpace(flagString(cmd, "symbol")),
 		Action:     action,
-		Quantity:   cmd.Float64("quantity"),
-		TakeProfit: cmd.Float64("take-profit"),
-		StopLoss:   cmd.Float64("stop-loss"),
+		Quantity:   flagFloat64(cmd, "quantity"),
+		TakeProfit: flagFloat64(cmd, "take-profit"),
+		StopLoss:   flagFloat64(cmd, "stop-loss"),
 		Duration:   duration,
 		Session:    session,
 	}, nil
 }
 
-// verticalOrderFlags returns the shared flag set for vertical spread workflows.
-func verticalOrderFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
-		&cli.StringFlag{Name: "expiration", Usage: "Expiration date (YYYY-MM-DD)"},
-		&cli.Float64Flag{Name: "long-strike", Usage: "Strike price of the option being bought"},
-		&cli.Float64Flag{Name: "short-strike", Usage: "Strike price of the option being sold"},
-		&cli.BoolFlag{Name: "call", Usage: "Call spread"},
-		&cli.BoolFlag{Name: "put", Usage: "Put spread"},
-		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
-		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
-		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts"},
-		&cli.Float64Flag{Name: "price", Usage: "Net debit or credit amount"},
-		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
-		&cli.StringFlag{Name: "session", Usage: "Trading session"},
-	}
+// verticalOrderFlagSetup registers vertical spread flags on cmd.
+func verticalOrderFlagSetup(cmd *cobra.Command) {
+	cmd.Flags().String("underlying", "", "Underlying symbol")
+	cmd.Flags().String("expiration", "", "Expiration date (YYYY-MM-DD)")
+	cmd.Flags().Float64("long-strike", 0, "Strike price of the option being bought")
+	cmd.Flags().Float64("short-strike", 0, "Strike price of the option being sold")
+	cmd.Flags().Bool("call", false, "Call spread")
+	cmd.Flags().Bool("put", false, "Put spread")
+	cmd.Flags().Bool("open", false, "Opening position")
+	cmd.Flags().Bool("close", false, "Closing position")
+	cmd.Flags().Float64("quantity", 0, "Number of contracts")
+	cmd.Flags().Float64("price", 0, "Net debit or credit amount")
+	cmd.Flags().String("duration", "", "Order duration")
+	cmd.Flags().String("session", "", "Trading session")
 }
 
-// ironCondorOrderFlags returns the CLI flags for the iron-condor build command.
-func ironCondorOrderFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
-		&cli.StringFlag{Name: "expiration", Usage: "Expiration date (YYYY-MM-DD)"},
-		&cli.Float64Flag{Name: "put-long-strike", Usage: "Lowest strike: put being bought (protection)"},
-		&cli.Float64Flag{Name: "put-short-strike", Usage: "Put being sold (premium)"},
-		&cli.Float64Flag{Name: "call-short-strike", Usage: "Call being sold (premium)"},
-		&cli.Float64Flag{Name: "call-long-strike", Usage: "Highest strike: call being bought (protection)"},
-		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
-		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
-		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts"},
-		&cli.Float64Flag{Name: "price", Usage: "Net credit or debit amount"},
-		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
-		&cli.StringFlag{Name: "session", Usage: "Trading session"},
-	}
+// ironCondorOrderFlagSetup registers iron condor flags on cmd.
+func ironCondorOrderFlagSetup(cmd *cobra.Command) {
+	cmd.Flags().String("underlying", "", "Underlying symbol")
+	cmd.Flags().String("expiration", "", "Expiration date (YYYY-MM-DD)")
+	cmd.Flags().Float64("put-long-strike", 0, "Lowest strike: put being bought (protection)")
+	cmd.Flags().Float64("put-short-strike", 0, "Put being sold (premium)")
+	cmd.Flags().Float64("call-short-strike", 0, "Call being sold (premium)")
+	cmd.Flags().Float64("call-long-strike", 0, "Highest strike: call being bought (protection)")
+	cmd.Flags().Bool("open", false, "Opening position")
+	cmd.Flags().Bool("close", false, "Closing position")
+	cmd.Flags().Float64("quantity", 0, "Number of contracts")
+	cmd.Flags().Float64("price", 0, "Net credit or debit amount")
+	cmd.Flags().String("duration", "", "Order duration")
+	cmd.Flags().String("session", "", "Trading session")
 }
 
 // parseIronCondorParams converts command flags into iron condor builder params.
-func parseIronCondorParams(cmd *cli.Command) (orderbuilder.IronCondorParams, error) {
-	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+func parseIronCondorParams(cmd *cobra.Command, _ []string) (orderbuilder.IronCondorParams, error) {
+	isOpen, err := parseOpenClose(flagBool(cmd, "open"), flagBool(cmd, "close"))
 	if err != nil {
 		return orderbuilder.IronCondorParams{}, err
 	}
@@ -736,28 +588,28 @@ func parseIronCondorParams(cmd *cli.Command) (orderbuilder.IronCondorParams, err
 	}
 
 	return orderbuilder.IronCondorParams{
-		Underlying:      strings.TrimSpace(cmd.String("underlying")),
+		Underlying:      strings.TrimSpace(flagString(cmd, "underlying")),
 		Expiration:      expiration,
-		PutLongStrike:   cmd.Float64("put-long-strike"),
-		PutShortStrike:  cmd.Float64("put-short-strike"),
-		CallShortStrike: cmd.Float64("call-short-strike"),
-		CallLongStrike:  cmd.Float64("call-long-strike"),
+		PutLongStrike:   flagFloat64(cmd, "put-long-strike"),
+		PutShortStrike:  flagFloat64(cmd, "put-short-strike"),
+		CallShortStrike: flagFloat64(cmd, "call-short-strike"),
+		CallLongStrike:  flagFloat64(cmd, "call-long-strike"),
 		Open:            isOpen,
-		Quantity:        cmd.Float64("quantity"),
-		Price:           cmd.Float64("price"),
+		Quantity:        flagFloat64(cmd, "quantity"),
+		Price:           flagFloat64(cmd, "price"),
 		Duration:        duration,
 		Session:         session,
 	}, nil
 }
 
 // parseEquityParams converts command flags into equity order builder params.
-func parseEquityParams(cmd *cli.Command) (orderbuilder.EquityParams, error) {
-	action, err := parseInstruction(cmd.String("action"))
+func parseEquityParams(cmd *cobra.Command, _ []string) (orderbuilder.EquityParams, error) {
+	action, err := parseInstruction(flagString(cmd, "action"))
 	if err != nil {
 		return orderbuilder.EquityParams{}, err
 	}
 
-	orderType, err := parseOrderType(cmd.String("type"), models.OrderTypeMarket)
+	orderType, err := parseOrderType(flagString(cmd, "type"), models.OrderTypeMarket)
 	if err != nil {
 		return orderbuilder.EquityParams{}, err
 	}
@@ -767,53 +619,53 @@ func parseEquityParams(cmd *cli.Command) (orderbuilder.EquityParams, error) {
 		return orderbuilder.EquityParams{}, err
 	}
 
-	stopLinkBasis, err := parseStopPriceLinkBasis(cmd.String("stop-link-basis"))
+	stopLinkBasis, err := parseStopPriceLinkBasis(flagString(cmd, "stop-link-basis"))
 	if err != nil {
 		return orderbuilder.EquityParams{}, err
 	}
 
-	stopLinkType, err := parseStopPriceLinkType(cmd.String("stop-link-type"))
+	stopLinkType, err := parseStopPriceLinkType(flagString(cmd, "stop-link-type"))
 	if err != nil {
 		return orderbuilder.EquityParams{}, err
 	}
 
-	stopType, err := parseStopType(cmd.String("stop-type"))
+	stopType, err := parseStopType(flagString(cmd, "stop-type"))
 	if err != nil {
 		return orderbuilder.EquityParams{}, err
 	}
 
-	specialInstruction, err := parseSpecialInstruction(cmd.String("special-instruction"))
+	specialInstruction, err := parseSpecialInstruction(flagString(cmd, "special-instruction"))
 	if err != nil {
 		return orderbuilder.EquityParams{}, err
 	}
 
-	destination, err := parseDestination(cmd.String("destination"))
+	destination, err := parseDestination(flagString(cmd, "destination"))
 	if err != nil {
 		return orderbuilder.EquityParams{}, err
 	}
 
-	priceLinkBasis, err := parsePriceLinkBasis(cmd.String("price-link-basis"))
+	priceLinkBasis, err := parsePriceLinkBasis(flagString(cmd, "price-link-basis"))
 	if err != nil {
 		return orderbuilder.EquityParams{}, err
 	}
 
-	priceLinkType, err := parsePriceLinkType(cmd.String("price-link-type"))
+	priceLinkType, err := parsePriceLinkType(flagString(cmd, "price-link-type"))
 	if err != nil {
 		return orderbuilder.EquityParams{}, err
 	}
 
 	return orderbuilder.EquityParams{
-		Symbol:             strings.TrimSpace(cmd.String("symbol")),
+		Symbol:             strings.TrimSpace(flagString(cmd, "symbol")),
 		Action:             action,
-		Quantity:           cmd.Float64("quantity"),
+		Quantity:           flagFloat64(cmd, "quantity"),
 		OrderType:          orderType,
-		Price:              cmd.Float64("price"),
-		StopPrice:          cmd.Float64("stop-price"),
-		StopPriceOffset:    cmd.Float64("stop-offset"),
+		Price:              flagFloat64(cmd, "price"),
+		StopPrice:          flagFloat64(cmd, "stop-price"),
+		StopPriceOffset:    flagFloat64(cmd, "stop-offset"),
 		StopPriceLinkBasis: stopLinkBasis,
 		StopPriceLinkType:  stopLinkType,
 		StopType:           stopType,
-		ActivationPrice:    cmd.Float64("activation-price"),
+		ActivationPrice:    flagFloat64(cmd, "activation-price"),
 		SpecialInstruction: specialInstruction,
 		Destination:        destination,
 		PriceLinkBasis:     priceLinkBasis,
@@ -824,13 +676,13 @@ func parseEquityParams(cmd *cli.Command) (orderbuilder.EquityParams, error) {
 }
 
 // parseOptionParams converts command flags into option order builder params.
-func parseOptionParams(cmd *cli.Command) (orderbuilder.OptionParams, error) {
-	action, err := parseInstruction(cmd.String("action"))
+func parseOptionParams(cmd *cobra.Command, _ []string) (orderbuilder.OptionParams, error) {
+	action, err := parseInstruction(flagString(cmd, "action"))
 	if err != nil {
 		return orderbuilder.OptionParams{}, err
 	}
 
-	orderType, err := parseOrderType(cmd.String("type"), models.OrderTypeMarket)
+	orderType, err := parseOrderType(flagString(cmd, "type"), models.OrderTypeMarket)
 	if err != nil {
 		return orderbuilder.OptionParams{}, err
 	}
@@ -840,7 +692,7 @@ func parseOptionParams(cmd *cli.Command) (orderbuilder.OptionParams, error) {
 		return orderbuilder.OptionParams{}, err
 	}
 
-	putCall, err := parsePutCall(cmd.Bool("call"), cmd.Bool("put"))
+	putCall, err := parsePutCall(flagBool(cmd, "call"), flagBool(cmd, "put"))
 	if err != nil {
 		return orderbuilder.OptionParams{}, err
 	}
@@ -850,35 +702,35 @@ func parseOptionParams(cmd *cli.Command) (orderbuilder.OptionParams, error) {
 		return orderbuilder.OptionParams{}, err
 	}
 
-	specialInstruction, err := parseSpecialInstruction(cmd.String("special-instruction"))
+	specialInstruction, err := parseSpecialInstruction(flagString(cmd, "special-instruction"))
 	if err != nil {
 		return orderbuilder.OptionParams{}, err
 	}
 
-	destination, err := parseDestination(cmd.String("destination"))
+	destination, err := parseDestination(flagString(cmd, "destination"))
 	if err != nil {
 		return orderbuilder.OptionParams{}, err
 	}
 
-	priceLinkBasis, err := parsePriceLinkBasis(cmd.String("price-link-basis"))
+	priceLinkBasis, err := parsePriceLinkBasis(flagString(cmd, "price-link-basis"))
 	if err != nil {
 		return orderbuilder.OptionParams{}, err
 	}
 
-	priceLinkType, err := parsePriceLinkType(cmd.String("price-link-type"))
+	priceLinkType, err := parsePriceLinkType(flagString(cmd, "price-link-type"))
 	if err != nil {
 		return orderbuilder.OptionParams{}, err
 	}
 
 	return orderbuilder.OptionParams{
-		Underlying:         strings.TrimSpace(cmd.String("underlying")),
+		Underlying:         strings.TrimSpace(flagString(cmd, "underlying")),
 		Expiration:         expiration,
-		Strike:             cmd.Float64("strike"),
+		Strike:             flagFloat64(cmd, "strike"),
 		PutCall:            putCall,
 		Action:             action,
-		Quantity:           cmd.Float64("quantity"),
+		Quantity:           flagFloat64(cmd, "quantity"),
 		OrderType:          orderType,
-		Price:              cmd.Float64("price"),
+		Price:              flagFloat64(cmd, "price"),
 		SpecialInstruction: specialInstruction,
 		Destination:        destination,
 		PriceLinkBasis:     priceLinkBasis,
@@ -889,13 +741,13 @@ func parseOptionParams(cmd *cli.Command) (orderbuilder.OptionParams, error) {
 }
 
 // parseBracketParams converts command flags into bracket order builder params.
-func parseBracketParams(cmd *cli.Command) (orderbuilder.BracketParams, error) {
-	action, err := parseInstruction(cmd.String("action"))
+func parseBracketParams(cmd *cobra.Command, _ []string) (orderbuilder.BracketParams, error) {
+	action, err := parseInstruction(flagString(cmd, "action"))
 	if err != nil {
 		return orderbuilder.BracketParams{}, err
 	}
 
-	orderType, err := parseOrderType(cmd.String("type"), models.OrderTypeMarket)
+	orderType, err := parseOrderType(flagString(cmd, "type"), models.OrderTypeMarket)
 	if err != nil {
 		return orderbuilder.BracketParams{}, err
 	}
@@ -906,20 +758,20 @@ func parseBracketParams(cmd *cli.Command) (orderbuilder.BracketParams, error) {
 	}
 
 	return orderbuilder.BracketParams{
-		Symbol:     strings.TrimSpace(cmd.String("symbol")),
+		Symbol:     strings.TrimSpace(flagString(cmd, "symbol")),
 		Action:     action,
-		Quantity:   cmd.Float64("quantity"),
+		Quantity:   flagFloat64(cmd, "quantity"),
 		OrderType:  orderType,
-		Price:      cmd.Float64("price"),
-		TakeProfit: cmd.Float64("take-profit"),
-		StopLoss:   cmd.Float64("stop-loss"),
+		Price:      flagFloat64(cmd, "price"),
+		TakeProfit: flagFloat64(cmd, "take-profit"),
+		StopLoss:   flagFloat64(cmd, "stop-loss"),
 		Duration:   duration,
 		Session:    session,
 	}, nil
 }
 
 // parseSpecOrder loads and validates spec mode JSON into an order request.
-func parseSpecOrder(cmd *cli.Command, spec string) (*models.OrderRequest, error) {
+func parseSpecOrder(cmd *cobra.Command, spec string) (*models.OrderRequest, error) {
 	raw, err := readSpecSource(cmd, spec)
 	if err != nil {
 		return nil, err
@@ -936,7 +788,7 @@ func parseSpecOrder(cmd *cli.Command, spec string) (*models.OrderRequest, error)
 // readSpecSource resolves inline, file, and stdin JSON inputs.
 // All three source types (stdin, @file, inline) share a single json.Valid check
 // after the raw bytes are resolved.
-func readSpecSource(cmd *cli.Command, spec string) ([]byte, error) {
+func readSpecSource(cmd any, spec string) ([]byte, error) {
 	trimmed := strings.TrimSpace(spec)
 	if trimmed == "" {
 		return nil, newValidationError("spec is required")
@@ -946,7 +798,7 @@ func readSpecSource(cmd *cli.Command, spec string) ([]byte, error) {
 
 	switch {
 	case trimmed == "-":
-		reader := cmd.Root().Reader
+		reader := specInputReader(cmd)
 		if reader == nil {
 			reader = strings.NewReader("")
 		}
@@ -982,6 +834,15 @@ func readSpecSource(cmd *cli.Command, spec string) ([]byte, error) {
 	return payload, nil
 }
 
+// specInputReader returns the command stdin reader.
+func specInputReader(cmd any) io.Reader {
+	if cobraCmd, ok := cmd.(interface{ InOrStdin() io.Reader }); ok {
+		return cobraCmd.InOrStdin()
+	}
+
+	return nil
+}
+
 // requireMutableEnabled checks that mutable operations are explicitly enabled in config.
 func requireMutableEnabled(configPath string) error {
 	cfg, err := auth.LoadConfig(configPath)
@@ -1006,11 +867,11 @@ func requireConfirm(confirmed bool) error {
 }
 
 // parseRequiredOrderID parses the --order-id flag or first positional argument as an order ID.
-func parseRequiredOrderID(cmd *cli.Command) (int64, error) {
+func parseRequiredOrderID(cmd *cobra.Command, args []string) (int64, error) {
 	// Flag takes priority over positional arg, matching resolveAccount() convention.
-	value := strings.TrimSpace(cmd.String("order-id"))
-	if value == "" {
-		value = strings.TrimSpace(cmd.Args().First())
+	value := strings.TrimSpace(flagString(cmd, "order-id"))
+	if value == "" && len(args) > 0 {
+		value = strings.TrimSpace(args[0])
 	}
 
 	if value == "" {
@@ -1190,13 +1051,13 @@ func parseSession(raw string) (models.Session, error) {
 }
 
 // parseVerticalParams converts command flags into vertical spread builder params.
-func parseVerticalParams(cmd *cli.Command) (orderbuilder.VerticalParams, error) {
-	putCall, err := parsePutCall(cmd.Bool("call"), cmd.Bool("put"))
+func parseVerticalParams(cmd *cobra.Command, _ []string) (orderbuilder.VerticalParams, error) {
+	putCall, err := parsePutCall(flagBool(cmd, "call"), flagBool(cmd, "put"))
 	if err != nil {
 		return orderbuilder.VerticalParams{}, err
 	}
 
-	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+	isOpen, err := parseOpenClose(flagBool(cmd, "open"), flagBool(cmd, "close"))
 	if err != nil {
 		return orderbuilder.VerticalParams{}, err
 	}
@@ -1212,45 +1073,43 @@ func parseVerticalParams(cmd *cli.Command) (orderbuilder.VerticalParams, error) 
 	}
 
 	return orderbuilder.VerticalParams{
-		Underlying:  strings.TrimSpace(cmd.String("underlying")),
+		Underlying:  strings.TrimSpace(flagString(cmd, "underlying")),
 		Expiration:  expiration,
-		LongStrike:  cmd.Float64("long-strike"),
-		ShortStrike: cmd.Float64("short-strike"),
+		LongStrike:  flagFloat64(cmd, "long-strike"),
+		ShortStrike: flagFloat64(cmd, "short-strike"),
 		PutCall:     putCall,
 		Open:        isOpen,
-		Quantity:    cmd.Float64("quantity"),
-		Price:       cmd.Float64("price"),
+		Quantity:    flagFloat64(cmd, "quantity"),
+		Price:       flagFloat64(cmd, "price"),
 		Duration:    duration,
 		Session:     session,
 	}, nil
 }
 
-// strangleOrderFlags returns the CLI flags for the strangle build command.
-func strangleOrderFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
-		&cli.StringFlag{Name: "expiration", Usage: "Expiration date (YYYY-MM-DD)"},
-		&cli.Float64Flag{Name: "call-strike", Usage: "Strike price for the call leg"},
-		&cli.Float64Flag{Name: "put-strike", Usage: "Strike price for the put leg"},
-		&cli.BoolFlag{Name: "buy", Usage: "Buy the strangle (long, net debit)"},
-		&cli.BoolFlag{Name: "sell", Usage: "Sell the strangle (short, net credit)"},
-		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
-		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
-		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts"},
-		&cli.Float64Flag{Name: "price", Usage: "Net debit or credit amount"},
-		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
-		&cli.StringFlag{Name: "session", Usage: "Trading session"},
-	}
+// strangleOrderFlagSetup registers strangle flags on cmd.
+func strangleOrderFlagSetup(cmd *cobra.Command) {
+	cmd.Flags().String("underlying", "", "Underlying symbol")
+	cmd.Flags().String("expiration", "", "Expiration date (YYYY-MM-DD)")
+	cmd.Flags().Float64("call-strike", 0, "Strike price for the call leg")
+	cmd.Flags().Float64("put-strike", 0, "Strike price for the put leg")
+	cmd.Flags().Bool("buy", false, "Buy the strangle (long, net debit)")
+	cmd.Flags().Bool("sell", false, "Sell the strangle (short, net credit)")
+	cmd.Flags().Bool("open", false, "Opening position")
+	cmd.Flags().Bool("close", false, "Closing position")
+	cmd.Flags().Float64("quantity", 0, "Number of contracts")
+	cmd.Flags().Float64("price", 0, "Net debit or credit amount")
+	cmd.Flags().String("duration", "", "Order duration")
+	cmd.Flags().String("session", "", "Trading session")
 }
 
 // parseStrangleParams converts command flags into strangle builder params.
-func parseStrangleParams(cmd *cli.Command) (orderbuilder.StrangleParams, error) {
-	isBuy, err := parseBuySell(cmd.Bool("buy"), cmd.Bool("sell"))
+func parseStrangleParams(cmd *cobra.Command, _ []string) (orderbuilder.StrangleParams, error) {
+	isBuy, err := parseBuySell(flagBool(cmd, "buy"), flagBool(cmd, "sell"))
 	if err != nil {
 		return orderbuilder.StrangleParams{}, err
 	}
 
-	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+	isOpen, err := parseOpenClose(flagBool(cmd, "open"), flagBool(cmd, "close"))
 	if err != nil {
 		return orderbuilder.StrangleParams{}, err
 	}
@@ -1266,44 +1125,42 @@ func parseStrangleParams(cmd *cli.Command) (orderbuilder.StrangleParams, error) 
 	}
 
 	return orderbuilder.StrangleParams{
-		Underlying: strings.TrimSpace(cmd.String("underlying")),
+		Underlying: strings.TrimSpace(flagString(cmd, "underlying")),
 		Expiration: expiration,
-		CallStrike: cmd.Float64("call-strike"),
-		PutStrike:  cmd.Float64("put-strike"),
+		CallStrike: flagFloat64(cmd, "call-strike"),
+		PutStrike:  flagFloat64(cmd, "put-strike"),
 		Buy:        isBuy,
 		Open:       isOpen,
-		Quantity:   cmd.Float64("quantity"),
-		Price:      cmd.Float64("price"),
+		Quantity:   flagFloat64(cmd, "quantity"),
+		Price:      flagFloat64(cmd, "price"),
 		Duration:   duration,
 		Session:    session,
 	}, nil
 }
 
-// straddleOrderFlags returns the CLI flags for the straddle build command.
-func straddleOrderFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
-		&cli.StringFlag{Name: "expiration", Usage: "Expiration date (YYYY-MM-DD)"},
-		&cli.Float64Flag{Name: "strike", Usage: "Strike price (shared by call and put legs)"},
-		&cli.BoolFlag{Name: "buy", Usage: "Buy the straddle (long, net debit)"},
-		&cli.BoolFlag{Name: "sell", Usage: "Sell the straddle (short, net credit)"},
-		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
-		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
-		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts"},
-		&cli.Float64Flag{Name: "price", Usage: "Net debit or credit amount"},
-		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
-		&cli.StringFlag{Name: "session", Usage: "Trading session"},
-	}
+// straddleOrderFlagSetup registers straddle flags on cmd.
+func straddleOrderFlagSetup(cmd *cobra.Command) {
+	cmd.Flags().String("underlying", "", "Underlying symbol")
+	cmd.Flags().String("expiration", "", "Expiration date (YYYY-MM-DD)")
+	cmd.Flags().Float64("strike", 0, "Strike price (shared by call and put legs)")
+	cmd.Flags().Bool("buy", false, "Buy the straddle (long, net debit)")
+	cmd.Flags().Bool("sell", false, "Sell the straddle (short, net credit)")
+	cmd.Flags().Bool("open", false, "Opening position")
+	cmd.Flags().Bool("close", false, "Closing position")
+	cmd.Flags().Float64("quantity", 0, "Number of contracts")
+	cmd.Flags().Float64("price", 0, "Net debit or credit amount")
+	cmd.Flags().String("duration", "", "Order duration")
+	cmd.Flags().String("session", "", "Trading session")
 }
 
 // parseStraddleParams converts command flags into straddle builder params.
-func parseStraddleParams(cmd *cli.Command) (orderbuilder.StraddleParams, error) {
-	isBuy, err := parseBuySell(cmd.Bool("buy"), cmd.Bool("sell"))
+func parseStraddleParams(cmd *cobra.Command, _ []string) (orderbuilder.StraddleParams, error) {
+	isBuy, err := parseBuySell(flagBool(cmd, "buy"), flagBool(cmd, "sell"))
 	if err != nil {
 		return orderbuilder.StraddleParams{}, err
 	}
 
-	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+	isOpen, err := parseOpenClose(flagBool(cmd, "open"), flagBool(cmd, "close"))
 	if err != nil {
 		return orderbuilder.StraddleParams{}, err
 	}
@@ -1319,33 +1176,31 @@ func parseStraddleParams(cmd *cli.Command) (orderbuilder.StraddleParams, error) 
 	}
 
 	return orderbuilder.StraddleParams{
-		Underlying: strings.TrimSpace(cmd.String("underlying")),
+		Underlying: strings.TrimSpace(flagString(cmd, "underlying")),
 		Expiration: expiration,
-		Strike:     cmd.Float64("strike"),
+		Strike:     flagFloat64(cmd, "strike"),
 		Buy:        isBuy,
 		Open:       isOpen,
-		Quantity:   cmd.Float64("quantity"),
-		Price:      cmd.Float64("price"),
+		Quantity:   flagFloat64(cmd, "quantity"),
+		Price:      flagFloat64(cmd, "price"),
 		Duration:   duration,
 		Session:    session,
 	}, nil
 }
 
-// coveredCallOrderFlags returns the CLI flags for the covered-call build command.
-func coveredCallOrderFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
-		&cli.StringFlag{Name: "expiration", Usage: "Expiration date (YYYY-MM-DD)"},
-		&cli.Float64Flag{Name: "strike", Usage: "Call strike price"},
-		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts (1 contract = 100 shares)"},
-		&cli.Float64Flag{Name: "price", Usage: "Net debit amount"},
-		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
-		&cli.StringFlag{Name: "session", Usage: "Trading session"},
-	}
+// coveredCallOrderFlagSetup registers covered call flags on cmd.
+func coveredCallOrderFlagSetup(cmd *cobra.Command) {
+	cmd.Flags().String("underlying", "", "Underlying symbol")
+	cmd.Flags().String("expiration", "", "Expiration date (YYYY-MM-DD)")
+	cmd.Flags().Float64("strike", 0, "Call strike price")
+	cmd.Flags().Float64("quantity", 0, "Number of contracts (1 contract = 100 shares)")
+	cmd.Flags().Float64("price", 0, "Net debit amount")
+	cmd.Flags().String("duration", "", "Order duration")
+	cmd.Flags().String("session", "", "Trading session")
 }
 
 // parseCoveredCallParams converts command flags into covered call builder params.
-func parseCoveredCallParams(cmd *cli.Command) (orderbuilder.CoveredCallParams, error) {
+func parseCoveredCallParams(cmd *cobra.Command, _ []string) (orderbuilder.CoveredCallParams, error) {
 	expiration, err := parseExpiration(cmd)
 	if err != nil {
 		return orderbuilder.CoveredCallParams{}, err
@@ -1357,35 +1212,33 @@ func parseCoveredCallParams(cmd *cli.Command) (orderbuilder.CoveredCallParams, e
 	}
 
 	return orderbuilder.CoveredCallParams{
-		Underlying: strings.TrimSpace(cmd.String("underlying")),
+		Underlying: strings.TrimSpace(flagString(cmd, "underlying")),
 		Expiration: expiration,
-		Strike:     cmd.Float64("strike"),
-		Quantity:   cmd.Float64("quantity"),
-		Price:      cmd.Float64("price"),
+		Strike:     flagFloat64(cmd, "strike"),
+		Quantity:   flagFloat64(cmd, "quantity"),
+		Price:      flagFloat64(cmd, "price"),
 		Duration:   duration,
 		Session:    session,
 	}, nil
 }
 
-// collarOrderFlags returns the CLI flags for the collar-with-stock build command.
-func collarOrderFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
-		&cli.Float64Flag{Name: "put-strike", Usage: "Protective put strike price"},
-		&cli.Float64Flag{Name: "call-strike", Usage: "Covered call strike price"},
-		&cli.StringFlag{Name: "expiration", Usage: "Expiration date for both options (YYYY-MM-DD)"},
-		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts (1 contract = 100 shares)"},
-		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
-		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
-		&cli.Float64Flag{Name: "price", Usage: "Net debit amount"},
-		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
-		&cli.StringFlag{Name: "session", Usage: "Trading session"},
-	}
+// collarOrderFlagSetup registers collar-with-stock flags on cmd.
+func collarOrderFlagSetup(cmd *cobra.Command) {
+	cmd.Flags().String("underlying", "", "Underlying symbol")
+	cmd.Flags().Float64("put-strike", 0, "Protective put strike price")
+	cmd.Flags().Float64("call-strike", 0, "Covered call strike price")
+	cmd.Flags().String("expiration", "", "Expiration date for both options (YYYY-MM-DD)")
+	cmd.Flags().Float64("quantity", 0, "Number of contracts (1 contract = 100 shares)")
+	cmd.Flags().Bool("open", false, "Opening position")
+	cmd.Flags().Bool("close", false, "Closing position")
+	cmd.Flags().Float64("price", 0, "Net debit amount")
+	cmd.Flags().String("duration", "", "Order duration")
+	cmd.Flags().String("session", "", "Trading session")
 }
 
 // parseCollarParams converts command flags into collar-with-stock builder params.
-func parseCollarParams(cmd *cli.Command) (orderbuilder.CollarParams, error) {
-	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+func parseCollarParams(cmd *cobra.Command, _ []string) (orderbuilder.CollarParams, error) {
+	isOpen, err := parseOpenClose(flagBool(cmd, "open"), flagBool(cmd, "close"))
 	if err != nil {
 		return orderbuilder.CollarParams{}, err
 	}
@@ -1401,54 +1254,52 @@ func parseCollarParams(cmd *cli.Command) (orderbuilder.CollarParams, error) {
 	}
 
 	return orderbuilder.CollarParams{
-		Underlying: strings.TrimSpace(cmd.String("underlying")),
-		PutStrike:  cmd.Float64("put-strike"),
-		CallStrike: cmd.Float64("call-strike"),
+		Underlying: strings.TrimSpace(flagString(cmd, "underlying")),
+		PutStrike:  flagFloat64(cmd, "put-strike"),
+		CallStrike: flagFloat64(cmd, "call-strike"),
 		Expiration: expiration,
-		Quantity:   cmd.Float64("quantity"),
+		Quantity:   flagFloat64(cmd, "quantity"),
 		Open:       isOpen,
-		Price:      cmd.Float64("price"),
+		Price:      flagFloat64(cmd, "price"),
 		Duration:   duration,
 		Session:    session,
 	}, nil
 }
 
-// calendarOrderFlags returns the CLI flags for the calendar spread build command.
-func calendarOrderFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
-		&cli.StringFlag{Name: "near-expiration", Usage: "Near-term expiration date (YYYY-MM-DD)"},
-		&cli.StringFlag{Name: "far-expiration", Usage: "Far-term expiration date (YYYY-MM-DD)"},
-		&cli.Float64Flag{Name: "strike", Usage: "Strike price (shared by both legs)"},
-		&cli.BoolFlag{Name: "call", Usage: "Call calendar spread"},
-		&cli.BoolFlag{Name: "put", Usage: "Put calendar spread"},
-		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
-		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
-		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts"},
-		&cli.Float64Flag{Name: "price", Usage: "Net debit amount"},
-		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
-		&cli.StringFlag{Name: "session", Usage: "Trading session"},
-	}
+// calendarOrderFlagSetup registers calendar spread flags on cmd.
+func calendarOrderFlagSetup(cmd *cobra.Command) {
+	cmd.Flags().String("underlying", "", "Underlying symbol")
+	cmd.Flags().String("near-expiration", "", "Near-term expiration date (YYYY-MM-DD)")
+	cmd.Flags().String("far-expiration", "", "Far-term expiration date (YYYY-MM-DD)")
+	cmd.Flags().Float64("strike", 0, "Strike price (shared by both legs)")
+	cmd.Flags().Bool("call", false, "Call calendar spread")
+	cmd.Flags().Bool("put", false, "Put calendar spread")
+	cmd.Flags().Bool("open", false, "Opening position")
+	cmd.Flags().Bool("close", false, "Closing position")
+	cmd.Flags().Float64("quantity", 0, "Number of contracts")
+	cmd.Flags().Float64("price", 0, "Net debit amount")
+	cmd.Flags().String("duration", "", "Order duration")
+	cmd.Flags().String("session", "", "Trading session")
 }
 
 // parseCalendarParams converts command flags into calendar spread builder params.
-func parseCalendarParams(cmd *cli.Command) (orderbuilder.CalendarParams, error) {
-	putCall, err := parsePutCall(cmd.Bool("call"), cmd.Bool("put"))
+func parseCalendarParams(cmd *cobra.Command, _ []string) (orderbuilder.CalendarParams, error) {
+	putCall, err := parsePutCall(flagBool(cmd, "call"), flagBool(cmd, "put"))
 	if err != nil {
 		return orderbuilder.CalendarParams{}, err
 	}
 
-	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+	isOpen, err := parseOpenClose(flagBool(cmd, "open"), flagBool(cmd, "close"))
 	if err != nil {
 		return orderbuilder.CalendarParams{}, err
 	}
 
-	nearExpiration, err := parseDateFlag(cmd.String("near-expiration"), "near-expiration")
+	nearExpiration, err := parseDateFlag(flagString(cmd, "near-expiration"), "near-expiration")
 	if err != nil {
 		return orderbuilder.CalendarParams{}, err
 	}
 
-	farExpiration, err := parseDateFlag(cmd.String("far-expiration"), "far-expiration")
+	farExpiration, err := parseDateFlag(flagString(cmd, "far-expiration"), "far-expiration")
 	if err != nil {
 		return orderbuilder.CalendarParams{}, err
 	}
@@ -1459,56 +1310,54 @@ func parseCalendarParams(cmd *cli.Command) (orderbuilder.CalendarParams, error) 
 	}
 
 	return orderbuilder.CalendarParams{
-		Underlying:     strings.TrimSpace(cmd.String("underlying")),
+		Underlying:     strings.TrimSpace(flagString(cmd, "underlying")),
 		NearExpiration: nearExpiration,
 		FarExpiration:  farExpiration,
-		Strike:         cmd.Float64("strike"),
+		Strike:         flagFloat64(cmd, "strike"),
 		PutCall:        putCall,
 		Open:           isOpen,
-		Quantity:       cmd.Float64("quantity"),
-		Price:          cmd.Float64("price"),
+		Quantity:       flagFloat64(cmd, "quantity"),
+		Price:          flagFloat64(cmd, "price"),
 		Duration:       duration,
 		Session:        session,
 	}, nil
 }
 
-// diagonalOrderFlags returns the CLI flags for the diagonal spread build command.
-func diagonalOrderFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "underlying", Usage: "Underlying symbol"},
-		&cli.StringFlag{Name: "near-expiration", Usage: "Near-term expiration date (YYYY-MM-DD)"},
-		&cli.StringFlag{Name: "far-expiration", Usage: "Far-term expiration date (YYYY-MM-DD)"},
-		&cli.Float64Flag{Name: "near-strike", Usage: "Strike price for the near-term (sold) leg"},
-		&cli.Float64Flag{Name: "far-strike", Usage: "Strike price for the far-term (bought) leg"},
-		&cli.BoolFlag{Name: "call", Usage: "Call diagonal spread"},
-		&cli.BoolFlag{Name: "put", Usage: "Put diagonal spread"},
-		&cli.BoolFlag{Name: "open", Usage: "Opening position"},
-		&cli.BoolFlag{Name: "close", Usage: "Closing position"},
-		&cli.Float64Flag{Name: "quantity", Usage: "Number of contracts"},
-		&cli.Float64Flag{Name: "price", Usage: "Net debit amount"},
-		&cli.StringFlag{Name: "duration", Usage: "Order duration"},
-		&cli.StringFlag{Name: "session", Usage: "Trading session"},
-	}
+// diagonalOrderFlagSetup registers diagonal spread flags on cmd.
+func diagonalOrderFlagSetup(cmd *cobra.Command) {
+	cmd.Flags().String("underlying", "", "Underlying symbol")
+	cmd.Flags().String("near-expiration", "", "Near-term expiration date (YYYY-MM-DD)")
+	cmd.Flags().String("far-expiration", "", "Far-term expiration date (YYYY-MM-DD)")
+	cmd.Flags().Float64("near-strike", 0, "Strike price for the near-term (sold) leg")
+	cmd.Flags().Float64("far-strike", 0, "Strike price for the far-term (bought) leg")
+	cmd.Flags().Bool("call", false, "Call diagonal spread")
+	cmd.Flags().Bool("put", false, "Put diagonal spread")
+	cmd.Flags().Bool("open", false, "Opening position")
+	cmd.Flags().Bool("close", false, "Closing position")
+	cmd.Flags().Float64("quantity", 0, "Number of contracts")
+	cmd.Flags().Float64("price", 0, "Net debit amount")
+	cmd.Flags().String("duration", "", "Order duration")
+	cmd.Flags().String("session", "", "Trading session")
 }
 
 // parseDiagonalParams converts command flags into diagonal spread builder params.
-func parseDiagonalParams(cmd *cli.Command) (orderbuilder.DiagonalParams, error) {
-	putCall, err := parsePutCall(cmd.Bool("call"), cmd.Bool("put"))
+func parseDiagonalParams(cmd *cobra.Command, _ []string) (orderbuilder.DiagonalParams, error) {
+	putCall, err := parsePutCall(flagBool(cmd, "call"), flagBool(cmd, "put"))
 	if err != nil {
 		return orderbuilder.DiagonalParams{}, err
 	}
 
-	isOpen, err := parseOpenClose(cmd.Bool("open"), cmd.Bool("close"))
+	isOpen, err := parseOpenClose(flagBool(cmd, "open"), flagBool(cmd, "close"))
 	if err != nil {
 		return orderbuilder.DiagonalParams{}, err
 	}
 
-	nearExpiration, err := parseDateFlag(cmd.String("near-expiration"), "near-expiration")
+	nearExpiration, err := parseDateFlag(flagString(cmd, "near-expiration"), "near-expiration")
 	if err != nil {
 		return orderbuilder.DiagonalParams{}, err
 	}
 
-	farExpiration, err := parseDateFlag(cmd.String("far-expiration"), "far-expiration")
+	farExpiration, err := parseDateFlag(flagString(cmd, "far-expiration"), "far-expiration")
 	if err != nil {
 		return orderbuilder.DiagonalParams{}, err
 	}
@@ -1519,15 +1368,15 @@ func parseDiagonalParams(cmd *cli.Command) (orderbuilder.DiagonalParams, error) 
 	}
 
 	return orderbuilder.DiagonalParams{
-		Underlying:     strings.TrimSpace(cmd.String("underlying")),
+		Underlying:     strings.TrimSpace(flagString(cmd, "underlying")),
 		NearExpiration: nearExpiration,
 		FarExpiration:  farExpiration,
-		NearStrike:     cmd.Float64("near-strike"),
-		FarStrike:      cmd.Float64("far-strike"),
+		NearStrike:     flagFloat64(cmd, "near-strike"),
+		FarStrike:      flagFloat64(cmd, "far-strike"),
 		PutCall:        putCall,
 		Open:           isOpen,
-		Quantity:       cmd.Float64("quantity"),
-		Price:          cmd.Float64("price"),
+		Quantity:       flagFloat64(cmd, "quantity"),
+		Price:          flagFloat64(cmd, "price"),
 		Duration:       duration,
 		Session:        session,
 	}, nil
@@ -1546,8 +1395,8 @@ func parseDateFlag(raw, flagName string) (time.Time, error) {
 }
 
 // parseExpiration parses the --expiration flag as a YYYY-MM-DD date.
-func parseExpiration(cmd *cli.Command) (time.Time, error) {
-	expiration, err := time.Parse("2006-01-02", strings.TrimSpace(cmd.String("expiration")))
+func parseExpiration(cmd *cobra.Command) (time.Time, error) {
+	expiration, err := time.Parse("2006-01-02", strings.TrimSpace(flagString(cmd, "expiration")))
 	if err != nil {
 		return time.Time{}, newValidationError("expiration must use YYYY-MM-DD format")
 	}
@@ -1557,13 +1406,13 @@ func parseExpiration(cmd *cli.Command) (time.Time, error) {
 
 // parseDurationSession parses the --duration and --session flags together.
 // Every order parse function needs both, so this eliminates the repeated pair.
-func parseDurationSession(cmd *cli.Command) (models.Duration, models.Session, error) {
-	duration, err := parseDuration(cmd.String("duration"))
+func parseDurationSession(cmd *cobra.Command) (models.Duration, models.Session, error) {
+	duration, err := parseDuration(flagString(cmd, "duration"))
 	if err != nil {
 		return "", "", err
 	}
 
-	session, err := parseSession(cmd.String("session"))
+	session, err := parseSession(flagString(cmd, "session"))
 	if err != nil {
 		return "", "", err
 	}

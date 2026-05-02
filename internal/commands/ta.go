@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/urfave/cli/v3"
+	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/models"
@@ -154,32 +154,75 @@ type simpleTAConfig struct {
 	compute func(closes []float64, period int) ([]float64, error)
 }
 
-// simpleTAIndicatorFlags returns the shared flags for closes-only indicators.
-// SMA, EMA, and RSI accept multiple periods in a single run.
-func simpleTAIndicatorFlags(defaultPeriod int) []cli.Flag {
-	return []cli.Flag{
-		&cli.IntSliceFlag{Name: "period", Usage: "Indicator period (repeatable or comma-separated)", Value: []int{defaultPeriod}},
-		&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
-		&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
+func maxPeriod(periods []int) int {
+	largest := periods[0]
+	for _, period := range periods[1:] {
+		if period > largest {
+			largest = period
+		}
 	}
+
+	return largest
 }
 
-// taIndicatorFlags returns the shared single-period flags for indicators that
-// are not wired for combined multi-period output.
-func taIndicatorFlags(defaultPeriod int) []cli.Flag {
-	return []cli.Flag{
-		&cli.IntFlag{Name: "period", Usage: "Indicator period", Value: defaultPeriod},
-		&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
-		&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
+// NewTACmd returns the Cobra command for technical analysis indicators.
+func NewTACmd(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "ta",
+		Short:   "Technical analysis indicators",
+		GroupID: "market-data",
+		RunE:    requireSubcommand,
 	}
+
+	cmd.AddCommand(
+		makeCobraSimpleTACommand(simpleTAConfig{
+			name:  "sma",
+			usage: "Simple Moving Average",
+			usageText: `schwab-agent ta sma AAPL
+	schwab-agent ta sma AAPL --period 50 --interval daily --points 10
+	schwab-agent ta sma AAPL --period 21,50,200 --points 1`,
+			defaultPeriod: 20,
+			multiplier:    1,
+			compute:       ta.SMA,
+		}, c, w),
+		makeCobraSimpleTACommand(simpleTAConfig{
+			name:  "ema",
+			usage: "Exponential Moving Average",
+			usageText: `schwab-agent ta ema AAPL
+	schwab-agent ta ema AAPL --period 50 --interval daily --points 10
+	schwab-agent ta ema AAPL --period 12 --period 26 --points 5`,
+			defaultPeriod: 20,
+			multiplier:    3,
+			compute:       ta.EMA,
+		}, c, w),
+		makeCobraSimpleTACommand(simpleTAConfig{
+			name:  "rsi",
+			usage: "Relative Strength Index",
+			usageText: `schwab-agent ta rsi AAPL
+	schwab-agent ta rsi AAPL --period 14 --interval daily --points 10`,
+			defaultPeriod: 14,
+			multiplier:    3,
+			compute:       ta.RSI,
+		}, c, w),
+		cobraTAMACDCommand(c, w),
+		cobraTAATRCommand(c, w),
+		cobraTABBandsCommand(c, w),
+		cobraTAStochCommand(c, w),
+		cobraTAADXCommand(c, w),
+		cobraTAVWAPCommand(c, w),
+		cobraTAHVCommand(c, w),
+		cobraTAExpectedMoveCommand(c, w),
+	)
+
+	return cmd
 }
 
-// parseTAPeriods returns the requested indicator windows. urfave/cli's slice
-// flag accepts both repeated flags and comma-separated values, which lets a
-// user ask for "21, 50, and 200 day moving averages" in a single command while
-// keeping the old single --period form working unchanged.
-func parseTAPeriods(cmd *cli.Command) ([]int, error) {
-	periods := cmd.IntSlice("period")
+// cobraParseTAPeriods returns the requested indicator windows from a Cobra command.
+// Cobra's IntSlice flag accepts both repeated flags and comma-separated values,
+// which lets a user ask for "21, 50, and 200 day moving averages" in a single
+// command while keeping the old single --period form working unchanged.
+func cobraParseTAPeriods(cmd *cobra.Command) ([]int, error) {
+	periods := flagIntSlice(cmd, "period")
 	if len(periods) == 0 {
 		return nil, newValidationError("at least one period is required")
 	}
@@ -199,43 +242,27 @@ func parseTAPeriods(cmd *cli.Command) ([]int, error) {
 	return periods, nil
 }
 
-// maxPeriod returns the largest requested period, used to fetch enough candle
-// history once before calculating each moving-average window locally.
-func maxPeriod(periods []int) int {
-	largest := periods[0]
-	for _, period := range periods[1:] {
-		if period > largest {
-			largest = period
-		}
-	}
-
-	return largest
-}
-
-// makeSimpleTACommand builds a CLI command for a closes-only indicator.
+// makeCobraSimpleTACommand builds a Cobra command for a closes-only indicator.
 // The returned command fetches candles, extracts close prices, runs the
 // indicator's compute function, and writes the result envelope.
-func makeSimpleTACommand(cfg simpleTAConfig, c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:      cfg.name,
-		Usage:     cfg.usage,
-		UsageText: cfg.usageText,
-		Flags:     simpleTAIndicatorFlags(cfg.defaultPeriod),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			symbol := cmd.Args().First()
-			if err := requireArg(symbol, "symbol"); err != nil {
-				return err
-			}
+func makeCobraSimpleTACommand(cfg simpleTAConfig, c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   cfg.name + " SYMBOL",
+		Short: cfg.usage,
+		Long:  cfg.usageText,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			symbol := args[0]
 
-			periods, err := parseTAPeriods(cmd)
+			periods, err := cobraParseTAPeriods(cmd)
 			if err != nil {
 				return err
 			}
 			period := maxPeriod(periods)
-			interval := cmd.String("interval")
-			points := cmd.Int("points")
+			interval := flagString(cmd, "interval")
+			points := flagInt(cmd, "points")
 
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period*cfg.multiplier, cfg.name)
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, period*cfg.multiplier, cfg.name)
 			if err != nil {
 				return err
 			}
@@ -261,83 +288,32 @@ func makeSimpleTACommand(cfg simpleTAConfig, c *client.Ref, w io.Writer) *cli.Co
 			return writeMultiTAOutput(w, cfg.name, symbol, interval, periods, points, timestamps, valuesByPeriod)
 		},
 	}
+
+	cmd.Flags().IntSlice("period", []int{cfg.defaultPeriod}, "Indicator period (repeatable or comma-separated)")
+	cmd.Flags().String("interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
+	cmd.Flags().Int("points", 1, "Number of output points (0 = all)")
+
+	return cmd
 }
 
-// TACommand returns the CLI command for technical analysis indicators.
-func TACommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:   "ta",
-		Usage:  "Technical analysis indicators",
-		Action: requireSubcommand(),
-		Commands: []*cli.Command{
-			makeSimpleTACommand(simpleTAConfig{
-				name:  "sma",
-				usage: "Simple Moving Average",
-				usageText: `schwab-agent ta sma AAPL
-	schwab-agent ta sma AAPL --period 50 --interval daily --points 10
-	schwab-agent ta sma AAPL --period 21,50,200 --points 1`,
-				defaultPeriod: 20,
-				multiplier:    1,
-				compute:       ta.SMA,
-			}, c, w),
-			makeSimpleTACommand(simpleTAConfig{
-				name:  "ema",
-				usage: "Exponential Moving Average",
-				usageText: `schwab-agent ta ema AAPL
-	schwab-agent ta ema AAPL --period 50 --interval daily --points 10
-	schwab-agent ta ema AAPL --period 12 --period 26 --points 5`,
-				defaultPeriod: 20,
-				multiplier:    3,
-				compute:       ta.EMA,
-			}, c, w),
-			makeSimpleTACommand(simpleTAConfig{
-				name:  "rsi",
-				usage: "Relative Strength Index",
-				usageText: `schwab-agent ta rsi AAPL
-	schwab-agent ta rsi AAPL --period 14 --interval daily --points 10`,
-				defaultPeriod: 14,
-				multiplier:    3,
-				compute:       ta.RSI,
-			}, c, w),
-			taMACDCommand(c, w),
-			taATRCommand(c, w),
-			taBBandsCommand(c, w),
-			taStochCommand(c, w),
-			taADXCommand(c, w),
-			taVWAPCommand(c, w),
-			taHVCommand(c, w),
-			taExpectedMoveCommand(c, w),
-		},
-	}
-}
-
-func taMACDCommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "macd",
-		Usage: "Moving Average Convergence/Divergence",
-		UsageText: `schwab-agent ta macd AAPL
+func cobraTAMACDCommand(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "macd SYMBOL",
+		Short: "Moving Average Convergence/Divergence",
+		Long: `schwab-agent ta macd AAPL
 schwab-agent ta macd AAPL --fast 12 --slow 26 --signal 9 --interval daily --points 10`,
-		Flags: []cli.Flag{
-			&cli.IntFlag{Name: "fast", Usage: "Fast EMA period", Value: 12},
-			&cli.IntFlag{Name: "slow", Usage: "Slow EMA period", Value: 26},
-			&cli.IntFlag{Name: "signal", Usage: "Signal EMA period", Value: 9},
-			&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
-			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			symbol := cmd.Args().First()
-			if err := requireArg(symbol, "symbol"); err != nil {
-				return err
-			}
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			symbol := args[0]
 
-			fast := cmd.Int("fast")
-			slow := cmd.Int("slow")
-			signal := cmd.Int("signal")
-			interval := cmd.String("interval")
-			points := cmd.Int("points")
+			fast := flagInt(cmd, "fast")
+			slow := flagInt(cmd, "slow")
+			signal := flagInt(cmd, "signal")
+			interval := flagString(cmd, "interval")
+			points := flagInt(cmd, "points")
 
 			// MACD layers slow EMA + signal EMA; 2x the combined period provides convergence.
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, (slow+signal)*2, "macd")
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, (slow+signal)*2, "macd")
 			if err != nil {
 				return err
 			}
@@ -381,27 +357,32 @@ schwab-agent ta macd AAPL --fast 12 --slow 26 --signal 9 --interval daily --poin
 			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
+
+	cmd.Flags().Int("fast", 12, "Fast EMA period")
+	cmd.Flags().Int("slow", 26, "Slow EMA period")
+	cmd.Flags().Int("signal", 9, "Signal EMA period")
+	cmd.Flags().String("interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
+	cmd.Flags().Int("points", 1, "Number of output points (0 = all)")
+
+	return cmd
 }
 
-func taATRCommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "atr",
-		Usage: "Average True Range",
-		UsageText: `schwab-agent ta atr AAPL
+func cobraTAATRCommand(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "atr SYMBOL",
+		Short: "Average True Range",
+		Long: `schwab-agent ta atr AAPL
 schwab-agent ta atr AAPL --period 14 --interval daily --points 10`,
-		Flags: taIndicatorFlags(14),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			symbol := cmd.Args().First()
-			if err := requireArg(symbol, "symbol"); err != nil {
-				return err
-			}
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			symbol := args[0]
 
-			period := cmd.Int("period")
-			interval := cmd.String("interval")
-			points := cmd.Int("points")
+			period := flagInt(cmd, "period")
+			interval := flagString(cmd, "interval")
+			points := flagInt(cmd, "points")
 
 			// ATR uses Wilder smoothing; 3x period provides convergence stability.
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period*3, "atr")
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, period*3, "atr")
 			if err != nil {
 				return err
 			}
@@ -427,32 +408,30 @@ schwab-agent ta atr AAPL --period 14 --interval daily --points 10`,
 			return writeTAOutput(w, "atr", symbol, interval, period, points, timestamps, values)
 		},
 	}
+
+	cmd.Flags().Int("period", 14, "Indicator period")
+	cmd.Flags().String("interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
+	cmd.Flags().Int("points", 1, "Number of output points (0 = all)")
+
+	return cmd
 }
 
-func taBBandsCommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "bbands",
-		Usage: "Bollinger Bands",
-		UsageText: `schwab-agent ta bbands AAPL
+func cobraTABBandsCommand(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "bbands SYMBOL",
+		Short: "Bollinger Bands",
+		Long: `schwab-agent ta bbands AAPL
 schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --interval daily --points 10`,
-		Flags: []cli.Flag{
-			&cli.IntFlag{Name: "period", Usage: "BBands period", Value: 20},
-			&cli.Float64Flag{Name: "std-dev", Usage: "Standard deviations", Value: 2.0},
-			&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
-			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			symbol := cmd.Args().First()
-			if err := requireArg(symbol, "symbol"); err != nil {
-				return err
-			}
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			symbol := args[0]
 
-			period := cmd.Int("period")
-			stdDev := cmd.Float("std-dev")
-			interval := cmd.String("interval")
-			points := cmd.Int("points")
+			period := flagInt(cmd, "period")
+			stdDev := flagFloat64(cmd, "std-dev")
+			interval := flagString(cmd, "interval")
+			points := flagInt(cmd, "points")
 
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period, "bbands")
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, period, "bbands")
 			if err != nil {
 				return err
 			}
@@ -495,36 +474,34 @@ schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --interval daily --points 
 			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
+
+	cmd.Flags().Int("period", 20, "BBands period")
+	cmd.Flags().Float64("std-dev", 2.0, "Standard deviations")
+	cmd.Flags().String("interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
+	cmd.Flags().Int("points", 1, "Number of output points (0 = all)")
+
+	return cmd
 }
 
-func taStochCommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "stoch",
-		Usage: "Stochastic Oscillator",
-		UsageText: `schwab-agent ta stoch AAPL
+func cobraTAStochCommand(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "stoch SYMBOL",
+		Short: "Stochastic Oscillator",
+		Long: `schwab-agent ta stoch AAPL
 schwab-agent ta stoch AAPL --k-period 14 --smooth-k 3 --d-period 3 --interval daily --points 10`,
-		Flags: []cli.Flag{
-			&cli.IntFlag{Name: "k-period", Usage: "Fast %K lookback period", Value: 14},
-			&cli.IntFlag{Name: "smooth-k", Usage: "Slow %K smoothing period", Value: 3},
-			&cli.IntFlag{Name: "d-period", Usage: "Slow %D period", Value: 3},
-			&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
-			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			symbol := cmd.Args().First()
-			if err := requireArg(symbol, "symbol"); err != nil {
-				return err
-			}
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			symbol := args[0]
 
-			kPeriod := cmd.Int("k-period")
-			smoothK := cmd.Int("smooth-k")
-			dPeriod := cmd.Int("d-period")
-			interval := cmd.String("interval")
-			points := cmd.Int("points")
+			kPeriod := flagInt(cmd, "k-period")
+			smoothK := flagInt(cmd, "smooth-k")
+			dPeriod := flagInt(cmd, "d-period")
+			interval := flagString(cmd, "interval")
+			points := flagInt(cmd, "points")
 
 			// Stochastic chains three windowed ops (raw %K, smoothed %K, %D);
 			// total depth is the sum of all window sizes.
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, kPeriod+smoothK+dPeriod, "stoch")
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, kPeriod+smoothK+dPeriod, "stoch")
 			if err != nil {
 				return err
 			}
@@ -575,27 +552,32 @@ schwab-agent ta stoch AAPL --k-period 14 --smooth-k 3 --d-period 3 --interval da
 			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
+
+	cmd.Flags().Int("k-period", 14, "Fast %K lookback period")
+	cmd.Flags().Int("smooth-k", 3, "Slow %K smoothing period")
+	cmd.Flags().Int("d-period", 3, "Slow %D period")
+	cmd.Flags().String("interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
+	cmd.Flags().Int("points", 1, "Number of output points (0 = all)")
+
+	return cmd
 }
 
-func taADXCommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "adx",
-		Usage: "Average Directional Index",
-		UsageText: `schwab-agent ta adx AAPL
+func cobraTAADXCommand(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "adx SYMBOL",
+		Short: "Average Directional Index",
+		Long: `schwab-agent ta adx AAPL
 schwab-agent ta adx AAPL --period 14 --interval daily --points 10`,
-		Flags: taIndicatorFlags(14),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			symbol := cmd.Args().First()
-			if err := requireArg(symbol, "symbol"); err != nil {
-				return err
-			}
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			symbol := args[0]
 
-			period := cmd.Int("period")
-			interval := cmd.String("interval")
-			points := cmd.Int("points")
+			period := flagInt(cmd, "period")
+			interval := flagString(cmd, "interval")
+			points := flagInt(cmd, "points")
 
 			// ADX double-smooths (DI pass + ADX pass); 4x period ensures both converge.
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period*4, "adx")
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, period*4, "adx")
 			if err != nil {
 				return err
 			}
@@ -645,31 +627,31 @@ schwab-agent ta adx AAPL --period 14 --interval daily --points 10`,
 			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
+
+	cmd.Flags().Int("period", 14, "Indicator period")
+	cmd.Flags().String("interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
+	cmd.Flags().Int("points", 1, "Number of output points (0 = all)")
+
+	return cmd
 }
 
-func taVWAPCommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "vwap",
-		Usage: "Volume Weighted Average Price",
-		UsageText: `schwab-agent ta vwap AAPL
+func cobraTAVWAPCommand(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "vwap SYMBOL",
+		Short: "Volume Weighted Average Price",
+		Long: `schwab-agent ta vwap AAPL
 schwab-agent ta vwap AAPL --interval 5min --points 10`,
+		Args: cobra.ExactArgs(1),
 		// VWAP is cumulative - no --period flag. Only --interval and --points.
-		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "interval", Usage: "Data interval (daily, weekly, 1min, 5min, 15min, 30min)", Value: "daily"},
-			&cli.IntFlag{Name: "points", Usage: "Number of output points (0 = all)", Value: 1},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			symbol := cmd.Args().First()
-			if err := requireArg(symbol, "symbol"); err != nil {
-				return err
-			}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			symbol := args[0]
 
-			interval := cmd.String("interval")
-			points := cmd.Int("points")
+			interval := flagString(cmd, "interval")
+			points := flagInt(cmd, "points")
 
 			// Use 20 as minimum candle count - VWAP works with any count >= 1
 			// but 20 gives meaningful output for typical use cases.
-			candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, 20, "vwap")
+			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, 20, "vwap")
 			if err != nil {
 				return err
 			}
@@ -700,27 +682,29 @@ schwab-agent ta vwap AAPL --interval 5min --points 10`,
 			return writeTAOutput(w, "vwap", symbol, interval, 0, points, timestamps, values)
 		},
 	}
+
+	cmd.Flags().String("interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
+	cmd.Flags().Int("points", 1, "Number of output points (0 = all)")
+
+	return cmd
 }
 
-func taHVCommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "hv",
-		Usage: "Historical Volatility with regime classification",
-		UsageText: `schwab-agent ta hv AAPL
+func cobraTAHVCommand(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "hv SYMBOL",
+		Short: "Historical Volatility with regime classification",
+		Long: `schwab-agent ta hv AAPL
 schwab-agent ta hv AAPL --period 20 --interval daily`,
-		Flags: taIndicatorFlags(20),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			symbol := cmd.Args().First()
-			if err := requireArg(symbol, "symbol"); err != nil {
-				return err
-			}
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			symbol := args[0]
 
-			period := cmd.Int("period")
-			interval := cmd.String("interval")
+			period := flagInt(cmd, "period")
+			interval := flagString(cmd, "interval")
 
 			// Need period+1 closes for N returns, plus extra for rolling window warmup.
 			// period+21 provides a safety margin for the rolling window.
-			candles, _, err := fetchAndValidateCandles(ctx, c, symbol, interval, period+21, "hv")
+			candles, _, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, period+21, "hv")
 			if err != nil {
 				return err
 			}
@@ -755,28 +739,28 @@ schwab-agent ta hv AAPL --period 20 --interval daily`,
 			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
+
+	cmd.Flags().Int("period", 20, "Indicator period")
+	cmd.Flags().String("interval", "daily", "Data interval (daily, weekly, 1min, 5min, 15min, 30min)")
+
+	return cmd
 }
 
-func taExpectedMoveCommand(c *client.Ref, w io.Writer) *cli.Command {
-	return &cli.Command{
-		Name:  "expected-move",
-		Usage: "Expected price move from ATM straddle pricing",
-		UsageText: `schwab-agent ta expected-move AAPL
+func cobraTAExpectedMoveCommand(c *client.Ref, w io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "expected-move SYMBOL",
+		Short: "Expected price move from ATM straddle pricing",
+		Long: `schwab-agent ta expected-move AAPL
 schwab-agent ta expected-move AAPL --dte 45`,
-		Flags: []cli.Flag{
-			&cli.IntFlag{Name: "dte", Usage: "Target days to expiration", Value: 30},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			symbol := cmd.Args().First()
-			if err := requireArg(symbol, "symbol"); err != nil {
-				return err
-			}
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			symbol := args[0]
 
-			targetDTE := cmd.Int("dte")
+			targetDTE := flagInt(cmd, "dte")
 
 			// Expected Move needs the underlying quote and near-the-money contracts in one response.
 			// Keep this to a single chain call so the underlying snapshot and option prices stay aligned.
-			chain, err := c.OptionChain(ctx, symbol, &client.ChainParams{
+			chain, err := c.OptionChain(cmd.Context(), symbol, &client.ChainParams{
 				ContractType:           "ALL",
 				IncludeUnderlyingQuote: "true",
 				StrikeRange:            "NTM",
@@ -896,10 +880,12 @@ schwab-agent ta expected-move AAPL --dte 45`,
 			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
+
+	cmd.Flags().Int("dte", 30, "Target days to expiration")
+
+	return cmd
 }
 
-// contractPrice extracts the best available option price.
-// The chain API sometimes omits mark, so fall back to the bid/ask midpoint.
 func contractPrice(contract *models.OptionContract, symbol, strike, putCall string) (float64, error) {
 	if contract.Mark != nil {
 		return *contract.Mark, nil

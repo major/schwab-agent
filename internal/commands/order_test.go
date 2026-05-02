@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -13,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v3"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
@@ -63,24 +62,20 @@ func writeTestConfigMutable(t *testing.T, defaultAccount string) string {
 	return configPath
 }
 
-// runOrderCommand runs the order command tree with the provided args and stdin.
+// runOrderCommand runs the Cobra order command tree with the provided args and stdin.
 func runOrderCommand(t *testing.T, c *client.Ref, configPath, stdin string, args ...string) (string, error) {
 	t.Helper()
 
 	var stdout strings.Builder
-	root := &cli.Command{
-		Name:           "schwab-agent",
-		Writer:         &stdout,
-		ErrWriter:      io.Discard,
-		Reader:         strings.NewReader(stdin),
-		ExitErrHandler: func(_ context.Context, _ *cli.Command, _ error) {},
-		Commands: []*cli.Command{
-			OrderCommand(c, configPath, &stdout),
-		},
+	cmd := NewOrderCmd(c, configPath, &stdout)
+	cmd.SetIn(strings.NewReader(stdin))
+
+	if len(args) > 0 && args[0] == "order" {
+		args = args[1:]
 	}
 
-	fullArgs := append([]string{"schwab-agent"}, args...)
-	err := root.Run(context.Background(), fullArgs)
+	cmd.SetArgs(args)
+	err := cmd.Execute()
 
 	return stdout.String(), err
 }
@@ -115,7 +110,7 @@ func mustMarshalJSON(t *testing.T, value any) string {
 	return string(encoded)
 }
 
-func TestOrderConfirmGate(t *testing.T) {
+func TestNewOrderCmdConfirmGate(t *testing.T) {
 	t.Parallel()
 
 	configPath := writeTestConfigMutable(t, "hash123")
@@ -157,7 +152,7 @@ func TestOrderConfirmGate(t *testing.T) {
 	}
 }
 
-func TestOrderPreviewSpecModes(t *testing.T) {
+func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 	t.Parallel()
 
 	orderID := int64(4242)
@@ -234,7 +229,7 @@ func TestOrderPreviewSpecModes(t *testing.T) {
 	}
 }
 
-func TestOrderBuildEquityOutputsRequestJSON(t *testing.T) {
+func TestNewOrderCmdBuildEquityOutputsRequestJSON(t *testing.T) {
 	t.Parallel()
 
 	stdout, err := runOrderCommand(
@@ -264,7 +259,7 @@ func TestOrderBuildEquityOutputsRequestJSON(t *testing.T) {
 	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
 }
 
-func TestOrderPlaceEquityPipeline(t *testing.T) {
+func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 	t.Parallel()
 
 	var received models.OrderRequest
@@ -315,7 +310,7 @@ func TestOrderPlaceEquityPipeline(t *testing.T) {
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
-func TestOrderPlaceSpecFromFile(t *testing.T) {
+func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 	t.Parallel()
 
 	var received models.OrderRequest
@@ -356,7 +351,7 @@ func TestOrderPlaceSpecFromFile(t *testing.T) {
 	assert.Equal(t, float64(24680), data["orderId"])
 }
 
-func TestOrderPlaceUnknownFlagSuggestsSubcommand(t *testing.T) {
+func TestNewOrderCmdPlaceUnknownFlagSuggestsSubcommand(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -377,10 +372,10 @@ func TestOrderPlaceUnknownFlagSuggestsSubcommand(t *testing.T) {
 	assert.Contains(t, valErr.Error(), "option")
 	assert.Contains(t, valErr.Error(), "bracket")
 	assert.Contains(t, valErr.Error(), "oco")
-	assert.Contains(t, valErr.Error(), "flag provided but not defined: -symbol")
+	assert.Contains(t, valErr.Error(), "unknown flag: --symbol")
 }
 
-func TestOrderPlaceSpecMissingValueKeepsOriginalUsageError(t *testing.T) {
+func TestNewOrderCmdPlaceSpecMissingValueKeepsOriginalUsageError(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -395,7 +390,7 @@ func TestOrderPlaceSpecMissingValueKeepsOriginalUsageError(t *testing.T) {
 	assert.NotContains(t, err.Error(), "requires a subcommand")
 }
 
-func TestOrderMutableGuard(t *testing.T) {
+func TestNewOrderCmdMutableGuard(t *testing.T) {
 	t.Parallel()
 
 	// Config WITHOUT i-also-like-to-live-dangerously (default: false).
@@ -438,7 +433,7 @@ func TestOrderMutableGuard(t *testing.T) {
 	}
 }
 
-func TestOrderMutableGuardTakesPriorityOverConfirm(t *testing.T) {
+func TestNewOrderCmdMutableGuardTakesPriorityOverConfirm(t *testing.T) {
 	t.Parallel()
 
 	// Config WITHOUT mutable flag, command WITHOUT --confirm.
@@ -457,7 +452,7 @@ func TestOrderMutableGuardTakesPriorityOverConfirm(t *testing.T) {
 	assert.Contains(t, validationErr.Error(), "i-also-like-to-live-dangerously")
 }
 
-func TestOrderPreviewNotBlockedByMutableGuard(t *testing.T) {
+func TestNewOrderCmdPreviewNotBlockedByMutableGuard(t *testing.T) {
 	t.Parallel()
 
 	orderID := int64(9999)
@@ -478,7 +473,7 @@ func TestOrderPreviewNotBlockedByMutableGuard(t *testing.T) {
 	assert.NotEmpty(t, stdout)
 }
 
-func TestOrderBuildOCOOutputsRequestJSON(t *testing.T) {
+func TestNewOrderCmdBuildOCOOutputsRequestJSON(t *testing.T) {
 	t.Parallel()
 
 	stdout, err := runOrderCommand(
@@ -513,7 +508,7 @@ func TestOrderBuildOCOOutputsRequestJSON(t *testing.T) {
 	assert.Equal(t, 140.0, *stopLoss.StopPrice)
 }
 
-func TestOrderBuildOCOSingleExit(t *testing.T) {
+func TestNewOrderCmdBuildOCOSingleExit(t *testing.T) {
 	t.Parallel()
 
 	// Stop-loss only: should produce a plain SINGLE order, not an OCO wrapper.
@@ -538,7 +533,7 @@ func TestOrderBuildOCOSingleExit(t *testing.T) {
 	assert.Empty(t, order.ChildOrderStrategies)
 }
 
-func TestOrderPlaceOCOPipeline(t *testing.T) {
+func TestNewOrderCmdPlaceOCOPipeline(t *testing.T) {
 	t.Parallel()
 
 	var received models.OrderRequest
@@ -590,7 +585,7 @@ func TestOrderPlaceOCOPipeline(t *testing.T) {
 // the parsing layer wires flags to params correctly, which is the untested gap that matters most
 // for order correctness.
 
-func TestOrderBuildIronCondorOpen(t *testing.T) {
+func TestNewOrderCmdBuildIronCondorOpen(t *testing.T) {
 	t.Parallel()
 
 	stdout, err := runOrderCommand(
@@ -651,7 +646,7 @@ func TestOrderBuildIronCondorOpen(t *testing.T) {
 	}
 }
 
-func TestOrderBuildIronCondorClose(t *testing.T) {
+func TestNewOrderCmdBuildIronCondorClose(t *testing.T) {
 	t.Parallel()
 
 	stdout, err := runOrderCommand(
@@ -680,7 +675,7 @@ func TestOrderBuildIronCondorClose(t *testing.T) {
 	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[3].Instruction)
 }
 
-func TestOrderBuildVerticalCallDebit(t *testing.T) {
+func TestNewOrderCmdBuildVerticalCallDebit(t *testing.T) {
 	t.Parallel()
 
 	// Bull call spread: buy lower strike, sell higher strike = NET_DEBIT.
@@ -720,7 +715,7 @@ func TestOrderBuildVerticalCallDebit(t *testing.T) {
 	assert.Equal(t, 190.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
 }
 
-func TestOrderBuildVerticalPutCredit(t *testing.T) {
+func TestNewOrderCmdBuildVerticalPutCredit(t *testing.T) {
 	t.Parallel()
 
 	// Bull put spread: buy lower strike put, sell higher strike put = NET_CREDIT.
@@ -751,7 +746,7 @@ func TestOrderBuildVerticalPutCredit(t *testing.T) {
 	}
 }
 
-func TestOrderBuildStrangleBuyOpen(t *testing.T) {
+func TestNewOrderCmdBuildStrangleBuyOpen(t *testing.T) {
 	t.Parallel()
 
 	stdout, err := runOrderCommand(
@@ -794,7 +789,7 @@ func TestOrderBuildStrangleBuyOpen(t *testing.T) {
 	assert.Equal(t, 250.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
 }
 
-func TestOrderBuildStrangleSellOpen(t *testing.T) {
+func TestNewOrderCmdBuildStrangleSellOpen(t *testing.T) {
 	t.Parallel()
 
 	stdout, err := runOrderCommand(
@@ -817,7 +812,7 @@ func TestOrderBuildStrangleSellOpen(t *testing.T) {
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
 }
 
-func TestOrderBuildStraddleBuyOpen(t *testing.T) {
+func TestNewOrderCmdBuildStraddleBuyOpen(t *testing.T) {
 	t.Parallel()
 
 	stdout, err := runOrderCommand(
@@ -862,7 +857,7 @@ func TestOrderBuildStraddleBuyOpen(t *testing.T) {
 	}
 }
 
-func TestOrderBuildStraddleSellOpen(t *testing.T) {
+func TestNewOrderCmdBuildStraddleSellOpen(t *testing.T) {
 	t.Parallel()
 
 	stdout, err := runOrderCommand(
@@ -884,7 +879,7 @@ func TestOrderBuildStraddleSellOpen(t *testing.T) {
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
 }
 
-func TestOrderBuildCoveredCallOutputsRequestJSON(t *testing.T) {
+func TestNewOrderCmdBuildCoveredCallOutputsRequestJSON(t *testing.T) {
 	t.Parallel()
 
 	stdout, err := runOrderCommand(
@@ -928,7 +923,7 @@ func TestOrderBuildCoveredCallOutputsRequestJSON(t *testing.T) {
 	assert.Equal(t, 14.0, *optionLeg.Instrument.OptionStrikePrice)
 }
 
-func TestOrderBuildSpreadDefaultDurationSession(t *testing.T) {
+func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
 	t.Parallel()
 
 	// Omit --duration and --session; defaults should be DAY and NORMAL.
@@ -1000,7 +995,7 @@ func TestOrderBuildSpreadDefaultDurationSession(t *testing.T) {
 // TestOrderBuildParseErrors covers error paths in the param parser functions
 // (parseEquityParams, parseOptionParams, parseBracketParams, parseOCOParams)
 // that aren't exercised by the spread tests.
-func TestOrderBuildParseErrors(t *testing.T) {
+func TestNewOrderCmdBuildParseErrors(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -1269,7 +1264,7 @@ func TestOrderBuildParseErrors(t *testing.T) {
 	}
 }
 
-func TestOrderBuildSpreadParseErrors(t *testing.T) {
+func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -1403,7 +1398,7 @@ func TestOrderBuildSpreadParseErrors(t *testing.T) {
 	}
 }
 
-func TestOrderListAllAccounts(t *testing.T) {
+func TestNewOrderCmdListAllAccounts(t *testing.T) {
 	t.Parallel()
 
 	// Arrange - mix of terminal and non-terminal orders. Default listing
@@ -1450,7 +1445,7 @@ func TestOrderListAllAccounts(t *testing.T) {
 	assert.Equal(t, "QUEUED", second["status"])
 }
 
-func TestOrderListWithAccount(t *testing.T) {
+func TestNewOrderCmdListWithAccount(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -1484,7 +1479,7 @@ func TestOrderListWithAccount(t *testing.T) {
 	assert.Equal(t, "QUEUED", order["status"])
 }
 
-func TestOrderListWithFilters(t *testing.T) {
+func TestNewOrderCmdListWithFilters(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -1517,7 +1512,7 @@ func TestOrderListWithFilters(t *testing.T) {
 	assert.Empty(t, orders)
 }
 
-func TestOrderListMultipleStatuses(t *testing.T) {
+func TestNewOrderCmdListMultipleStatuses(t *testing.T) {
 	t.Parallel()
 
 	// Arrange - the Schwab API accepts only one status per request, so multiple
@@ -1570,7 +1565,7 @@ func TestOrderListMultipleStatuses(t *testing.T) {
 	assert.Equal(t, "FILLED", second["status"])
 }
 
-func TestOrderListCommaSeparatedStatuses(t *testing.T) {
+func TestNewOrderCmdListCommaSeparatedStatuses(t *testing.T) {
 	t.Parallel()
 
 	// Arrange - comma-separated statuses should split into separate API calls,
@@ -1603,7 +1598,7 @@ func TestOrderListCommaSeparatedStatuses(t *testing.T) {
 	assert.Empty(t, orders)
 }
 
-func TestOrderListAPIError(t *testing.T) {
+func TestNewOrderCmdListAPIError(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -1627,7 +1622,7 @@ func TestOrderListAPIError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
 }
 
-func TestOrderListDefaultFiltersTerminalStatuses(t *testing.T) {
+func TestNewOrderCmdListDefaultFiltersTerminalStatuses(t *testing.T) {
 	t.Parallel()
 
 	// Arrange - return orders in every terminal status plus one non-terminal.
@@ -1671,7 +1666,7 @@ func TestOrderListDefaultFiltersTerminalStatuses(t *testing.T) {
 	}
 }
 
-func TestOrderListStatusAllDisablesFiltering(t *testing.T) {
+func TestNewOrderCmdListStatusAllDisablesFiltering(t *testing.T) {
 	t.Parallel()
 
 	// Arrange - --status all should return everything unfiltered.
@@ -1705,7 +1700,7 @@ func TestOrderListStatusAllDisablesFiltering(t *testing.T) {
 	require.Len(t, orders, 3, "should return all orders when --status all")
 }
 
-func TestOrderListExplicitStatusBypassesDefault(t *testing.T) {
+func TestNewOrderCmdListExplicitStatusBypassesDefault(t *testing.T) {
 	t.Parallel()
 
 	// Arrange - when the user explicitly requests a terminal status,
@@ -1735,7 +1730,7 @@ func TestOrderListExplicitStatusBypassesDefault(t *testing.T) {
 	require.Len(t, orders, 2)
 }
 
-func TestOrderListNilStatusIncludedByDefault(t *testing.T) {
+func TestNewOrderCmdListNilStatusIncludedByDefault(t *testing.T) {
 	t.Parallel()
 
 	// Arrange - orders with no status field should be kept (conservative:
@@ -1769,7 +1764,7 @@ func TestOrderListNilStatusIncludedByDefault(t *testing.T) {
 	assert.Equal(t, float64(1), o["orderId"])
 }
 
-func TestOrderGetSuccess(t *testing.T) {
+func TestNewOrderCmdGetSuccess(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -1800,7 +1795,7 @@ func TestOrderGetSuccess(t *testing.T) {
 	assert.Equal(t, "FILLED", order["status"])
 }
 
-func TestOrderGetOrderIDFlagSuccess(t *testing.T) {
+func TestNewOrderCmdGetOrderIDFlagSuccess(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -1830,7 +1825,7 @@ func TestOrderGetOrderIDFlagSuccess(t *testing.T) {
 	assert.Equal(t, float64(1234567890), order["orderId"])
 }
 
-func TestOrderGetOrderIDFlagWinsOverPositional(t *testing.T) {
+func TestNewOrderCmdGetOrderIDFlagWinsOverPositional(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -1860,7 +1855,7 @@ func TestOrderGetOrderIDFlagWinsOverPositional(t *testing.T) {
 	assert.Equal(t, float64(1234567890), order["orderId"])
 }
 
-func TestOrderGetNoAccount(t *testing.T) {
+func TestNewOrderCmdGetNoAccount(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -1876,7 +1871,7 @@ func TestOrderGetNoAccount(t *testing.T) {
 	require.ErrorAs(t, err, &accountErr)
 }
 
-func TestOrderGetMissingOrderID(t *testing.T) {
+func TestNewOrderCmdGetMissingOrderID(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -1893,7 +1888,7 @@ func TestOrderGetMissingOrderID(t *testing.T) {
 	assert.Contains(t, validationErr.Error(), "order-id is required")
 }
 
-func TestOrderGetInvalidOrderID(t *testing.T) {
+func TestNewOrderCmdGetInvalidOrderID(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -1910,7 +1905,7 @@ func TestOrderGetInvalidOrderID(t *testing.T) {
 	assert.Equal(t, "order-id must be a valid integer", validationErr.Error())
 }
 
-func TestOrderCancelSuccess(t *testing.T) {
+func TestNewOrderCmdCancelSuccess(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -1936,7 +1931,7 @@ func TestOrderCancelSuccess(t *testing.T) {
 	assert.Equal(t, true, data["canceled"])
 }
 
-func TestOrderCancelOrderIDFlagSuccess(t *testing.T) {
+func TestNewOrderCmdCancelOrderIDFlagSuccess(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -1962,7 +1957,7 @@ func TestOrderCancelOrderIDFlagSuccess(t *testing.T) {
 	assert.Equal(t, true, data["canceled"])
 }
 
-func TestOrderCancelMutableDisabled(t *testing.T) {
+func TestNewOrderCmdCancelMutableDisabled(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -1979,7 +1974,7 @@ func TestOrderCancelMutableDisabled(t *testing.T) {
 	assert.Equal(t, mutableDisabledMessage, validationErr.Error())
 }
 
-func TestOrderCancelAPIError(t *testing.T) {
+func TestNewOrderCmdCancelAPIError(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -2004,7 +1999,7 @@ func TestOrderCancelAPIError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
 }
 
-func TestOrderReplaceSuccess(t *testing.T) {
+func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -2057,7 +2052,7 @@ func TestOrderReplaceSuccess(t *testing.T) {
 	assert.Equal(t, true, data["replaced"])
 }
 
-func TestOrderReplaceOrderIDFlagSuccess(t *testing.T) {
+func TestNewOrderCmdReplaceOrderIDFlagSuccess(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -2098,7 +2093,7 @@ func TestOrderReplaceOrderIDFlagSuccess(t *testing.T) {
 	assert.Equal(t, true, data["replaced"])
 }
 
-func TestOrderReplaceMutableDisabled(t *testing.T) {
+func TestNewOrderCmdReplaceMutableDisabled(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -2115,7 +2110,7 @@ func TestOrderReplaceMutableDisabled(t *testing.T) {
 	assert.Equal(t, mutableDisabledMessage, validationErr.Error())
 }
 
-func TestOrderReplaceAPIError(t *testing.T) {
+func TestNewOrderCmdReplaceAPIError(t *testing.T) {
 	t.Parallel()
 
 	// Arrange
@@ -2149,13 +2144,13 @@ func TestParseRequiredOrderID(t *testing.T) {
 		wantID    int64
 		wantError string
 	}{
-		{name: "empty", args: []string{"order-test"}, wantError: "order-id is required"},
-		{name: "valid int", args: []string{"order-test", "12345"}, wantID: 12345},
-		{name: "flag valid int", args: []string{"order-test", "--order-id", "67890"}, wantID: 67890},
-		{name: "flag wins over positional", args: []string{"order-test", "--order-id", "67890", "12345"}, wantID: 67890},
-		{name: "invalid non-numeric", args: []string{"order-test", "abc"}, wantError: "order-id must be a valid integer"},
-		{name: "negative int", args: []string{"order-test", "-99"}, wantError: "order-id must be a positive integer"},
-		{name: "zero", args: []string{"order-test", "0"}, wantError: "order-id must be a positive integer"},
+		{name: "empty", args: []string{}, wantError: "order-id is required"},
+		{name: "valid int", args: []string{"12345"}, wantID: 12345},
+		{name: "flag valid int", args: []string{"--order-id", "67890"}, wantID: 67890},
+		{name: "flag wins over positional", args: []string{"--order-id", "67890", "12345"}, wantID: 67890},
+		{name: "invalid non-numeric", args: []string{"abc"}, wantError: "order-id must be a valid integer"},
+		{name: "negative int", args: []string{"--", "-99"}, wantError: "order-id must be a positive integer"},
+		{name: "zero", args: []string{"0"}, wantError: "order-id must be a positive integer"},
 	}
 
 	for _, tc := range testCases {
@@ -2164,20 +2159,18 @@ func TestParseRequiredOrderID(t *testing.T) {
 
 			// Arrange
 			var parsedID int64
-			cmd := &cli.Command{
-				Name: "order-test",
-				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "order-id", Usage: "Order ID"},
-				},
-				Action: func(_ context.Context, cmd *cli.Command) error {
+			cmd := &cobra.Command{
+				Use: "order-test",
+				RunE: func(cmd *cobra.Command, args []string) error {
 					var err error
-					parsedID, err = parseRequiredOrderID(cmd)
+					parsedID, err = parseRequiredOrderID(cmd, args)
 					return err
 				},
 			}
+			cmd.Flags().String("order-id", "", "Order ID")
 
 			// Act
-			err := runTestCommand(t, cmd, tc.args...)
+			_, err := runTestCommand(t, cmd, tc.args...)
 
 			// Assert
 			if tc.wantError == "" {
@@ -2194,7 +2187,7 @@ func TestParseRequiredOrderID(t *testing.T) {
 	}
 }
 
-func TestOrderBuildOptionOutputsRequestJSON(t *testing.T) {
+func TestNewOrderCmdBuildOptionOutputsRequestJSON(t *testing.T) {
 	t.Parallel()
 
 	// Act
@@ -2240,7 +2233,7 @@ func TestOrderBuildOptionOutputsRequestJSON(t *testing.T) {
 	assert.Equal(t, 185.0, *leg.Instrument.OptionStrikePrice)
 }
 
-func TestOrderBuildBracketOutputsRequestJSON(t *testing.T) {
+func TestNewOrderCmdBuildBracketOutputsRequestJSON(t *testing.T) {
 	t.Parallel()
 
 	// Act
@@ -2313,7 +2306,7 @@ func TestParseInstruction_ErrorPaths(t *testing.T) {
 	}
 }
 
-func TestOrderPreview_EmptySpec(t *testing.T) {
+func TestNewOrderCmdPreview_EmptySpec(t *testing.T) {
 	// Arrange / Act
 	stdout, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "preview")
@@ -2324,7 +2317,7 @@ func TestOrderPreview_EmptySpec(t *testing.T) {
 	assert.Contains(t, err.Error(), "spec is required")
 }
 
-func TestOrderPreview_APIError(t *testing.T) {
+func TestNewOrderCmdPreview_APIError(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -2347,7 +2340,7 @@ func TestOrderPreview_APIError(t *testing.T) {
 	require.ErrorAs(t, err, &httpErr)
 }
 
-func TestOrderPlace_MissingSpec(t *testing.T) {
+func TestNewOrderCmdPlace_MissingSpec(t *testing.T) {
 	// order place (no subcommand) requires --spec
 	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
 		"order", "place")
@@ -2357,7 +2350,7 @@ func TestOrderPlace_MissingSpec(t *testing.T) {
 	assert.Contains(t, err.Error(), "spec is required")
 }
 
-func TestOrderPlace_InvalidSpec_NonJSONPrefix(t *testing.T) {
+func TestNewOrderCmdPlace_InvalidSpec_NonJSONPrefix(t *testing.T) {
 	// Spec that doesn't start with { or [ should return the "inline JSON" error.
 	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
 		"order", "place", "--spec", "hello world", "--confirm")
@@ -2367,7 +2360,7 @@ func TestOrderPlace_InvalidSpec_NonJSONPrefix(t *testing.T) {
 	assert.Contains(t, err.Error(), "spec must be inline JSON, @file, or -")
 }
 
-func TestOrderPlace_InvalidSpec_BadJSON(t *testing.T) {
+func TestNewOrderCmdPlace_InvalidSpec_BadJSON(t *testing.T) {
 	// Spec starts with { but isn't valid JSON.
 	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
 		"order", "place", "--spec", "{not valid json}", "--confirm")
@@ -2377,7 +2370,7 @@ func TestOrderPlace_InvalidSpec_BadJSON(t *testing.T) {
 	assert.Contains(t, err.Error(), "spec must contain valid JSON")
 }
 
-func TestOrderPreview_SpecFileNotFound(t *testing.T) {
+func TestNewOrderCmdPreview_SpecFileNotFound(t *testing.T) {
 	stdout, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "preview", "--spec", "@/nonexistent/file.json")
 
@@ -2386,7 +2379,7 @@ func TestOrderPreview_SpecFileNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "read spec file")
 }
 
-func TestOrderReplace_MissingOrderID(t *testing.T) {
+func TestNewOrderCmdReplace_MissingOrderID(t *testing.T) {
 	// Replace requires a positional order-id argument.
 	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
 		"order", "replace", "--confirm",
@@ -2397,7 +2390,7 @@ func TestOrderReplace_MissingOrderID(t *testing.T) {
 	assert.Contains(t, err.Error(), "order-id is required")
 }
 
-func TestOrderReplace_InvalidAction(t *testing.T) {
+func TestNewOrderCmdReplace_InvalidAction(t *testing.T) {
 	// Replace parses equity params; invalid --action triggers parseInstruction error.
 	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
 		"order", "replace", "12345", "--confirm",
@@ -2452,7 +2445,7 @@ func validSecondarySpec(t *testing.T) string {
 	})
 }
 
-func TestOrderBuildFTSInlineJSON(t *testing.T) {
+func TestNewOrderCmdBuildFTSInlineJSON(t *testing.T) {
 	t.Parallel()
 
 	primary := validPrimarySpec(t)
@@ -2488,7 +2481,7 @@ func TestOrderBuildFTSInlineJSON(t *testing.T) {
 	assert.Equal(t, models.InstructionSell, child.OrderLegCollection[0].Instruction)
 }
 
-func TestOrderBuildFTSFromFiles(t *testing.T) {
+func TestNewOrderCmdBuildFTSFromFiles(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -2512,10 +2505,10 @@ func TestOrderBuildFTSFromFiles(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeSingle, order.ChildOrderStrategies[0].OrderStrategyType)
 }
 
-func TestOrderBuildFTSMissingPrimary(t *testing.T) {
+func TestNewOrderCmdBuildFTSMissingPrimary(t *testing.T) {
 	t.Parallel()
 
-	// urfave/cli v3 enforces Required flags before the action runs,
+	// Cobra validates required flags before RunE executes,
 	// so a missing --primary should produce an error.
 	_, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "fts",
@@ -2525,7 +2518,7 @@ func TestOrderBuildFTSMissingPrimary(t *testing.T) {
 	assert.Contains(t, err.Error(), "primary")
 }
 
-func TestOrderBuildFTSMissingSecondary(t *testing.T) {
+func TestNewOrderCmdBuildFTSMissingSecondary(t *testing.T) {
 	t.Parallel()
 
 	_, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
@@ -2536,7 +2529,7 @@ func TestOrderBuildFTSMissingSecondary(t *testing.T) {
 	assert.Contains(t, err.Error(), "secondary")
 }
 
-func TestOrderBuildFTSValidationError(t *testing.T) {
+func TestNewOrderCmdBuildFTSValidationError(t *testing.T) {
 	t.Parallel()
 
 	// An empty order ({}) has no OrderType and no legs, so ValidateFTSOrder
@@ -2552,7 +2545,7 @@ func TestOrderBuildFTSValidationError(t *testing.T) {
 	assert.Contains(t, err.Error(), "primary order is empty")
 }
 
-func TestOrderBuildFTSInvalidJSON(t *testing.T) {
+func TestNewOrderCmdBuildFTSInvalidJSON(t *testing.T) {
 	t.Parallel()
 
 	_, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "",
@@ -2565,7 +2558,7 @@ func TestOrderBuildFTSInvalidJSON(t *testing.T) {
 	assert.Contains(t, err.Error(), "valid JSON")
 }
 
-func TestOrderBuildFTSRejectsComplexPrimary(t *testing.T) {
+func TestNewOrderCmdBuildFTSRejectsComplexPrimary(t *testing.T) {
 	t.Parallel()
 	price := 150.0
 
@@ -2805,219 +2798,11 @@ func TestParseDuration(t *testing.T) {
 	}
 }
 
-// --- order repeat tests ---
-
-// sampleOrderJSON returns a JSON string for a filled order response. Includes
-// response-only fields (orderId, status, filledQuantity) that OrderToRequest
-// should strip when converting to a submittable request.
-func sampleOrderJSON() string {
-	return `{
-		"session":"NORMAL",
-		"duration":"DAY",
-		"orderType":"LIMIT",
-		"cancelTime":"2025-12-31T00:00:00+0000",
-		"orderStrategyType":"SINGLE",
-		"orderId":12345,
-		"status":"FILLED",
-		"filledQuantity":10,
-		"remainingQuantity":0,
-		"cancelable":false,
-		"editable":false,
-		"price":150.0,
-		"orderLegCollection":[{
-			"instruction":"BUY",
-			"quantity":10,
-			"instrument":{"assetType":"EQUITY","symbol":"AAPL"}
-		}]
-	}`
-}
-
-func TestOrderRepeatBuildDefault(t *testing.T) {
-	t.Parallel()
-
-	// Arrange: mock server returns order on GET, nothing else expected.
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/trader/v1/accounts/hash123/orders/12345", r.URL.Path)
-
-		w.Header().Set("Content-Type", "application/json")
-		_, err := w.Write([]byte(sampleOrderJSON()))
-		require.NoError(t, err)
-	}))
-	defer server.Close()
-
-	configPath := writeTestConfig(t, "hash123")
-	cliClient := testClient(t, server)
-
-	// Act: no mode flag means --build (default).
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "repeat", "12345")
-
-	// Assert: raw JSON output (not envelope-wrapped), no response-only fields.
-	require.NoError(t, err)
-	order := decodeOrderRequest(t, stdout)
-	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
-	assert.Equal(t, models.SessionNormal, order.Session)
-	assert.Equal(t, models.DurationDay, order.Duration)
-	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
-	require.NotNil(t, order.Price)
-	assert.Equal(t, 150.0, *order.Price)
-	require.Len(t, order.OrderLegCollection, 1)
-	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
-	assert.Equal(t, "AAPL", order.OrderLegCollection[0].Instrument.Symbol)
-	assert.Equal(t, float64(10), order.OrderLegCollection[0].Quantity)
-
-	// Verify CancelTime is preserved through OrderToRequest.
-	assert.Contains(t, stdout, `"cancelTime"`)
-
-	// Verify response-only fields are NOT present in the output.
-	assert.NotContains(t, stdout, `"orderId"`)
-	assert.NotContains(t, stdout, `"status"`)
-	assert.NotContains(t, stdout, `"filledQuantity"`)
-}
-
-func TestOrderRepeatOrderIDFlagBuild(t *testing.T) {
-	t.Parallel()
-
-	// Arrange
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/trader/v1/accounts/hash123/orders/1234567890", r.URL.Path)
-
-		w.Header().Set("Content-Type", "application/json")
-		_, err := w.Write([]byte(sampleOrderJSON()))
-		require.NoError(t, err)
-	}))
-	defer server.Close()
-
-	configPath := writeTestConfig(t, "hash123")
-	cliClient := testClient(t, server)
-
-	// Act
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "repeat", "--order-id", "1234567890")
-
-	// Assert
-	require.NoError(t, err)
-	order := decodeOrderRequest(t, stdout)
-	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
-	assert.NotContains(t, stdout, `"orderId"`)
-}
-
-func TestOrderRepeatBuildExplicit(t *testing.T) {
-	t.Parallel()
-
-	// Arrange
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, err := w.Write([]byte(sampleOrderJSON()))
-		require.NoError(t, err)
-	}))
-	defer server.Close()
-
-	configPath := writeTestConfig(t, "hash123")
-	cliClient := testClient(t, server)
-
-	// Act: explicit --build flag.
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "repeat", "--build", "12345")
-
-	// Assert
-	require.NoError(t, err)
-	order := decodeOrderRequest(t, stdout)
-	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
-	assert.NotContains(t, stdout, `"orderId"`)
-}
-
-func TestOrderRepeatPreview(t *testing.T) {
-	t.Parallel()
-
-	// Arrange: GET returns order, POST to previewOrder returns preview response.
-	requestCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		requestCount++
-
-		switch {
-		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/orders/12345"):
-			_, err := w.Write([]byte(sampleOrderJSON()))
-			require.NoError(t, err)
-		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/previewOrder"):
-			// Verify the posted body is a valid OrderRequest (no response-only fields).
-			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			var req models.OrderRequest
-			require.NoError(t, json.Unmarshal(body, &req))
-			assert.Equal(t, models.OrderTypeLimit, req.OrderType)
-
-			_, err = w.Write([]byte(`{"orderStrategy":{"orderType":"LIMIT","status":"ACCEPTED"}}`))
-			require.NoError(t, err)
-		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	defer server.Close()
-
-	configPath := writeTestConfig(t, "hash123")
-	cliClient := testClient(t, server)
-
-	// Act
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "repeat", "--preview", "12345")
-
-	// Assert: envelope-wrapped preview response.
-	require.NoError(t, err)
-	assert.Equal(t, 2, requestCount, "should make GET + POST requests")
-	envelope := decodeEnvelope(t, stdout)
-	data, ok := envelope.Data.(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, float64(12345), data["originalOrderId"])
-	assert.NotNil(t, data["preview"])
-}
-
-func TestOrderRepeatConfirmSuccess(t *testing.T) {
-	t.Parallel()
-
-	// Arrange: GET returns order, POST to orders endpoint returns Location header.
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		switch {
-		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/orders/12345"):
-			_, err := w.Write([]byte(sampleOrderJSON()))
-			require.NoError(t, err)
-		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/orders"):
-			// PlaceOrder: verify request body, return Location header with new order ID.
-			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			var req models.OrderRequest
-			require.NoError(t, json.Unmarshal(body, &req))
-			assert.Equal(t, models.OrderTypeLimit, req.OrderType)
-
-			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/99999")
-			w.WriteHeader(http.StatusCreated)
-		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	defer server.Close()
-
-	configPath := writeTestConfigMutable(t, "hash123")
-	cliClient := testClient(t, server)
-
-	// Act
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "repeat", "--confirm", "12345")
-
-	// Assert
-	require.NoError(t, err)
-	envelope := decodeEnvelope(t, stdout)
-	data, ok := envelope.Data.(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, float64(99999), data["orderId"])
-	assert.Equal(t, float64(12345), data["originalOrderId"])
-}
-
 // farExpDate is testFutureExpTime + 30 days, formatted as YYYY-MM-DD.
 // Calendar and diagonal spreads need two different expirations.
 var farExpDate = testFutureExpTime.AddDate(0, 0, 30).Format("2006-01-02")
 
-func TestOrderBuildCalendarCallOpen(t *testing.T) {
+func TestNewOrderCmdBuildCalendarCallOpen(t *testing.T) {
 	t.Parallel()
 
 	// Long calendar call spread: buy far-dated call, sell near-dated call.
@@ -3058,7 +2843,7 @@ func TestOrderBuildCalendarCallOpen(t *testing.T) {
 	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[1].Instrument.PutCall)
 }
 
-func TestOrderBuildCalendarPutClose(t *testing.T) {
+func TestNewOrderCmdBuildCalendarPutClose(t *testing.T) {
 	t.Parallel()
 
 	// Closing a put calendar: sell far-dated put, buy near-dated put.
@@ -3091,7 +2876,7 @@ func TestOrderBuildCalendarPutClose(t *testing.T) {
 	}
 }
 
-func TestOrderBuildDiagonalCallOpen(t *testing.T) {
+func TestNewOrderCmdBuildDiagonalCallOpen(t *testing.T) {
 	t.Parallel()
 
 	// Diagonal call: different strikes AND different expirations.
@@ -3133,7 +2918,7 @@ func TestOrderBuildDiagonalCallOpen(t *testing.T) {
 	assert.Equal(t, 150.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
 }
 
-func TestOrderBuildDiagonalPutOpen(t *testing.T) {
+func TestNewOrderCmdBuildDiagonalPutOpen(t *testing.T) {
 	t.Parallel()
 
 	stdout, err := runOrderCommand(
@@ -3161,7 +2946,7 @@ func TestOrderBuildDiagonalPutOpen(t *testing.T) {
 	}
 }
 
-func TestOrderBuildCollarOpen(t *testing.T) {
+func TestNewOrderCmdBuildCollarOpen(t *testing.T) {
 	t.Parallel()
 
 	// Collar opening: buy shares, buy protective put, sell covered call.
@@ -3211,7 +2996,7 @@ func TestOrderBuildCollarOpen(t *testing.T) {
 	assert.Equal(t, 160.0, *callLeg.Instrument.OptionStrikePrice)
 }
 
-func TestOrderBuildCollarClose(t *testing.T) {
+func TestNewOrderCmdBuildCollarClose(t *testing.T) {
 	t.Parallel()
 
 	// Collar closing: sell shares, sell put, buy call.
@@ -3238,7 +3023,7 @@ func TestOrderBuildCollarClose(t *testing.T) {
 	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[2].Instruction)
 }
 
-func TestOrderBuildCalendarInvalidDate(t *testing.T) {
+func TestNewOrderCmdBuildCalendarInvalidDate(t *testing.T) {
 	t.Parallel()
 
 	// Bad near-expiration format should produce a parseDateFlag error.
@@ -3261,7 +3046,7 @@ func TestOrderBuildCalendarInvalidDate(t *testing.T) {
 	assert.Contains(t, validationErr.Error(), "near-expiration must use YYYY-MM-DD format")
 }
 
-func TestOrderBuildDiagonalInvalidDate(t *testing.T) {
+func TestNewOrderCmdBuildDiagonalInvalidDate(t *testing.T) {
 	t.Parallel()
 
 	// Bad far-expiration format should produce a parseDateFlag error.
@@ -3283,72 +3068,4 @@ func TestOrderBuildDiagonalInvalidDate(t *testing.T) {
 	var validationErr *apperr.ValidationError
 	require.ErrorAs(t, err, &validationErr)
 	assert.Contains(t, validationErr.Error(), "far-expiration must use YYYY-MM-DD format")
-}
-
-func TestOrderRepeatConfirmMutableDisabled(t *testing.T) {
-	t.Parallel()
-
-	// Arrange: mutable operations disabled in config.
-	configPath := writeTestConfig(t, "hash123")
-
-	// Act: --confirm should fail before even calling the API.
-	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "repeat", "--confirm", "12345")
-
-	// Assert
-	require.Error(t, err)
-	assert.Empty(t, stdout)
-	var validationErr *apperr.ValidationError
-	require.ErrorAs(t, err, &validationErr)
-	assert.Equal(t, mutableDisabledMessage, validationErr.Error())
-}
-
-func TestOrderRepeatInvalidOrderID(t *testing.T) {
-	t.Parallel()
-
-	// Arrange
-	configPath := writeTestConfig(t, "hash123")
-
-	// Act
-	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "repeat", "abc")
-
-	// Assert
-	require.Error(t, err)
-	assert.Empty(t, stdout)
-	var validationErr *apperr.ValidationError
-	require.ErrorAs(t, err, &validationErr)
-	assert.Equal(t, "order-id must be a valid integer", validationErr.Error())
-}
-
-func TestOrderRepeatMissingOrderID(t *testing.T) {
-	t.Parallel()
-
-	// Arrange
-	configPath := writeTestConfig(t, "hash123")
-
-	// Act
-	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "repeat")
-
-	// Assert
-	require.Error(t, err)
-	assert.Empty(t, stdout)
-	var validationErr *apperr.ValidationError
-	require.ErrorAs(t, err, &validationErr)
-	assert.Contains(t, validationErr.Error(), "order-id is required")
-}
-
-func TestOrderRepeatMultipleModes(t *testing.T) {
-	t.Parallel()
-
-	// Arrange
-	configPath := writeTestConfig(t, "hash123")
-
-	// Act: passing both --build and --preview should error.
-	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "repeat", "--build", "--preview", "12345")
-
-	// Assert
-	require.Error(t, err)
-	assert.Empty(t, stdout)
-	var validationErr *apperr.ValidationError
-	require.ErrorAs(t, err, &validationErr)
-	assert.Equal(t, "specify only one of --build, --preview, or --confirm", validationErr.Error())
 }

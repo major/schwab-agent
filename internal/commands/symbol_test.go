@@ -11,34 +11,34 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-// TestSymbolBuild verifies the symbol build subcommand produces correct OCC symbols.
-func TestSymbolBuild(t *testing.T) {
+// TestNewSymbolCmdBuild verifies the symbol build subcommand produces correct OCC symbols.
+func TestNewSymbolCmdBuild(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		args       []string
-		wantSymbol string
+		name        string
+		args        []string
+		wantSymbol  string
 		wantPutCall string
-		wantStrike float64
+		wantStrike  float64
 	}{
 		{
 			name:        "aapl call",
-			args:        []string{"symbol", "build", "--underlying", "AAPL", "--expiration", "2025-06-20", "--strike", "200", "--call"},
+			args:        []string{"build", "--underlying", "AAPL", "--expiration", "2025-06-20", "--strike", "200", "--call"},
 			wantSymbol:  "AAPL  250620C00200000",
 			wantPutCall: "CALL",
 			wantStrike:  200,
 		},
 		{
 			name:        "spy put with decimal",
-			args:        []string{"symbol", "build", "--underlying", "SPY", "--expiration", "2025-12-19", "--strike", "450.50", "--put"},
+			args:        []string{"build", "--underlying", "SPY", "--expiration", "2025-12-19", "--strike", "450.50", "--put"},
 			wantSymbol:  "SPY   251219P00450500",
 			wantPutCall: "PUT",
 			wantStrike:  450.5,
 		},
 		{
 			name:        "googl call",
-			args:        []string{"symbol", "build", "--underlying", "GOOGL", "--expiration", "2025-01-17", "--strike", "150", "--call"},
+			args:        []string{"build", "--underlying", "GOOGL", "--expiration", "2025-01-17", "--strike", "150", "--call"},
 			wantSymbol:  "GOOGL 250117C00150000",
 			wantPutCall: "CALL",
 			wantStrike:  150,
@@ -47,10 +47,10 @@ func TestSymbolBuild(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			cmd := SymbolCommand(&buf)
+			buf := &bytes.Buffer{}
+			cmd := NewSymbolCmd(buf)
 
-			err := runTestCommand(t, cmd, tt.args...)
+			_, err := runTestCommand(t, cmd, tt.args...)
 			require.NoError(t, err)
 
 			var env output.Envelope
@@ -67,8 +67,8 @@ func TestSymbolBuild(t *testing.T) {
 	}
 }
 
-// TestSymbolBuildValidation verifies that symbol build rejects invalid input.
-func TestSymbolBuildValidation(t *testing.T) {
+// TestNewSymbolCmdBuildValidation verifies that symbol build rejects invalid input.
+func TestNewSymbolCmdBuildValidation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -78,35 +78,35 @@ func TestSymbolBuildValidation(t *testing.T) {
 	}{
 		{
 			name:    "no put or call flag",
-			args:    []string{"symbol", "build", "--underlying", "AAPL", "--expiration", "2025-06-20", "--strike", "200"},
+			args:    []string{"build", "--underlying", "AAPL", "--expiration", "2025-06-20", "--strike", "200"},
 			wantMsg: "exactly one of --call or --put is required",
 		},
 		{
 			name:    "both put and call flags",
-			args:    []string{"symbol", "build", "--underlying", "AAPL", "--expiration", "2025-06-20", "--strike", "200", "--call", "--put"},
+			args:    []string{"build", "--underlying", "AAPL", "--expiration", "2025-06-20", "--strike", "200", "--call", "--put"},
 			wantMsg: "exactly one of --call or --put is required",
 		},
 		{
 			name:    "invalid expiration format",
-			args:    []string{"symbol", "build", "--underlying", "AAPL", "--expiration", "06/20/2025", "--strike", "200", "--call"},
+			args:    []string{"build", "--underlying", "AAPL", "--expiration", "06/20/2025", "--strike", "200", "--call"},
 			wantMsg: "YYYY-MM-DD",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			cmd := SymbolCommand(&buf)
+			buf := &bytes.Buffer{}
+			cmd := NewSymbolCmd(buf)
 
-			err := runTestCommand(t, cmd, tt.args...)
+			_, err := runTestCommand(t, cmd, tt.args...)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantMsg)
 		})
 	}
 }
 
-// TestSymbolParse verifies the symbol parse subcommand decomposes OCC symbols.
-func TestSymbolParse(t *testing.T) {
+// TestNewSymbolCmdParse verifies the symbol parse subcommand decomposes OCC symbols.
+func TestNewSymbolCmdParse(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -145,10 +145,10 @@ func TestSymbolParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			cmd := SymbolCommand(&buf)
+			buf := &bytes.Buffer{}
+			cmd := NewSymbolCmd(buf)
 
-			err := runTestCommand(t, cmd, "symbol", "parse", tt.symbol)
+			_, err := runTestCommand(t, cmd, "parse", tt.symbol)
 			require.NoError(t, err)
 
 			var env output.Envelope
@@ -167,8 +167,8 @@ func TestSymbolParse(t *testing.T) {
 	}
 }
 
-// TestSymbolParseValidation verifies that symbol parse rejects invalid input.
-func TestSymbolParseValidation(t *testing.T) {
+// TestNewSymbolCmdParseValidation verifies that symbol parse rejects invalid input.
+func TestNewSymbolCmdParseValidation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -178,40 +178,40 @@ func TestSymbolParseValidation(t *testing.T) {
 	}{
 		{
 			name:    "no argument",
-			args:    []string{"symbol", "parse"},
-			wantMsg: "OCC symbol argument is required",
+			args:    []string{"parse"},
+			wantMsg: "accepts 1 arg(s), received 0",
 		},
 		{
 			name:    "too short",
-			args:    []string{"symbol", "parse", "AAPL"},
+			args:    []string{"parse", "AAPL"},
 			wantMsg: "must be 21 characters",
 		},
 		{
 			name:    "invalid put/call char",
-			args:    []string{"symbol", "parse", "AAPL  250620X00200000"},
+			args:    []string{"parse", "AAPL  250620X00200000"},
 			wantMsg: "invalid put/call indicator",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			cmd := SymbolCommand(&buf)
+			buf := &bytes.Buffer{}
+			cmd := NewSymbolCmd(buf)
 
-			err := runTestCommand(t, cmd, tt.args...)
+			_, err := runTestCommand(t, cmd, tt.args...)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantMsg)
 		})
 	}
 }
 
-// TestSymbolParseRoundTrip verifies that build -> parse produces consistent components.
-func TestSymbolParseRoundTrip(t *testing.T) {
-	var buildBuf bytes.Buffer
-	buildCmd := SymbolCommand(&buildBuf)
+// TestNewSymbolCmdParseRoundTrip verifies that build -> parse produces consistent components.
+func TestNewSymbolCmdParseRoundTrip(t *testing.T) {
+	buildBuf := &bytes.Buffer{}
+	buildCmd := NewSymbolCmd(buildBuf)
 
 	// Build
-	err := runTestCommand(t, buildCmd, "symbol", "build",
+	_, err := runTestCommand(t, buildCmd, "build",
 		"--underlying", "TSLA", "--expiration", "2026-01-16", "--strike", "275.50", "--put")
 	require.NoError(t, err)
 
@@ -222,10 +222,10 @@ func TestSymbolParseRoundTrip(t *testing.T) {
 	symbol := buildData["symbol"].(string)
 
 	// Parse
-	var parseBuf bytes.Buffer
-	parseCmd := SymbolCommand(&parseBuf)
+	parseBuf := &bytes.Buffer{}
+	parseCmd := NewSymbolCmd(parseBuf)
 
-	err = runTestCommand(t, parseCmd, "symbol", "parse", symbol)
+	_, err = runTestCommand(t, parseCmd, "parse", symbol)
 	require.NoError(t, err)
 
 	var parseEnv output.Envelope

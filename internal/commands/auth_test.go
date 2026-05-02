@@ -2,7 +2,6 @@ package commands
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -79,10 +78,19 @@ type testLoginPayload struct {
 	AutoSetDefault   bool   `json:"auto_set_default"`
 }
 
-// TestAuthStatusCommand_WritesExpectedEnvelope verifies the status JSON shape.
-func TestAuthStatusCommand_WritesExpectedEnvelope(t *testing.T) {
+// TestNewAuthCmd_StatusWritesExpectedEnvelope verifies the Cobra status JSON shape.
+func TestNewAuthCmd_StatusWritesExpectedEnvelope(t *testing.T) {
 	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
 	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	// Cobra auth loads config from disk (PersistentPreRunE is skipped).
+	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
+		ClientID:       "abcd1234-client",
+		ClientSecret:   "secret",
+		DefaultAccount: "hash-123",
+	}))
+
 	now := time.Now().UTC()
 	expiresAt := now.Add(30 * time.Minute).Unix()
 	createdAt := now.Add(-1 * time.Hour).Unix()
@@ -97,13 +105,9 @@ func TestAuthStatusCommand_WritesExpectedEnvelope(t *testing.T) {
 	}))
 
 	var stdout bytes.Buffer
-	cmd := AuthCommand(&auth.Config{
-		ClientID:       "abcd1234-client",
-		ClientSecret:   "secret",
-		DefaultAccount: "hash-123",
-	}, tokenPath, &stdout)
+	cmd := NewAuthCmd(configPath, tokenPath, &stdout, AuthDeps{})
 
-	err := cmd.Run(context.Background(), []string{"auth", "status"})
+	_, err := runTestCommand(t, cmd, "status")
 	require.NoError(t, err)
 
 	envelope := decodeAuthEnvelope(t, stdout.Bytes())
@@ -118,10 +122,18 @@ func TestAuthStatusCommand_WritesExpectedEnvelope(t *testing.T) {
 	assert.Equal(t, "abcd...", payload.ClientID)
 }
 
-// TestAuthRefreshCommand_CallsRefresh verifies refresh delegation and persistence.
-func TestAuthRefreshCommand_CallsRefresh(t *testing.T) {
+// TestNewAuthCmd_RefreshCallsRefresh verifies refresh delegation and persistence.
+func TestNewAuthCmd_RefreshCallsRefresh(t *testing.T) {
 	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
 	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	// Write config to disk for Cobra auth (no pre-loaded config).
+	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
+		ClientID:     "client-id",
+		ClientSecret: "client-secret",
+	}))
+
 	originalToken := &auth.TokenFile{
 		CreationTimestamp: 1_650_000_000,
 		Token: auth.TokenData{
@@ -133,26 +145,28 @@ func TestAuthRefreshCommand_CallsRefresh(t *testing.T) {
 	require.NoError(t, auth.SaveToken(tokenPath, originalToken))
 
 	called := false
-	deps := defaultAuthDeps()
-	deps.refreshAccessToken = func(cfg *auth.Config, tf *auth.TokenFile, endpoint string) (*auth.TokenFile, error) {
-		called = true
-		assert.Equal(t, "client-id", cfg.ClientID)
-		assert.Equal(t, originalToken.Token.RefreshToken, tf.Token.RefreshToken)
-		assert.Equal(t, "", endpoint)
-		return &auth.TokenFile{
-			CreationTimestamp: tf.CreationTimestamp,
-			Token: auth.TokenData{
-				AccessToken:  "new-token",
-				RefreshToken: tf.Token.RefreshToken,
-				ExpiresAt:    float64(1_650_004_200),
-			},
-		}, nil
+	deps := AuthDeps{
+		RefreshAccessToken: func(cfg *auth.Config, tf *auth.TokenFile, endpoint string) (*auth.TokenFile, error) {
+			called = true
+			assert.Equal(t, "client-id", cfg.ClientID)
+			assert.Equal(t, originalToken.Token.RefreshToken, tf.Token.RefreshToken)
+			assert.Equal(t, "", endpoint)
+
+			return &auth.TokenFile{
+				CreationTimestamp: tf.CreationTimestamp,
+				Token: auth.TokenData{
+					AccessToken:  "new-token",
+					RefreshToken: tf.Token.RefreshToken,
+					ExpiresAt:    float64(1_650_004_200),
+				},
+			}, nil
+		},
 	}
 
 	var stdout bytes.Buffer
-	cmd := newAuthCommand(&auth.Config{ClientID: "client-id", ClientSecret: "client-secret"}, tokenPath, &stdout, deps)
+	cmd := NewAuthCmd(configPath, tokenPath, &stdout, deps)
 
-	err := cmd.Run(context.Background(), []string{"auth", "refresh"})
+	_, err := runTestCommand(t, cmd, "refresh")
 	require.NoError(t, err)
 	assert.True(t, called)
 
@@ -166,8 +180,8 @@ func TestAuthRefreshCommand_CallsRefresh(t *testing.T) {
 	assert.Equal(t, time.Unix(1_650_004_200, 0).UTC().Format(time.RFC3339), payload.ExpiresAt)
 }
 
-// TestAuthLoginCommand_AutoSetsDefaultAccount verifies login output and default account behavior.
-func TestAuthLoginCommand_AutoSetsDefaultAccount(t *testing.T) {
+// TestNewAuthCmd_LoginAutoSetsDefaultAccount verifies login output and default account behavior.
+func TestNewAuthCmd_LoginAutoSetsDefaultAccount(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	tokenPath := filepath.Join(tmpDir, "token.json")
@@ -196,43 +210,40 @@ func TestAuthLoginCommand_AutoSetsDefaultAccount(t *testing.T) {
 	}))
 	defer server.Close()
 
-	deps := defaultAuthDeps()
-	deps.configPath = func() string { return configPath }
-	deps.oauthTokenEndpoint = func() string { return server.URL + "/v1/oauth/token" }
-	deps.newAccountClient = func(token string, _ *auth.Config) accountNumbersClient {
-		return client.NewClient(token, client.WithBaseURL(server.URL))
-	}
-	deps.runLogin = func(cfg *auth.Config, targetTokenPath string, tokenEndpoint string, openBrowser bool, w io.Writer) error {
-		assert.False(t, openBrowser)
-		_, err := fmt.Fprintln(w, "https://example.com/authorize")
-		require.NoError(t, err)
+	deps := AuthDeps{
+		OAuthTokenEndpoint: func() string { return server.URL + "/v1/oauth/token" },
+		NewAccountClient: func(token string, _ *auth.Config) accountNumbersClient {
+			return client.NewClient(token, client.WithBaseURL(server.URL))
+		},
+		RunLogin: func(cfg *auth.Config, targetTokenPath string, tokenEndpoint string, openBrowser bool, w io.Writer) error {
+			assert.False(t, openBrowser)
+			_, err := fmt.Fprintln(w, "https://example.com/authorize")
+			require.NoError(t, err)
 
-		response, err := http.Post(tokenEndpoint, "application/x-www-form-urlencoded", bytes.NewBufferString("grant_type=authorization_code"))
-		if err != nil {
-			return err
-		}
-		defer response.Body.Close()
+			response, err := http.Post(tokenEndpoint, "application/x-www-form-urlencoded", bytes.NewBufferString("grant_type=authorization_code"))
+			if err != nil {
+				return err
+			}
+			defer response.Body.Close()
 
-		var token auth.TokenData
-		if err := json.NewDecoder(response.Body).Decode(&token); err != nil {
-			return err
-		}
+			var token auth.TokenData
+			if err := json.NewDecoder(response.Body).Decode(&token); err != nil {
+				return err
+			}
 
-		token.ExpiresAt = float64(expiresAt)
-		return auth.SaveToken(targetTokenPath, &auth.TokenFile{
-			CreationTimestamp: time.Now().UTC().Add(-1 * time.Hour).Unix(),
-			Token:            token,
-		})
+			token.ExpiresAt = float64(expiresAt)
+
+			return auth.SaveToken(targetTokenPath, &auth.TokenFile{
+				CreationTimestamp: time.Now().UTC().Add(-1 * time.Hour).Unix(),
+				Token:             token,
+			})
+		},
 	}
 
 	var stdout bytes.Buffer
-	cmd := newAuthCommand(&auth.Config{
-		ClientID:     "client-id",
-		ClientSecret: "client-secret",
-		CallbackURL:  "https://127.0.0.1:8182",
-	}, tokenPath, &stdout, deps)
+	cmd := NewAuthCmd(configPath, tokenPath, &stdout, deps)
 
-	err := cmd.Run(context.Background(), []string{"auth", "login", "--no-browser"})
+	_, err := runTestCommand(t, cmd, "login", "--no-browser")
 	require.NoError(t, err)
 
 	savedConfig, err := auth.LoadConfig(configPath)
@@ -248,7 +259,8 @@ func TestAuthLoginCommand_AutoSetsDefaultAccount(t *testing.T) {
 	assert.True(t, payload.AutoSetDefault)
 }
 
-func TestAuthLoginCommand_DefaultAccountLookupUsesConfiguredProxy(t *testing.T) {
+// TestNewAuthCmd_LoginUsesConfiguredProxy verifies login uses proxy settings from config.
+func TestNewAuthCmd_LoginUsesConfiguredProxy(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	tokenPath := filepath.Join(tmpDir, "token.json")
@@ -273,36 +285,32 @@ func TestAuthLoginCommand_DefaultAccountLookupUsesConfiguredProxy(t *testing.T) 
 		BaseURLInsecure: true,
 	}))
 
-	deps := defaultAuthDeps()
-	deps.configPath = func() string { return configPath }
-	deps.runLogin = func(_ *auth.Config, targetTokenPath string, _ string, openBrowser bool, w io.Writer) error {
-		assert.False(t, openBrowser)
-		_, err := fmt.Fprintln(w, "https://proxy.example.com/proxy/v1/oauth/authorize")
-		require.NoError(t, err)
+	// Only override RunLogin; NewAccountClient uses the default which reads
+	// BaseURL and BaseURLInsecure from the config loaded off disk.
+	deps := AuthDeps{
+		RunLogin: func(_ *auth.Config, targetTokenPath string, _ string, openBrowser bool, w io.Writer) error {
+			assert.False(t, openBrowser)
+			_, err := fmt.Fprintln(w, "https://proxy.example.com/proxy/v1/oauth/authorize")
+			require.NoError(t, err)
 
-		return auth.SaveToken(targetTokenPath, &auth.TokenFile{
-			CreationTimestamp: time.Now().UTC().Add(-1 * time.Hour).Unix(),
-			Token: auth.TokenData{
-				AccessToken:  "access-token",
-				TokenType:    "Bearer",
-				ExpiresIn:    1800,
-				RefreshToken: "refresh-token",
-				Scope:        "api",
-				ExpiresAt:    float64(time.Now().UTC().Add(30 * time.Minute).Unix()),
-			},
-		})
+			return auth.SaveToken(targetTokenPath, &auth.TokenFile{
+				CreationTimestamp: time.Now().UTC().Add(-1 * time.Hour).Unix(),
+				Token: auth.TokenData{
+					AccessToken:  "access-token",
+					TokenType:    "Bearer",
+					ExpiresIn:    1800,
+					RefreshToken: "refresh-token",
+					Scope:        "api",
+					ExpiresAt:    float64(time.Now().UTC().Add(30 * time.Minute).Unix()),
+				},
+			})
+		},
 	}
 
 	var stdout bytes.Buffer
-	cmd := newAuthCommand(&auth.Config{
-		ClientID:        "client-id",
-		ClientSecret:    "client-secret",
-		CallbackURL:     "https://127.0.0.1:8182",
-		BaseURL:         proxy.URL + "/proxy/",
-		BaseURLInsecure: true,
-	}, tokenPath, &stdout, deps)
+	cmd := NewAuthCmd(configPath, tokenPath, &stdout, deps)
 
-	err := cmd.Run(context.Background(), []string{"auth", "login", "--no-browser"})
+	_, err := runTestCommand(t, cmd, "login", "--no-browser")
 	require.NoError(t, err)
 
 	savedConfig, err := auth.LoadConfig(configPath)
@@ -328,9 +336,9 @@ func TestAuthAccountSetDefaultCommand_WritesSuccess(t *testing.T) {
 	}))
 
 	var stdout bytes.Buffer
-	cmd := AccountSetDefaultCommand(configPath, &stdout)
+	cmd := newAccountSetDefaultCmd(configPath, &stdout)
 
-	err := cmd.Run(context.Background(), []string{"set-default", "hash-xyz"})
+	_, err := runTestCommand(t, cmd, "hash-xyz")
 	require.NoError(t, err)
 
 	savedConfig, err := auth.LoadConfig(configPath)
@@ -524,41 +532,47 @@ func TestDefaultAuthConfigPath_FallsBackToHomeDir(t *testing.T) {
 	assert.Contains(t, path, filepath.Join(".config", "schwab-agent", "config.json"))
 }
 
-func TestAuthRefreshCommand_MissingConfig(t *testing.T) {
-	// When no config is provided and the config file doesn't exist, refresh should fail.
+func TestNewAuthCmd_RefreshMissingConfig(t *testing.T) {
+	// When the config file doesn't exist, refresh should fail.
 	// Clear env vars so LoadConfig can't succeed from environment alone.
 	t.Setenv("SCHWAB_CLIENT_ID", "")
 	t.Setenv("SCHWAB_CLIENT_SECRET", "")
 	t.Setenv("SCHWAB_CALLBACK_URL", "")
 
 	var stdout bytes.Buffer
-	deps := defaultAuthDeps()
-	deps.configPath = func() string { return "/nonexistent/config.json" }
+	cmd := NewAuthCmd("/nonexistent/config.json", "/nonexistent/token.json", &stdout, AuthDeps{})
 
-	cmd := newAuthCommand(nil, "/nonexistent/token.json", &stdout, deps)
-	err := runTestCommand(t, cmd, "auth", "refresh")
-
+	_, err := runTestCommand(t, cmd, "refresh")
 	require.Error(t, err)
 }
 
-func TestAuthRefreshCommand_MissingToken(t *testing.T) {
-	var stdout bytes.Buffer
-	deps := defaultAuthDeps()
-
-	cmd := newAuthCommand(
-		&auth.Config{ClientID: "id", ClientSecret: "secret"},
-		"/nonexistent/token.json",
-		&stdout,
-		deps,
-	)
-	err := runTestCommand(t, cmd, "auth", "refresh")
-
-	require.Error(t, err)
-}
-
-func TestAuthRefreshCommand_RefreshFails(t *testing.T) {
+func TestNewAuthCmd_RefreshMissingToken(t *testing.T) {
 	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+
+	// Cobra auth loads config from disk, so write it.
+	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
+		ClientID:     "id",
+		ClientSecret: "secret",
+	}))
+
+	var stdout bytes.Buffer
+	cmd := NewAuthCmd(configPath, "/nonexistent/token.json", &stdout, AuthDeps{})
+
+	_, err := runTestCommand(t, cmd, "refresh")
+	require.Error(t, err)
+}
+
+func TestNewAuthCmd_RefreshFails(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
 	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
+		ClientID:     "id",
+		ClientSecret: "secret",
+	}))
+
 	require.NoError(t, auth.SaveToken(tokenPath, &auth.TokenFile{
 		CreationTimestamp: time.Now().Unix(),
 		Token: auth.TokenData{
@@ -568,29 +582,25 @@ func TestAuthRefreshCommand_RefreshFails(t *testing.T) {
 		},
 	}))
 
-	deps := defaultAuthDeps()
-	deps.refreshAccessToken = func(_ *auth.Config, _ *auth.TokenFile, _ string) (*auth.TokenFile, error) {
-		return nil, fmt.Errorf("refresh failed: server error")
+	deps := AuthDeps{
+		RefreshAccessToken: func(_ *auth.Config, _ *auth.TokenFile, _ string) (*auth.TokenFile, error) {
+			return nil, fmt.Errorf("refresh failed: server error")
+		},
 	}
 
 	var stdout bytes.Buffer
-	cmd := newAuthCommand(
-		&auth.Config{ClientID: "id", ClientSecret: "secret"},
-		tokenPath,
-		&stdout,
-		deps,
-	)
-	err := runTestCommand(t, cmd, "auth", "refresh")
+	cmd := NewAuthCmd(configPath, tokenPath, &stdout, deps)
 
+	_, err := runTestCommand(t, cmd, "refresh")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "refresh failed")
 }
 
 func TestAccountSetDefaultCommand_MissingHash(t *testing.T) {
 	var stdout bytes.Buffer
-	cmd := AccountSetDefaultCommand("/whatever/config.json", &stdout)
+	cmd := newAccountSetDefaultCmd("/whatever/config.json", &stdout)
 
-	err := runTestCommand(t, cmd, "set-default")
+	_, err := runTestCommand(t, cmd)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "account hash is required")

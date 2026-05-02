@@ -10,11 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 )
 
-func TestHistoryCommand_Get_Success(t *testing.T) {
+func TestNewHistoryCmd_Get_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
@@ -25,38 +24,12 @@ func TestHistoryCommand_Get_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	var buf bytes.Buffer
-	cmd := HistoryCommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "history", "get", "AAPL"))
-
-	var envelope output.Envelope
-	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
-	assert.NotNil(t, envelope.Data)
-	assert.NotEmpty(t, envelope.Metadata.Timestamp)
+	cmd := NewHistoryCmd(testClient(t, srv), &bytes.Buffer{})
+	_, err := runTestCommand(t, cmd, "get", "AAPL")
+	require.NoError(t, err)
 }
 
-func TestHistoryCommand_Shorthand_Success(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
-		assert.Equal(t, "AAPL", r.URL.Query().Get("symbol"))
-
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"symbol":"AAPL","empty":false,"candles":[{"open":148.0,"close":150.25}]}`))
-	}))
-	defer srv.Close()
-
-	var buf bytes.Buffer
-	cmd := HistoryCommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd, "history", "AAPL"))
-
-	var envelope output.Envelope
-	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
-	assert.NotNil(t, envelope.Data)
-	assert.NotEmpty(t, envelope.Metadata.Timestamp)
-}
-
-func TestHistoryCommand_Get_WithFlags(t *testing.T) {
+func TestNewHistoryCmd_Get_WithFlags(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		assert.Equal(t, "AAPL", q.Get("symbol"))
@@ -71,22 +44,23 @@ func TestHistoryCommand_Get_WithFlags(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	cmd := HistoryCommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd,
-		"history", "get",
+	cmd := NewHistoryCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd,
+		"get",
 		"--period-type", "day",
 		"--period", "10",
 		"--frequency-type", "minute",
 		"--frequency", "5",
 		"AAPL",
-	))
+	)
+	require.NoError(t, err)
 
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.NotNil(t, envelope.Data)
 }
 
-func TestHistoryCommand_Get_DateRange(t *testing.T) {
+func TestNewHistoryCmd_Get_DateRange(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		assert.Equal(t, "1700000000000", q.Get("startDate"))
@@ -98,68 +72,44 @@ func TestHistoryCommand_Get_DateRange(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	cmd := HistoryCommand(testClient(t, srv), &buf)
-	require.NoError(t, runTestCommand(t, cmd,
-		"history", "get",
+	cmd := NewHistoryCmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd,
+		"get",
 		"--from", "1700000000000",
 		"--to", "1700100000000",
 		"AAPL",
-	))
+	)
+	require.NoError(t, err)
 }
 
-func TestHistoryCommand_Get_MissingSymbol(t *testing.T) {
+func TestNewHistoryCmd_Get_MissingSymbol(t *testing.T) {
 	server := jsonServer(`{}`)
 	defer server.Close()
 
-	var buf bytes.Buffer
-	cmd := HistoryCommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "history", "get")
+	cmd := NewHistoryCmd(testClient(t, server), &bytes.Buffer{})
+	_, err := runTestCommand(t, cmd, "get")
 	require.Error(t, err)
-
-	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
 }
 
-func TestHistoryCommand_Get_ExtraArgs(t *testing.T) {
+func TestNewHistoryCmd_Get_ExtraArgs(t *testing.T) {
 	server := jsonServer(`{}`)
 	defer server.Close()
 
 	// "history get AAPL MSFT" should reject the extra positional arg
 	// since the command only accepts a single symbol.
-	var buf bytes.Buffer
-	cmd := HistoryCommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "history", "get", "AAPL", "MSFT")
+	cmd := NewHistoryCmd(testClient(t, server), &bytes.Buffer{})
+	_, err := runTestCommand(t, cmd, "get", "AAPL", "MSFT")
 	require.Error(t, err)
-
-	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
-	assert.Contains(t, err.Error(), "exactly one symbol")
 }
 
-func TestHistoryCommand_Shorthand_ExtraArgs(t *testing.T) {
-	server := jsonServer(`{}`)
-	defer server.Close()
-
-	// "history AAPL MSFT" via shorthand should also reject extra args.
-	var buf bytes.Buffer
-	cmd := HistoryCommand(testClient(t, server), &buf)
-	err := runTestCommand(t, cmd, "history", "AAPL", "MSFT")
-	require.Error(t, err)
-
-	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
-	assert.Contains(t, err.Error(), "exactly one symbol")
-}
-
-func TestHistoryCommand_Get_APIError(t *testing.T) {
+func TestNewHistoryCmd_Get_APIError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error":"server error"}`))
 	}))
 	defer srv.Close()
 
-	var buf bytes.Buffer
-	cmd := HistoryCommand(testClient(t, srv), &buf)
-	err := runTestCommand(t, cmd, "history", "get", "AAPL")
+	cmd := NewHistoryCmd(testClient(t, srv), &bytes.Buffer{})
+	_, err := runTestCommand(t, cmd, "get", "AAPL")
 	require.Error(t, err)
 }

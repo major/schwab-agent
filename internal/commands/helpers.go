@@ -1,12 +1,11 @@
 package commands
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"strings"
 
-	"github.com/urfave/cli/v3"
+	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
 )
@@ -74,33 +73,36 @@ func validEnumString[T ~string](valid []T) string {
 	return strings.Join(s, ", ")
 }
 
-// requireSubcommand returns a cli.ActionFunc that rejects direct invocation of
-// a parent command with a clear error. Without this, urfave/cli produces a
-// confusing "No help topic for '<arg>'" message when the user omits the
-// subcommand (e.g. "quote AAPL" instead of "quote get AAPL").
-func requireSubcommand() cli.ActionFunc {
-	return func(_ context.Context, cmd *cli.Command) error {
-		list := strings.Join(visibleSubcommandNames(cmd), ", ")
+// newValidationError creates a consistent validation error for command parsing.
+func newValidationError(message string) error {
+	return apperr.NewValidationError(message, nil)
+}
 
-		if arg := cmd.Args().First(); arg != "" {
-			return apperr.NewValidationError(
-				fmt.Sprintf("unknown command %q for %q; available subcommands: %s", arg, cmd.Name, list),
-				nil,
-			)
-		}
+// requireSubcommand returns a cobra.RunE that rejects direct invocation of
+// a parent command with a clear error. Without this, cobra produces a confusing
+// "no subcommands available" message when the user omits the subcommand
+// (e.g. "quote AAPL" instead of "quote get AAPL").
+func requireSubcommand(cmd *cobra.Command, args []string) error {
+	list := strings.Join(visibleSubcommandNames(cmd), ", ")
 
+	if len(args) > 0 {
 		return apperr.NewValidationError(
-			fmt.Sprintf("%q requires a subcommand: %s", cmd.Name, list),
+			fmt.Sprintf("unknown command %q for %q; available subcommands: %s", args[0], cmd.Name(), list),
 			nil,
 		)
 	}
+
+	return apperr.NewValidationError(
+		fmt.Sprintf("%q requires a subcommand: %s", cmd.Name(), list),
+		nil,
+	)
 }
 
-// suggestSubcommands handles usage errors that happen before Action runs. This
+// suggestSubcommands handles usage errors that happen before RunE runs. This
 // is most useful for parent commands whose subcommands own distinct flags: an
 // unknown flag on the parent usually means the user skipped the subcommand.
-func suggestSubcommands(_ context.Context, cmd *cli.Command, err error, _ bool) error {
-	if !strings.Contains(err.Error(), "flag provided but not defined") {
+func suggestSubcommands(cmd *cobra.Command, err error) error {
+	if !strings.Contains(err.Error(), "unknown flag") && !strings.Contains(err.Error(), "flag provided but not defined") {
 		return err
 	}
 
@@ -112,7 +114,7 @@ func suggestSubcommands(_ context.Context, cmd *cli.Command, err error, _ bool) 
 	return apperr.NewValidationError(
 		fmt.Sprintf(
 			"%q requires a subcommand: %s (%s)",
-			cmd.FullName(),
+			cmd.CommandPath(),
 			strings.Join(names, ", "),
 			err.Error(),
 		),
@@ -121,20 +123,15 @@ func suggestSubcommands(_ context.Context, cmd *cli.Command, err error, _ bool) 
 }
 
 // visibleSubcommandNames returns only invokable subcommands for user-facing
-// errors, omitting hidden commands and urfave/cli's built-in help command.
-func visibleSubcommandNames(cmd *cli.Command) []string {
-	names := make([]string, 0, len(cmd.Commands))
-	for _, sub := range cmd.Commands {
-		if sub.Hidden || sub.Name == "help" {
+// errors, omitting hidden commands.
+func visibleSubcommandNames(cmd *cobra.Command) []string {
+	names := make([]string, 0, len(cmd.Commands()))
+	for _, sub := range cmd.Commands() {
+		if sub.Hidden {
 			continue
 		}
-		names = append(names, sub.Name)
+		names = append(names, sub.Name())
 	}
 
 	return names
-}
-
-// newValidationError creates a consistent validation error for command parsing.
-func newValidationError(message string) error {
-	return apperr.NewValidationError(message, nil)
 }
