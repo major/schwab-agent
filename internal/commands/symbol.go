@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -24,12 +25,15 @@ type symbolResult struct {
 
 // symbolBuildOpts holds the options for the symbol build subcommand.
 type symbolBuildOpts struct {
-	Underlying string
-	Expiration string
-	Strike     float64
-	Call       bool
-	Put        bool
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol (e.g. AAPL)"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"`
+	Strike     float64 `flag:"strike" flagdescr:"Strike price (e.g. 200, 450.50)"`
+	Call       bool    `flag:"call" flagdescr:"Call option"`
+	Put        bool    `flag:"put" flagdescr:"Put option"`
 }
+
+// Attach implements structcli.Options interface.
+func (o *symbolBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewSymbolCmd returns the Cobra command for option symbol utilities.
 // These are pure computation commands that do not require API authentication.
@@ -55,6 +59,10 @@ func newSymbolBuildCmd(w io.Writer) *cobra.Command {
 		Short: "Build an OCC option symbol from components",
 		Long:  "Build an OCC option symbol from components (underlying, expiration, strike, call/put)",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			if opts.Underlying == "" {
 				return apperr.NewValidationError("underlying is required", nil)
 			}
@@ -87,11 +95,11 @@ func newSymbolBuildCmd(w io.Writer) *cobra.Command {
 			return output.WriteSuccess(w, result, output.NewMetadata())
 		},
 	}
-	cmd.Flags().StringVar(&opts.Underlying, "underlying", "", "Underlying symbol (e.g. AAPL)")
-	cmd.Flags().StringVar(&opts.Expiration, "expiration", "", "Expiration date (YYYY-MM-DD)")
-	cmd.Flags().Float64Var(&opts.Strike, "strike", 0, "Strike price (e.g. 200, 450.50)")
-	cmd.Flags().BoolVar(&opts.Call, "call", false, "Call option")
-	cmd.Flags().BoolVar(&opts.Put, "put", false, "Put option")
+
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
+
 	cmd.MarkFlagsMutuallyExclusive("call", "put")
 	cmd.MarkFlagsOneRequired("call", "put")
 	return cmd
