@@ -6,14 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/major/schwab-agent/internal/apperr"
 )
@@ -73,29 +71,17 @@ func (cfg *Config) OAuthTokenURL() string {
 	return cfg.resolveAPIPath("/v1/oauth/token")
 }
 
-// HTTPClient returns an outbound HTTP client for REST or OAuth requests.
+// TLSConfig returns a TLS configuration for OAuth and API HTTP clients.
 // When base_url_insecure is true we skip certificate verification so local
 // self-signed proxy setups can terminate TLS without requiring a custom trust
-// store on every developer machine.
-func (cfg *Config) HTTPClient(timeout time.Duration) *http.Client {
-	insecure := cfg != nil && cfg.BaseURLInsecure
-	client := &http.Client{Timeout: timeout}
-
-	if !insecure {
-		return client
+// store on every developer machine. Returns nil for standard secure connections.
+func (cfg *Config) TLSConfig() *tls.Config {
+	if cfg == nil || !cfg.BaseURLInsecure {
+		return nil
 	}
-
-	transport, ok := http.DefaultTransport.(*http.Transport)
-	if !ok {
-		return client
-	}
-
-	clonedTransport := transport.Clone()
-	clonedTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // base_url_insecure is an explicit opt-in for local self-signed proxies
-	client.Transport = clonedTransport
-
-	return client
+	return &tls.Config{InsecureSkipVerify: true} //nolint:gosec // base_url_insecure is an explicit opt-in for local self-signed proxies
 }
+
 
 // resolveAPIPath joins an API path onto the normalized base URL while
 // preserving any proxy path prefix present in base_url.

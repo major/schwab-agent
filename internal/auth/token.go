@@ -3,12 +3,8 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -106,46 +102,35 @@ func RefreshAccessToken(cfg *Config, tf *TokenFile, endpoint string) (*TokenFile
 		endpoint = cfg.OAuthTokenURL()
 	}
 
-	// Build form body
-	formData := url.Values{
-		"grant_type":    {"refresh_token"},
-		"refresh_token": {tf.Token.RefreshToken},
-	}
+	client := newOAuthClient(cfg, oauthHTTPTimeout)
+	defer client.Close()
 
-	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(formData.Encode()))
+	resp, err := client.R().
+		SetBasicAuth(cfg.ClientID, cfg.ClientSecret).
+		SetFormData(map[string]string{
+			"grant_type":    "refresh_token",
+			"refresh_token": tf.Token.RefreshToken,
+		}).
+		Post(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("token refresh request failed: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(cfg.ClientID, cfg.ClientSecret)
-
-	resp, err := cfg.HTTPClient(oauthHTTPTimeout).Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("token refresh request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read token response: %w", err)
 	}
 
 	// Handle non-2xx responses
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode() != 200 {
 		var errResp tokenErrorResponse
-		if json.Unmarshal(body, &errResp) == nil && errResp.Error == "invalid_grant" {
+		if json.Unmarshal(resp.Bytes(), &errResp) == nil && errResp.Error == "invalid_grant" {
 			return nil, apperr.NewAuthExpiredError(
 				"refresh token expired: run `schwab-agent auth login` to re-authenticate",
 				nil,
 			)
 		}
-		return nil, fmt.Errorf("token refresh failed with status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("token refresh failed with status %d: %s", resp.StatusCode(), string(resp.Bytes()))
 	}
 
 	// Parse new token data
 	var newToken TokenData
-	if err := json.Unmarshal(body, &newToken); err != nil {
+	if err := json.Unmarshal(resp.Bytes(), &newToken); err != nil {
 		return nil, fmt.Errorf("failed to parse token response: %w", err)
 	}
 

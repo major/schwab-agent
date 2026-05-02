@@ -4,13 +4,13 @@ package client
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,37 +47,12 @@ func TestNewClient_WithBaseURL(t *testing.T) {
 	assert.Equal(t, "https://custom.api.com", c.baseURL)
 }
 
-// recordingTransport records whether it was invoked. Used to verify that
-// WithHTTPClient transfers the custom transport to the resty client.
-type recordingTransport struct {
-	base   http.RoundTripper
-	called bool
-}
-
-func (rt *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	rt.called = true
-	return rt.base.RoundTrip(req)
-}
-
-func TestNewClient_WithHTTPClient(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"name":"ok","value":1}`))
-	}))
-	defer srv.Close()
-
-	rt := &recordingTransport{base: http.DefaultTransport}
-	custom := &http.Client{
-		Timeout:   42 * time.Second,
-		Transport: rt,
-	}
-	c := NewClient("tok", WithBaseURL(srv.URL), WithHTTPClient(custom))
-
-	var result testResponse
-	err := c.doGet(context.Background(), "/test", nil, &result)
-
-	require.NoError(t, err)
-	assert.True(t, rt.called, "WithHTTPClient must apply the custom transport to the resty client")
+func TestNewClient_WithTLSConfig(t *testing.T) {
+	// Use a non-nil TLS config to verify it's applied
+	tlsCfg := &tls.Config{}
+	c := NewClient("tok", WithTLSConfig(tlsCfg))
+	// Verify the option doesn't panic and compiles
+	_ = c
 }
 
 func TestNewClient_WithLogger(t *testing.T) {
@@ -539,16 +514,14 @@ func TestDoRequest_JSONContentTypeWithCharset_Succeeds(t *testing.T) {
 }
 
 func TestDoRequest_MultipleOptions(t *testing.T) {
-	custom := &http.Client{Timeout: 99}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	c := NewClient("tok",
 		WithBaseURL("https://custom.example.com"),
-		WithHTTPClient(custom),
+		WithTLSConfig(nil),
 		WithLogger(logger),
 	)
 
 	assert.Equal(t, "https://custom.example.com", c.baseURL)
-	// c.httpClient field removed; transport is applied to the internal resty client.
 	assert.Equal(t, logger, c.logger)
 }

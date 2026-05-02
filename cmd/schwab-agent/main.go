@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/urfave/cli/v3"
 
@@ -192,11 +191,17 @@ func buildAppWithDeps(w io.Writer, deps appDeps) *cli.Command {
 			clientOptions := []client.Option{
 				client.WithUserAgent("schwab-agent/" + version),
 				client.WithBaseURL(cfg.APIBaseURL()),
-				client.WithHTTPClient(cfg.HTTPClient(30 * time.Second)),
+				client.WithTLSConfig(cfg.TLSConfig()),
 			}
 
 			apiClient.Client = deps.newClient(token.Token.AccessToken, clientOptions...)
 			return ctx, nil
+		},
+		After: func(_ context.Context, _ *cli.Command) error {
+			if apiClient.Client != nil {
+				apiClient.Close()
+			}
+			return nil
 		},
 		Commands: []*cli.Command{
 			commands.AuthCommand(loadedConfig, tokenPath, w),

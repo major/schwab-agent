@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/pkg/browser"
+	"resty.dev/v3"
 
 	"github.com/major/schwab-agent/internal/apperr"
 )
@@ -45,6 +46,16 @@ const (
 	// callbackServerTimeout bounds how long the local HTTPS callback server waits.
 	callbackServerTimeout = 300 * time.Second
 )
+
+// newOAuthClient creates a resty client configured for OAuth token requests.
+// The caller must defer client.Close() to release idle connections.
+func newOAuthClient(cfg *Config, timeout time.Duration) *resty.Client {
+	c := resty.New().SetTimeout(timeout)
+	if tlsCfg := cfg.TLSConfig(); tlsCfg != nil {
+		c.SetTLSClientConfig(tlsCfg)
+	}
+	return c
+}
 
 // AuthorizeURL builds the Schwab authorization URL and returns it with a random state value.
 func AuthorizeURL(cfg *Config) (authURL, state string, err error) {
@@ -71,39 +82,30 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*Toke
 		tokenEndpoint = cfg.OAuthTokenURL()
 	}
 
-	formData := url.Values{}
-	formData.Set("grant_type", "authorization_code")
-	formData.Set("code", code)
-	formData.Set("redirect_uri", cfg.CallbackURL)
+	client := newOAuthClient(cfg, oauthHTTPTimeout)
+	defer client.Close()
 
-	req, err := http.NewRequest(http.MethodPost, tokenEndpoint, strings.NewReader(formData.Encode()))
-	if err != nil {
-		return nil, apperr.NewAuthCallbackError("failed to build token exchange request", err)
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(cfg.ClientID, cfg.ClientSecret)
-
-	resp, err := cfg.HTTPClient(oauthHTTPTimeout).Do(req)
+	resp, err := client.R().
+		SetBasicAuth(cfg.ClientID, cfg.ClientSecret).
+		SetFormData(map[string]string{
+			"grant_type":   "authorization_code",
+			"code":         code,
+			"redirect_uri": cfg.CallbackURL,
+		}).
+		Post(tokenEndpoint)
 	if err != nil {
 		return nil, apperr.NewAuthCallbackError("token exchange request failed", err)
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, apperr.NewAuthCallbackError("failed to read token exchange response", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, apperr.NewAuthCallbackError(
-			fmt.Sprintf("token exchange failed with status %d", resp.StatusCode),
-			fmt.Errorf("response body: %s", strings.TrimSpace(string(body))),
+			fmt.Sprintf("token exchange failed with status %d", resp.StatusCode()),
+			fmt.Errorf("response body: %s", strings.TrimSpace(string(resp.Bytes()))),
 		)
 	}
 
 	var token TokenData
-	if err := json.Unmarshal(body, &token); err != nil {
+	if err := json.Unmarshal(resp.Bytes(), &token); err != nil {
 		return nil, apperr.NewAuthCallbackError("failed to parse token exchange response", err)
 	}
 
