@@ -61,15 +61,13 @@ Exception: `order build` commands write raw JSON (not envelope-wrapped).
 
 ## Safety Guards
 
-Mutable commands (order place/cancel/replace) enforce two safety checks:
+Mutable commands (order place/cancel/replace) enforce a safety check:
 
 ```go
 if err := requireMutableEnabled(configPath); err != nil { return err }
-if err := requireConfirm(cmd); err != nil { return err }
 ```
 
 - `requireMutableEnabled`: Checks `i-also-like-to-live-dangerously` in config
-- `requireConfirm`: Checks `--confirm` flag is set
 
 ## Account Resolution
 

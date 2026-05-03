@@ -112,48 +112,6 @@ func mustMarshalJSON(t *testing.T, value any) string {
 	return string(encoded)
 }
 
-func TestNewOrderCmdConfirmGate(t *testing.T) {
-	t.Parallel()
-
-	configPath := writeTestConfigMutable(t, "hash123")
-
-	testCases := []struct {
-		name string
-		args []string
-	}{
-		{
-			name: "place equity requires confirm",
-			args: []string{"order", "place", "equity", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10"},
-		},
-		{
-			name: "place spec requires confirm",
-			args: []string{"order", "place", "--spec", `{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderLegCollection":[{"instruction":"BUY","quantity":1,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}`},
-		},
-		{
-			name: "cancel requires confirm",
-			args: []string{"order", "cancel", "12345"},
-		},
-		{
-			name: "replace requires confirm",
-			args: []string{"order", "replace", "12345", "--symbol", "AAPL", "--action", "BUY", "--quantity", "5"},
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			stdout, err := runOrderCommand(t, nil, configPath, "", testCase.args...)
-			require.Error(t, err)
-			assert.Empty(t, stdout)
-
-			var validationErr *apperr.ValidationError
-			require.ErrorAs(t, err, &validationErr)
-			assert.Equal(t, "Add --confirm to execute this order", validationErr.Error())
-		})
-	}
-}
-
 func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 	t.Parallel()
 
@@ -294,7 +252,6 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 		"--price", "185.25",
 		"--duration", "DAY",
 		"--session", "NORMAL",
-		"--confirm",
 	)
 	require.NoError(t, err)
 
@@ -342,7 +299,7 @@ func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 	specPath := filepath.Join(t.TempDir(), "spec.json")
 	require.NoError(t, os.WriteFile(specPath, []byte(mustMarshalJSON(t, orderRequest)), 0o600))
 
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "place", "--spec", "@"+specPath, "--confirm")
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "place", "--spec", "@"+specPath)
 	require.NoError(t, err)
 
 	require.Len(t, received.OrderLegCollection, 1)
@@ -404,19 +361,19 @@ func TestNewOrderCmdMutableGuard(t *testing.T) {
 	}{
 		{
 			name: "place spec blocked without mutable flag",
-			args: []string{"order", "place", "--spec", `{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderLegCollection":[{"instruction":"BUY","quantity":1,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}`, "--confirm"},
+			args: []string{"order", "place", "--spec", `{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderLegCollection":[{"instruction":"BUY","quantity":1,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}`},
 		},
 		{
 			name: "place equity blocked without mutable flag",
-			args: []string{"order", "place", "equity", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10", "--confirm"},
+			args: []string{"order", "place", "equity", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10"},
 		},
 		{
 			name: "cancel blocked without mutable flag",
-			args: []string{"order", "cancel", "12345", "--confirm"},
+			args: []string{"order", "cancel", "12345"},
 		},
 		{
 			name: "replace blocked without mutable flag",
-			args: []string{"order", "replace", "12345", "--symbol", "AAPL", "--action", "BUY", "--quantity", "5", "--confirm"},
+			args: []string{"order", "replace", "12345", "--symbol", "AAPL", "--action", "BUY", "--quantity", "5"},
 		},
 	}
 
@@ -435,11 +392,11 @@ func TestNewOrderCmdMutableGuard(t *testing.T) {
 	}
 }
 
-func TestNewOrderCmdMutableGuardTakesPriorityOverConfirm(t *testing.T) {
+func TestNewOrderCmdMutableGuardRequired(t *testing.T) {
 	t.Parallel()
 
-	// Config WITHOUT mutable flag, command WITHOUT --confirm.
-	// The mutable guard should fire first.
+	// Config WITHOUT mutable flag.
+	// The mutable guard should block the operation.
 	configPath := writeTestConfig(t, "hash123")
 
 	stdout, err := runOrderCommand(t, nil, configPath, "",
@@ -566,7 +523,6 @@ func TestNewOrderCmdPlaceOCOPipeline(t *testing.T) {
 		"--quantity", "100",
 		"--take-profit", "160",
 		"--stop-loss", "140",
-		"--confirm",
 	)
 	require.NoError(t, err)
 
@@ -1918,7 +1874,7 @@ func TestNewOrderCmdCancelSuccess(t *testing.T) {
 	cliClient := testClient(t, server)
 
 	// Act
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "cancel", "--confirm", "12345")
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "cancel", "12345")
 
 	// Assert
 	require.NoError(t, err)
@@ -1944,7 +1900,7 @@ func TestNewOrderCmdCancelOrderIDFlagSuccess(t *testing.T) {
 	cliClient := testClient(t, server)
 
 	// Act
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "cancel", "--order-id", "1234567890", "--confirm")
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "cancel", "--order-id", "1234567890")
 
 	// Assert
 	require.NoError(t, err)
@@ -1962,7 +1918,7 @@ func TestNewOrderCmdCancelMutableDisabled(t *testing.T) {
 	configPath := writeTestConfig(t, "hash123")
 
 	// Act
-	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "cancel", "--confirm", "12345")
+	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "cancel", "12345")
 
 	// Assert
 	require.Error(t, err)
@@ -1987,7 +1943,7 @@ func TestNewOrderCmdCancelAPIError(t *testing.T) {
 	cliClient := testClient(t, server)
 
 	// Act
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "cancel", "--confirm", "12345")
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "cancel", "12345")
 
 	// Assert
 	require.Error(t, err)
@@ -2031,7 +1987,6 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 		"--price", "185.25",
 		"--duration", "DAY",
 		"--session", "NORMAL",
-		"--confirm",
 	)
 
 	// Assert
@@ -2079,7 +2034,6 @@ func TestNewOrderCmdReplaceOrderIDFlagSuccess(t *testing.T) {
 		"--price", "185.25",
 		"--duration", "DAY",
 		"--session", "NORMAL",
-		"--confirm",
 	)
 
 	// Assert
@@ -2098,7 +2052,7 @@ func TestNewOrderCmdReplaceMutableDisabled(t *testing.T) {
 	configPath := writeTestConfig(t, "hash123")
 
 	// Act
-	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "replace", "12345", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10", "--confirm")
+	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "replace", "12345", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10")
 
 	// Assert
 	require.Error(t, err)
@@ -2123,7 +2077,7 @@ func TestNewOrderCmdReplaceAPIError(t *testing.T) {
 	cliClient := testClient(t, server)
 
 	// Act
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "replace", "12345", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10", "--confirm")
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "replace", "12345", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10")
 
 	// Assert
 	require.Error(t, err)
@@ -2352,7 +2306,7 @@ func TestNewOrderCmdPlace_MissingSpec(t *testing.T) {
 func TestNewOrderCmdPlace_InvalidSpec_NonJSONPrefix(t *testing.T) {
 	// Spec that doesn't start with { or [ should return the "inline JSON" error.
 	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
-		"order", "place", "--spec", "hello world", "--confirm")
+		"order", "place", "--spec", "hello world")
 
 	require.Error(t, err)
 	assert.Empty(t, stdout)
@@ -2362,7 +2316,7 @@ func TestNewOrderCmdPlace_InvalidSpec_NonJSONPrefix(t *testing.T) {
 func TestNewOrderCmdPlace_InvalidSpec_BadJSON(t *testing.T) {
 	// Spec starts with { but isn't valid JSON.
 	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
-		"order", "place", "--spec", "{not valid json}", "--confirm")
+		"order", "place", "--spec", "{not valid json}")
 
 	require.Error(t, err)
 	assert.Empty(t, stdout)
@@ -2381,7 +2335,7 @@ func TestNewOrderCmdPreview_SpecFileNotFound(t *testing.T) {
 func TestNewOrderCmdReplace_MissingOrderID(t *testing.T) {
 	// Replace requires a positional order-id argument.
 	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
-		"order", "replace", "--confirm",
+		"order", "replace",
 		"--symbol", "AAPL", "--action", "BUY", "--quantity", "10")
 
 	require.Error(t, err)
@@ -2392,7 +2346,7 @@ func TestNewOrderCmdReplace_MissingOrderID(t *testing.T) {
 func TestNewOrderCmdReplace_InvalidAction(t *testing.T) {
 	// Replace parses equity params; invalid --action triggers parseInstruction error.
 	stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "",
-		"order", "replace", "12345", "--confirm",
+		"order", "replace", "12345",
 		"--symbol", "AAPL", "--action", "INVALID", "--quantity", "10")
 
 	require.Error(t, err)

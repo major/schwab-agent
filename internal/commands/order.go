@@ -76,8 +76,7 @@ func (o *orderGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 // orderPlaceOpts holds local flags for top-level spec-based order placement.
 type orderPlaceOpts struct {
-	Spec    string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin" flagrequired:"true"`
-	Confirm bool   `flag:"confirm" flagdescr:"Confirm order placement"`
+	Spec string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin" flagrequired:"true"`
 }
 
 // Attach implements structcli.Options interface.
@@ -94,7 +93,6 @@ func (o *orderPreviewOpts) Attach(_ *cobra.Command) error { return nil }
 // orderCancelOpts holds local flags for order cancellation.
 type orderCancelOpts struct {
 	OrderID string `flag:"order-id" flagdescr:"Order ID"`
-	Confirm bool   `flag:"confirm" flagdescr:"Confirm cancellation"`
 }
 
 // Attach implements structcli.Options interface.
@@ -103,7 +101,6 @@ func (o *orderCancelOpts) Attach(_ *cobra.Command) error { return nil }
 // orderReplaceOpts holds local flags for order replacement.
 type orderReplaceOpts struct {
 	OrderID string `flag:"order-id" flagdescr:"Order ID"`
-	Confirm bool   `flag:"confirm" flagdescr:"Confirm replacement"`
 }
 
 // Attach implements structcli.Options interface.
@@ -330,8 +327,6 @@ type diagonalBuildOpts struct {
 // Attach implements structcli.Options interface.
 func (o *diagonalBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
-const confirmOrderMessage = "Add --confirm to execute this order"
-
 const mutableDisabledMessage = `Mutable operations are disabled by default. ` +
 	`Set "i-also-like-to-live-dangerously": true in your config file to enable order placement, cancellation, and replacement.`
 
@@ -342,8 +337,8 @@ func NewOrderCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 		Short: "List, build, preview, place, cancel, and replace orders",
 		Long: `Manage orders across your Schwab accounts. Supports listing, viewing, placing,
 previewing, building, canceling, and replacing orders. Placing, canceling, and
-replacing orders require both the "i-also-like-to-live-dangerously" config flag
-and --confirm on each command. Duration aliases GTC, FOK, and IOC are accepted.`,
+replacing orders require the "i-also-like-to-live-dangerously" config flag.
+Duration aliases GTC, FOK, and IOC are accepted.`,
 		GroupID: "trading",
 		RunE:    requireSubcommand,
 	}
@@ -523,16 +518,15 @@ func newOrderPlaceCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comm
 		Use:   "place",
 		Short: "Place an order",
 		Long: `Place an order via subcommand (equity, option, bracket, oco) or from a JSON spec
-with --spec. Both safety guards are required: set "i-also-like-to-live-dangerously"
-to true in config.json, and pass --confirm on every placement. Recommended workflow:
-check the price with quote get, build the order JSON with order build, preview it
-with order preview, then place with --confirm.`,
+with --spec. Requires "i-also-like-to-live-dangerously" set to true in config.json.
+Recommended workflow: check the price with quote get, build the order JSON with
+order build, preview it with order preview, then place.`,
 		Example: `  # Place from a JSON file
-  schwab-agent order place --spec @order.json --confirm
-  # Place from stdin (piped from order build)
-  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec - --confirm
-  # Place from inline JSON
-  schwab-agent order place --spec '{"orderType":"LIMIT",...}' --confirm`,
+   schwab-agent order place --spec @order.json
+   # Place from stdin (piped from order build)
+   schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -
+   # Place from inline JSON
+   schwab-agent order place --spec '{"orderType":"LIMIT",...}'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
@@ -550,15 +544,11 @@ with order preview, then place with --confirm.`,
 				configFlag = configPath
 			}
 
-			if err := requireMutableEnabled(configFlag); err != nil {
-				return err
-			}
+		if err := requireMutableEnabled(configFlag); err != nil {
+			return err
+		}
 
-			if err := requireConfirm(opts.Confirm); err != nil {
-				return err
-			}
-
-			accountFlag, err := cmd.Flags().GetString("account")
+		accountFlag, err := cmd.Flags().GetString("account")
 			if err != nil {
 				return err
 			}
@@ -656,7 +646,6 @@ func makeCobraPlaceOrderCommand[O any, P any](
 	build func(*P) (*models.OrderRequest, error),
 ) *cobra.Command {
 	opts := newOpts()
-	var confirm bool
 	cmd := &cobra.Command{
 		Use:   name,
 		Short: usage,
@@ -673,15 +662,11 @@ func makeCobraPlaceOrderCommand[O any, P any](
 				configFlag = configPath
 			}
 
-			if err := requireMutableEnabled(configFlag); err != nil {
-				return err
-			}
+		if err := requireMutableEnabled(configFlag); err != nil {
+			return err
+		}
 
-			if err := requireConfirm(confirm); err != nil {
-				return err
-			}
-
-			accountFlag, err := cmd.Flags().GetString("account")
+		accountFlag, err := cmd.Flags().GetString("account")
 			if err != nil {
 				return err
 			}
@@ -718,7 +703,6 @@ func makeCobraPlaceOrderCommand[O any, P any](
 	if flagSetup != nil {
 		flagSetup(cmd, opts)
 	}
-	cmd.Flags().BoolVar(&confirm, "confirm", false, "Confirm order placement")
 
 	return cmd
 }
@@ -781,11 +765,11 @@ func newOrderCancelCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Com
 	cmd := &cobra.Command{
 		Use:   "cancel [order-id]",
 		Short: "Cancel an order",
-		Long: `Cancel an existing order by ID. Requires both safety guards: the
-"i-also-like-to-live-dangerously" config flag and --confirm. The order ID can
-be passed as a positional argument or with --order-id (flag takes priority).`,
-		Example: `  schwab-agent order cancel 1234567890 --confirm
-  schwab-agent order cancel --order-id 1234567890 --confirm`,
+		Long: `Cancel an existing order by ID. Requires the "i-also-like-to-live-dangerously"
+config flag. The order ID can be passed as a positional argument or with
+--order-id (flag takes priority).`,
+		Example: `  schwab-agent order cancel 1234567890
+   schwab-agent order cancel --order-id 1234567890`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
@@ -799,42 +783,38 @@ be passed as a positional argument or with --order-id (flag takes priority).`,
 				configFlag = configPath
 			}
 
-			if err := requireMutableEnabled(configFlag); err != nil {
-				return err
-			}
+		if err := requireMutableEnabled(configFlag); err != nil {
+			return err
+		}
 
-			if err := requireConfirm(opts.Confirm); err != nil {
-				return err
-			}
+		orderID, err := parseRequiredOrderID(opts.OrderID, args)
+		if err != nil {
+			return err
+		}
 
-			orderID, err := parseRequiredOrderID(opts.OrderID, args)
-			if err != nil {
-				return err
-			}
+		accountFlag, err := cmd.Flags().GetString("account")
+		if err != nil {
+			return err
+		}
 
-			accountFlag, err := cmd.Flags().GetString("account")
-			if err != nil {
-				return err
-			}
+		account, err := resolveAccount(accountFlag, configFlag, nil)
+		if err != nil {
+			return err
+		}
 
-			account, err := resolveAccount(accountFlag, configFlag, nil)
-			if err != nil {
-				return err
-			}
+		if err := c.CancelOrder(cmd.Context(), account, orderID); err != nil {
+			return err
+		}
 
-			if err := c.CancelOrder(cmd.Context(), account, orderID); err != nil {
-				return err
-			}
+		return output.WriteSuccess(w, orderCancelData{OrderID: orderID, Canceled: true}, output.NewMetadata())
+	},
+}
 
-			return output.WriteSuccess(w, orderCancelData{OrderID: orderID, Canceled: true}, output.NewMetadata())
-		},
-	}
+if err := structcli.Define(cmd, opts); err != nil {
+	panic(err)
+}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-
-	return cmd
+return cmd
 }
 
 // newOrderReplaceCmd replaces an existing order with a new equity order payload.
@@ -846,10 +826,10 @@ func newOrderReplaceCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Co
 		Short: "Replace an order with a new equity order spec",
 		Long: `Replace an existing order with a new equity order. The original order is
 canceled and a new one is created with a new ID. Only equity order flags are
-accepted. Requires both safety guards. The original order status becomes
-REPLACED after the new order is created.`,
-		Example: `  schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
-  schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm`,
+accepted. Requires the "i-also-like-to-live-dangerously" config flag. The
+original order status becomes REPLACED after the new order is created.`,
+		Example: `  schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY
+   schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
@@ -866,58 +846,54 @@ REPLACED after the new order is created.`,
 				configFlag = configPath
 			}
 
-			if err := requireMutableEnabled(configFlag); err != nil {
-				return err
-			}
+		if err := requireMutableEnabled(configFlag); err != nil {
+			return err
+		}
 
-			if err := requireConfirm(opts.Confirm); err != nil {
-				return err
-			}
+		orderID, err := parseRequiredOrderID(opts.OrderID, args)
+		if err != nil {
+			return err
+		}
 
-			orderID, err := parseRequiredOrderID(opts.OrderID, args)
-			if err != nil {
-				return err
-			}
+		accountFlag, err := cmd.Flags().GetString("account")
+		if err != nil {
+			return err
+		}
 
-			accountFlag, err := cmd.Flags().GetString("account")
-			if err != nil {
-				return err
-			}
+		account, err := resolveAccount(accountFlag, configFlag, nil)
+		if err != nil {
+			return err
+		}
 
-			account, err := resolveAccount(accountFlag, configFlag, nil)
-			if err != nil {
-				return err
-			}
+		params, err := parseEquityParams(equityOpts, args)
+		if err != nil {
+			return err
+		}
 
-			params, err := parseEquityParams(equityOpts, args)
-			if err != nil {
-				return err
-			}
+		if err := orderbuilder.ValidateEquityOrder(params); err != nil {
+			return err
+		}
 
-			if err := orderbuilder.ValidateEquityOrder(params); err != nil {
-				return err
-			}
+		order, err := orderbuilder.BuildEquityOrder(params)
+		if err != nil {
+			return err
+		}
 
-			order, err := orderbuilder.BuildEquityOrder(params)
-			if err != nil {
-				return err
-			}
+		if err := c.ReplaceOrder(cmd.Context(), account, orderID, order); err != nil {
+			return err
+		}
 
-			if err := c.ReplaceOrder(cmd.Context(), account, orderID, order); err != nil {
-				return err
-			}
+		return output.WriteSuccess(w, orderReplaceData{OrderID: orderID, Replaced: true}, output.NewMetadata())
+	},
+}
+cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
-			return output.WriteSuccess(w, orderReplaceData{OrderID: orderID, Replaced: true}, output.NewMetadata())
-		},
-	}
-	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
+equityOrderFlagSetup(cmd, equityOpts)
+if err := structcli.Define(cmd, opts); err != nil {
+	panic(err)
+}
 
-	equityOrderFlagSetup(cmd, equityOpts)
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-
-	return cmd
+return cmd
 }
 
 // equityOrderFlagSetup registers equity order flags on cmd.
@@ -1181,14 +1157,7 @@ func requireMutableEnabled(configPath string) error {
 	return nil
 }
 
-// requireConfirm enforces the write-operation safety gate.
-func requireConfirm(confirmed bool) error {
-	if confirmed {
-		return nil
-	}
 
-	return apperr.NewValidationError(confirmOrderMessage, nil)
-}
 
 // parseRequiredOrderID parses the --order-id flag or first positional argument as an order ID.
 func parseRequiredOrderID(orderIDValue string, args []string) (int64, error) {
