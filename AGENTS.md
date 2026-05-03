@@ -35,12 +35,23 @@ internal/
 make build       # /usr/local/go/bin/go build -o schwab-agent ./cmd/schwab-agent/
 make test        # go test -v ./...
 make lint        # golangci-lint run ./...
+make smoke       # Both tiers: no-auth + auth-required read-only (local only)
+make smoke-ci    # Tier 1 only: no-auth commands (safe for CI)
 make install     # Install to /usr/local/bin
 make clean       # Remove binary
 make release VERSION=vX.Y.Z  # Run test+lint, generate tag message, create GPG-signed tag
 ```
 
-CI runs lint (golangci-lint v2.11) and test (race detector + coverage + build verification) on push to main and PRs. Releases via goreleaser on v* tags (Linux/Darwin, amd64/arm64, CGO disabled).
+CI runs lint (golangci-lint v2.11), test (race detector + coverage + build verification), and smoke tests (tier 1) on push to main and PRs. Releases via goreleaser on v* tags (Linux/Darwin, amd64/arm64, CGO disabled).
+
+## Smoke Tests
+
+Shell script at `scripts/smoke-test.sh`. Two tiers:
+
+- **Tier 1** (no auth, CI-safe): help text for all 64 commands/subcommands, symbol build/parse, all 13 order build sub-types with full permutations (135 tests). Runs in CI and locally via `make smoke-ci`.
+- **Tier 2** (auth required, local only): read-only API commands (account, position, quote, order list, chain, history, instrument, market, all 11 TA indicators). Requires a valid token. Runs locally via `make smoke` (both tiers) or `SMOKE_TIER=2 ./scripts/smoke-test.sh` (tier 2 only).
+
+Each test validates exit code 0, valid JSON output, and the correct envelope structure (`.data` for API commands, raw JSON for order builds). `SMOKE_BIN` env var overrides the binary path.
 
 ## Linting
 
