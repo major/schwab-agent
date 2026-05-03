@@ -137,30 +137,30 @@ order build, preview it with order preview, then place.`,
 	equityCmd := makeCobraPlaceOrderCommand(c, configPath, w, "equity", "Place an equity order", func() *equityPlaceOpts { return &equityPlaceOpts{} }, func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) }, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
 	equityCmd.Long = `Place an equity (stock) order. Supports MARKET, LIMIT, STOP, STOP_LIMIT, and
 TRAILING_STOP order types. Default type is MARKET if --type is omitted. Duration
-aliases GTC, FOK, and IOC are accepted alongside their full names. Both safety
-guards are required for placement.`
+aliases GTC, FOK, and IOC are accepted alongside their full names. Requires
+i-also-like-to-live-dangerously in config for placement.`
 	equityCmd.Example = `  # Buy 10 shares at market price
-  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --confirm
+  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10
   # Buy with a limit price, good till cancel
-  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC --confirm
+  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC
   # Sell with a trailing stop ($2.50 offset)
-  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type TRAILING_STOP --stop-offset 2.50 --confirm
+  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type TRAILING_STOP --stop-offset 2.50
   # Sell with a stop-limit order
-  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type STOP_LIMIT --stop-price 145 --price 144 --confirm`
+  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type STOP_LIMIT --stop-price 145 --price 144`
 
 	optionCmd := makeCobraPlaceOrderCommand(c, configPath, w, "option", "Place an option order", func() *optionPlaceOpts { return &optionPlaceOpts{} }, func(cmd *cobra.Command, opts *optionPlaceOpts) {
 		defineAndConstrain(cmd, opts, []string{"call", "put"})
 	}, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder)
 	optionCmd.Long = `Place a single-leg option order. Requires --underlying, --expiration, --strike,
 and exactly one of --call or --put. Use BUY_TO_OPEN/SELL_TO_CLOSE for new
-positions and SELL_TO_OPEN/BUY_TO_CLOSE for existing ones. Both safety guards
-are required for placement.`
+positions and SELL_TO_OPEN/BUY_TO_CLOSE for existing ones. Requires
+i-also-like-to-live-dangerously in config for placement.`
 	optionCmd.Example = `  # Buy a call option to open
-  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --confirm
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1
   # Sell a put at a limit price
-  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50 --confirm
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50
   # Close an existing call position
-  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action SELL_TO_CLOSE --quantity 1 --confirm`
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action SELL_TO_CLOSE --quantity 1`
 
 	bracketCmd := makeCobraPlaceOrderCommand(c, configPath, w, "bracket", "Place a bracket order", func() *bracketPlaceOpts { return &bracketPlaceOpts{} }, func(cmd *cobra.Command, opts *bracketPlaceOpts) { defineAndConstrain(cmd, opts) }, parseBracketParams, orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder)
 	bracketCmd.Long = `Place a bracket order that combines an entry trade with automatic exit orders.
@@ -168,11 +168,11 @@ At least one of --take-profit or --stop-loss is required. Exit instructions are
 auto-inverted from the entry action (BUY entry creates SELL exits). Canceling
 the parent cascades to all child orders.`
 	bracketCmd.Example = `  # Buy with both take-profit and stop-loss
-  schwab-agent order place bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120 --confirm
+  schwab-agent order place bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
   # Buy with only a stop-loss safety net
-  schwab-agent order place bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170 --confirm
+  schwab-agent order place bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170
   # Buy with only a take-profit target
-  schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300 --confirm`
+  schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300`
 
 	ocoCmd := makeCobraPlaceOrderCommand(c, configPath, w, "oco", "Place a one-cancels-other order for an existing position", func() *ocoPlaceOpts { return &ocoPlaceOpts{} }, func(cmd *cobra.Command, opts *ocoPlaceOpts) { defineAndConstrain(cmd, opts) }, parseOCOParams, orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder)
 	ocoCmd.Long = `Place a one-cancels-other order for an existing position. When one exit fills,
@@ -180,11 +180,11 @@ the other is automatically canceled. At least one of --take-profit or --stop-los
 is required. For long positions use SELL; for short positions use BUY. Unlike
 bracket orders, OCO has no entry leg.`
 	ocoCmd.Example = `  # Set take-profit and stop-loss for a long position
-  schwab-agent order place oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140 --confirm
+  schwab-agent order place oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140
   # Protect a position with only a stop-loss
-  schwab-agent order place oco --symbol AAPL --action SELL --quantity 50 --stop-loss 140 --confirm
+  schwab-agent order place oco --symbol AAPL --action SELL --quantity 50 --stop-loss 140
   # Close a short position with exits
-  schwab-agent order place oco --symbol TSLA --action BUY --quantity 10 --take-profit 200 --stop-loss 250 --confirm`
+  schwab-agent order place oco --symbol TSLA --action BUY --quantity 10 --take-profit 200 --stop-loss 250`
 
 	cmd.AddCommand(equityCmd, optionCmd, bracketCmd, ocoCmd)
 
