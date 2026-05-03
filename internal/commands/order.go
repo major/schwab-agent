@@ -544,11 +544,11 @@ order build, preview it with order preview, then place.`,
 				configFlag = configPath
 			}
 
-		if err := requireMutableEnabled(configFlag); err != nil {
-			return err
-		}
+			if err := requireMutableEnabled(configFlag); err != nil {
+				return err
+			}
 
-		accountFlag, err := cmd.Flags().GetString("account")
+			accountFlag, err := cmd.Flags().GetString("account")
 			if err != nil {
 				return err
 			}
@@ -577,7 +577,7 @@ order build, preview it with order preview, then place.`,
 		panic(err)
 	}
 
-	equityCmd := makeCobraPlaceOrderCommand(c, configPath, w, "equity", "Place an equity order", func() *equityPlaceOpts { return &equityPlaceOpts{} }, equityOrderFlagSetup, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
+	equityCmd := makeCobraPlaceOrderCommand(c, configPath, w, "equity", "Place an equity order", func() *equityPlaceOpts { return &equityPlaceOpts{} }, func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) }, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
 	equityCmd.Long = `Place an equity (stock) order. Supports MARKET, LIMIT, STOP, STOP_LIMIT, and
 TRAILING_STOP order types. Default type is MARKET if --type is omitted. Duration
 aliases GTC, FOK, and IOC are accepted alongside their full names. Both safety
@@ -591,7 +591,9 @@ guards are required for placement.`
   # Sell with a stop-limit order
   schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type STOP_LIMIT --stop-price 145 --price 144 --confirm`
 
-	optionCmd := makeCobraPlaceOrderCommand(c, configPath, w, "option", "Place an option order", func() *optionPlaceOpts { return &optionPlaceOpts{} }, optionOrderFlagSetup, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder)
+	optionCmd := makeCobraPlaceOrderCommand(c, configPath, w, "option", "Place an option order", func() *optionPlaceOpts { return &optionPlaceOpts{} }, func(cmd *cobra.Command, opts *optionPlaceOpts) {
+		defineAndConstrain(cmd, opts, []string{"call", "put"})
+	}, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder)
 	optionCmd.Long = `Place a single-leg option order. Requires --underlying, --expiration, --strike,
 and exactly one of --call or --put. Use BUY_TO_OPEN/SELL_TO_CLOSE for new
 positions and SELL_TO_OPEN/BUY_TO_CLOSE for existing ones. Both safety guards
@@ -603,7 +605,7 @@ are required for placement.`
   # Close an existing call position
   schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action SELL_TO_CLOSE --quantity 1 --confirm`
 
-	bracketCmd := makeCobraPlaceOrderCommand(c, configPath, w, "bracket", "Place a bracket order", func() *bracketPlaceOpts { return &bracketPlaceOpts{} }, bracketOrderFlagSetup, parseBracketParams, orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder)
+	bracketCmd := makeCobraPlaceOrderCommand(c, configPath, w, "bracket", "Place a bracket order", func() *bracketPlaceOpts { return &bracketPlaceOpts{} }, func(cmd *cobra.Command, opts *bracketPlaceOpts) { defineAndConstrain(cmd, opts) }, parseBracketParams, orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder)
 	bracketCmd.Long = `Place a bracket order that combines an entry trade with automatic exit orders.
 At least one of --take-profit or --stop-loss is required. Exit instructions are
 auto-inverted from the entry action (BUY entry creates SELL exits). Canceling
@@ -615,7 +617,7 @@ the parent cascades to all child orders.`
   # Buy with only a take-profit target
   schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300 --confirm`
 
-	ocoCmd := makeCobraPlaceOrderCommand(c, configPath, w, "oco", "Place a one-cancels-other order for an existing position", func() *ocoPlaceOpts { return &ocoPlaceOpts{} }, ocoOrderFlagSetup, parseOCOParams, orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder)
+	ocoCmd := makeCobraPlaceOrderCommand(c, configPath, w, "oco", "Place a one-cancels-other order for an existing position", func() *ocoPlaceOpts { return &ocoPlaceOpts{} }, func(cmd *cobra.Command, opts *ocoPlaceOpts) { defineAndConstrain(cmd, opts) }, parseOCOParams, orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder)
 	ocoCmd.Long = `Place a one-cancels-other order for an existing position. When one exit fills,
 the other is automatically canceled. At least one of --take-profit or --stop-loss
 is required. For long positions use SELL; for short positions use BUY. Unlike
@@ -662,11 +664,11 @@ func makeCobraPlaceOrderCommand[O any, P any](
 				configFlag = configPath
 			}
 
-		if err := requireMutableEnabled(configFlag); err != nil {
-			return err
-		}
+			if err := requireMutableEnabled(configFlag); err != nil {
+				return err
+			}
 
-		accountFlag, err := cmd.Flags().GetString("account")
+			accountFlag, err := cmd.Flags().GetString("account")
 			if err != nil {
 				return err
 			}
@@ -783,38 +785,38 @@ config flag. The order ID can be passed as a positional argument or with
 				configFlag = configPath
 			}
 
-		if err := requireMutableEnabled(configFlag); err != nil {
-			return err
-		}
+			if err := requireMutableEnabled(configFlag); err != nil {
+				return err
+			}
 
-		orderID, err := parseRequiredOrderID(opts.OrderID, args)
-		if err != nil {
-			return err
-		}
+			orderID, err := parseRequiredOrderID(opts.OrderID, args)
+			if err != nil {
+				return err
+			}
 
-		accountFlag, err := cmd.Flags().GetString("account")
-		if err != nil {
-			return err
-		}
+			accountFlag, err := cmd.Flags().GetString("account")
+			if err != nil {
+				return err
+			}
 
-		account, err := resolveAccount(accountFlag, configFlag, nil)
-		if err != nil {
-			return err
-		}
+			account, err := resolveAccount(accountFlag, configFlag, nil)
+			if err != nil {
+				return err
+			}
 
-		if err := c.CancelOrder(cmd.Context(), account, orderID); err != nil {
-			return err
-		}
+			if err := c.CancelOrder(cmd.Context(), account, orderID); err != nil {
+				return err
+			}
 
-		return output.WriteSuccess(w, orderCancelData{OrderID: orderID, Canceled: true}, output.NewMetadata())
-	},
-}
+			return output.WriteSuccess(w, orderCancelData{OrderID: orderID, Canceled: true}, output.NewMetadata())
+		},
+	}
 
-if err := structcli.Define(cmd, opts); err != nil {
-	panic(err)
-}
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
 
-return cmd
+	return cmd
 }
 
 // newOrderReplaceCmd replaces an existing order with a new equity order payload.
@@ -846,84 +848,54 @@ original order status becomes REPLACED after the new order is created.`,
 				configFlag = configPath
 			}
 
-		if err := requireMutableEnabled(configFlag); err != nil {
-			return err
-		}
+			if err := requireMutableEnabled(configFlag); err != nil {
+				return err
+			}
 
-		orderID, err := parseRequiredOrderID(opts.OrderID, args)
-		if err != nil {
-			return err
-		}
+			orderID, err := parseRequiredOrderID(opts.OrderID, args)
+			if err != nil {
+				return err
+			}
 
-		accountFlag, err := cmd.Flags().GetString("account")
-		if err != nil {
-			return err
-		}
+			accountFlag, err := cmd.Flags().GetString("account")
+			if err != nil {
+				return err
+			}
 
-		account, err := resolveAccount(accountFlag, configFlag, nil)
-		if err != nil {
-			return err
-		}
+			account, err := resolveAccount(accountFlag, configFlag, nil)
+			if err != nil {
+				return err
+			}
 
-		params, err := parseEquityParams(equityOpts, args)
-		if err != nil {
-			return err
-		}
+			params, err := parseEquityParams(equityOpts, args)
+			if err != nil {
+				return err
+			}
 
-		if err := orderbuilder.ValidateEquityOrder(params); err != nil {
-			return err
-		}
+			if err := orderbuilder.ValidateEquityOrder(params); err != nil {
+				return err
+			}
 
-		order, err := orderbuilder.BuildEquityOrder(params)
-		if err != nil {
-			return err
-		}
+			order, err := orderbuilder.BuildEquityOrder(params)
+			if err != nil {
+				return err
+			}
 
-		if err := c.ReplaceOrder(cmd.Context(), account, orderID, order); err != nil {
-			return err
-		}
+			if err := c.ReplaceOrder(cmd.Context(), account, orderID, order); err != nil {
+				return err
+			}
 
-		return output.WriteSuccess(w, orderReplaceData{OrderID: orderID, Replaced: true}, output.NewMetadata())
-	},
-}
-cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
+			return output.WriteSuccess(w, orderReplaceData{OrderID: orderID, Replaced: true}, output.NewMetadata())
+		},
+	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
-equityOrderFlagSetup(cmd, equityOpts)
-if err := structcli.Define(cmd, opts); err != nil {
-	panic(err)
-}
-
-return cmd
-}
-
-// equityOrderFlagSetup registers equity order flags on cmd.
-func equityOrderFlagSetup(cmd *cobra.Command, opts *equityPlaceOpts) {
+	defineAndConstrain(cmd, equityOpts)
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
-}
 
-// optionOrderFlagSetup registers option order flags on cmd.
-func optionOrderFlagSetup(cmd *cobra.Command, opts *optionPlaceOpts) {
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.MarkFlagsMutuallyExclusive("call", "put")
-	cmd.MarkFlagsOneRequired("call", "put")
-}
-
-// bracketOrderFlagSetup registers bracket order flags on cmd.
-func bracketOrderFlagSetup(cmd *cobra.Command, opts *bracketPlaceOpts) {
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-}
-
-// ocoOrderFlagSetup registers standalone OCO order flags on cmd.
-func ocoOrderFlagSetup(cmd *cobra.Command, opts *ocoPlaceOpts) {
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	return cmd
 }
 
 // parseOCOParams converts command flags into standalone OCO builder params.
@@ -941,26 +913,6 @@ func parseOCOParams(opts *ocoPlaceOpts, _ []string) (*orderbuilder.OCOParams, er
 		Duration:   normalizeDuration(opts.Duration),
 		Session:    opts.Session,
 	}, nil
-}
-
-// verticalOrderFlagSetup registers vertical spread flags on cmd.
-func verticalOrderFlagSetup(cmd *cobra.Command, opts *verticalBuildOpts) {
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.MarkFlagsMutuallyExclusive("call", "put")
-	cmd.MarkFlagsOneRequired("call", "put")
-	cmd.MarkFlagsMutuallyExclusive("open", "close")
-	cmd.MarkFlagsOneRequired("open", "close")
-}
-
-// ironCondorOrderFlagSetup registers iron condor flags on cmd.
-func ironCondorOrderFlagSetup(cmd *cobra.Command, opts *ironCondorBuildOpts) {
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.MarkFlagsMutuallyExclusive("open", "close")
-	cmd.MarkFlagsOneRequired("open", "close")
 }
 
 // parseIronCondorParams converts command flags into iron condor builder params.
@@ -1156,8 +1108,6 @@ func requireMutableEnabled(configPath string) error {
 
 	return nil
 }
-
-
 
 // parseRequiredOrderID parses the --order-id flag or first positional argument as an order ID.
 func parseRequiredOrderID(orderIDValue string, args []string) (int64, error) {
@@ -1452,17 +1402,6 @@ func parseVerticalParams(opts *verticalBuildOpts, _ []string) (*orderbuilder.Ver
 	}, nil
 }
 
-// strangleOrderFlagSetup registers strangle flags on cmd.
-func strangleOrderFlagSetup(cmd *cobra.Command, opts *strangleBuildOpts) {
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.MarkFlagsMutuallyExclusive("buy", "sell")
-	cmd.MarkFlagsOneRequired("buy", "sell")
-	cmd.MarkFlagsMutuallyExclusive("open", "close")
-	cmd.MarkFlagsOneRequired("open", "close")
-}
-
 // parseStrangleParams converts command flags into strangle builder params.
 func parseStrangleParams(opts *strangleBuildOpts, _ []string) (*orderbuilder.StrangleParams, error) {
 	isBuy, err := parseBuySell(opts.Buy, opts.Sell)
@@ -1492,17 +1431,6 @@ func parseStrangleParams(opts *strangleBuildOpts, _ []string) (*orderbuilder.Str
 		Duration:   normalizeDuration(opts.Duration),
 		Session:    opts.Session,
 	}, nil
-}
-
-// straddleOrderFlagSetup registers straddle flags on cmd.
-func straddleOrderFlagSetup(cmd *cobra.Command, opts *straddleBuildOpts) {
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.MarkFlagsMutuallyExclusive("buy", "sell")
-	cmd.MarkFlagsOneRequired("buy", "sell")
-	cmd.MarkFlagsMutuallyExclusive("open", "close")
-	cmd.MarkFlagsOneRequired("open", "close")
 }
 
 // parseStraddleParams converts command flags into straddle builder params.
@@ -1535,13 +1463,6 @@ func parseStraddleParams(opts *straddleBuildOpts, _ []string) (*orderbuilder.Str
 	}, nil
 }
 
-// coveredCallOrderFlagSetup registers covered call flags on cmd.
-func coveredCallOrderFlagSetup(cmd *cobra.Command, opts *coveredCallBuildOpts) {
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-}
-
 // parseCoveredCallParams converts command flags into covered call builder params.
 func parseCoveredCallParams(opts *coveredCallBuildOpts, _ []string) (*orderbuilder.CoveredCallParams, error) {
 	expiration, err := parseExpiration(opts.Expiration)
@@ -1558,15 +1479,6 @@ func parseCoveredCallParams(opts *coveredCallBuildOpts, _ []string) (*orderbuild
 		Duration:   normalizeDuration(opts.Duration),
 		Session:    opts.Session,
 	}, nil
-}
-
-// collarOrderFlagSetup registers collar-with-stock flags on cmd.
-func collarOrderFlagSetup(cmd *cobra.Command, opts *collarBuildOpts) {
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.MarkFlagsMutuallyExclusive("open", "close")
-	cmd.MarkFlagsOneRequired("open", "close")
 }
 
 // parseCollarParams converts command flags into collar-with-stock builder params.
@@ -1592,17 +1504,6 @@ func parseCollarParams(opts *collarBuildOpts, _ []string) (*orderbuilder.CollarP
 		Duration:   normalizeDuration(opts.Duration),
 		Session:    opts.Session,
 	}, nil
-}
-
-// calendarOrderFlagSetup registers calendar spread flags on cmd.
-func calendarOrderFlagSetup(cmd *cobra.Command, opts *calendarBuildOpts) {
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.MarkFlagsMutuallyExclusive("call", "put")
-	cmd.MarkFlagsOneRequired("call", "put")
-	cmd.MarkFlagsMutuallyExclusive("open", "close")
-	cmd.MarkFlagsOneRequired("open", "close")
 }
 
 // parseCalendarParams converts command flags into calendar spread builder params.
@@ -1639,17 +1540,6 @@ func parseCalendarParams(opts *calendarBuildOpts, _ []string) (*orderbuilder.Cal
 		Duration:       normalizeDuration(opts.Duration),
 		Session:        opts.Session,
 	}, nil
-}
-
-// diagonalOrderFlagSetup registers diagonal spread flags on cmd.
-func diagonalOrderFlagSetup(cmd *cobra.Command, opts *diagonalBuildOpts) {
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.MarkFlagsMutuallyExclusive("call", "put")
-	cmd.MarkFlagsOneRequired("call", "put")
-	cmd.MarkFlagsMutuallyExclusive("open", "close")
-	cmd.MarkFlagsOneRequired("open", "close")
 }
 
 // parseDiagonalParams converts command flags into diagonal spread builder params.

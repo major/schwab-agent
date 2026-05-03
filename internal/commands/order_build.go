@@ -81,7 +81,7 @@ option, bracket, OCO, and multi-leg option strategies.`,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
-	equityBuild := makeCobraBuildOrderCommand(w, "equity", "Build an equity order request", func() *equityPlaceOpts { return &equityPlaceOpts{} }, equityOrderFlagSetup, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
+	equityBuild := makeCobraBuildOrderCommand(w, "equity", "Build an equity order request", func() *equityPlaceOpts { return &equityPlaceOpts{} }, func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) }, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
 	equityBuild.Long = `Build an equity order request JSON. Validates flags and outputs the order
 payload without placing it. Pipe to order place --spec - to execute,
 or to order preview --spec - to check estimated commissions.`
@@ -89,28 +89,32 @@ or to order preview --spec - to check estimated commissions.`
   schwab-agent order build equity --symbol AAPL --action SELL --quantity 10 --type STOP --stop-price 145
   schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -`
 
-	optionBuild := makeCobraBuildOrderCommand(w, "option", "Build an option order request", func() *optionPlaceOpts { return &optionPlaceOpts{} }, optionOrderFlagSetup, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder)
+	optionBuild := makeCobraBuildOrderCommand(w, "option", "Build an option order request", func() *optionPlaceOpts { return &optionPlaceOpts{} }, func(cmd *cobra.Command, opts *optionPlaceOpts) {
+		defineAndConstrain(cmd, opts, []string{"call", "put"})
+	}, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder)
 	optionBuild.Long = `Build a single-leg option order request JSON. Requires --underlying,
 --expiration, --strike, and exactly one of --call or --put. Output is raw JSON
 suitable for piping to order place or order preview.`
 	optionBuild.Example = `  schwab-agent order build option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
   schwab-agent order build option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1`
 
-	bracketBuild := makeCobraBuildOrderCommand(w, "bracket", "Build a bracket order request", func() *bracketPlaceOpts { return &bracketPlaceOpts{} }, bracketOrderFlagSetup, parseBracketParams, orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder)
+	bracketBuild := makeCobraBuildOrderCommand(w, "bracket", "Build a bracket order request", func() *bracketPlaceOpts { return &bracketPlaceOpts{} }, func(cmd *cobra.Command, opts *bracketPlaceOpts) { defineAndConstrain(cmd, opts) }, parseBracketParams, orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder)
 	bracketBuild.Long = `Build a bracket order request JSON with entry and automatic exit legs. At
 least one of --take-profit or --stop-loss is required. Exit instructions are
 auto-inverted from the entry action.`
 	bracketBuild.Example = `  schwab-agent order build bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
   schwab-agent order build bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170`
 
-	ocoBuild := makeCobraBuildOrderCommand(w, "oco", "Build a one-cancels-other order request for an existing position", func() *ocoPlaceOpts { return &ocoPlaceOpts{} }, ocoOrderFlagSetup, parseOCOParams, orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder)
+	ocoBuild := makeCobraBuildOrderCommand(w, "oco", "Build a one-cancels-other order request for an existing position", func() *ocoPlaceOpts { return &ocoPlaceOpts{} }, func(cmd *cobra.Command, opts *ocoPlaceOpts) { defineAndConstrain(cmd, opts) }, parseOCOParams, orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder)
 	ocoBuild.Long = `Build a one-cancels-other order request JSON for an existing position. When
 one exit fills, the other is canceled. At least one of --take-profit or
 --stop-loss is required.`
 	ocoBuild.Example = `  schwab-agent order build oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140
   schwab-agent order build oco --symbol TSLA --action BUY --quantity 10 --stop-loss 250`
 
-	verticalBuild := makeCobraBuildOrderCommand(w, "vertical", "Build a vertical spread order request", func() *verticalBuildOpts { return &verticalBuildOpts{} }, verticalOrderFlagSetup, parseVerticalParams, orderbuilder.ValidateVerticalOrder, orderbuilder.BuildVerticalOrder)
+	verticalBuild := makeCobraBuildOrderCommand(w, "vertical", "Build a vertical spread order request", func() *verticalBuildOpts { return &verticalBuildOpts{} }, func(cmd *cobra.Command, opts *verticalBuildOpts) {
+		defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"open", "close"})
+	}, parseVerticalParams, orderbuilder.ValidateVerticalOrder, orderbuilder.BuildVerticalOrder)
 	verticalBuild.Long = `Build a vertical spread (bull/bear call or put spread) order request JSON.
 Use --long-strike for the strike bought and --short-strike for the strike sold.
 NET_DEBIT or NET_CREDIT is auto-determined from the strike relationship.`
@@ -119,46 +123,58 @@ NET_DEBIT or NET_CREDIT is auto-determined from the strike relationship.`
   # Bear put spread
   schwab-agent order build vertical --underlying F --expiration 2026-06-18 --long-strike 14 --short-strike 12 --put --open --quantity 1 --price 0.50`
 
-	ironCondorBuild := makeCobraBuildOrderCommand(w, "iron-condor", "Build an iron condor order request", func() *ironCondorBuildOpts { return &ironCondorBuildOpts{} }, ironCondorOrderFlagSetup, parseIronCondorParams, orderbuilder.ValidateIronCondorOrder, orderbuilder.BuildIronCondorOrder)
+	ironCondorBuild := makeCobraBuildOrderCommand(w, "iron-condor", "Build an iron condor order request", func() *ironCondorBuildOpts { return &ironCondorBuildOpts{} }, func(cmd *cobra.Command, opts *ironCondorBuildOpts) {
+		defineAndConstrain(cmd, opts, []string{"open", "close"})
+	}, parseIronCondorParams, orderbuilder.ValidateIronCondorOrder, orderbuilder.BuildIronCondorOrder)
 	ironCondorBuild.Long = `Build an iron condor order request JSON. Four strikes must be ordered:
 put-long < put-short < call-short < call-long. Opening an iron condor
 generates a NET_CREDIT.`
 	ironCondorBuild.Example = `  schwab-agent order build iron-condor --underlying F --expiration 2026-06-18 --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 --open --quantity 1 --price 0.50`
 
-	straddleBuild := makeCobraBuildOrderCommand(w, "straddle", "Build a straddle order request", func() *straddleBuildOpts { return &straddleBuildOpts{} }, straddleOrderFlagSetup, parseStraddleParams, orderbuilder.ValidateStraddleOrder, orderbuilder.BuildStraddleOrder)
+	straddleBuild := makeCobraBuildOrderCommand(w, "straddle", "Build a straddle order request", func() *straddleBuildOpts { return &straddleBuildOpts{} }, func(cmd *cobra.Command, opts *straddleBuildOpts) {
+		defineAndConstrain(cmd, opts, []string{"buy", "sell"}, []string{"open", "close"})
+	}, parseStraddleParams, orderbuilder.ValidateStraddleOrder, orderbuilder.BuildStraddleOrder)
 	straddleBuild.Long = `Build a straddle order request JSON. A straddle buys (or sells) a call and
 put at the same strike price and expiration. Use --buy for long straddles
 (expecting large price movement) or --sell for short straddles.`
 	straddleBuild.Example = `  schwab-agent order build straddle --underlying F --expiration 2026-06-18 --strike 12 --buy --open --quantity 1 --price 1.50
   schwab-agent order build straddle --underlying F --expiration 2026-06-18 --strike 12 --sell --open --quantity 1 --price 1.50`
 
-	strangleBuild := makeCobraBuildOrderCommand(w, "strangle", "Build a strangle order request", func() *strangleBuildOpts { return &strangleBuildOpts{} }, strangleOrderFlagSetup, parseStrangleParams, orderbuilder.ValidateStrangleOrder, orderbuilder.BuildStrangleOrder)
+	strangleBuild := makeCobraBuildOrderCommand(w, "strangle", "Build a strangle order request", func() *strangleBuildOpts { return &strangleBuildOpts{} }, func(cmd *cobra.Command, opts *strangleBuildOpts) {
+		defineAndConstrain(cmd, opts, []string{"buy", "sell"}, []string{"open", "close"})
+	}, parseStrangleParams, orderbuilder.ValidateStrangleOrder, orderbuilder.BuildStrangleOrder)
 	strangleBuild.Long = `Build a strangle order request JSON. A strangle uses different strikes for
 the call and put legs. Use --buy for long strangles (expecting volatility)
 or --sell for short strangles (expecting low volatility).`
 	strangleBuild.Example = `  schwab-agent order build strangle --underlying F --expiration 2026-06-18 --call-strike 14 --put-strike 10 --buy --open --quantity 1 --price 0.50
   schwab-agent order build strangle --underlying F --expiration 2026-06-18 --call-strike 14 --put-strike 10 --sell --open --quantity 1 --price 0.50`
 
-	coveredCallBuild := makeCobraBuildOrderCommand(w, "covered-call", "Build a covered call order request (buy shares + sell call)", func() *coveredCallBuildOpts { return &coveredCallBuildOpts{} }, coveredCallOrderFlagSetup, parseCoveredCallParams, orderbuilder.ValidateCoveredCallOrder, orderbuilder.BuildCoveredCallOrder)
+	coveredCallBuild := makeCobraBuildOrderCommand(w, "covered-call", "Build a covered call order request (buy shares + sell call)", func() *coveredCallBuildOpts { return &coveredCallBuildOpts{} }, func(cmd *cobra.Command, opts *coveredCallBuildOpts) { defineAndConstrain(cmd, opts) }, parseCoveredCallParams, orderbuilder.ValidateCoveredCallOrder, orderbuilder.BuildCoveredCallOrder)
 	coveredCallBuild.Long = `Build a covered call order request JSON that atomically buys shares and sells
 a call. Quantity 1 means 100 shares plus 1 call contract. The --price is the
 net debit per share after call premium. To sell calls against shares you
 already own, use order place option --action SELL_TO_OPEN instead.`
 	coveredCallBuild.Example = `  schwab-agent order build covered-call --underlying F --expiration 2026-06-18 --strike 14 --quantity 1 --price 12.00`
 
-	collarBuild := makeCobraBuildOrderCommand(w, "collar", "Build a collar-with-stock order request (buy shares + buy put + sell call)", func() *collarBuildOpts { return &collarBuildOpts{} }, collarOrderFlagSetup, parseCollarParams, orderbuilder.ValidateCollarOrder, orderbuilder.BuildCollarOrder)
+	collarBuild := makeCobraBuildOrderCommand(w, "collar", "Build a collar-with-stock order request (buy shares + buy put + sell call)", func() *collarBuildOpts { return &collarBuildOpts{} }, func(cmd *cobra.Command, opts *collarBuildOpts) {
+		defineAndConstrain(cmd, opts, []string{"open", "close"})
+	}, parseCollarParams, orderbuilder.ValidateCollarOrder, orderbuilder.BuildCollarOrder)
 	collarBuild.Long = `Build a collar-with-stock order request JSON. Combines long stock, a
 protective long put, and a covered short call. Limits downside risk while
 capping upside. Quantity 1 means 100 shares plus 1 put and 1 call contract.`
 	collarBuild.Example = `  schwab-agent order build collar --underlying F --put-strike 10 --call-strike 14 --expiration 2026-06-18 --quantity 1 --open --price 12.00`
 
-	calendarBuild := makeCobraBuildOrderCommand(w, "calendar", "Build a calendar spread order request (same strike, different expirations)", func() *calendarBuildOpts { return &calendarBuildOpts{} }, calendarOrderFlagSetup, parseCalendarParams, orderbuilder.ValidateCalendarOrder, orderbuilder.BuildCalendarOrder)
+	calendarBuild := makeCobraBuildOrderCommand(w, "calendar", "Build a calendar spread order request (same strike, different expirations)", func() *calendarBuildOpts { return &calendarBuildOpts{} }, func(cmd *cobra.Command, opts *calendarBuildOpts) {
+		defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"open", "close"})
+	}, parseCalendarParams, orderbuilder.ValidateCalendarOrder, orderbuilder.BuildCalendarOrder)
 	calendarBuild.Long = `Build a calendar spread order request JSON. Same strike price across two
 different expirations: sells the near-term contract and buys the far-term
 contract. Profits from time decay differential between the two legs.`
 	calendarBuild.Example = `  schwab-agent order build calendar --underlying F --near-expiration 2026-05-16 --far-expiration 2026-07-17 --strike 12 --call --open --quantity 1 --price 0.50`
 
-	diagonalBuild := makeCobraBuildOrderCommand(w, "diagonal", "Build a diagonal spread order request (different strikes and expirations)", func() *diagonalBuildOpts { return &diagonalBuildOpts{} }, diagonalOrderFlagSetup, parseDiagonalParams, orderbuilder.ValidateDiagonalOrder, orderbuilder.BuildDiagonalOrder)
+	diagonalBuild := makeCobraBuildOrderCommand(w, "diagonal", "Build a diagonal spread order request (different strikes and expirations)", func() *diagonalBuildOpts { return &diagonalBuildOpts{} }, func(cmd *cobra.Command, opts *diagonalBuildOpts) {
+		defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"open", "close"})
+	}, parseDiagonalParams, orderbuilder.ValidateDiagonalOrder, orderbuilder.BuildDiagonalOrder)
 	diagonalBuild.Long = `Build a diagonal spread order request JSON. Different strikes AND different
 expirations: sells the near-term contract at one strike and buys the far-term
 contract at a different strike. Combines elements of vertical and calendar spreads.`

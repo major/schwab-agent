@@ -14,6 +14,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type defineAndConstrainTestOpts struct {
+	Call bool `flag:"call" flagdescr:"Call option"`
+	Put  bool `flag:"put" flagdescr:"Put option"`
+}
+
+// Attach implements structcli.Options for defineAndConstrainTestOpts.
+func (o *defineAndConstrainTestOpts) Attach(_ *cobra.Command) error { return nil }
+
 // testClient creates a *client.Ref backed by the given httptest server.
 func testClient(t *testing.T, server *httptest.Server) *client.Ref {
 	t.Helper()
@@ -115,4 +123,28 @@ func TestCobraVisibleSubcommandNames(t *testing.T) {
 	// Assert
 	assert.Equal(t, []string{"visible1", "visible2"}, names)
 	assert.NotContains(t, names, "hidden")
+}
+
+func TestDefineAndConstrain(t *testing.T) {
+	// Arrange
+	cmd := &cobra.Command{
+		Use:  "option",
+		RunE: func(_ *cobra.Command, _ []string) error { return nil },
+	}
+	opts := &defineAndConstrainTestOpts{}
+
+	// Act
+	defineAndConstrain(cmd, opts, []string{"call", "put"})
+
+	// Assert
+	require.NotNil(t, cmd.Flags().Lookup("call"))
+	require.NotNil(t, cmd.Flags().Lookup("put"))
+
+	_, err := runTestCommand(t, cmd)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "at least one of the flags in the group [call put] is required")
+
+	_, err = runTestCommand(t, cmd, "--call", "--put")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "if any flags in the group [call put] are set none of the others can be")
 }
