@@ -99,7 +99,6 @@ JSON at `~/.config/schwab-agent/config.json`. Fields: `client_id`, `client_secre
 ## Safety Guards
 
 - **Mutable operations** require `"i-also-like-to-live-dangerously": true` in config
-- **Order placement/cancel/replace** require `--confirm` flag
 - Market orders intentionally exclude price fields in the builder
 
 ## Testing Conventions

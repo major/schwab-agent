@@ -73,12 +73,11 @@ All commands return JSON through `internal/output`. Use `WriteSuccess`, `WriteEr
 
 ### Safety
 
-This tool handles real money. Two safety mechanisms exist for mutable operations (order placement, cancellation, replacement):
+This tool handles real money. One safety mechanism exists for mutable operations (order placement, cancellation, replacement):
 
 1. Config file must have `"i-also-like-to-live-dangerously": true`
-2. Each mutable command requires `--confirm`
 
-If you're adding a new command that modifies account state, it must use both guards.
+If you're adding a new command that modifies account state, it must use this guard.
 
 ## Pull requests
 

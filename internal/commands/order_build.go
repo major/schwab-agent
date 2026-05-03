@@ -83,11 +83,11 @@ option, bracket, OCO, and multi-leg option strategies.`,
 
 	equityBuild := makeCobraBuildOrderCommand(w, "equity", "Build an equity order request", func() *equityPlaceOpts { return &equityPlaceOpts{} }, equityOrderFlagSetup, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
 	equityBuild.Long = `Build an equity order request JSON. Validates flags and outputs the order
-payload without placing it. Pipe to order place --spec - --confirm to execute,
+payload without placing it. Pipe to order place --spec - to execute,
 or to order preview --spec - to check estimated commissions.`
 	equityBuild.Example = `  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --duration DAY
   schwab-agent order build equity --symbol AAPL --action SELL --quantity 10 --type STOP --stop-price 145
-  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec - --confirm`
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -`
 
 	optionBuild := makeCobraBuildOrderCommand(w, "option", "Build an option order request", func() *optionPlaceOpts { return &optionPlaceOpts{} }, optionOrderFlagSetup, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder)
 	optionBuild.Long = `Build a single-leg option order request JSON. Requires --underlying,

@@ -409,8 +409,8 @@ schwab-agent market movers '$SPX' --sort PERCENT_CHANGE_UP
 
 Manage orders across your Schwab accounts. Supports listing, viewing, placing,
 previewing, building, canceling, and replacing orders. Placing, canceling, and
-replacing orders require both the "i-also-like-to-live-dangerously" config flag
-and --confirm on each command. Duration aliases GTC, FOK, and IOC are accepted.
+replacing orders require the "i-also-like-to-live-dangerously" config flag.
+Duration aliases GTC, FOK, and IOC are accepted.
 
 #### `schwab-agent order build`
 
@@ -560,7 +560,7 @@ schwab-agent order build diagonal --underlying F --near-strike 12 --far-strike 1
 #### `schwab-agent order build equity`
 
 Build an equity order request JSON. Validates flags and outputs the order
-payload without placing it. Pipe to order place --spec - --confirm to execute,
+payload without placing it. Pipe to order place --spec - to execute,
 or to order preview --spec - to check estimated commissions.
 
 **Flags:**
@@ -590,7 +590,7 @@ or to order preview --spec - to check estimated commissions.
 ```
 schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --duration DAY
   schwab-agent order build equity --symbol AAPL --action SELL --quantity 10 --type STOP --stop-price 145
-  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec - --confirm
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -
 ```
 
 #### `schwab-agent order build fts`
@@ -794,22 +794,21 @@ NET_DEBIT or NET_CREDIT is auto-determined from the strike relationship.
 
 #### `schwab-agent order cancel`
 
-Cancel an existing order by ID. Requires both safety guards: the
-"i-also-like-to-live-dangerously" config flag and --confirm. The order ID can
-be passed as a positional argument or with --order-id (flag takes priority).
+Cancel an existing order by ID. Requires the "i-also-like-to-live-dangerously"
+config flag. The order ID can be passed as a positional argument or with
+--order-id (flag takes priority).
 
 **Flags:**
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--confirm` | bool | false | no | Confirm cancellation |
 | `--order-id` | string | - | no | Order ID |
 
 **Example:**
 
 ```
-schwab-agent order cancel 1234567890 --confirm
-  schwab-agent order cancel --order-id 1234567890 --confirm
+schwab-agent order cancel 1234567890
+  schwab-agent order cancel --order-id 1234567890
 ```
 
 #### `schwab-agent order get`
@@ -860,27 +859,25 @@ schwab-agent order list
 #### `schwab-agent order place`
 
 Place an order via subcommand (equity, option, bracket, oco) or from a JSON spec
-with --spec. Both safety guards are required: set "i-also-like-to-live-dangerously"
-to true in config.json, and pass --confirm on every placement. Recommended workflow:
-check the price with quote get, build the order JSON with order build, preview it
-with order preview, then place with --confirm.
+with --spec. The "i-also-like-to-live-dangerously" config flag must be set to
+true in config.json. Recommended workflow: check the price with quote get, build
+the order JSON with order build, preview it with order preview, then place it.
 
 **Flags:**
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--confirm` | bool | false | no | Confirm order placement |
 | `--spec` | string | - | yes | Inline JSON, @file, or - for stdin |
 
 **Example:**
 
 ```
 # Place from a JSON file
-  schwab-agent order place --spec @order.json --confirm
+  schwab-agent order place --spec @order.json
   # Place from stdin (piped from order build)
-  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec - --confirm
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -
   # Place from inline JSON
-  schwab-agent order place --spec '{"orderType":"LIMIT",...}' --confirm
+  schwab-agent order place --spec '{"orderType":"LIMIT",...}'
 ```
 
 #### `schwab-agent order place bracket`
@@ -895,7 +892,6 @@ the parent cascades to all child orders.
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
 | `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
-| `--confirm` | bool | false | no | Confirm order placement |
 | `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
 | `--price` | float64 | 0 | no | Entry price |
 | `--quantity` | float64 | 0 | yes | Share quantity |
@@ -909,19 +905,19 @@ the parent cascades to all child orders.
 
 ```
 # Buy with both take-profit and stop-loss
-  schwab-agent order place bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120 --confirm
+  schwab-agent order place bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
   # Buy with only a stop-loss safety net
-  schwab-agent order place bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170 --confirm
+  schwab-agent order place bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170
   # Buy with only a take-profit target
-  schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300 --confirm
+  schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300
 ```
 
 #### `schwab-agent order place equity`
 
 Place an equity (stock) order. Supports MARKET, LIMIT, STOP, STOP_LIMIT, and
 TRAILING_STOP order types. Default type is MARKET if --type is omitted. Duration
-aliases GTC, FOK, and IOC are accepted alongside their full names. Both safety
-guards are required for placement.
+aliases GTC, FOK, and IOC are accepted alongside their full names. The
+"i-also-like-to-live-dangerously" config flag must be set to true.
 
 **Flags:**
 
@@ -929,7 +925,6 @@ guards are required for placement.
 |------|------|---------|----------|-------------|
 | `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
 | `--activation-price` | float64 | 0 | no | Price that activates the trailing stop |
-| `--confirm` | bool | false | no | Confirm order placement |
 | `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
 | `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
 | `--price` | float64 | 0 | no | Limit price |
@@ -950,13 +945,13 @@ guards are required for placement.
 
 ```
 # Buy 10 shares at market price
-  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --confirm
+  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10
   # Buy with a limit price, good till cancel
-  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC --confirm
+  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC
   # Sell with a trailing stop ($2.50 offset)
-  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type TRAILING_STOP --stop-offset 2.50 --confirm
+  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type TRAILING_STOP --stop-offset 2.50
   # Sell with a stop-limit order
-  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type STOP_LIMIT --stop-price 145 --price 144 --confirm
+  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type STOP_LIMIT --stop-price 145 --price 144
 ```
 
 #### `schwab-agent order place oco`
@@ -971,7 +966,6 @@ bracket orders, OCO has no entry leg.
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
 | `--action` | string | - | yes | Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
-| `--confirm` | bool | false | no | Confirm order placement |
 | `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
 | `--quantity` | float64 | 0 | yes | Share quantity |
 | `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
@@ -983,19 +977,19 @@ bracket orders, OCO has no entry leg.
 
 ```
 # Set take-profit and stop-loss for a long position
-  schwab-agent order place oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140 --confirm
+  schwab-agent order place oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140
   # Protect a position with only a stop-loss
-  schwab-agent order place oco --symbol AAPL --action SELL --quantity 50 --stop-loss 140 --confirm
+  schwab-agent order place oco --symbol AAPL --action SELL --quantity 50 --stop-loss 140
   # Close a short position with exits
-  schwab-agent order place oco --symbol TSLA --action BUY --quantity 10 --take-profit 200 --stop-loss 250 --confirm
+  schwab-agent order place oco --symbol TSLA --action BUY --quantity 10 --take-profit 200 --stop-loss 250
 ```
 
 #### `schwab-agent order place option`
 
 Place a single-leg option order. Requires --underlying, --expiration, --strike,
 and exactly one of --call or --put. Use BUY_TO_OPEN/SELL_TO_CLOSE for new
-positions and SELL_TO_OPEN/BUY_TO_CLOSE for existing ones. Both safety guards
-are required for placement.
+positions and SELL_TO_OPEN/BUY_TO_CLOSE for existing ones. The
+"i-also-like-to-live-dangerously" config flag must be set to true.
 
 **Flags:**
 
@@ -1003,7 +997,6 @@ are required for placement.
 |------|------|---------|----------|-------------|
 | `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
 | `--call` | bool | false | no | Call option |
-| `--confirm` | bool | false | no | Confirm order placement |
 | `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
 | `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
@@ -1022,11 +1015,11 @@ are required for placement.
 
 ```
 # Buy a call option to open
-  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --confirm
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1
   # Sell a put at a limit price
-  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50 --confirm
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50
   # Close an existing call position
-  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action SELL_TO_CLOSE --quantity 1 --confirm
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action SELL_TO_CLOSE --quantity 1
 ```
 
 #### `schwab-agent order preview`
@@ -1053,8 +1046,8 @@ schwab-agent order preview --spec @order.json
 
 Replace an existing order with a new equity order. The original order is
 canceled and a new one is created with a new ID. Only equity order flags are
-accepted. Requires both safety guards. The original order status becomes
-REPLACED after the new order is created.
+accepted. The "i-also-like-to-live-dangerously" config flag must be set to true.
+The original order status becomes REPLACED after the new order is created.
 
 **Flags:**
 
@@ -1062,7 +1055,6 @@ REPLACED after the new order is created.
 |------|------|---------|----------|-------------|
 | `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
 | `--activation-price` | float64 | 0 | no | Price that activates the trailing stop |
-| `--confirm` | bool | false | no | Confirm replacement |
 | `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
 | `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
 | `--order-id` | string | - | no | Order ID |
@@ -1083,8 +1075,8 @@ REPLACED after the new order is created.
 **Example:**
 
 ```
-schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
-  schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
+schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY
+  schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY
 ```
 
 #### `schwab-agent position`
@@ -1587,7 +1579,7 @@ schwab-agent order build diagonal --underlying F --near-strike 12 --far-strike 1
 ```
 schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --duration DAY
   schwab-agent order build equity --symbol AAPL --action SELL --quantity 10 --type STOP --stop-price 145
-  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec - --confirm
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -
 ```
 
 #### schwab-agent order build fts
@@ -1643,8 +1635,8 @@ schwab-agent order build strangle --underlying F --expiration 2026-06-18 --call-
 #### schwab-agent order cancel
 
 ```
-schwab-agent order cancel 1234567890 --confirm
-  schwab-agent order cancel --order-id 1234567890 --confirm
+schwab-agent order cancel 1234567890
+  schwab-agent order cancel --order-id 1234567890
 ```
 
 #### schwab-agent order get
@@ -1668,57 +1660,57 @@ schwab-agent order list
 
 ```
 # Place from a JSON file
-  schwab-agent order place --spec @order.json --confirm
+  schwab-agent order place --spec @order.json
   # Place from stdin (piped from order build)
-  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec - --confirm
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -
   # Place from inline JSON
-  schwab-agent order place --spec '{"orderType":"LIMIT",...}' --confirm
+  schwab-agent order place --spec '{"orderType":"LIMIT",...}'
 ```
 
 #### schwab-agent order place bracket
 
 ```
 # Buy with both take-profit and stop-loss
-  schwab-agent order place bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120 --confirm
+  schwab-agent order place bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
   # Buy with only a stop-loss safety net
-  schwab-agent order place bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170 --confirm
+  schwab-agent order place bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170
   # Buy with only a take-profit target
-  schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300 --confirm
+  schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300
 ```
 
 #### schwab-agent order place equity
 
 ```
 # Buy 10 shares at market price
-  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --confirm
+  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10
   # Buy with a limit price, good till cancel
-  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC --confirm
+  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC
   # Sell with a trailing stop ($2.50 offset)
-  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type TRAILING_STOP --stop-offset 2.50 --confirm
+  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type TRAILING_STOP --stop-offset 2.50
   # Sell with a stop-limit order
-  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type STOP_LIMIT --stop-price 145 --price 144 --confirm
+  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type STOP_LIMIT --stop-price 145 --price 144
 ```
 
 #### schwab-agent order place oco
 
 ```
 # Set take-profit and stop-loss for a long position
-  schwab-agent order place oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140 --confirm
+  schwab-agent order place oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140
   # Protect a position with only a stop-loss
-  schwab-agent order place oco --symbol AAPL --action SELL --quantity 50 --stop-loss 140 --confirm
+  schwab-agent order place oco --symbol AAPL --action SELL --quantity 50 --stop-loss 140
   # Close a short position with exits
-  schwab-agent order place oco --symbol TSLA --action BUY --quantity 10 --take-profit 200 --stop-loss 250 --confirm
+  schwab-agent order place oco --symbol TSLA --action BUY --quantity 10 --take-profit 200 --stop-loss 250
 ```
 
 #### schwab-agent order place option
 
 ```
 # Buy a call option to open
-  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --confirm
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1
   # Sell a put at a limit price
-  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50 --confirm
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50
   # Close an existing call position
-  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action SELL_TO_CLOSE --quantity 1 --confirm
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action SELL_TO_CLOSE --quantity 1
 ```
 
 #### schwab-agent order preview
@@ -1731,8 +1723,8 @@ schwab-agent order preview --spec @order.json
 #### schwab-agent order replace
 
 ```
-schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
-  schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
+schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY
+  schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY
 ```
 
 #### schwab-agent position list

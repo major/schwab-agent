@@ -103,15 +103,14 @@ schwab-agent chain get AAPL
 # Get multiple moving averages in one technical-analysis run
 schwab-agent ta sma AAPL --period 21,50,200 --points 1
 
-# Place a limit order (requires safety config + --confirm)
+# Place a limit order (requires safety config)
 schwab-agent order place equity \
   --symbol AAPL \
   --action BUY \
   --quantity 10 \
   --order-type LIMIT \
   --price 150.00 \
-  --duration DAY \
-  --confirm
+  --duration DAY
 
 # Preview an order without placing it
 schwab-agent order preview equity \
@@ -130,7 +129,7 @@ schwab-agent order build equity \
   --duration DAY
 
 # Place from a JSON spec
-schwab-agent order place --spec @order.json --confirm
+schwab-agent order place --spec @order.json
 ```
 
 ## Commands
@@ -160,12 +159,11 @@ schwab-agent order place --spec @order.json --confirm
 
 ## Safety
 
-schwab-agent has two layers of protection for operations that modify your account:
+schwab-agent has a single layer of protection for operations that modify your account:
 
 1. **Config flag**: Set `"i-also-like-to-live-dangerously": true` in your config file to enable mutable operations (order placement, cancellation, replacement).
-2. **CLI flag**: Pass `--confirm` on each mutable command.
 
-Both are required. This prevents accidental trades from misconfigured agents.
+This prevents accidental trades from misconfigured agents.
 
 ## Agent integration
 
