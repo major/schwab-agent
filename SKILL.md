@@ -1,0 +1,1848 @@
+---
+name: schwab-agent
+description: |
+  CLI tool for AI agents to trade via Schwab APIs. Use when you need to: manage schwab trading accounts. list accounts with nicknames, view account
+  details, look up account numbers and hash values, set a default account, and
+  query transaction history. account list and get enrich results with nicknames
+  from the preferences api (best-effort, degrades gracefully), get details for a single account by hash value. the hash can be passed as a
+  positional argument, via --account, or resolved from the default_account
+  config. results are enriched with nicknames from the preferences api. use
+  --positions to include current positions, list all linked schwab accounts with nicknames and settings enriched from
+  the preferences api. use --positions to include current positions for each
+  account in the response. nicknames are loaded best-effort and omitted if
+  the preferences api is unavailable, list account numbers and their corresponding hash values. hash values are
+  used as account identifiers in all other commands. use set-def...
+metadata:
+  author: major
+  version: dev
+  mcp-server: schwab-agent --mcp
+---
+
+# schwab-agent
+
+## Instructions
+
+### Available Commands
+
+#### `schwab-agent`
+
+CLI tool for AI agents to trade via Schwab APIs
+
+#### `schwab-agent account`
+
+Manage Schwab trading accounts. List accounts with nicknames, view account
+details, look up account numbers and hash values, set a default account, and
+query transaction history. Account list and get enrich results with nicknames
+from the preferences API (best-effort, degrades gracefully).
+
+#### `schwab-agent account get`
+
+Get details for a single account by hash value. The hash can be passed as a
+positional argument, via --account, or resolved from the default_account
+config. Results are enriched with nicknames from the preferences API. Use
+--positions to include current positions.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--positions` | bool | false | no | Include current positions in the account response |
+
+**Example:**
+
+```
+schwab-agent account get
+  schwab-agent account get ABCDEF1234567890
+  schwab-agent account get --positions
+```
+
+#### `schwab-agent account list`
+
+List all linked Schwab accounts with nicknames and settings enriched from
+the preferences API. Use --positions to include current positions for each
+account in the response. Nicknames are loaded best-effort and omitted if
+the preferences API is unavailable.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--positions` | bool | false | no | Include current positions for each account |
+
+**Example:**
+
+```
+schwab-agent account list
+  schwab-agent account list --positions
+```
+
+#### `schwab-agent account numbers`
+
+List account numbers and their corresponding hash values. Hash values are
+used as account identifiers in all other commands. Use set-default to store
+a hash as the default account.
+
+**Example:**
+
+```
+schwab-agent account numbers
+```
+
+#### `schwab-agent account set-default`
+
+Set the default account hash in the config file. Commands that require an
+account will use this value when --account is not specified. Run account
+numbers to find valid hash values.
+
+**Example:**
+
+```
+schwab-agent account set-default ABCDEF1234567890
+```
+
+#### `schwab-agent account transaction`
+
+Query transaction history for an account. Transactions are account-scoped and
+inherit the --account flag from the parent command. Filter by type, date range,
+and symbol.
+
+#### `schwab-agent account transaction get`
+
+Get a specific transaction by ID
+
+**Example:**
+
+```
+schwab-agent account transaction get 98765432101
+```
+
+#### `schwab-agent account transaction list`
+
+List transactions for an account with optional filtering by type, date range,
+and symbol. Date values use ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Uses the
+default account unless --account is specified.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--from` | string | - | no | Start date (YYYY-MM-DDTHH:MM:SSZ) |
+| `--symbol` | string | - | no | Filter by symbol |
+| `--to` | string | - | no | End date (YYYY-MM-DDTHH:MM:SSZ) |
+| `--types` | string | - | no | Transaction type filter (TRADE, DIVIDEND, etc.) |
+
+**Example:**
+
+```
+schwab-agent account transaction list
+  schwab-agent account transaction list --types TRADE --symbol AAPL
+  schwab-agent account transaction list --from 2025-01-01T00:00:00Z --to 2025-01-31T23:59:59Z
+```
+
+#### `schwab-agent auth`
+
+Manage OAuth2 authentication with the Schwab API. Login starts the OAuth flow,
+status checks token expiration, and refresh forces a token refresh. Auth
+commands bypass the global auth check so they can run without existing tokens.
+Tokens are stored locally and refreshed automatically during normal use.
+
+#### `schwab-agent auth login`
+
+Start the OAuth2 login flow to authenticate with Schwab. Opens a browser by
+default; use --no-browser to print the authorization URL instead. After
+authorization, tokens are stored locally. If exactly one account is found,
+it is automatically set as the default.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--no-browser` | bool | false | no | Print the authorization URL in the JSON response instead of opening a browser |
+
+**Example:**
+
+```
+schwab-agent auth login
+  schwab-agent auth login --no-browser
+```
+
+#### `schwab-agent auth refresh`
+
+Force a refresh of the current access token without re-authenticating. Requires
+a valid refresh token (not expired). If the refresh token is stale (older than
+6.5 days), run auth login again instead.
+
+**Example:**
+
+```
+schwab-agent auth refresh
+```
+
+#### `schwab-agent auth status`
+
+Show current authentication status including access token expiration, refresh
+token expiration, configured default account, and client ID (redacted). Use
+this to check whether tokens are still valid before running other commands.
+
+**Example:**
+
+```
+schwab-agent auth status
+```
+
+#### `schwab-agent chain`
+
+Option chain operations
+
+#### `schwab-agent chain expiration`
+
+Get available option expiration dates for a symbol without fetching the full
+chain data. Useful for discovering valid expirations before requesting a
+detailed chain.
+
+**Example:**
+
+```
+schwab-agent chain expiration AAPL
+```
+
+#### `schwab-agent chain get`
+
+Get the full option chain for a symbol with optional filtering by contract type,
+strike range, expiration dates, and strategy. Use --strategy ANALYTICAL with
+--volatility and --days-to-expiration for theoretical pricing. Filter to
+specific moneyness with --strike-range (ITM, NTM, OTM, ALL).
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--days-to-expiration` | string | - | no | Days to expiration for theoretical pricing calculations |
+| `--from-date` | string | - | no | Start date (YYYY-MM-DD) |
+| `--include-underlying-quote` | bool | false | no | Include underlying quote data in response |
+| `--interest-rate` | string | - | no | Interest rate for theoretical pricing calculations |
+| `--interval` | string | - | no | Strike interval for spread strategy chains |
+| `--strategy` | string | - | no | Option pricing strategy {,ANALYTICAL,BUTTERFLY,CALENDAR,COLLAR,CONDOR,COVERED,DIAGONAL,ROLL,SINGLE,STRADDLE,STRANGLE,VERTICAL} |
+| `--strike` | string | - | no | Filter to a specific strike price |
+| `--strike-count` | string | - | no | Number of strikes to return |
+| `--strike-range` | string | - | no | Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL {,ALL,ITM,NTM,OTM,SAK,SBK,SNK} |
+| `--to-date` | string | - | no | End date (YYYY-MM-DD) |
+| `--type` | string | - | no | Contract type: CALL, PUT, or ALL {,ALL,CALL,PUT} |
+| `--underlying-price` | string | - | no | Override underlying price for theoretical calculations |
+| `--volatility` | string | - | no | Volatility for theoretical pricing calculations |
+
+**Example:**
+
+```
+schwab-agent chain get AAPL
+  schwab-agent chain get AAPL --type CALL --strike-count 5
+  schwab-agent chain get AAPL --from-date 2025-06-01 --to-date 2025-07-31 --type PUT
+  schwab-agent chain get AAPL --strategy ANALYTICAL --volatility 30.5 --days-to-expiration 45
+  schwab-agent chain get AAPL --strike-range NTM --include-underlying-quote
+```
+
+#### `schwab-agent completion`
+
+Generate shell completion scripts for bash, zsh, fish, or powershell.
+
+#### `schwab-agent completion bash`
+
+Generate bash completion script.
+
+To load completions in your current shell session:
+
+	source <(schwab-agent completion bash)
+
+To load completions for every new session, execute once:
+
+	schwab-agent completion bash | sudo tee /etc/bash_completion.d/schwab-agent
+
+or
+
+	schwab-agent completion bash >> ~/.bashrc
+
+
+#### `schwab-agent completion fish`
+
+Generate fish completion script.
+
+To load completions in your current shell session:
+
+	schwab-agent completion fish | source
+
+To load completions for every new session, execute once:
+
+	schwab-agent completion fish > ~/.config/fish/completions/schwab-agent.fish
+
+
+#### `schwab-agent completion powershell`
+
+Generate powershell completion script.
+
+To load completions in your current shell session:
+
+	schwab-agent completion powershell | Out-String | Invoke-Expression
+
+To load completions for every new session, add the output of the above command
+to your powershell profile.
+
+
+#### `schwab-agent completion zsh`
+
+Generate zsh completion script.
+
+To load completions in your current shell session:
+
+	source <(schwab-agent completion zsh)
+
+To load completions for every new session, execute once:
+
+	schwab-agent completion zsh > "${fpath[1]}/_schwab-agent"
+
+
+#### `schwab-agent history`
+
+Retrieve price history for a symbol
+
+#### `schwab-agent history get`
+
+Get price history candles for a symbol. Supports configurable period types (day,
+month, year, ytd), frequency types (minute, daily, weekly, monthly), and
+date ranges via epoch milliseconds. Returns OHLCV candle data.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--frequency` | string | - | no | Frequency value {,1,10,15,30,5} |
+| `--frequency-type` | string | - | no | Frequency type (minute, daily, weekly, monthly) {,daily,minute,monthly,weekly} |
+| `--from` | string | - | no | Start date (milliseconds since epoch) |
+| `--period` | string | - | no | Number of periods |
+| `--period-type` | string | - | no | Period type (day, month, year, ytd) {,day,month,year,ytd} |
+| `--to` | string | - | no | End date (milliseconds since epoch) |
+
+**Example:**
+
+```
+schwab-agent history get AAPL
+  schwab-agent history get AAPL --period-type month --period 3 --frequency-type daily --frequency 1
+  schwab-agent history get AAPL --period-type day --period 5 --frequency-type minute --frequency 15
+  schwab-agent history get AAPL --from 1735689600000 --to 1743379200000
+```
+
+#### `schwab-agent instrument`
+
+Search and look up instruments
+
+#### `schwab-agent instrument get`
+
+Get instrument details by CUSIP identifier. Returns the instrument type,
+description, exchange, and other metadata for the specified CUSIP.
+
+**Example:**
+
+```
+schwab-agent instrument get 037833100
+```
+
+#### `schwab-agent instrument search`
+
+Search for instruments by symbol or description. Use --projection to control
+the search type: symbol-search (default), symbol-regex, desc-search,
+desc-regex, search, or fundamental.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--projection` | string | symbol-search | no | Search projection (symbol-search, symbol-regex, desc-search, desc-regex, search, fundamental) |
+
+**Example:**
+
+```
+schwab-agent instrument search AAPL
+  schwab-agent instrument search "Apple" --projection desc-search
+  schwab-agent instrument search AAPL --projection fundamental
+```
+
+#### `schwab-agent market`
+
+Market hours and top movers
+
+#### `schwab-agent market hours`
+
+Get current market hours for one or more markets. With no arguments, returns
+hours for all markets (equity, option, bond, future, forex). Specify one or
+more market names to filter.
+
+**Example:**
+
+```
+schwab-agent market hours
+  schwab-agent market hours equity
+  schwab-agent market hours equity option
+```
+
+#### `schwab-agent market movers`
+
+Get top movers for a market index. Sort by VOLUME, TRADES, PERCENT_CHANGE_UP,
+or PERCENT_CHANGE_DOWN. Use --frequency to filter by minimum percent change
+magnitude (0, 1, 5, 10, 30, 60). Quote shell-special characters in index
+names (e.g. '$SPX').
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--frequency` | string | - | no | Minimum percent change magnitude (0, 1, 5, 10, 30, 60) {,0,1,10,30,5,60} |
+| `--sort` | string | - | no | Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN) {,PERCENT_CHANGE_DOWN,PERCENT_CHANGE_UP,TRADES,VOLUME} |
+
+**Example:**
+
+```
+schwab-agent market movers '$SPX' --sort PERCENT_CHANGE_UP
+  schwab-agent market movers '$DJI' --sort VOLUME --frequency 5
+  schwab-agent market movers EQUITY_ALL --sort PERCENT_CHANGE_UP
+```
+
+#### `schwab-agent order`
+
+Manage orders across your Schwab accounts. Supports listing, viewing, placing,
+previewing, building, canceling, and replacing orders. Placing, canceling, and
+replacing orders require both the "i-also-like-to-live-dangerously" config flag
+and --confirm on each command. Duration aliases GTC, FOK, and IOC are accepted.
+
+#### `schwab-agent order build`
+
+Build order request JSON locally without calling the API or requiring
+authentication. Output is raw JSON (not envelope-wrapped) that can be piped to
+order preview or order place --spec - for a staged workflow. Supports equity,
+option, bracket, OCO, and multi-leg option strategies.
+
+#### `schwab-agent order build bracket`
+
+Build a bracket order request JSON with entry and automatic exit legs. At
+least one of --take-profit or --stop-loss is required. Exit instructions are
+auto-inverted from the entry action.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--price` | float64 | 0 | no | Entry price |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--stop-loss` | float64 | 0 | no | Stop-loss exit price |
+| `--symbol` | string | - | yes | Equity symbol |
+| `--take-profit` | float64 | 0 | no | Take-profit exit price |
+| `--type` | string | - | no | Entry order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+
+**Example:**
+
+```
+schwab-agent order build bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
+  schwab-agent order build bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170
+```
+
+#### `schwab-agent order build calendar`
+
+Build a calendar spread order request JSON. Same strike price across two
+different expirations: sells the near-term contract and buys the far-term
+contract. Profits from time decay differential between the two legs.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--call` | bool | false | no | Call calendar spread |
+| `--close` | bool | false | no | Closing position |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--far-expiration` | string | - | yes | Far-term expiration date (YYYY-MM-DD) |
+| `--near-expiration` | string | - | yes | Near-term expiration date (YYYY-MM-DD) |
+| `--open` | bool | false | no | Opening position |
+| `--price` | float64 | 0 | yes | Net debit amount |
+| `--put` | bool | false | no | Put calendar spread |
+| `--quantity` | float64 | 0 | yes | Number of contracts |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--strike` | float64 | 0 | yes | Strike price (shared by both legs) |
+| `--underlying` | string | - | yes | Underlying symbol |
+
+**Example:**
+
+```
+schwab-agent order build calendar --underlying F --near-expiration 2026-05-16 --far-expiration 2026-07-17 --strike 12 --call --open --quantity 1 --price 0.50
+```
+
+#### `schwab-agent order build collar`
+
+Build a collar-with-stock order request JSON. Combines long stock, a
+protective long put, and a covered short call. Limits downside risk while
+capping upside. Quantity 1 means 100 shares plus 1 put and 1 call contract.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--call-strike` | float64 | 0 | yes | Covered call strike price |
+| `--close` | bool | false | no | Closing position |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--expiration` | string | - | yes | Expiration date for both options (YYYY-MM-DD) |
+| `--open` | bool | false | no | Opening position |
+| `--price` | float64 | 0 | yes | Net debit amount |
+| `--put-strike` | float64 | 0 | yes | Protective put strike price |
+| `--quantity` | float64 | 0 | yes | Number of contracts (1 contract = 100 shares) |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--underlying` | string | - | yes | Underlying symbol |
+
+**Example:**
+
+```
+schwab-agent order build collar --underlying F --put-strike 10 --call-strike 14 --expiration 2026-06-18 --quantity 1 --open --price 12.00
+```
+
+#### `schwab-agent order build covered-call`
+
+Build a covered call order request JSON that atomically buys shares and sells
+a call. Quantity 1 means 100 shares plus 1 call contract. The --price is the
+net debit per share after call premium. To sell calls against shares you
+already own, use order place option --action SELL_TO_OPEN instead.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
+| `--price` | float64 | 0 | yes | Net debit amount |
+| `--quantity` | float64 | 0 | yes | Number of contracts (1 contract = 100 shares) |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--strike` | float64 | 0 | yes | Call strike price |
+| `--underlying` | string | - | yes | Underlying symbol |
+
+**Example:**
+
+```
+schwab-agent order build covered-call --underlying F --expiration 2026-06-18 --strike 14 --quantity 1 --price 12.00
+```
+
+#### `schwab-agent order build diagonal`
+
+Build a diagonal spread order request JSON. Different strikes AND different
+expirations: sells the near-term contract at one strike and buys the far-term
+contract at a different strike. Combines elements of vertical and calendar spreads.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--call` | bool | false | no | Call diagonal spread |
+| `--close` | bool | false | no | Closing position |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--far-expiration` | string | - | yes | Far-term expiration date (YYYY-MM-DD) |
+| `--far-strike` | float64 | 0 | yes | Strike price for the far-term (bought) leg |
+| `--near-expiration` | string | - | yes | Near-term expiration date (YYYY-MM-DD) |
+| `--near-strike` | float64 | 0 | yes | Strike price for the near-term (sold) leg |
+| `--open` | bool | false | no | Opening position |
+| `--price` | float64 | 0 | yes | Net debit amount |
+| `--put` | bool | false | no | Put diagonal spread |
+| `--quantity` | float64 | 0 | yes | Number of contracts |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--underlying` | string | - | yes | Underlying symbol |
+
+**Example:**
+
+```
+schwab-agent order build diagonal --underlying F --near-strike 12 --far-strike 14 --near-expiration 2026-05-16 --far-expiration 2026-07-17 --call --open --quantity 1 --price 0.50
+```
+
+#### `schwab-agent order build equity`
+
+Build an equity order request JSON. Validates flags and outputs the order
+payload without placing it. Pipe to order place --spec - --confirm to execute,
+or to order preview --spec - to check estimated commissions.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--activation-price` | float64 | 0 | no | Price that activates the trailing stop |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--price` | float64 | 0 | no | Limit price |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
+| `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
+| `--stop-link-type` | string | - | no | Trailing stop offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--stop-offset` | float64 | 0 | no | Trailing stop offset amount |
+| `--stop-price` | float64 | 0 | no | Stop price |
+| `--stop-type` | string | - | no | Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) {,ASK,BID,LAST,MARK,STANDARD} |
+| `--symbol` | string | - | yes | Equity symbol |
+| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+
+**Example:**
+
+```
+schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --duration DAY
+  schwab-agent order build equity --symbol AAPL --action SELL --quantity 10 --type STOP --stop-price 145
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec - --confirm
+```
+
+#### `schwab-agent order build fts`
+
+Build a first-triggers-second order from two JSON order specs. The primary
+order executes first; when it fills, the secondary order is automatically
+triggered. Both --primary and --secondary accept inline JSON, @file, or
+- for stdin.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--primary` | string | - | yes | Primary order spec (inline JSON, @file, or - for stdin) |
+| `--secondary` | string | - | yes | Secondary order spec (inline JSON, @file, or - for stdin) |
+
+**Example:**
+
+```
+schwab-agent order build fts --primary @entry.json --secondary @exit.json
+  schwab-agent order build fts --primary '{"orderType":"LIMIT",...}' --secondary '{"orderType":"STOP",...}'
+```
+
+#### `schwab-agent order build iron-condor`
+
+Build an iron condor order request JSON. Four strikes must be ordered:
+put-long < put-short < call-short < call-long. Opening an iron condor
+generates a NET_CREDIT.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--call-long-strike` | float64 | 0 | yes | Highest strike: call being bought (protection) |
+| `--call-short-strike` | float64 | 0 | yes | Call being sold (premium) |
+| `--close` | bool | false | no | Closing position |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
+| `--open` | bool | false | no | Opening position |
+| `--price` | float64 | 0 | yes | Net credit or debit amount |
+| `--put-long-strike` | float64 | 0 | yes | Lowest strike: put being bought (protection) |
+| `--put-short-strike` | float64 | 0 | yes | Put being sold (premium) |
+| `--quantity` | float64 | 0 | yes | Number of contracts |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--underlying` | string | - | yes | Underlying symbol |
+
+**Example:**
+
+```
+schwab-agent order build iron-condor --underlying F --expiration 2026-06-18 --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 --open --quantity 1 --price 0.50
+```
+
+#### `schwab-agent order build oco`
+
+Build a one-cancels-other order request JSON for an existing position. When
+one exit fills, the other is canceled. At least one of --take-profit or
+--stop-loss is required.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--stop-loss` | float64 | 0 | no | Stop-loss exit price (stop order) |
+| `--symbol` | string | - | yes | Equity symbol |
+| `--take-profit` | float64 | 0 | no | Take-profit exit price (limit order) |
+
+**Example:**
+
+```
+schwab-agent order build oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140
+  schwab-agent order build oco --symbol TSLA --action BUY --quantity 10 --stop-loss 250
+```
+
+#### `schwab-agent order build option`
+
+Build a single-leg option order request JSON. Requires --underlying,
+--expiration, --strike, and exactly one of --call or --put. Output is raw JSON
+suitable for piping to order place or order preview.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--call` | bool | false | no | Call option |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
+| `--price` | float64 | 0 | no | Limit price |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--put` | bool | false | no | Put option |
+| `--quantity` | float64 | 0 | yes | Contract quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
+| `--strike` | float64 | 0 | yes | Strike price |
+| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--underlying` | string | - | yes | Underlying symbol |
+
+**Example:**
+
+```
+schwab-agent order build option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
+  schwab-agent order build option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1
+```
+
+#### `schwab-agent order build straddle`
+
+Build a straddle order request JSON. A straddle buys (or sells) a call and
+put at the same strike price and expiration. Use --buy for long straddles
+(expecting large price movement) or --sell for short straddles.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--buy` | bool | false | no | Buy the straddle (long, net debit) |
+| `--close` | bool | false | no | Closing position |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
+| `--open` | bool | false | no | Opening position |
+| `--price` | float64 | 0 | yes | Net debit or credit amount |
+| `--quantity` | float64 | 0 | yes | Number of contracts |
+| `--sell` | bool | false | no | Sell the straddle (short, net credit) |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--strike` | float64 | 0 | yes | Strike price (shared by call and put legs) |
+| `--underlying` | string | - | yes | Underlying symbol |
+
+**Example:**
+
+```
+schwab-agent order build straddle --underlying F --expiration 2026-06-18 --strike 12 --buy --open --quantity 1 --price 1.50
+  schwab-agent order build straddle --underlying F --expiration 2026-06-18 --strike 12 --sell --open --quantity 1 --price 1.50
+```
+
+#### `schwab-agent order build strangle`
+
+Build a strangle order request JSON. A strangle uses different strikes for
+the call and put legs. Use --buy for long strangles (expecting volatility)
+or --sell for short strangles (expecting low volatility).
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--buy` | bool | false | no | Buy the strangle (long, net debit) |
+| `--call-strike` | float64 | 0 | yes | Strike price for the call leg |
+| `--close` | bool | false | no | Closing position |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
+| `--open` | bool | false | no | Opening position |
+| `--price` | float64 | 0 | yes | Net debit or credit amount |
+| `--put-strike` | float64 | 0 | yes | Strike price for the put leg |
+| `--quantity` | float64 | 0 | yes | Number of contracts |
+| `--sell` | bool | false | no | Sell the strangle (short, net credit) |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--underlying` | string | - | yes | Underlying symbol |
+
+**Example:**
+
+```
+schwab-agent order build strangle --underlying F --expiration 2026-06-18 --call-strike 14 --put-strike 10 --buy --open --quantity 1 --price 0.50
+  schwab-agent order build strangle --underlying F --expiration 2026-06-18 --call-strike 14 --put-strike 10 --sell --open --quantity 1 --price 0.50
+```
+
+#### `schwab-agent order build vertical`
+
+Build a vertical spread (bull/bear call or put spread) order request JSON.
+Use --long-strike for the strike bought and --short-strike for the strike sold.
+NET_DEBIT or NET_CREDIT is auto-determined from the strike relationship.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--call` | bool | false | no | Call spread |
+| `--close` | bool | false | no | Closing position |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
+| `--long-strike` | float64 | 0 | yes | Strike price of the option being bought |
+| `--open` | bool | false | no | Opening position |
+| `--price` | float64 | 0 | yes | Net debit or credit amount |
+| `--put` | bool | false | no | Put spread |
+| `--quantity` | float64 | 0 | yes | Number of contracts |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--short-strike` | float64 | 0 | yes | Strike price of the option being sold |
+| `--underlying` | string | - | yes | Underlying symbol |
+
+**Example:**
+
+```
+# Bull call spread
+  schwab-agent order build vertical --underlying F --expiration 2026-06-18 --long-strike 12 --short-strike 14 --call --open --quantity 1 --price 0.50
+  # Bear put spread
+  schwab-agent order build vertical --underlying F --expiration 2026-06-18 --long-strike 14 --short-strike 12 --put --open --quantity 1 --price 0.50
+```
+
+#### `schwab-agent order cancel`
+
+Cancel an existing order by ID. Requires both safety guards: the
+"i-also-like-to-live-dangerously" config flag and --confirm. The order ID can
+be passed as a positional argument or with --order-id (flag takes priority).
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--confirm` | bool | false | no | Confirm cancellation |
+| `--order-id` | string | - | no | Order ID |
+
+**Example:**
+
+```
+schwab-agent order cancel 1234567890 --confirm
+  schwab-agent order cancel --order-id 1234567890 --confirm
+```
+
+#### `schwab-agent order get`
+
+Retrieve a single order by its ID. The order ID can be passed as a positional
+argument or with the --order-id flag. When both are provided, the flag takes
+priority. Requires a default account or --account flag.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--order-id` | string | - | no | Order ID |
+
+**Example:**
+
+```
+schwab-agent order get 1234567890
+  schwab-agent order get --order-id 1234567890
+```
+
+#### `schwab-agent order list`
+
+List orders for the current account, or all accounts when no --account is set.
+By default, terminal statuses (FILLED, CANCELED, REJECTED, EXPIRED, REPLACED)
+are filtered out to show only actionable orders. Use --status all to see
+everything. Multiple --status values fan out into separate API calls with
+merged, deduplicated results.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--from` | string | - | no | Filter by entered time lower bound |
+| `--status` | stringSlice | [] | no | Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc. |
+| `--to` | string | - | no | Filter by entered time upper bound |
+
+**Example:**
+
+```
+schwab-agent order list
+  schwab-agent order list --status all
+  schwab-agent order list --status WORKING --status PENDING_ACTIVATION
+  schwab-agent order list --status WORKING,FILLED,EXPIRED
+  schwab-agent order list --from 2025-01-01 --to 2025-01-31
+```
+
+#### `schwab-agent order place`
+
+Place an order via subcommand (equity, option, bracket, oco) or from a JSON spec
+with --spec. Both safety guards are required: set "i-also-like-to-live-dangerously"
+to true in config.json, and pass --confirm on every placement. Recommended workflow:
+check the price with quote get, build the order JSON with order build, preview it
+with order preview, then place with --confirm.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--confirm` | bool | false | no | Confirm order placement |
+| `--spec` | string | - | yes | Inline JSON, @file, or - for stdin |
+
+**Example:**
+
+```
+# Place from a JSON file
+  schwab-agent order place --spec @order.json --confirm
+  # Place from stdin (piped from order build)
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec - --confirm
+  # Place from inline JSON
+  schwab-agent order place --spec '{"orderType":"LIMIT",...}' --confirm
+```
+
+#### `schwab-agent order place bracket`
+
+Place a bracket order that combines an entry trade with automatic exit orders.
+At least one of --take-profit or --stop-loss is required. Exit instructions are
+auto-inverted from the entry action (BUY entry creates SELL exits). Canceling
+the parent cascades to all child orders.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--confirm` | bool | false | no | Confirm order placement |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--price` | float64 | 0 | no | Entry price |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--stop-loss` | float64 | 0 | no | Stop-loss exit price |
+| `--symbol` | string | - | yes | Equity symbol |
+| `--take-profit` | float64 | 0 | no | Take-profit exit price |
+| `--type` | string | - | no | Entry order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+
+**Example:**
+
+```
+# Buy with both take-profit and stop-loss
+  schwab-agent order place bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120 --confirm
+  # Buy with only a stop-loss safety net
+  schwab-agent order place bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170 --confirm
+  # Buy with only a take-profit target
+  schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300 --confirm
+```
+
+#### `schwab-agent order place equity`
+
+Place an equity (stock) order. Supports MARKET, LIMIT, STOP, STOP_LIMIT, and
+TRAILING_STOP order types. Default type is MARKET if --type is omitted. Duration
+aliases GTC, FOK, and IOC are accepted alongside their full names. Both safety
+guards are required for placement.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--activation-price` | float64 | 0 | no | Price that activates the trailing stop |
+| `--confirm` | bool | false | no | Confirm order placement |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--price` | float64 | 0 | no | Limit price |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
+| `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
+| `--stop-link-type` | string | - | no | Trailing stop offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--stop-offset` | float64 | 0 | no | Trailing stop offset amount |
+| `--stop-price` | float64 | 0 | no | Stop price |
+| `--stop-type` | string | - | no | Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) {,ASK,BID,LAST,MARK,STANDARD} |
+| `--symbol` | string | - | yes | Equity symbol |
+| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+
+**Example:**
+
+```
+# Buy 10 shares at market price
+  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --confirm
+  # Buy with a limit price, good till cancel
+  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC --confirm
+  # Sell with a trailing stop ($2.50 offset)
+  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type TRAILING_STOP --stop-offset 2.50 --confirm
+  # Sell with a stop-limit order
+  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type STOP_LIMIT --stop-price 145 --price 144 --confirm
+```
+
+#### `schwab-agent order place oco`
+
+Place a one-cancels-other order for an existing position. When one exit fills,
+the other is automatically canceled. At least one of --take-profit or --stop-loss
+is required. For long positions use SELL; for short positions use BUY. Unlike
+bracket orders, OCO has no entry leg.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--confirm` | bool | false | no | Confirm order placement |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--stop-loss` | float64 | 0 | no | Stop-loss exit price (stop order) |
+| `--symbol` | string | - | yes | Equity symbol |
+| `--take-profit` | float64 | 0 | no | Take-profit exit price (limit order) |
+
+**Example:**
+
+```
+# Set take-profit and stop-loss for a long position
+  schwab-agent order place oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140 --confirm
+  # Protect a position with only a stop-loss
+  schwab-agent order place oco --symbol AAPL --action SELL --quantity 50 --stop-loss 140 --confirm
+  # Close a short position with exits
+  schwab-agent order place oco --symbol TSLA --action BUY --quantity 10 --take-profit 200 --stop-loss 250 --confirm
+```
+
+#### `schwab-agent order place option`
+
+Place a single-leg option order. Requires --underlying, --expiration, --strike,
+and exactly one of --call or --put. Use BUY_TO_OPEN/SELL_TO_CLOSE for new
+positions and SELL_TO_OPEN/BUY_TO_CLOSE for existing ones. Both safety guards
+are required for placement.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--call` | bool | false | no | Call option |
+| `--confirm` | bool | false | no | Confirm order placement |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
+| `--price` | float64 | 0 | no | Limit price |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--put` | bool | false | no | Put option |
+| `--quantity` | float64 | 0 | yes | Contract quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
+| `--strike` | float64 | 0 | yes | Strike price |
+| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--underlying` | string | - | yes | Underlying symbol |
+
+**Example:**
+
+```
+# Buy a call option to open
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --confirm
+  # Sell a put at a limit price
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50 --confirm
+  # Close an existing call position
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action SELL_TO_CLOSE --quantity 1 --confirm
+```
+
+#### `schwab-agent order preview`
+
+Preview an order from a JSON spec without placing it. Returns estimated
+commissions, fees, and order details. Pipe output from order build for a
+build-then-preview workflow. Does not require safety guards since no order
+is actually placed.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--spec` | string | - | yes | Inline JSON, @file, or - for stdin |
+
+**Example:**
+
+```
+schwab-agent order preview --spec @order.json
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -
+```
+
+#### `schwab-agent order replace`
+
+Replace an existing order with a new equity order. The original order is
+canceled and a new one is created with a new ID. Only equity order flags are
+accepted. Requires both safety guards. The original order status becomes
+REPLACED after the new order is created.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--activation-price` | float64 | 0 | no | Price that activates the trailing stop |
+| `--confirm` | bool | false | no | Confirm replacement |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--order-id` | string | - | no | Order ID |
+| `--price` | float64 | 0 | no | Limit price |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
+| `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
+| `--stop-link-type` | string | - | no | Trailing stop offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--stop-offset` | float64 | 0 | no | Trailing stop offset amount |
+| `--stop-price` | float64 | 0 | no | Stop price |
+| `--stop-type` | string | - | no | Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) {,ASK,BID,LAST,MARK,STANDARD} |
+| `--symbol` | string | - | yes | Equity symbol |
+| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+
+**Example:**
+
+```
+schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
+  schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
+```
+
+#### `schwab-agent position`
+
+View positions across accounts
+
+#### `schwab-agent position list`
+
+List positions as a flat list with account identifiers and computed cost basis
+and P&L fields that Schwab's API does not provide directly. Uses the default
+account unless --account or --all-accounts is specified. Computed fields
+include totalCostBasis, unrealizedPnL, and unrealizedPnLPct.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--account` | string | - | no | Account hash (overrides config default) |
+| `--all-accounts` | bool | false | no | Show positions across all linked accounts |
+
+**Example:**
+
+```
+schwab-agent position list
+  schwab-agent position list --account ABCDEF1234567890
+  schwab-agent position list --all-accounts
+```
+
+#### `schwab-agent quote`
+
+Get quotes for one or more symbols
+
+#### `schwab-agent quote get`
+
+Get quotes for one or more symbols. Multiple symbols return a partial response
+when some are missing. Use --fields to select specific data groups (quote,
+fundamental, extended, reference, regular). Key output fields include last
+price, bid/ask, volume, 52-week high/low, PE ratio, dividend yield, and
+market cap.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--fields` | stringSlice | [] | no | Quote fields to return (repeatable): quote, fundamental, extended, reference, regular |
+| `--indicative` | bool | false | no | Request indicative (non-tradeable) quotes |
+
+**Example:**
+
+```
+schwab-agent quote get AAPL
+  schwab-agent quote get AAPL NVDA TSLA
+  schwab-agent quote get AAPL --fields quote,fundamental
+  schwab-agent quote get AAPL --fields fundamental --indicative
+```
+
+#### `schwab-agent symbol`
+
+Build and parse OCC-format option symbols locally. These are pure computation
+commands that make no API calls and require no authentication.
+
+#### `schwab-agent symbol build`
+
+Build an OCC option symbol from underlying, expiration date, strike price, and
+contract type. No API call or authentication required. Output is JSON with the
+constructed symbol and its components.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--call` | bool | false | no | Call option |
+| `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
+| `--put` | bool | false | no | Put option |
+| `--strike` | float64 | 0 | yes | Strike price (e.g. 200, 450.50) |
+| `--underlying` | string | - | yes | Underlying symbol (e.g. AAPL) |
+
+**Example:**
+
+```
+schwab-agent symbol build --underlying AAPL --expiration 2025-06-20 --strike 200 --call
+  schwab-agent symbol build --underlying TSLA --expiration 2025-12-19 --strike 350.50 --put
+```
+
+#### `schwab-agent symbol parse`
+
+Parse an OCC option symbol string into its underlying, expiration date, strike
+price, and contract type components. No API call or authentication required.
+
+**Example:**
+
+```
+schwab-agent symbol parse "AAPL  250620C00200000"
+```
+
+#### `schwab-agent ta`
+
+Compute technical analysis indicators from Schwab price history. All indicators
+are calculated locally after fetching candles. Use --interval to select data
+frequency (daily, weekly, 1min, 5min, 15min, 30min) and --points to limit
+output to the N most recent values.
+
+#### `schwab-agent ta adx`
+
+Compute Average Directional Index for a symbol. ADX above 25 indicates a
+trending market, below 20 indicates a ranging market. Output includes adx,
+plus_di, and minus_di for directional bias. Default period is 14.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--period` | int | 14 | no | Indicator period |
+| `--points` | int | 1 | no | Number of output points (0 = all) |
+
+**Example:**
+
+```
+schwab-agent ta adx AAPL
+  schwab-agent ta adx AAPL --period 14 --interval daily --points 10
+```
+
+#### `schwab-agent ta atr`
+
+Compute Average True Range for a symbol. ATR measures volatility in price
+units: higher values indicate wider price swings. Uses high, low, and close
+data with Wilder smoothing. Default period is 14.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--period` | int | 14 | no | Indicator period |
+| `--points` | int | 1 | no | Number of output points (0 = all) |
+
+**Example:**
+
+```
+schwab-agent ta atr AAPL
+  schwab-agent ta atr AAPL --period 14 --interval daily --points 10
+```
+
+#### `schwab-agent ta bbands`
+
+Compute Bollinger Bands for a symbol. Output keys are upper, middle, and lower
+bands. Price near the upper band is relatively high, near the lower band is
+relatively low. Use --std-dev to widen or narrow the bands (default 2.0).
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--period` | int | 20 | no | BBands period |
+| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--std-dev` | float64 | 2.0 | no | Standard deviations |
+
+**Example:**
+
+```
+schwab-agent ta bbands AAPL
+  schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --points 10
+  schwab-agent ta bbands AAPL --std-dev 1.5 --points 10
+```
+
+#### `schwab-agent ta ema`
+
+Compute Exponential Moving Average for a symbol. EMA gives more weight to
+recent prices than SMA. The --period flag can be repeated or comma-separated
+for multiple lookbacks in one command (e.g. --period 12,26 for crossover
+analysis).
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--period` | intSlice | 20 | no | Indicator period (repeatable or comma-separated) |
+| `--points` | int | 1 | no | Number of output points (0 = all) |
+
+**Example:**
+
+```
+schwab-agent ta ema AAPL
+  schwab-agent ta ema AAPL --period 50 --interval daily --points 10
+  schwab-agent ta ema AAPL --period 12,26 --points 5
+```
+
+#### `schwab-agent ta expected-move`
+
+Compute expected price move from ATM straddle pricing. Fetches the option
+chain, finds the nearest expiration to --dte (default 30), and prices the
+ATM straddle. Output includes 1x and 2x standard deviation ranges (upper
+and lower bounds).
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--dte` | int | 30 | no | Target days to expiration |
+
+**Example:**
+
+```
+schwab-agent ta expected-move AAPL
+  schwab-agent ta expected-move AAPL --dte 45
+```
+
+#### `schwab-agent ta hv`
+
+Compute Historical Volatility for a symbol. Returns a scalar summary (not
+time series) with annualized volatility, percentile rank, and regime
+classification (low, normal, high, extreme). Includes daily, weekly, and
+monthly volatility breakdowns.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--period` | int | 20 | no | Indicator period |
+
+**Example:**
+
+```
+schwab-agent ta hv AAPL
+  schwab-agent ta hv AAPL --period 20 --interval daily
+```
+
+#### `schwab-agent ta macd`
+
+Compute MACD (Moving Average Convergence/Divergence) for a symbol. Uses
+--fast, --slow, and --signal periods instead of --period. Output keys include
+macd, signal, and histogram (histogram = macd - signal). Defaults: fast=12,
+slow=26, signal=9.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--fast` | int | 12 | no | Fast EMA period |
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--signal` | int | 9 | no | Signal EMA period |
+| `--slow` | int | 26 | no | Slow EMA period |
+
+**Example:**
+
+```
+schwab-agent ta macd AAPL
+  schwab-agent ta macd AAPL --fast 12 --slow 26 --signal 9 --points 10
+  schwab-agent ta macd NVDA --interval weekly --points 10
+```
+
+#### `schwab-agent ta rsi`
+
+Compute Relative Strength Index for a symbol. RSI ranges 0-100: values above
+70 suggest overbought conditions, below 30 suggest oversold. The --period flag
+can be repeated or comma-separated for multiple lookbacks. Default period is 14.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--period` | intSlice | 14 | no | Indicator period (repeatable or comma-separated) |
+| `--points` | int | 1 | no | Number of output points (0 = all) |
+
+**Example:**
+
+```
+schwab-agent ta rsi AAPL
+  schwab-agent ta rsi AAPL --period 14 --interval daily --points 10
+  schwab-agent ta rsi AAPL --period 9 --interval 5min --points 20
+```
+
+#### `schwab-agent ta sma`
+
+Compute Simple Moving Average for a symbol. The --period flag sets the lookback
+window (default 20). Multiple periods can be requested in one command using
+comma-separated values or repeated flags, producing crossover-ready output
+with keys like sma_21, sma_50, sma_200.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--period` | intSlice | 20 | no | Indicator period (repeatable or comma-separated) |
+| `--points` | int | 1 | no | Number of output points (0 = all) |
+
+**Example:**
+
+```
+schwab-agent ta sma AAPL
+  schwab-agent ta sma AAPL --period 50 --interval daily --points 10
+  schwab-agent ta sma AAPL --period 21,50,200 --points 1
+```
+
+#### `schwab-agent ta stoch`
+
+Compute Stochastic Oscillator for a symbol. Output keys are slowk and slowd,
+both ranging 0-100. Above 80 and below 20 are common signal thresholds.
+Configurable via --k-period, --smooth-k, and --d-period.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--d-period` | int | 3 | no | Slow %D period |
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--k-period` | int | 14 | no | Fast %K lookback period |
+| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--smooth-k` | int | 3 | no | Slow %K smoothing period |
+
+**Example:**
+
+```
+schwab-agent ta stoch AAPL
+  schwab-agent ta stoch AAPL --k-period 14 --smooth-k 3 --d-period 3 --points 10
+```
+
+#### `schwab-agent ta vwap`
+
+Compute Volume Weighted Average Price for a symbol. VWAP is a cumulative
+indicator with no --period flag. Primarily used for intraday analysis with
+minute-level intervals. Price above VWAP suggests bullish bias, below
+suggests bearish.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--points` | int | 1 | no | Number of output points (0 = all) |
+
+**Example:**
+
+```
+schwab-agent ta vwap AAPL
+  schwab-agent ta vwap AAPL --interval 5min --points 20
+```
+
+### Environment Variable Prefix
+
+All environment variables use the `SCHWAB_AGENT_` prefix.
+
+### Examples
+
+#### schwab-agent account get
+
+```
+schwab-agent account get
+  schwab-agent account get ABCDEF1234567890
+  schwab-agent account get --positions
+```
+
+#### schwab-agent account list
+
+```
+schwab-agent account list
+  schwab-agent account list --positions
+```
+
+#### schwab-agent account numbers
+
+```
+schwab-agent account numbers
+```
+
+#### schwab-agent account set-default
+
+```
+schwab-agent account set-default ABCDEF1234567890
+```
+
+#### schwab-agent account transaction get
+
+```
+schwab-agent account transaction get 98765432101
+```
+
+#### schwab-agent account transaction list
+
+```
+schwab-agent account transaction list
+  schwab-agent account transaction list --types TRADE --symbol AAPL
+  schwab-agent account transaction list --from 2025-01-01T00:00:00Z --to 2025-01-31T23:59:59Z
+```
+
+#### schwab-agent auth login
+
+```
+schwab-agent auth login
+  schwab-agent auth login --no-browser
+```
+
+#### schwab-agent auth refresh
+
+```
+schwab-agent auth refresh
+```
+
+#### schwab-agent auth status
+
+```
+schwab-agent auth status
+```
+
+#### schwab-agent chain expiration
+
+```
+schwab-agent chain expiration AAPL
+```
+
+#### schwab-agent chain get
+
+```
+schwab-agent chain get AAPL
+  schwab-agent chain get AAPL --type CALL --strike-count 5
+  schwab-agent chain get AAPL --from-date 2025-06-01 --to-date 2025-07-31 --type PUT
+  schwab-agent chain get AAPL --strategy ANALYTICAL --volatility 30.5 --days-to-expiration 45
+  schwab-agent chain get AAPL --strike-range NTM --include-underlying-quote
+```
+
+#### schwab-agent history get
+
+```
+schwab-agent history get AAPL
+  schwab-agent history get AAPL --period-type month --period 3 --frequency-type daily --frequency 1
+  schwab-agent history get AAPL --period-type day --period 5 --frequency-type minute --frequency 15
+  schwab-agent history get AAPL --from 1735689600000 --to 1743379200000
+```
+
+#### schwab-agent instrument get
+
+```
+schwab-agent instrument get 037833100
+```
+
+#### schwab-agent instrument search
+
+```
+schwab-agent instrument search AAPL
+  schwab-agent instrument search "Apple" --projection desc-search
+  schwab-agent instrument search AAPL --projection fundamental
+```
+
+#### schwab-agent market hours
+
+```
+schwab-agent market hours
+  schwab-agent market hours equity
+  schwab-agent market hours equity option
+```
+
+#### schwab-agent market movers
+
+```
+schwab-agent market movers '$SPX' --sort PERCENT_CHANGE_UP
+  schwab-agent market movers '$DJI' --sort VOLUME --frequency 5
+  schwab-agent market movers EQUITY_ALL --sort PERCENT_CHANGE_UP
+```
+
+#### schwab-agent order build bracket
+
+```
+schwab-agent order build bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
+  schwab-agent order build bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170
+```
+
+#### schwab-agent order build calendar
+
+```
+schwab-agent order build calendar --underlying F --near-expiration 2026-05-16 --far-expiration 2026-07-17 --strike 12 --call --open --quantity 1 --price 0.50
+```
+
+#### schwab-agent order build collar
+
+```
+schwab-agent order build collar --underlying F --put-strike 10 --call-strike 14 --expiration 2026-06-18 --quantity 1 --open --price 12.00
+```
+
+#### schwab-agent order build covered-call
+
+```
+schwab-agent order build covered-call --underlying F --expiration 2026-06-18 --strike 14 --quantity 1 --price 12.00
+```
+
+#### schwab-agent order build diagonal
+
+```
+schwab-agent order build diagonal --underlying F --near-strike 12 --far-strike 14 --near-expiration 2026-05-16 --far-expiration 2026-07-17 --call --open --quantity 1 --price 0.50
+```
+
+#### schwab-agent order build equity
+
+```
+schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --duration DAY
+  schwab-agent order build equity --symbol AAPL --action SELL --quantity 10 --type STOP --stop-price 145
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec - --confirm
+```
+
+#### schwab-agent order build fts
+
+```
+schwab-agent order build fts --primary @entry.json --secondary @exit.json
+  schwab-agent order build fts --primary '{"orderType":"LIMIT",...}' --secondary '{"orderType":"STOP",...}'
+```
+
+#### schwab-agent order build iron-condor
+
+```
+schwab-agent order build iron-condor --underlying F --expiration 2026-06-18 --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 --open --quantity 1 --price 0.50
+```
+
+#### schwab-agent order build oco
+
+```
+schwab-agent order build oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140
+  schwab-agent order build oco --symbol TSLA --action BUY --quantity 10 --stop-loss 250
+```
+
+#### schwab-agent order build option
+
+```
+schwab-agent order build option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
+  schwab-agent order build option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1
+```
+
+#### schwab-agent order build straddle
+
+```
+schwab-agent order build straddle --underlying F --expiration 2026-06-18 --strike 12 --buy --open --quantity 1 --price 1.50
+  schwab-agent order build straddle --underlying F --expiration 2026-06-18 --strike 12 --sell --open --quantity 1 --price 1.50
+```
+
+#### schwab-agent order build strangle
+
+```
+schwab-agent order build strangle --underlying F --expiration 2026-06-18 --call-strike 14 --put-strike 10 --buy --open --quantity 1 --price 0.50
+  schwab-agent order build strangle --underlying F --expiration 2026-06-18 --call-strike 14 --put-strike 10 --sell --open --quantity 1 --price 0.50
+```
+
+#### schwab-agent order build vertical
+
+```
+# Bull call spread
+  schwab-agent order build vertical --underlying F --expiration 2026-06-18 --long-strike 12 --short-strike 14 --call --open --quantity 1 --price 0.50
+  # Bear put spread
+  schwab-agent order build vertical --underlying F --expiration 2026-06-18 --long-strike 14 --short-strike 12 --put --open --quantity 1 --price 0.50
+```
+
+#### schwab-agent order cancel
+
+```
+schwab-agent order cancel 1234567890 --confirm
+  schwab-agent order cancel --order-id 1234567890 --confirm
+```
+
+#### schwab-agent order get
+
+```
+schwab-agent order get 1234567890
+  schwab-agent order get --order-id 1234567890
+```
+
+#### schwab-agent order list
+
+```
+schwab-agent order list
+  schwab-agent order list --status all
+  schwab-agent order list --status WORKING --status PENDING_ACTIVATION
+  schwab-agent order list --status WORKING,FILLED,EXPIRED
+  schwab-agent order list --from 2025-01-01 --to 2025-01-31
+```
+
+#### schwab-agent order place
+
+```
+# Place from a JSON file
+  schwab-agent order place --spec @order.json --confirm
+  # Place from stdin (piped from order build)
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec - --confirm
+  # Place from inline JSON
+  schwab-agent order place --spec '{"orderType":"LIMIT",...}' --confirm
+```
+
+#### schwab-agent order place bracket
+
+```
+# Buy with both take-profit and stop-loss
+  schwab-agent order place bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120 --confirm
+  # Buy with only a stop-loss safety net
+  schwab-agent order place bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170 --confirm
+  # Buy with only a take-profit target
+  schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300 --confirm
+```
+
+#### schwab-agent order place equity
+
+```
+# Buy 10 shares at market price
+  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --confirm
+  # Buy with a limit price, good till cancel
+  schwab-agent order place equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC --confirm
+  # Sell with a trailing stop ($2.50 offset)
+  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type TRAILING_STOP --stop-offset 2.50 --confirm
+  # Sell with a stop-limit order
+  schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type STOP_LIMIT --stop-price 145 --price 144 --confirm
+```
+
+#### schwab-agent order place oco
+
+```
+# Set take-profit and stop-loss for a long position
+  schwab-agent order place oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140 --confirm
+  # Protect a position with only a stop-loss
+  schwab-agent order place oco --symbol AAPL --action SELL --quantity 50 --stop-loss 140 --confirm
+  # Close a short position with exits
+  schwab-agent order place oco --symbol TSLA --action BUY --quantity 10 --take-profit 200 --stop-loss 250 --confirm
+```
+
+#### schwab-agent order place option
+
+```
+# Buy a call option to open
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --confirm
+  # Sell a put at a limit price
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50 --confirm
+  # Close an existing call position
+  schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action SELL_TO_CLOSE --quantity 1 --confirm
+```
+
+#### schwab-agent order preview
+
+```
+schwab-agent order preview --spec @order.json
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -
+```
+
+#### schwab-agent order replace
+
+```
+schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
+  schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY --confirm
+```
+
+#### schwab-agent position list
+
+```
+schwab-agent position list
+  schwab-agent position list --account ABCDEF1234567890
+  schwab-agent position list --all-accounts
+```
+
+#### schwab-agent quote get
+
+```
+schwab-agent quote get AAPL
+  schwab-agent quote get AAPL NVDA TSLA
+  schwab-agent quote get AAPL --fields quote,fundamental
+  schwab-agent quote get AAPL --fields fundamental --indicative
+```
+
+#### schwab-agent symbol build
+
+```
+schwab-agent symbol build --underlying AAPL --expiration 2025-06-20 --strike 200 --call
+  schwab-agent symbol build --underlying TSLA --expiration 2025-12-19 --strike 350.50 --put
+```
+
+#### schwab-agent symbol parse
+
+```
+schwab-agent symbol parse "AAPL  250620C00200000"
+```
+
+#### schwab-agent ta adx
+
+```
+schwab-agent ta adx AAPL
+  schwab-agent ta adx AAPL --period 14 --interval daily --points 10
+```
+
+#### schwab-agent ta atr
+
+```
+schwab-agent ta atr AAPL
+  schwab-agent ta atr AAPL --period 14 --interval daily --points 10
+```
+
+#### schwab-agent ta bbands
+
+```
+schwab-agent ta bbands AAPL
+  schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --points 10
+  schwab-agent ta bbands AAPL --std-dev 1.5 --points 10
+```
+
+#### schwab-agent ta ema
+
+```
+schwab-agent ta ema AAPL
+  schwab-agent ta ema AAPL --period 50 --interval daily --points 10
+  schwab-agent ta ema AAPL --period 12,26 --points 5
+```
+
+#### schwab-agent ta expected-move
+
+```
+schwab-agent ta expected-move AAPL
+  schwab-agent ta expected-move AAPL --dte 45
+```
+
+#### schwab-agent ta hv
+
+```
+schwab-agent ta hv AAPL
+  schwab-agent ta hv AAPL --period 20 --interval daily
+```
+
+#### schwab-agent ta macd
+
+```
+schwab-agent ta macd AAPL
+  schwab-agent ta macd AAPL --fast 12 --slow 26 --signal 9 --points 10
+  schwab-agent ta macd NVDA --interval weekly --points 10
+```
+
+#### schwab-agent ta rsi
+
+```
+schwab-agent ta rsi AAPL
+  schwab-agent ta rsi AAPL --period 14 --interval daily --points 10
+  schwab-agent ta rsi AAPL --period 9 --interval 5min --points 20
+```
+
+#### schwab-agent ta sma
+
+```
+schwab-agent ta sma AAPL
+  schwab-agent ta sma AAPL --period 50 --interval daily --points 10
+  schwab-agent ta sma AAPL --period 21,50,200 --points 1
+```
+
+#### schwab-agent ta stoch
+
+```
+schwab-agent ta stoch AAPL
+  schwab-agent ta stoch AAPL --k-period 14 --smooth-k 3 --d-period 3 --points 10
+```
+
+#### schwab-agent ta vwap
+
+```
+schwab-agent ta vwap AAPL
+  schwab-agent ta vwap AAPL --interval 5min --points 20
+```

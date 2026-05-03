@@ -1,4 +1,4 @@
-.PHONY: build test lint clean install release
+.PHONY: build test lint clean install release docs
 
 build:
 	go build -o schwab-agent ./cmd/schwab-agent/
@@ -16,6 +16,9 @@ clean:
 
 install:
 	go install ./cmd/schwab-agent/
+
+docs:
+	go run ./cmd/generate-docs/
 
 release:
 ifndef VERSION
