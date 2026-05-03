@@ -180,6 +180,50 @@ func TestBuildApp_AllCommandsPresent(t *testing.T) {
 	}
 }
 
+func TestJSONSchemaTreeIsCanonicalDiscoveryContract(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	stdout, err := runApp(t, "schwab-agent", "--jsonschema=tree")
+	require.NoError(t, err)
+
+	schemas := schemaByTitle(t, stdout)
+	rootSchema := schemas["schwab-agent"]
+	require.NotNil(t, rootSchema)
+
+	assert.Subset(t, schemaStrings(t, rootSchema, "x-structcli-subcommands"), []string{
+		"account",
+		"auth",
+		"chain",
+		"history",
+		"instrument",
+		"market",
+		"order",
+		"position",
+		"quote",
+		"symbol",
+		"ta",
+	})
+	assert.Equal(t, "a", schemaProperty(t, rootSchema, "account")["x-structcli-shorthand"])
+	assert.Equal(t, "v", schemaProperty(t, rootSchema, "verbose")["x-structcli-shorthand"])
+	assert.Contains(t, schemaProperties(t, rootSchema), "config")
+	assert.Contains(t, schemaProperties(t, rootSchema), "token")
+
+	symbolBuildSchema := schemas["schwab-agent symbol build"]
+	require.NotNil(t, symbolBuildSchema)
+	assert.Subset(t, schemaStrings(t, symbolBuildSchema, "required"), []string{"expiration", "strike", "underlying"})
+
+	equitySchema := schemas["schwab-agent order build equity"]
+	require.NotNil(t, equitySchema)
+	assert.Subset(t, schemaStrings(t, equitySchema, "required"), []string{"action", "quantity", "symbol"})
+	assert.Subset(t, schemaStrings(t, schemaProperty(t, equitySchema, "action"), "enum"), []string{"BUY", "SELL"})
+	assert.Subset(t, schemaStrings(t, schemaProperty(t, equitySchema, "type"), "enum"), []string{"LIMIT", "MARKET"})
+
+	taSchema := schemas["schwab-agent ta sma"]
+	require.NotNil(t, taSchema)
+	assert.Equal(t, "daily", schemaProperty(t, taSchema, "interval")["default"])
+	assert.Subset(t, schemaStrings(t, schemaProperty(t, taSchema, "interval"), "enum"), []string{"1min", "daily", "weekly"})
+}
+
 func TestBeforeHook_SkipsAuthForAuthCommand(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 

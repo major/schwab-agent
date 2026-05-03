@@ -22,6 +22,14 @@ metadata:
 
 ## Instructions
 
+## Agent discovery
+
+Run `schwab-agent --jsonschema=tree` first when you need to discover commands, flags, enum values, defaults, config keys, or environment variable bindings. Treat that JSON Schema tree as the authoritative shell command contract. Use this skill file for workflow guidance and examples after choosing the command and flags from the schema.
+
+```bash
+schwab-agent --jsonschema=tree
+```
+
 ### Available Commands
 
 #### `schwab-agent`

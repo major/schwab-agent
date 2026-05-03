@@ -167,17 +167,17 @@ This prevents accidental trades from misconfigured agents.
 
 ## Agent integration
 
-Every command includes detailed `--help` output with usage descriptions and concrete examples that agents can reference. The `--jsonschema` flag provides machine-readable CLI introspection:
+For LLM agents: run `schwab-agent --jsonschema=tree` first when you need to discover commands, flags, enum values, defaults, config keys, or environment variable bindings. Treat this JSON Schema tree as the authoritative command contract for shell-based automation. Use `llms.txt`, `SKILL.md`, and `--help` for workflow guidance and examples after choosing the command and flags from the schema.
 
 ```bash
-# Full JSON Schema for the entire CLI
-schwab-agent --jsonschema
-
-# Tree view showing all commands with their flags
+# Canonical shell-agent discovery path for the full CLI contract
 schwab-agent --jsonschema=tree
 
 # Schema for a specific subcommand
 schwab-agent quote --jsonschema
+
+# Flat JSON Schema for the entire CLI, useful for tools that do not need hierarchy
+schwab-agent --jsonschema
 ```
 
 ## Development

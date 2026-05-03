@@ -4,6 +4,14 @@ https://github.com/major/schwab-agent
 
 > CLI tool for AI agents to trade via Schwab APIs
 
+## Discovery
+
+Run `schwab-agent --jsonschema=tree` first when you need to discover commands, flags, enum values, defaults, config keys, or environment variable bindings. Treat that JSON Schema tree as the authoritative shell command contract. Use this file for workflow guidance and static context after choosing the command and flags from the schema.
+
+```bash
+schwab-agent --jsonschema=tree
+```
+
 ## Commands
 
 - [schwab-agent](#schwab-agent): CLI tool for AI agents to trade via Schwab APIs
