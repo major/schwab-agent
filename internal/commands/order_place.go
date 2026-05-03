@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
@@ -13,27 +14,24 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-// orderPlaceData wraps a successful order placement response.
-type orderPlaceData struct {
-	OrderID int64 `json:"orderId"`
+// orderActionData wraps a successful mutable order response.
+//
+// Schwab's mutation endpoints return little useful body data, so the CLI follows
+// up with a GET and returns the canonical order shape agents already consume
+// from `order get`. OrderID stays in the wrapper as a small convenience and as a
+// fallback for rare Schwab/proxy responses that accept the mutation without an
+// order Location header.
+type orderActionData struct {
+	OrderID  int64         `json:"orderId"`
+	Canceled bool          `json:"canceled,omitempty"`
+	Replaced bool          `json:"replaced,omitempty"`
+	Order    *models.Order `json:"order,omitempty"`
 }
 
 // orderPreviewData wraps an order preview response.
 type orderPreviewData struct {
 	Preview *models.PreviewOrder `json:"preview"`
 	OrderID *int64               `json:"orderId,omitempty"`
-}
-
-// orderCancelData wraps a successful order cancellation response.
-type orderCancelData struct {
-	OrderID  int64 `json:"orderId"`
-	Canceled bool  `json:"canceled"`
-}
-
-// orderReplaceData wraps a successful order replacement response.
-type orderReplaceData struct {
-	OrderID  int64 `json:"orderId"`
-	Replaced bool  `json:"replaced"`
 }
 
 // orderPlaceOpts holds local flags for top-level spec-based order placement.
@@ -67,6 +65,38 @@ type orderReplaceOpts struct {
 
 // Attach implements structcli.Options interface.
 func (o *orderReplaceOpts) Attach(_ *cobra.Command) error { return nil }
+
+// fetchOrderActionData returns the order details after a successful mutable
+// action. The follow-up GET is deliberately best-effort: once Schwab accepts a
+// mutation, the CLI must not turn that successful trade action into a command
+// failure just because the read-after-write lookup is delayed or unavailable.
+func fetchOrderActionData(cmd *cobra.Command, c *client.Ref, account string, orderID int64) (data orderActionData, errs []string) {
+	data = orderActionData{OrderID: orderID}
+	if orderID == 0 {
+		return data, []string{"order details unavailable: Schwab accepted the order action but did not return an order ID"}
+	}
+
+	order, err := c.GetOrder(cmd.Context(), account, orderID)
+	if err != nil {
+		return data, []string{fmt.Sprintf("order details unavailable after successful order action: %v", err)}
+	}
+
+	data.Order = order
+	return data, nil
+}
+
+// writeOrderActionResult emits a normal success envelope when the canonical
+// order lookup succeeds, or a partial envelope when Schwab accepted the mutation
+// but the follow-up details could not be fetched. That distinction lets agents
+// trust the order action occurred while still seeing why `data.order` is absent.
+func writeOrderActionResult(w io.Writer, data orderActionData, errs []string) error {
+	metadata := output.NewMetadata()
+	if len(errs) > 0 {
+		return output.WritePartial(w, data, errs, metadata)
+	}
+
+	return output.WriteSuccess(w, data, metadata)
+}
 
 // newOrderPlaceCmd places new orders from either flags or a JSON spec.
 func newOrderPlaceCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
@@ -125,7 +155,8 @@ order build, preview it with order preview, then place.`,
 				return err
 			}
 
-			return output.WriteSuccess(w, orderPlaceData{OrderID: response.OrderID}, output.NewMetadata())
+			data, errs := fetchOrderActionData(cmd, c, account, response.OrderID)
+			return writeOrderActionResult(w, data, errs)
 		},
 	}
 
@@ -254,7 +285,8 @@ func makeCobraPlaceOrderCommand[O any, P any](
 				return err
 			}
 
-			return output.WriteSuccess(w, orderPlaceData{OrderID: response.OrderID}, output.NewMetadata())
+			data, errs := fetchOrderActionData(cmd, c, account, response.OrderID)
+			return writeOrderActionResult(w, data, errs)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
@@ -365,7 +397,9 @@ config flag. The order ID can be passed as a positional argument or with
 				return err
 			}
 
-			return output.WriteSuccess(w, orderCancelData{OrderID: orderID, Canceled: true}, output.NewMetadata())
+			data, errs := fetchOrderActionData(cmd, c, account, orderID)
+			data.Canceled = true
+			return writeOrderActionResult(w, data, errs)
 		},
 	}
 
@@ -438,11 +472,14 @@ original order status becomes REPLACED after the new order is created.`,
 				return err
 			}
 
-			if err := c.ReplaceOrder(cmd.Context(), account, orderID, order); err != nil {
+			response, err := c.ReplaceOrder(cmd.Context(), account, orderID, order)
+			if err != nil {
 				return err
 			}
 
-			return output.WriteSuccess(w, orderReplaceData{OrderID: orderID, Replaced: true}, output.NewMetadata())
+			data, errs := fetchOrderActionData(cmd, c, account, response.OrderID)
+			data.Replaced = true
+			return writeOrderActionResult(w, data, errs)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)

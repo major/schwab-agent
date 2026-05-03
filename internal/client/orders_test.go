@@ -267,6 +267,51 @@ func TestPlaceOrder_Success(t *testing.T) {
 	assert.Equal(t, int64(67890), result.OrderID)
 }
 
+func TestOrderIDFromLocation(t *testing.T) {
+	tests := []struct {
+		name     string
+		location string
+		want     int64
+	}{
+		{
+			name:     "relative path",
+			location: "/trader/v1/accounts/abc123/orders/67890",
+			want:     67890,
+		},
+		{
+			name:     "absolute URL",
+			location: "https://api.schwabapi.com/trader/v1/accounts/abc123/orders/67890",
+			want:     67890,
+		},
+		{
+			name:     "trailing slash",
+			location: "/trader/v1/accounts/abc123/orders/67890/",
+			want:     67890,
+		},
+		{
+			name:     "query string",
+			location: "/trader/v1/accounts/abc123/orders/67890?source=proxy",
+			want:     67890,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := orderIDFromLocation(tt.location)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestOrderIDFromLocation_MissingOrderID(t *testing.T) {
+	_, err := orderIDFromLocation("https://api.schwabapi.com/")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing order ID")
+}
+
 func TestPlaceOrder_400_ReturnsOrderRejectedError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -361,14 +406,33 @@ func TestReplaceOrder_Success(t *testing.T) {
 		require.Len(t, req.OrderLegCollection, 1)
 		assert.Equal(t, "AAPL", req.OrderLegCollection[0].Instrument.Symbol)
 
+		w.Header().Set("Location", "/trader/v1/accounts/abc123/orders/67890")
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 
 	c := NewClient("test-token", WithBaseURL(srv.URL))
-	err := c.ReplaceOrder(context.Background(), "abc123", 12345, testOrderRequest())
+	resp, err := c.ReplaceOrder(context.Background(), "abc123", 12345, testOrderRequest())
 
 	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, int64(67890), resp.OrderID)
+}
+
+func TestReplaceOrder_NoLocationHeaderFallsBackToOriginalOrderID(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/trader/v1/accounts/abc123/orders/12345", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	resp, err := c.ReplaceOrder(context.Background(), "abc123", 12345, testOrderRequest())
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, int64(12345), resp.OrderID)
 }
 
 func TestCancelOrder_Success(t *testing.T) {
@@ -515,7 +579,7 @@ func TestReplaceOrder_APIError(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient("test-token", WithBaseURL(srv.URL))
-	err := c.ReplaceOrder(context.Background(), "abc123", 12345, testOrderRequest())
+	_, err := c.ReplaceOrder(context.Background(), "abc123", 12345, testOrderRequest())
 
 	require.Error(t, err)
 

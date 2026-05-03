@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"net/url"
+	pathpkg "path"
 	"strconv"
 	"strings"
 
@@ -39,6 +41,41 @@ func (p OrderListParams) toQueryParams() map[string]string {
 // PlaceOrderResponse contains the result of a successful order placement.
 type PlaceOrderResponse struct {
 	OrderID int64
+}
+
+// ReplaceOrderResponse contains the best order ID Schwab exposes after a
+// successful replacement. Schwab may return the new replacement order in the
+// Location header; older/proxied responses sometimes omit it, so callers can
+// fall back to the original order ID they asked to replace.
+type ReplaceOrderResponse struct {
+	OrderID int64
+}
+
+// orderIDFromLocation extracts the trailing order ID from a Schwab Location
+// header such as /trader/v1/accounts/{hash}/orders/12345.
+//
+// Schwab usually returns a relative path, but proxies and future API changes may
+// legally produce an absolute URL, query string, or trailing slash. Parse the
+// header as a URL first so a successful mutation is not reported as failed just
+// because the Location format is slightly different.
+func orderIDFromLocation(location string) (int64, error) {
+	parsedURL, err := url.Parse(location)
+	if err != nil {
+		return 0, fmt.Errorf("parse Location header %q: %w", location, err)
+	}
+
+	locationPath := strings.TrimRight(parsedURL.Path, "/")
+	if locationPath == "" {
+		return 0, fmt.Errorf("parse order ID from Location header %q: missing order ID", location)
+	}
+
+	orderIDStr := pathpkg.Base(locationPath)
+	parsedID, err := strconv.ParseInt(orderIDStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse order ID from Location header %q: %w", location, err)
+	}
+
+	return parsedID, nil
 }
 
 // fetchOrders retrieves orders from the given path, fanning out one API call
@@ -167,11 +204,9 @@ func (c *Client) PlaceOrder(ctx context.Context, hashValue string, order *models
 		return &PlaceOrderResponse{}, nil
 	}
 
-	parts := strings.Split(location, "/")
-	orderIDStr := parts[len(parts)-1]
-	parsedID, err := strconv.ParseInt(orderIDStr, 10, 64)
+	parsedID, err := orderIDFromLocation(location)
 	if err != nil {
-		return nil, fmt.Errorf("parse order ID from Location header %q: %w", location, err)
+		return nil, err
 	}
 
 	return &PlaceOrderResponse{OrderID: parsedID}, nil
@@ -188,9 +223,55 @@ func (c *Client) PreviewOrder(ctx context.Context, hashValue string, order *mode
 }
 
 // ReplaceOrder replaces an existing order with a new order specification.
-func (c *Client) ReplaceOrder(ctx context.Context, hashValue string, orderID int64, order *models.OrderRequest) error {
+func (c *Client) ReplaceOrder(ctx context.Context, hashValue string, orderID int64, order *models.OrderRequest) (*ReplaceOrderResponse, error) {
 	path := fmt.Sprintf("/trader/v1/accounts/%s/orders/%d", hashValue, orderID)
-	return c.doPut(ctx, path, order, nil)
+
+	encoded, err := json.Marshal(order)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request body: %w", err)
+	}
+
+	c.logger.Debug("http request", "method", http.MethodPut, "path", path)
+
+	resp, err := c.resty.R().
+		SetContext(ctx).
+		SetHeader("Content-Type", "application/json").
+		SetBody(encoded).
+		Execute(http.MethodPut, path)
+	if err != nil {
+		return nil, fmt.Errorf("execute request: %w", err)
+	}
+
+	respBody := resp.Bytes()
+	if resp.StatusCode() == http.StatusUnauthorized {
+		return nil, apperr.NewAuthExpiredError("authentication expired", nil)
+	}
+	if resp.StatusCode() == http.StatusBadRequest || resp.StatusCode() == http.StatusUnprocessableEntity {
+		return nil, apperr.NewOrderRejectedError(
+			fmt.Sprintf("order rejected: %s", string(respBody)),
+			nil,
+		)
+	}
+	if resp.StatusCode() >= 400 {
+		return nil, apperr.NewHTTPError(
+			fmt.Sprintf("HTTP %d", resp.StatusCode()),
+			resp.StatusCode(),
+			string(respBody),
+			nil,
+		)
+	}
+
+	location := resp.Header().Get("Location")
+	if location == "" {
+		return &ReplaceOrderResponse{OrderID: orderID}, nil
+	}
+
+	replacementID, err := orderIDFromLocation(location)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ReplaceOrderResponse{OrderID: replacementID}, nil
 }
 
 // CancelOrder cancels an existing order.

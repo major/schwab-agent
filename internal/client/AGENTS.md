@@ -23,7 +23,7 @@ WithTLSConfig applies a custom TLS configuration to the resty client's transport
 ## Adding a New Endpoint
 
 1. Create `<resource>.go` with methods on `*Client`
-2. Use the appropriate HTTP helper: `doGet`, `doPost`, `doPut`, `doDelete`
+2. Use the appropriate HTTP helper: `doGet`, `doPost`, `doDelete`, or call `doRequest` directly when the endpoint needs a method-specific response header or status-code quirk
 3. Create `<resource>_test.go` with httptest-based tests
 4. Define any new request/response types in `internal/models/`
 
@@ -33,7 +33,6 @@ Core method `doRequest` uses resty v3 internally. It sets the Bearer token via r
 
 - `doGet(ctx, path, params, result)`: GET with query params
 - `doPost(ctx, path, body, result)`: POST with JSON body
-- `doPut(ctx, path, body, result)`: PUT with JSON body
 - `doDelete(ctx, path, result)`: DELETE
 
 Content-Type header is set by resty only when a request body is present (not on GET). Accept: application/json is set globally on the resty client.
