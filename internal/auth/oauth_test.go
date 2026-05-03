@@ -363,12 +363,12 @@ func TestCallbackHandler_Idempotency_OnlyProcessesFirstRequest(t *testing.T) {
 	handler := callbackHandler("test-state", resultCh, &once)
 
 	// Act - first request with valid code
-	req1 := httptest.NewRequest(http.MethodGet, "/?code=first-code&state=test-state", nil)
+	req1 := httptest.NewRequest(http.MethodGet, "/?code=first-code&state=test-state", http.NoBody)
 	w1 := httptest.NewRecorder()
 	handler.ServeHTTP(w1, req1)
 
 	// Act - second request with different code (sync.Once prevents processing)
-	req2 := httptest.NewRequest(http.MethodGet, "/?code=second-code&state=test-state", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/?code=second-code&state=test-state", http.NoBody)
 	w2 := httptest.NewRecorder()
 	handler.ServeHTTP(w2, req2)
 
