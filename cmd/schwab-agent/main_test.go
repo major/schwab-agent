@@ -537,3 +537,59 @@ func TestBuildApp_VersionFlag(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "dev")
 }
+
+func TestDebugOptions_TextFormat(t *testing.T) {
+	// --debug-options should print text flag attribution without requiring
+	// auth credentials or a valid token.
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	stdout, err := runApp(t, "schwab-agent", "--debug-options", "account", "list")
+	require.NoError(t, err)
+
+	assert.Contains(t, stdout, "Command:")
+	assert.Contains(t, stdout, "Flags:")
+}
+
+func TestDebugOptions_JSONFormat(t *testing.T) {
+	// --debug-options=json should produce structured JSON output.
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	stdout, err := runApp(t, "schwab-agent", "--debug-options=json", "account", "list")
+	require.NoError(t, err)
+
+	assert.Contains(t, stdout, `"command"`)
+	assert.Contains(t, stdout, `"flags"`)
+	assert.Contains(t, stdout, `"source"`)
+}
+
+func TestDebugOptions_SkipsAuth(t *testing.T) {
+	// Debug mode on a command that normally requires auth should not attempt
+	// authentication at all (no config/token files needed).
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// Point config/token at non-existent paths to prove auth is skipped.
+	stdout, err := runApp(t,
+		"schwab-agent",
+		"--debug-options",
+		"--config", filepath.Join(tmpDir, "does-not-exist.json"),
+		"--token", filepath.Join(tmpDir, "no-token.json"),
+		"account", "list",
+	)
+	require.NoError(t, err)
+
+	// Should get debug output, not an auth error.
+	assert.Contains(t, stdout, "Command:")
+	assert.Contains(t, stdout, "Flags:")
+}
+
+func TestDebugOptions_BareFlag(t *testing.T) {
+	// Bare --debug-options (no value) should default to text format.
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	stdout, err := runApp(t, "schwab-agent", "--debug-options", "account", "list")
+	require.NoError(t, err)
+
+	assert.Contains(t, stdout, "Command:")
+	assert.Contains(t, stdout, "Flags:")
+}
