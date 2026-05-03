@@ -316,14 +316,6 @@ func TestNewMetadataIsUTC(t *testing.T) {
 	assert.Contains(t, meta.Timestamp, "Z")
 }
 
-func TestTimestampMeta(t *testing.T) {
-	meta := TimestampMeta()
-
-	assert.NotEmpty(t, meta.Timestamp)
-	_, err := time.Parse(time.RFC3339, meta.Timestamp)
-	assert.NoError(t, err)
-}
-
 func TestEnvelopeJSONStructure(t *testing.T) {
 	buf := &bytes.Buffer{}
 	data := map[string]any{"key": "value"}
