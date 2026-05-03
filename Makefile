@@ -1,4 +1,4 @@
-.PHONY: build test lint clean install release docs
+.PHONY: build test lint clean install release docs smoke smoke-ci
 
 build:
 	go build -o schwab-agent ./cmd/schwab-agent/
@@ -19,6 +19,12 @@ install:
 
 docs:
 	go run ./cmd/generate-docs/
+
+smoke:
+	SMOKE_TIER=all ./scripts/smoke-test.sh
+
+smoke-ci:
+	SMOKE_TIER=1 ./scripts/smoke-test.sh
 
 release:
 ifndef VERSION

@@ -76,7 +76,8 @@ func newOrderBuildCmd(w io.Writer) *cobra.Command {
 authentication. Output is raw JSON (not envelope-wrapped) that can be piped to
 order preview or order place --spec - for a staged workflow. Supports equity,
 option, bracket, OCO, and multi-leg option strategies.`,
-		RunE: requireSubcommand,
+		RunE:        requireSubcommand,
+		Annotations: map[string]string{"skipAuth": "true"},
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
