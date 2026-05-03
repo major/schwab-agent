@@ -274,6 +274,169 @@ func TestNewAccountCmd_Numbers_Success(t *testing.T) {
 	assert.Len(t, accountList, 2)
 }
 
+func TestNewAccountCmd_Summary_Success(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/trader/v1/accounts/accountNumbers":
+			_, _ = w.Write([]byte(`[
+				{"accountNumber":"12345","hashValue":"HASH_ABC"},
+				{"accountNumber":"67890","hashValue":"HASH_DEF"}
+			]`))
+		case "/trader/v1/userPreference":
+			_, _ = w.Write([]byte(`{"accounts":[
+				{"accountNumber":"12345","nickName":"My IRA","primaryAccount":true,"type":"MARGIN"},
+				{"accountNumber":"67890","nickName":"Joint Taxable","primaryAccount":false,"type":"CASH"}
+			]}`))
+		case "/trader/v1/accounts":
+			t.Errorf("account summary should not fetch the full account payload")
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			t.Errorf("unexpected request: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "summary")
+
+	// Assert
+	require.NoError(t, err)
+
+	env := decodeAccountEnvelope(t, buf.Bytes())
+	assert.NotEmpty(t, env.Metadata.Timestamp)
+	assert.Equal(t, 2, env.Metadata.Returned)
+
+	dataMap, ok := env.Data.(map[string]any)
+	require.True(t, ok)
+
+	accountList, ok := dataMap["accounts"].([]any)
+	require.True(t, ok)
+	require.Len(t, accountList, 2)
+
+	first, ok := accountList[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "HASH_ABC", first["accountHash"])
+	assert.Equal(t, "12345", first["accountNumber"])
+	assert.Equal(t, "My IRA", first["nickName"])
+	assert.Equal(t, true, first["primaryAccount"])
+	assert.Equal(t, "MARGIN", first["type"])
+
+	second, ok := accountList[1].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "HASH_DEF", second["accountHash"])
+	assert.Equal(t, "67890", second["accountNumber"])
+	assert.Equal(t, "Joint Taxable", second["nickName"])
+	assert.Equal(t, false, second["primaryAccount"])
+	assert.Equal(t, "CASH", second["type"])
+}
+
+func TestNewAccountCmd_Summary_PreferencesFailure_StillReturnsHashes(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/trader/v1/accounts/accountNumbers":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[{"accountNumber":"12345","hashValue":"HASH_ABC"}]`))
+		case "/trader/v1/userPreference":
+			w.WriteHeader(http.StatusInternalServerError)
+		case "/trader/v1/accounts":
+			t.Errorf("account summary should not fetch the full account payload")
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			t.Errorf("unexpected request: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "summary")
+
+	// Assert
+	require.NoError(t, err)
+
+	env := decodeAccountEnvelope(t, buf.Bytes())
+	dataMap, ok := env.Data.(map[string]any)
+	require.True(t, ok)
+
+	accountList, ok := dataMap["accounts"].([]any)
+	require.True(t, ok)
+	require.Len(t, accountList, 1)
+
+	first, ok := accountList[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "HASH_ABC", first["accountHash"])
+	assert.Equal(t, "12345", first["accountNumber"])
+	assert.NotContains(t, first, "nickName")
+	assert.NotContains(t, first, "primaryAccount")
+	assert.NotContains(t, first, "type")
+}
+
+func TestNewAccountCmd_Summary_EmptyAccountsSkipsPreferences(t *testing.T) {
+	// Arrange
+	var preferenceRequests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/trader/v1/accounts/accountNumbers":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[]`))
+		case "/trader/v1/userPreference":
+			preferenceRequests++
+			t.Errorf("empty account summary should not fetch preferences")
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			t.Errorf("unexpected request: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "summary")
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, 0, preferenceRequests)
+
+	env := decodeAccountEnvelope(t, buf.Bytes())
+	assert.Equal(t, 0, env.Metadata.Returned)
+
+	dataMap, ok := env.Data.(map[string]any)
+	require.True(t, ok)
+	accountList, ok := dataMap["accounts"].([]any)
+	require.True(t, ok)
+	assert.Empty(t, accountList)
+}
+
+func TestNewAccountCmd_Summary_AccountNumbersError(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/trader/v1/accounts/accountNumbers", r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"server error"}`))
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "summary")
+
+	// Assert
+	require.Error(t, err)
+	_, ok := errors.AsType[*apperr.HTTPError](err)
+	assert.True(t, ok)
+}
+
 func TestNewAccountCmd_Get_WithPositionsFlag(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

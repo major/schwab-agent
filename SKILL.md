@@ -1,9 +1,9 @@
 ---
 name: schwab-agent
 description: |
-  CLI tool for AI agents to trade via Schwab APIs. Use when you need to: manage schwab trading accounts. list accounts with nicknames, view account
+  CLI tool for AI agents to trade via Schwab APIs. Use when you need to: manage schwab trading accounts. list compact account summaries with hashes and nicknames, view account
   details, look up account numbers and hash values, set a default account, and
-  query transaction history. account list and get enrich results with nicknames
+  query transaction history. account summary is the token-efficient account picker for agents. account list and get enrich results with nicknames
   from the preferences api (best-effort, degrades gracefully), get details for a single account by hash value. the hash can be passed as a
   positional argument, via --account, or resolved from the default_account
   config. results are enriched with nicknames from the preferences api. use
@@ -69,7 +69,9 @@ schwab-agent account get
 List all linked Schwab accounts with nicknames and settings enriched from
 the preferences API. Use --positions to include current positions for each
 account in the response. Nicknames are loaded best-effort and omitted if
-the preferences API is unavailable.
+the preferences API is unavailable. Agents that only need account hashes,
+nicknames, and primary account markers should use account summary for a smaller
+one-command account picker.
 
 **Flags:**
 
@@ -82,6 +84,20 @@ the preferences API is unavailable.
 ```
 schwab-agent account list
   schwab-agent account list --positions
+```
+
+#### `schwab-agent account summary`
+
+List linked Schwab accounts in a compact, token-efficient shape for agents.
+Each entry includes the account hash required by other commands, the readable
+account number, and best-effort nickname/primary/type data from user preferences.
+Use account list when you need full balances or account list --positions when
+you need the full Schwab account payload with positions.
+
+**Example:**
+
+```bash
+schwab-agent account summary
 ```
 
 #### `schwab-agent account numbers`
@@ -1449,6 +1465,12 @@ schwab-agent account get
 ```
 schwab-agent account list
   schwab-agent account list --positions
+```
+
+#### schwab-agent account summary
+
+```bash
+schwab-agent account summary
 ```
 
 #### schwab-agent account numbers

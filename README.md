@@ -94,7 +94,10 @@ Run any command with `--help` to see detailed usage, examples, and available fla
 # Get a quote
 schwab-agent quote get AAPL
 
-# List accounts
+# List compact account identifiers for agent workflows
+schwab-agent account summary
+
+# List full account details and balances
 schwab-agent account list
 
 # Get option chains
@@ -108,7 +111,7 @@ schwab-agent order place equity \
   --symbol AAPL \
   --action BUY \
   --quantity 10 \
-  --order-type LIMIT \
+  --type LIMIT \
   --price 150.00 \
   --duration DAY
 
@@ -117,14 +120,14 @@ schwab-agent order preview equity \
   --symbol AAPL \
   --action BUY \
   --quantity 10 \
-  --order-type MARKET
+  --type MARKET
 
 # Build order JSON offline
 schwab-agent order build equity \
   --symbol AAPL \
   --action BUY \
   --quantity 10 \
-  --order-type LIMIT \
+  --type LIMIT \
   --price 150.00 \
   --duration DAY
 
@@ -137,7 +140,7 @@ schwab-agent order place --spec @order.json
 | Command | Description |
 |---|---|
 | `auth` | Login, status, token refresh |
-| `account` | List (with nicknames), get details, set default, transactions |
+| `account` | Compact summaries, full account details, hashes, set default, transactions |
 | `position` | List positions for one or all accounts (with computed cost basis and P&L) |
 | `quote` | Get quotes for one or more symbols |
 | `order` | List, get, place, preview, build, cancel, replace |
