@@ -51,6 +51,13 @@ func NewRootCmd(
 		SilenceUsage:               true,
 		SuggestionsMinimumDistance: 2,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			// In MCP server mode the root command runs just to start the
+			// JSON-RPC loop. Auth is handled per-tool-call via the
+			// CommandFactory fresh trees, so skip it here.
+			if isMCPMode(cmd) {
+				return nil
+			}
+
 			if hasSkipAuthAnnotation(cmd) {
 				return nil
 			}
@@ -176,6 +183,16 @@ func completeRootDeps(deps RootDeps) RootDeps {
 	}
 
 	return deps
+}
+
+// isMCPMode returns true when the root --mcp flag is set, meaning the CLI is
+// running as an MCP JSON-RPC server rather than executing a single command.
+func isMCPMode(cmd *cobra.Command) bool {
+	if f := cmd.Root().PersistentFlags().Lookup("mcp"); f != nil {
+		return f.Changed
+	}
+
+	return false
 }
 
 // hasSkipAuthAnnotation checks the current command and ancestors for auth bypass.
