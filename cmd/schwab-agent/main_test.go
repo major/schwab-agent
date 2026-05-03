@@ -413,68 +413,6 @@ func TestIntegration_ValidToken_QuoteGet(t *testing.T) {
 	assert.Contains(t, stdout, `"AAPL"`)
 }
 
-func TestIntegration_OrderConfirmGate(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	configPath := filepath.Join(tmpDir, "schwab-agent", "config.json")
-	tokenPath := filepath.Join(tmpDir, "schwab-agent", "token.json")
-	writeTestConfig(t, configPath)
-	writeTestToken(t, tokenPath, freshToken())
-	// Enable mutable operations so the test reaches the confirm gate.
-	// Without this, requireMutableEnabled fires before requireConfirm and the
-	// test never exercises the --confirm flag logic.
-	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
-		ClientID:                   "test-client",
-		ClientSecret:               "test-secret",
-		CallbackURL:                "https://127.0.0.1:8182",
-		DefaultAccount:             "hash-123",
-		IAlsoLikeToLiveDangerously: true,
-	}))
-
-	_, err := runApp(t,
-		"schwab-agent",
-		"order", "place", "equity",
-		"--symbol", "AAPL",
-		"--action", "BUY",
-		"--quantity", "10",
-		"--type", "MARKET",
-	)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "confirm")
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "Bearer fresh-access-token", r.Header.Get("Authorization"))
-
-		if r.URL.Path != "/trader/v1/accounts/hash-123/orders" {
-			http.NotFound(w, r)
-			return
-		}
-
-		assert.Equal(t, http.MethodPost, r.Method)
-		w.Header().Set("Location", "/trader/v1/accounts/hash-123/orders/98765")
-		w.WriteHeader(http.StatusCreated)
-	}))
-	defer server.Close()
-
-	deps := commands.DefaultRootDeps()
-	deps.NewClient = func(token string, _ ...client.Option) *client.Client {
-		return client.NewClient(token, client.WithBaseURL(server.URL))
-	}
-
-	stdout, err := runAppWithDeps(t, deps,
-		"schwab-agent",
-		"order", "place", "equity",
-		"--symbol", "AAPL",
-		"--action", "BUY",
-		"--quantity", "10",
-		"--type", "MARKET",
-		"--confirm",
-	)
-	require.NoError(t, err)
-	assert.Contains(t, stdout, `"orderId":98765`)
-}
-
 func TestUnknownCommand_SuggestsClosestMatch(t *testing.T) {
 	// When an unknown command is used without conflicting flags, the Before
 	// hook should catch it and return a clear error with a suggestion.

@@ -1156,7 +1156,7 @@ func writeTAOutput(
 		Period:    period,
 		Values:    out,
 	}
-	return output.WriteSuccess(w, data, output.TimestampMeta())
+	return output.WriteSuccess(w, data, output.NewMetadata())
 }
 
 // writeMultiTAOutput builds a combined time series for multiple requested
@@ -1205,5 +1205,5 @@ func writeMultiTAOutput(
 		Periods:   periods,
 		Values:    out,
 	}
-	return output.WriteSuccess(w, data, output.TimestampMeta())
+	return output.WriteSuccess(w, data, output.NewMetadata())
 }

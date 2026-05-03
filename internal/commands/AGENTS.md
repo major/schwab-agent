@@ -39,7 +39,7 @@ func (o *quoteGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 - `structcli.Define(cmd, opts)` in command setup replaces manual `cmd.Flags()` calls
 - `structcli.Unmarshal(cmd, opts)` at top of RunE before reading option fields
-- `MarkFlagsMutuallyExclusive`/`MarkFlagsOneRequired` stay as raw Cobra after `Define()`
+- `defineAndConstrain[O](cmd, opts, exclusivePairs...)` from helpers.go wraps `Define()` + `MarkFlagsMutuallyExclusive`/`MarkFlagsOneRequired` for order commands with mutual exclusion constraints
 - Root persistent flags (--account, --verbose, --config, --token) remain as manual Cobra registrations
 
 ## Adding a New Command
@@ -53,7 +53,7 @@ func (o *quoteGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 All command output goes through `internal/output` envelopes:
 
-- `output.WriteSuccess(w, data, output.TimestampMeta())` for success
+- `output.WriteSuccess(w, data, output.NewMetadata())` for success
 - Return typed errors from `internal/apperr` for failures (the Before hook handles formatting)
 - `output.WritePartial(w, data, missing, meta)` when some results succeed and some fail (e.g., multi-symbol quote)
 
@@ -61,15 +61,13 @@ Exception: `order build` commands write raw JSON (not envelope-wrapped).
 
 ## Safety Guards
 
-Mutable commands (order place/cancel/replace) enforce two safety checks:
+Mutable commands (order place/cancel/replace) enforce a safety check:
 
 ```go
 if err := requireMutableEnabled(configPath); err != nil { return err }
-if err := requireConfirm(cmd); err != nil { return err }
 ```
 
 - `requireMutableEnabled`: Checks `i-also-like-to-live-dangerously` in config
-- `requireConfirm`: Checks `--confirm` flag is set
 
 ## Account Resolution
 
@@ -84,7 +82,7 @@ Pass `nil` for `positionalArgs` when the command doesn't accept positional accou
 
 ## Order Workflows
 
-Three order types share a common pattern: parse flags -> validate -> build -> place/preview.
+Four order types share a common pattern: parse flags -> validate -> build -> place/preview.
 
 - **Equity**: `parseEquityParams` -> `orderbuilder.ValidateEquityOrder` -> `orderbuilder.BuildEquityOrder`
 - **Option**: `parseOptionParams` -> `orderbuilder.ValidateOptionOrder` -> `orderbuilder.BuildOptionOrder`
@@ -125,7 +123,9 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 | account.go | account | list, get, numbers, set-default, transaction (list, get) |
 | position.go | position | list (--all-accounts, --account) |
 | quote.go | quote | get |
-| order.go | order | list, get, place (equity/option/bracket/oco), preview, cancel, replace |
+| order.go | order | list, get |
+| order_place.go | order | place (equity/option/bracket/oco), preview, cancel, replace |
+| order_helpers.go | (shared) | opts structs, enum parsing, flag definitions, validation helpers |
 | order_build.go | order build | equity, option, bracket, oco, vertical, iron-condor, straddle, strangle, covered-call |
 | chain.go | chain | get, expiration |
 | history.go | history | get |

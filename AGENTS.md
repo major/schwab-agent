@@ -88,7 +88,7 @@ All command output uses `internal/output` JSON envelopes:
 
 spf13/cobra + leodido/structcli. `buildApp()` in main.go constructs the command tree via `buildAppWithDeps()`. PersistentPreRunE on the root command skips auth for `auth` and `symbol` commands (and structcli help topics), then loads config + token, refreshes if expired, populates `*client.Ref` for command access. PersistentPostRunE calls `Client.Close()` to release idle connections when the command finishes. `structcli.Setup()` is called after all subcommands are added to enable `--jsonschema` flag and help topics (e.g., `env-vars`).
 
-Command flags use structcli struct tags (`flag`, `flagdescr`, `default`, `flagshort`) with `Define()` for registration and `Unmarshal()` in RunE for parsing. Root persistent flags (--account, --verbose, --config, --token) stay as manual Cobra registrations. `MarkFlagsMutuallyExclusive`/`MarkFlagsOneRequired` calls remain as raw Cobra after `Define()`.
+Command flags use structcli struct tags (`flag`, `flagdescr`, `default`, `flagshort`) with `Define()` for registration and `Unmarshal()` in RunE for parsing. Most order commands use `defineAndConstrain[O]()` from helpers.go, which wraps `Define()` + `MarkFlagsMutuallyExclusive`/`MarkFlagsOneRequired` in a single call. Root persistent flags (--account, --verbose, --config, --token) stay as manual Cobra registrations.
 
 11 subcommands: auth (setup/login/status), account (list/get/numbers/set-default/transaction), position (list with --all-accounts/--account), quote (get), order (list/get/place/preview/build/cancel/replace; place/build sub-types: equity/option/bracket/oco), chain, history, instrument, market (hours/movers), symbol (build/parse), ta (sma/ema/rsi/macd/atr/bbands/stoch/adx/vwap/hv/expected-move). Account list/get enriches results with nicknames from the preferences API (best-effort, degrades gracefully). Position list enriches with nicknames and adds computed cost basis / P&L fields. Order list defaults to non-terminal statuses (use --status all for everything).
 
@@ -99,7 +99,6 @@ JSON at `~/.config/schwab-agent/config.json`. Fields: `client_id`, `client_secre
 ## Safety Guards
 
 - **Mutable operations** require `"i-also-like-to-live-dangerously": true` in config
-- **Order placement/cancel/replace** require `--confirm` flag
 - Market orders intentionally exclude price fields in the builder
 
 ## Testing Conventions

@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -71,6 +72,19 @@ func requireTypedEnum[T ~string](value T, label string) error {
 	}
 
 	return nil
+}
+
+// defineAndConstrain centralizes structcli flag registration plus Cobra flag
+// relationships for order commands. Each pair represents a set of flags that
+// must be mutually exclusive and where one member must be provided.
+func defineAndConstrain[O structcli.Options](cmd *cobra.Command, opts O, exclusivePairs ...[]string) {
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
+	for _, pair := range exclusivePairs {
+		cmd.MarkFlagsMutuallyExclusive(pair...)
+		cmd.MarkFlagsOneRequired(pair...)
+	}
 }
 
 // validEnumString joins valid enum values into a comma-separated string for

@@ -26,13 +26,6 @@ func NewMetadata() Metadata {
 	}
 }
 
-// TimestampMeta returns metadata with the standard UTC timestamp field set.
-// It exists as the success-envelope helper used by command packages; NewMetadata
-// remains the lower-level constructor for callers that add more metadata fields.
-func TimestampMeta() Metadata {
-	return NewMetadata()
-}
-
 // Envelope is the standard JSON response wrapper for successful operations.
 type Envelope struct {
 	Data     any      `json:"data"`

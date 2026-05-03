@@ -90,23 +90,6 @@ func resolveAccount(accountFlag, configPath string, positionalArgs []string) (st
 	)
 }
 
-// enrichAccountWithPreferences adds nickname and primary account flag from
-// user preferences to a single account. Matches by account number.
-func enrichAccountWithPreferences(account *models.Account, prefs *models.UserPreference) {
-	if prefs == nil || account.SecuritiesAccount == nil || account.SecuritiesAccount.AccountNumber == nil {
-		return
-	}
-
-	for i := range prefs.Accounts {
-		if prefs.Accounts[i].AccountNumber != nil && *prefs.Accounts[i].AccountNumber == *account.SecuritiesAccount.AccountNumber {
-			account.NickName = prefs.Accounts[i].NickName
-			account.PrimaryAccount = prefs.Accounts[i].PrimaryAccount
-
-			return
-		}
-	}
-}
-
 // enrichAccountsWithPreferences adds nickname and primary account flag from
 // user preferences to each account in the slice. Builds a lookup map for O(n) matching.
 func enrichAccountsWithPreferences(accounts []models.Account, prefs *models.UserPreference) {
@@ -245,16 +228,18 @@ config. Results are enriched with nicknames from the preferences API. Use
 				return err
 			}
 
-			// Enrich with nickname from user preferences (best-effort).
-			prefs, prefsErr := c.UserPreference(cmd.Context())
-			if prefsErr == nil {
-				enrichAccountWithPreferences(account, prefs)
-			}
+		// Enrich with nickname from user preferences (best-effort).
+		prefs, prefsErr := c.UserPreference(cmd.Context())
+		if prefsErr == nil {
+			accounts := []models.Account{*account}
+			enrichAccountsWithPreferences(accounts, prefs)
+			account = &accounts[0]
+		}
 
-			meta := output.NewMetadata()
-			meta.Account = hash
+		meta := output.NewMetadata()
+		meta.Account = hash
 
-			return output.WriteSuccess(w, account, meta)
+		return output.WriteSuccess(w, account, meta)
 		},
 	}
 

@@ -585,8 +585,10 @@ func TestEnrichAccountWithPreferences_SingleAccount(t *testing.T) {
 	nick := "My Account"
 	primary := true
 
-	account := &models.Account{
-		SecuritiesAccount: &models.SecuritiesAccount{AccountNumber: &acctNum},
+	accounts := []models.Account{
+		{
+			SecuritiesAccount: &models.SecuritiesAccount{AccountNumber: &acctNum},
+		},
 	}
 
 	prefs := &models.UserPreference{
@@ -595,12 +597,12 @@ func TestEnrichAccountWithPreferences_SingleAccount(t *testing.T) {
 		},
 	}
 
-	enrichAccountWithPreferences(account, prefs)
+	enrichAccountsWithPreferences(accounts, prefs)
 
-	require.NotNil(t, account.NickName)
-	assert.Equal(t, "My Account", *account.NickName)
-	require.NotNil(t, account.PrimaryAccount)
-	assert.True(t, *account.PrimaryAccount)
+	require.NotNil(t, accounts[0].NickName)
+	assert.Equal(t, "My Account", *accounts[0].NickName)
+	require.NotNil(t, accounts[0].PrimaryAccount)
+	assert.True(t, *accounts[0].PrimaryAccount)
 }
 
 // --- Transaction subcommand tests ---

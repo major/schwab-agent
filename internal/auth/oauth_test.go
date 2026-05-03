@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -329,6 +330,162 @@ func TestValidateCallbackAddr_EdgeCases(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "127.0.0.1:9999", addr)
 	})
+}
+
+func TestStartCallbackServer_MissingCode_ReturnsAuthCallbackError(t *testing.T) {
+	// Arrange
+	addr := freeLoopbackAddress(t)
+	resultCh := make(chan callbackResult, 1)
+
+	go func() {
+		code, err := StartCallbackServer(addr, "expected-state")
+		resultCh <- callbackResult{code: code, err: err}
+	}()
+
+	// Act - send request with valid state but empty code
+	responseBody, statusCode := sendCallbackRequest(t, addr, "", "expected-state")
+	result := <-resultCh
+
+	// Assert
+	assert.Empty(t, result.code)
+	require.Error(t, result.err)
+	var callbackErr *apperr.AuthCallbackError
+	assert.ErrorAs(t, result.err, &callbackErr)
+	assert.Contains(t, result.err.Error(), "missing code")
+	assert.Equal(t, http.StatusBadRequest, statusCode)
+	assert.Contains(t, responseBody, "missing code")
+}
+
+func TestCallbackHandler_Idempotency_OnlyProcessesFirstRequest(t *testing.T) {
+	// Arrange
+	resultCh := make(chan callbackResult, 1)
+	var once sync.Once
+	handler := callbackHandler("test-state", resultCh, &once)
+
+	// Act - first request with valid code
+	req1 := httptest.NewRequest(http.MethodGet, "/?code=first-code&state=test-state", http.NoBody)
+	w1 := httptest.NewRecorder()
+	handler.ServeHTTP(w1, req1)
+
+	// Act - second request with different code (sync.Once prevents processing)
+	req2 := httptest.NewRequest(http.MethodGet, "/?code=second-code&state=test-state", http.NoBody)
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, req2)
+
+	// Assert - only the first code was captured
+	result := <-resultCh
+	assert.Equal(t, "first-code", result.code)
+	require.NoError(t, result.err)
+
+	// Both requests got success HTML since the response is written before once.Do
+	assert.Equal(t, http.StatusOK, w1.Code)
+	assert.Contains(t, w1.Body.String(), "Authentication successful")
+	assert.Equal(t, http.StatusOK, w2.Code)
+
+	// Channel should be empty - second request did not send a result
+	select {
+	case r := <-resultCh:
+		t.Fatalf("second request should not have sent a result, got: %+v", r)
+	default:
+		// expected: sync.Once prevented second write
+	}
+}
+
+func TestCallbackAddress(t *testing.T) {
+	tests := []struct {
+		name        string
+		callbackURL string
+		wantAddr    string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "valid loopback URL with port",
+			callbackURL: "https://127.0.0.1:8182",
+			wantAddr:    "127.0.0.1:8182",
+		},
+		{
+			name:        "valid loopback URL with different port",
+			callbackURL: "https://127.0.0.1:9999",
+			wantAddr:    "127.0.0.1:9999",
+		},
+		{
+			name:        "missing host returns error",
+			callbackURL: "/just-a-path",
+			wantErr:     true,
+			errContains: "host and port",
+		},
+		{
+			name:        "non-loopback host returns error",
+			callbackURL: "https://192.168.1.1:8182",
+			wantErr:     true,
+			errContains: "127.0.0.1",
+		},
+		{
+			name:        "missing port returns error",
+			callbackURL: "https://127.0.0.1",
+			wantErr:     true,
+			errContains: "host and port",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{CallbackURL: tt.callbackURL}
+
+			addr, err := callbackAddress(cfg)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				var callbackErr *apperr.AuthCallbackError
+				assert.ErrorAs(t, err, &callbackErr)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantAddr, addr)
+		})
+	}
+}
+
+func TestGenerateSelfSignedCertificate_ReturnsValidCertificate(t *testing.T) {
+	// Act
+	cert, err := generateSelfSignedCertificate()
+
+	// Assert
+	require.NoError(t, err)
+	require.Len(t, cert.Certificate, 1, "should contain exactly one certificate")
+
+	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+	require.NoError(t, err)
+
+	// Subject and SANs
+	assert.Equal(t, "127.0.0.1", x509Cert.Subject.CommonName)
+	assert.Contains(t, x509Cert.DNSNames, "localhost")
+
+	// IP SAN check: net.ParseIP returns a 16-byte representation, so compare
+	// using Equal method rather than direct slice comparison.
+	foundIP := false
+	for _, ip := range x509Cert.IPAddresses {
+		if ip.Equal(net.ParseIP("127.0.0.1")) {
+			foundIP = true
+			break
+		}
+	}
+	assert.True(t, foundIP, "certificate should include 127.0.0.1 in IP SANs")
+
+	// Validity window
+	now := time.Now()
+	assert.True(t, x509Cert.NotBefore.Before(now), "NotBefore should be in the past")
+	assert.True(t, x509Cert.NotAfter.After(now), "NotAfter should be in the future")
+
+	// Key usage
+	assert.Equal(t, x509.KeyUsageDigitalSignature|x509.KeyUsageKeyEncipherment, x509Cert.KeyUsage)
+	assert.Contains(t, x509Cert.ExtKeyUsage, x509.ExtKeyUsageServerAuth)
+	assert.True(t, x509Cert.BasicConstraintsValid)
 }
 
 // freeLoopbackAddress reserves and returns an available loopback port for tests.

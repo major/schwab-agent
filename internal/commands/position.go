@@ -235,7 +235,7 @@ include totalCostBasis, unrealizedPnL, and unrealizedPnLPct.`,
 		panic(err)
 	}
 
-	cmd.Flags().String("account", "", "Account hash (overrides config default)")
+	cmd.PersistentFlags().String("account", "", "Account hash (overrides config default)")
 
 	return cmd
 }
@@ -261,7 +261,9 @@ func cobraListSingleAccountPositions(
 	// Enrich with nickname from user preferences (best-effort).
 	prefs, prefsErr := c.UserPreference(ctx)
 	if prefsErr == nil {
-		enrichAccountWithPreferences(account, prefs)
+		accounts := []models.Account{*account}
+		enrichAccountsWithPreferences(accounts, prefs)
+		account = &accounts[0]
 	}
 
 	acctNum := ""
