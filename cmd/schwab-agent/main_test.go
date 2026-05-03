@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodido/structcli"
 	structclimcp "github.com/leodido/structcli/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,7 +68,7 @@ func runApp(t *testing.T, args ...string) (string, error) {
 	app.SetErr(&stdout)
 	app.SetArgs(cobraArgs(args))
 
-	err := app.Execute()
+	_, err := structcli.ExecuteC(app)
 
 	return stdout.String(), err
 }
@@ -82,7 +83,7 @@ func runAppWithDeps(t *testing.T, deps commands.RootDeps, args ...string) (strin
 	app.SetErr(&stdout)
 	app.SetArgs(cobraArgs(args))
 
-	err := app.Execute()
+	_, err := structcli.ExecuteC(app)
 
 	return stdout.String(), err
 }
@@ -94,6 +95,61 @@ func cobraArgs(args []string) []string {
 	}
 
 	return args
+}
+
+// schemaByTitle indexes the --jsonschema=tree output by command title.
+func schemaByTitle(t *testing.T, stdout string) map[string]map[string]any {
+	t.Helper()
+
+	var schemas []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &schemas))
+	require.NotEmpty(t, schemas)
+
+	byTitle := make(map[string]map[string]any, len(schemas))
+	for _, schema := range schemas {
+		title, ok := schema["title"].(string)
+		require.True(t, ok, "schema entry is missing a string title: %#v", schema)
+		byTitle[title] = schema
+	}
+
+	return byTitle
+}
+
+// schemaStrings returns a string slice from a schema array field.
+func schemaStrings(t *testing.T, schema map[string]any, key string) []string {
+	t.Helper()
+
+	values, ok := schema[key].([]any)
+	require.True(t, ok, "schema %q field is not an array", key)
+
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		stringValue, ok := value.(string)
+		require.True(t, ok, "schema %q field contains a non-string value: %#v", key, value)
+		result = append(result, stringValue)
+	}
+
+	return result
+}
+
+// schemaProperties returns the JSON Schema properties map for a command schema.
+func schemaProperties(t *testing.T, schema map[string]any) map[string]any {
+	t.Helper()
+
+	properties, ok := schema["properties"].(map[string]any)
+	require.True(t, ok, "schema entry is missing properties: %#v", schema)
+
+	return properties
+}
+
+// schemaProperty returns a single named flag property from a command schema.
+func schemaProperty(t *testing.T, schema map[string]any, name string) map[string]any {
+	t.Helper()
+
+	property, ok := schemaProperties(t, schema)[name].(map[string]any)
+	require.True(t, ok, "schema entry is missing property %q", name)
+
+	return property
 }
 
 // writeTestConfig persists a valid auth config for Before hook tests.
@@ -150,7 +206,7 @@ func TestSkipAuth_HelpTopic(t *testing.T) {
 	var buf bytes.Buffer
 	app := buildAppWithDeps(&buf, commands.RootDeps{})
 	app.SetArgs([]string{"env-vars"})
-	err := app.Execute()
+	_, err := structcli.ExecuteC(app)
 	require.NoError(t, err)
 
 	// Verify output contains help topic content.
@@ -549,7 +605,7 @@ func runMCP(t *testing.T, requests ...string) (string, error) {
 	app.SetOut(&stdout)
 	app.SetArgs([]string{"--mcp"})
 
-	err := app.Execute()
+	_, err := structcli.ExecuteC(app)
 
 	return stdout.String(), err
 }
@@ -565,7 +621,7 @@ func runMCPWithDeps(t *testing.T, deps commands.RootDeps, requests ...string) (s
 	app.SetOut(&stdout)
 	app.SetArgs([]string{"--mcp"})
 
-	err := app.Execute()
+	_, err := structcli.ExecuteC(app)
 
 	return stdout.String(), err
 }
