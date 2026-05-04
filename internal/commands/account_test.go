@@ -335,6 +335,171 @@ func TestNewAccountCmd_Summary_Success(t *testing.T) {
 	assert.Equal(t, "CASH", second["type"])
 }
 
+func TestNewAccountCmd_Summary_WithPositionsFlag(t *testing.T) {
+	// Arrange
+	configPath := writeAccountTestConfig(t, t.TempDir(), "HASH_ABC")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/trader/v1/accounts/accountNumbers":
+			_, _ = w.Write([]byte(`[
+				{"accountNumber":"12345","hashValue":"HASH_ABC"},
+				{"accountNumber":"67890","hashValue":"HASH_DEF"}
+			]`))
+		case "/trader/v1/userPreference":
+			_, _ = w.Write([]byte(`{"accounts":[
+				{"accountNumber":"12345","nickName":"My IRA","primaryAccount":true,"type":"MARGIN"},
+				{"accountNumber":"67890","nickName":"Joint Taxable","primaryAccount":false,"type":"CASH"}
+			]}`))
+		case "/trader/v1/accounts":
+			assert.Equal(t, "positions", r.URL.Query().Get("fields"))
+			_, _ = w.Write([]byte(`[{
+				"securitiesAccount": {
+					"accountNumber": "12345",
+					"positions": [{
+						"longQuantity": 10,
+						"averagePrice": 100,
+						"marketValue": 1200,
+						"longOpenProfitLoss": 200,
+						"instrument": {"symbol": "AAPL", "assetType": "EQUITY", "description": "Apple Inc"}
+					}]
+				}
+			}]`))
+		default:
+			t.Errorf("unexpected request: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAccountCmd(testClient(t, srv), configPath, &buf)
+	_, err := runTestCommand(t, cmd, "summary", "--positions")
+
+	// Assert
+	require.NoError(t, err)
+
+	env := decodeAccountEnvelope(t, buf.Bytes())
+	assert.Equal(t, 2, env.Metadata.Returned)
+	assert.True(t, env.Metadata.PositionsIncluded)
+
+	dataMap, ok := env.Data.(map[string]any)
+	require.True(t, ok)
+	accountList, ok := dataMap["accounts"].([]any)
+	require.True(t, ok)
+	require.Len(t, accountList, 2)
+
+	first, ok := accountList[0].(map[string]any)
+	require.True(t, ok)
+	assert.NotContains(t, first, "defaultAccount")
+
+	positions, ok := first["positions"].([]any)
+	require.True(t, ok)
+	require.Len(t, positions, 1)
+	position, ok := positions[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "AAPL", position["symbol"])
+	assert.Equal(t, "EQUITY", position["assetType"])
+	assert.Equal(t, "Apple Inc", position["description"])
+	assert.Equal(t, 10.0, position["quantity"])
+	assert.Equal(t, 1000.0, position["totalCostBasis"])
+	assert.Equal(t, 200.0, position["unrealizedPnL"])
+	assert.Equal(t, 20.0, position["unrealizedPnLPct"])
+
+	second, ok := accountList[1].(map[string]any)
+	require.True(t, ok)
+	emptyPositions, ok := second["positions"].([]any)
+	require.True(t, ok)
+	assert.Empty(t, emptyPositions)
+	assert.NotContains(t, second, "defaultAccount")
+}
+
+func TestNewAccountCmd_Summary_WithPositionsFlag_EmptyAccountsSkipsPositions(t *testing.T) {
+	// Arrange
+	var accountPayloadRequests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/trader/v1/accounts/accountNumbers":
+			_, _ = w.Write([]byte(`[]`))
+		case "/trader/v1/accounts":
+			accountPayloadRequests++
+			t.Errorf("empty account summary should not fetch positions")
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			t.Errorf("unexpected request: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "summary", "--positions")
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, 0, accountPayloadRequests)
+
+	env := decodeAccountEnvelope(t, buf.Bytes())
+	assert.Equal(t, 0, env.Metadata.Returned)
+	assert.True(t, env.Metadata.PositionsIncluded)
+}
+
+func TestNewAccountCmd_Summary_PreferencesFailure_StillReturnsPositions(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/trader/v1/accounts/accountNumbers":
+			_, _ = w.Write([]byte(`[{"accountNumber":"12345","hashValue":"HASH_ABC"}]`))
+		case "/trader/v1/userPreference":
+			w.WriteHeader(http.StatusInternalServerError)
+		case "/trader/v1/accounts":
+			assert.Equal(t, "positions", r.URL.Query().Get("fields"))
+			_, _ = w.Write([]byte(`[{
+				"securitiesAccount": {
+					"accountNumber": "12345",
+					"positions": [{"shortQuantity": 5, "averagePrice": 20, "shortOpenProfitLoss": -10}]
+				}
+			}]`))
+		default:
+			t.Errorf("unexpected request: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAccountCmd(testClient(t, srv), "", &buf)
+	_, err := runTestCommand(t, cmd, "summary", "--positions")
+
+	// Assert
+	require.NoError(t, err)
+
+	env := decodeAccountEnvelope(t, buf.Bytes())
+	dataMap, ok := env.Data.(map[string]any)
+	require.True(t, ok)
+	accountList, ok := dataMap["accounts"].([]any)
+	require.True(t, ok)
+	require.Len(t, accountList, 1)
+
+	first, ok := accountList[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "HASH_ABC", first["accountHash"])
+	assert.NotContains(t, first, "nickName")
+	positions, ok := first["positions"].([]any)
+	require.True(t, ok)
+	require.Len(t, positions, 1)
+	position, ok := positions[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, 5.0, position["quantity"])
+	assert.Equal(t, -10.0, position["unrealizedPnL"])
+}
+
 func TestNewAccountCmd_Summary_PreferencesFailure_StillReturnsHashes(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

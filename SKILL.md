@@ -91,13 +91,15 @@ schwab-agent account list
 List linked Schwab accounts in a compact, token-efficient shape for agents.
 Each entry includes the account hash required by other commands, the readable
 account number, and best-effort nickname/primary/type data from user preferences.
-Use account list when you need full balances or account list --positions when
-you need the full Schwab account payload with positions.
+Use --positions to include compact holdings with computed cost basis and P&L in
+the same response. Use account list when you need full balances or account list
+--positions when you need the full Schwab account payload with positions.
 
 **Example:**
 
 ```bash
 schwab-agent account summary
+schwab-agent account summary --positions
 ```
 
 #### `schwab-agent account numbers`
@@ -1471,6 +1473,7 @@ schwab-agent account list
 
 ```bash
 schwab-agent account summary
+schwab-agent account summary --positions
 ```
 
 #### schwab-agent account numbers

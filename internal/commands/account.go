@@ -2,6 +2,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -33,16 +34,35 @@ type accountSummaryData struct {
 	Accounts []accountSummaryEntry `json:"accounts"`
 }
 
+// accountSummaryPosition is the compact position shape used by account summary
+// when agents ask for holdings in the same round trip as account selection.
+// Keep this intentionally smaller than models.Position; account list --positions
+// remains the full Schwab payload for workflows that need every raw field.
+type accountSummaryPosition struct {
+	Symbol           *string  `json:"symbol,omitempty"`
+	AssetType        *string  `json:"assetType,omitempty"`
+	Description      *string  `json:"description,omitempty"`
+	Quantity         *float64 `json:"quantity,omitempty"`
+	LongQuantity     *float64 `json:"longQuantity,omitempty"`
+	ShortQuantity    *float64 `json:"shortQuantity,omitempty"`
+	MarketValue      *float64 `json:"marketValue,omitempty"`
+	AveragePrice     *float64 `json:"averagePrice,omitempty"`
+	TotalCostBasis   *float64 `json:"totalCostBasis,omitempty"`
+	UnrealizedPnL    *float64 `json:"unrealizedPnL,omitempty"`
+	UnrealizedPnLPct *float64 `json:"unrealizedPnLPct,omitempty"`
+}
+
 // accountSummaryEntry combines the hash values required by downstream commands
 // with the human-friendly labels stored in Schwab user preferences. Keeping this
 // shape small avoids forcing LLMs to inspect the large balance payload returned
 // by account list just to choose an account.
 type accountSummaryEntry struct {
-	AccountHash    string  `json:"accountHash"`
-	AccountNumber  string  `json:"accountNumber"`
-	NickName       *string `json:"nickName,omitempty"`
-	PrimaryAccount *bool   `json:"primaryAccount,omitempty"`
-	Type           *string `json:"type,omitempty"`
+	AccountHash    string                    `json:"accountHash"`
+	AccountNumber  string                    `json:"accountNumber"`
+	NickName       *string                   `json:"nickName,omitempty"`
+	PrimaryAccount *bool                     `json:"primaryAccount,omitempty"`
+	Type           *string                   `json:"type,omitempty"`
+	Positions      *[]accountSummaryPosition `json:"positions,omitempty"`
 }
 
 // transactionListData wraps the transaction list response.
@@ -62,6 +82,14 @@ type accountListOpts struct {
 
 // Attach implements structcli.Options interface.
 func (o *accountListOpts) Attach(_ *cobra.Command) error { return nil }
+
+// accountSummaryOpts holds the options for the compact account summary command.
+type accountSummaryOpts struct {
+	Positions bool `flag:"positions" flagdescr:"Include compact current positions for each account"`
+}
+
+// Attach implements structcli.Options interface.
+func (o *accountSummaryOpts) Attach(_ *cobra.Command) error { return nil }
 
 // accountGetOpts holds the options for the account get subcommand.
 type accountGetOpts struct {
@@ -138,7 +166,11 @@ func enrichAccountsWithPreferences(accounts []models.Account, prefs *models.User
 // The accountNumbers endpoint is the source of truth for hashes, while
 // userPreference is the only Schwab endpoint that exposes nicknames and primary
 // account flags. They must be joined client-side by plain account number.
-func summarizeAccounts(numbers []models.AccountNumber, prefs *models.UserPreference) []accountSummaryEntry {
+func summarizeAccounts(
+	numbers []models.AccountNumber,
+	prefs *models.UserPreference,
+	positionsByAccount map[string][]accountSummaryPosition,
+) []accountSummaryEntry {
 	prefMap := make(map[string]*models.UserPreferenceAccount)
 	if prefs != nil {
 		prefMap = make(map[string]*models.UserPreferenceAccount, len(prefs.Accounts))
@@ -162,10 +194,82 @@ func summarizeAccounts(numbers []models.AccountNumber, prefs *models.UserPrefere
 			entry.Type = pref.Type
 		}
 
+		if positionsByAccount != nil {
+			positions := positionsByAccount[number.AccountNumber]
+			if positions == nil {
+				positions = []accountSummaryPosition{}
+			}
+			entry.Positions = &positions
+		}
+
 		entries = append(entries, entry)
 	}
 
 	return entries
+}
+
+// accountSummaryPositions fetches all positions once and groups them by account
+// number so account summary can return account identifiers and compact holdings
+// in one command. The accounts endpoint gives account numbers, while the summary
+// entries already get hashes from accountNumbers.
+func accountSummaryPositions(ctx context.Context, c *client.Ref) (map[string][]accountSummaryPosition, error) {
+	accounts, err := c.Accounts(ctx, "positions")
+	if err != nil {
+		return nil, err
+	}
+
+	positionsByAccount := make(map[string][]accountSummaryPosition, len(accounts))
+	for _, acct := range accounts {
+		if acct.SecuritiesAccount == nil || acct.SecuritiesAccount.AccountNumber == nil {
+			continue
+		}
+
+		accountNumber := *acct.SecuritiesAccount.AccountNumber
+		positions := make([]accountSummaryPosition, 0, len(acct.SecuritiesAccount.Positions))
+		for i := range acct.SecuritiesAccount.Positions {
+			positions = append(positions, newAccountSummaryPosition(&acct.SecuritiesAccount.Positions[i]))
+		}
+
+		positionsByAccount[accountNumber] = positions
+	}
+
+	return positionsByAccount, nil
+}
+
+// newAccountSummaryPosition keeps only the position fields an agent usually
+// needs for account selection and holdings inspection. It reuses the existing
+// computed P&L logic through positionEntry so account summary and position list
+// never drift on derived values.
+func newAccountSummaryPosition(pos *models.Position) accountSummaryPosition {
+	entry := newPositionEntry("", "", "", pos)
+	compact := accountSummaryPosition{
+		LongQuantity:     entry.LongQuantity,
+		ShortQuantity:    entry.ShortQuantity,
+		MarketValue:      entry.MarketValue,
+		AveragePrice:     entry.AveragePrice,
+		TotalCostBasis:   entry.TotalCostBasis,
+		UnrealizedPnL:    entry.UnrealizedPnL,
+		UnrealizedPnLPct: entry.UnrealizedPnLPct,
+	}
+
+	if entry.LongQuantity != nil || entry.ShortQuantity != nil {
+		quantity := 0.0
+		if entry.LongQuantity != nil {
+			quantity += *entry.LongQuantity
+		}
+		if entry.ShortQuantity != nil {
+			quantity += *entry.ShortQuantity
+		}
+		compact.Quantity = &quantity
+	}
+
+	if entry.Instrument != nil {
+		compact.Symbol = entry.Instrument.Symbol
+		compact.AssetType = entry.Instrument.AssetType
+		compact.Description = entry.Instrument.Description
+	}
+
+	return compact
 }
 
 // NewAccountCmd returns the Cobra parent command for account operations.
@@ -200,16 +304,23 @@ from the preferences API (best-effort, degrades gracefully).`,
 
 // newAccountSummaryCmd returns a compact account picker for agents.
 func newAccountSummaryCmd(c *client.Ref, w io.Writer) *cobra.Command {
-	return &cobra.Command{
+	opts := &accountSummaryOpts{}
+	cmd := &cobra.Command{
 		Use:   "summary",
 		Short: "List compact account identifiers for agents",
 		Long: `List linked Schwab accounts in a compact, token-efficient shape for agents.
 Each entry includes the account hash required by other commands, the readable
 account number, and best-effort nickname/primary/type data from user preferences.
-Use account list when you need full balances or account list --positions when
-you need the full Schwab account payload with positions.`,
-		Example: "  schwab-agent account summary",
+Use --positions to include compact holdings with computed cost basis and P&L
+in the same response. Use account list when you need full balances or account
+list --positions when you need the full Schwab account payload with positions.`,
+		Example: `  schwab-agent account summary
+  schwab-agent account summary --positions`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
 			numbers, err := c.AccountNumbers(cmd.Context())
 			if err != nil {
 				return err
@@ -226,13 +337,32 @@ you need the full Schwab account payload with positions.`,
 				}
 			}
 
-			accounts := summarizeAccounts(numbers, prefs)
+			var positionsByAccount map[string][]accountSummaryPosition
+			if opts.Positions && len(numbers) > 0 {
+				positionsByAccount, err = accountSummaryPositions(cmd.Context(), c)
+				if err != nil {
+					return err
+				}
+			} else if opts.Positions {
+				positionsByAccount = map[string][]accountSummaryPosition{}
+			}
+
+			accounts := summarizeAccounts(numbers, prefs, positionsByAccount)
 			meta := output.NewMetadata()
 			meta.Returned = len(accounts)
+			if opts.Positions {
+				meta.PositionsIncluded = true
+			}
 
 			return output.WriteSuccess(w, accountSummaryData{Accounts: accounts}, meta)
 		},
 	}
+
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
+
+	return cmd
 }
 
 // newAccountListCmd returns the Cobra subcommand for listing all accounts.
