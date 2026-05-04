@@ -204,7 +204,7 @@ order build, preview it with order preview, then place.`,
 				return err
 			}
 
-			account, err := resolveAccount(accountFlag, configFlag, nil)
+			account, err := resolveAccount(c, accountFlag, configFlag, nil)
 			if err != nil {
 				return err
 			}
@@ -328,7 +328,7 @@ func makeCobraPlaceOrderCommand[O any, P any](
 				return err
 			}
 
-			account, err := resolveAccount(accountFlag, configFlag, nil)
+			account, err := resolveAccount(c, accountFlag, configFlag, nil)
 			if err != nil {
 				return err
 			}
@@ -394,7 +394,7 @@ Does not require safety guards since no order is actually placed.`,
 				return err
 			}
 
-			account, err := resolveAccount(accountFlag, configPath, nil)
+			account, err := resolveAccount(c, accountFlag, configPath, nil)
 			if err != nil {
 				return err
 			}
@@ -485,7 +485,7 @@ func makeCobraPreviewOrderCommand[O any, P any](
 				return err
 			}
 
-			account, err := resolveAccount(accountFlag, configPath, nil)
+			account, err := resolveAccount(c, accountFlag, configPath, nil)
 			if err != nil {
 				return err
 			}
@@ -559,7 +559,7 @@ config flag. The order ID can be passed as a positional argument or with
 				return err
 			}
 
-			account, err := resolveAccount(accountFlag, configFlag, nil)
+			account, err := resolveAccount(c, accountFlag, configFlag, nil)
 			if err != nil {
 				return err
 			}
@@ -624,7 +624,7 @@ original order status becomes REPLACED after the new order is created.`,
 				return err
 			}
 
-			account, err := resolveAccount(accountFlag, configFlag, nil)
+			account, err := resolveAccount(c, accountFlag, configFlag, nil)
 			if err != nil {
 				return err
 			}

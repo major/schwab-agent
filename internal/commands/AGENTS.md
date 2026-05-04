@@ -71,12 +71,14 @@ if err := requireMutableEnabled(configPath); err != nil { return err }
 
 ## Account Resolution
 
-All commands needing an account use `resolveAccount(accountFlag, configPath, positionalArgs)` from account.go:
+All commands needing an account use `resolveAccount(c, accountFlag, configPath, positionalArgs)` from account.go:
 
 1. Check `--account` flag first
 2. Check positional args (if non-nil, used by `account get`)
 3. Fall back to `default_account` from config
-4. Return `AccountNotFoundError` if none found
+4. If the chosen identifier looks like a long hex Schwab hash, return it without API calls
+5. Resolve account numbers through `AccountNumbers()` and nicknames through `UserPreference()`
+6. Return `AccountNotFoundError` if none found or multiple nickname matches exist
 
 Pass `nil` for `positionalArgs` when the command doesn't accept positional account arguments.
 

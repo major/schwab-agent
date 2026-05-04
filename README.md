@@ -172,7 +172,7 @@ schwab-agent order place --spec @order.json
 ### Global flags
 
 ```text
---account   Override the default account for this command
+--account   Override the default account by hash, account number, or nickname
 --verbose   Enable verbose logging
 --config    Path to config file (default: ~/.config/schwab-agent/config.json)
 --token     Path to token file (default: ~/.config/schwab-agent/token.json)

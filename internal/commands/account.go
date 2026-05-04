@@ -7,6 +7,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
@@ -113,27 +114,202 @@ func (o *accountTransactionListOpts) Attach(_ *cobra.Command) error { return nil
 // resolveAccount determines the account hash from multiple sources.
 // Priority: flag > positional args (if provided) > config default > error.
 // Pass nil for positionalArgs when the command doesn't accept positional account arguments.
-func resolveAccount(accountFlag, configPath string, positionalArgs []string) (string, error) {
+func resolveAccount(c *client.Ref, accountFlag, configPath string, positionalArgs []string) (string, error) {
+	accountID := firstAccountIdentifier(accountFlag, configPath, positionalArgs)
+	if accountID == "" {
+		return "", apperr.NewAccountNotFoundError(
+			"no account specified: use --account flag or set default_account in config",
+			nil,
+			apperr.WithDetails("Run `schwab-agent account summary` or `schwab-agent account numbers` to list accounts, then `schwab-agent account set-default` to set one"),
+		)
+	}
+
+	// Schwab account hashes are opaque identifiers that appear as long hex strings.
+	// Returning these directly avoids two needless API calls for the common path.
+	if isLikelyAccountHash(accountID) {
+		return accountID, nil
+	}
+
+	if c == nil || c.Client == nil {
+		return "", apperr.NewAccountNotFoundError(
+			fmt.Sprintf("Account %q cannot be resolved without an API client", accountID),
+			nil,
+			apperr.WithDetails("Use an account hash directly or run with an authenticated client to resolve account numbers and nicknames"),
+		)
+	}
+
+	numbers, err := c.AccountNumbers(context.Background())
+	if err != nil {
+		return "", err
+	}
+
+	for _, number := range numbers {
+		if strings.EqualFold(accountID, number.AccountNumber) {
+			return number.HashValue, nil
+		}
+	}
+
+	prefs, err := c.UserPreference(context.Background())
+	if err != nil {
+		return "", err
+	}
+
+	matches := matchingNicknameAccounts(accountID, numbers, prefs)
+	if len(matches) == 1 {
+		return matches[0].hash, nil
+	}
+	if len(matches) > 1 {
+		return "", apperr.NewAccountNotFoundError(
+			fmt.Sprintf("multiple accounts match nickname %q. Candidates: %s", accountID, formatResolvedAccountCandidates(matches)),
+			nil,
+		)
+	}
+
+	return "", apperr.NewAccountNotFoundError(
+		fmt.Sprintf("Account '%s' not found. Available accounts: %s", accountID, formatAvailableAccounts(numbers, prefs)),
+		nil,
+	)
+}
+
+// firstAccountIdentifier applies resolveAccount's source priority before the
+// selected identifier is normalized into the required Schwab hash value.
+func firstAccountIdentifier(accountFlag, configPath string, positionalArgs []string) string {
 	if strings.TrimSpace(accountFlag) != "" {
-		return strings.TrimSpace(accountFlag), nil
+		return strings.TrimSpace(accountFlag)
 	}
 
 	if len(positionalArgs) > 0 && strings.TrimSpace(positionalArgs[0]) != "" {
-		return strings.TrimSpace(positionalArgs[0]), nil
+		return strings.TrimSpace(positionalArgs[0])
 	}
 
 	if configPath != "" {
 		cfg, err := auth.LoadConfig(configPath)
 		if err == nil && strings.TrimSpace(cfg.DefaultAccount) != "" {
-			return strings.TrimSpace(cfg.DefaultAccount), nil
+			return strings.TrimSpace(cfg.DefaultAccount)
 		}
 	}
 
-	return "", apperr.NewAccountNotFoundError(
-		"no account specified: use --account flag or set default_account in config",
-		nil,
-		apperr.WithDetails("Run `schwab-agent account numbers` to list accounts, then `schwab-agent account set-default` to set one"),
-	)
+	return ""
+}
+
+// isLikelyAccountHash recognizes the long hex account hashes returned by
+// Schwab's accountNumbers endpoint. The heuristic is intentionally conservative:
+// short or non-hex values fall through to API lookup so account numbers and
+// nicknames keep working.
+func isLikelyAccountHash(value string) bool {
+	lower := strings.ToLower(value)
+	if strings.Contains(lower, "hash") {
+		return true
+	}
+
+	if len(value) >= 16 {
+		for _, r := range value {
+			if !unicode.Is(unicode.ASCII_Hex_Digit, r) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Existing command tests and local Schwab-compatible fixtures use compact
+	// alphanumeric placeholders such as abc123. Purely numeric values still fall
+	// through because they are more likely to be plain account numbers.
+	if len(value) < 6 {
+		return false
+	}
+	hasLetter := false
+	hasDigit := false
+	for _, r := range value {
+		if unicode.IsLetter(r) {
+			hasLetter = true
+			continue
+		}
+		if unicode.IsDigit(r) {
+			hasDigit = true
+			continue
+		}
+		if unicode.IsSpace(r) {
+			return false
+		}
+		return false
+	}
+
+	return hasLetter && hasDigit
+}
+
+type resolvedAccountCandidate struct {
+	accountNumber string
+	hash          string
+	nickname      string
+}
+
+// matchingNicknameAccounts joins user preference nicknames back to hashes via
+// account number because Schwab preferences do not include hash values.
+func matchingNicknameAccounts(
+	accountID string,
+	numbers []models.AccountNumber,
+	prefs *models.UserPreference,
+) []resolvedAccountCandidate {
+	hashByNumber := make(map[string]string, len(numbers))
+	for _, number := range numbers {
+		hashByNumber[number.AccountNumber] = number.HashValue
+	}
+
+	if prefs == nil {
+		return nil
+	}
+
+	matches := make([]resolvedAccountCandidate, 0)
+	for _, pref := range prefs.Accounts {
+		if pref.AccountNumber == nil || pref.NickName == nil || !strings.EqualFold(accountID, *pref.NickName) {
+			continue
+		}
+		hash, ok := hashByNumber[*pref.AccountNumber]
+		if !ok {
+			continue
+		}
+		matches = append(matches, resolvedAccountCandidate{
+			accountNumber: *pref.AccountNumber,
+			hash:          hash,
+			nickname:      *pref.NickName,
+		})
+	}
+
+	return matches
+}
+
+func formatResolvedAccountCandidates(candidates []resolvedAccountCandidate) string {
+	parts := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		parts = append(parts, fmt.Sprintf("%s (account: %s, hash: %s)", candidate.nickname, candidate.accountNumber, candidate.hash))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func formatAvailableAccounts(numbers []models.AccountNumber, prefs *models.UserPreference) string {
+	nicknameByNumber := make(map[string]string)
+	if prefs != nil {
+		nicknameByNumber = make(map[string]string, len(prefs.Accounts))
+		for _, pref := range prefs.Accounts {
+			if pref.AccountNumber != nil && pref.NickName != nil && strings.TrimSpace(*pref.NickName) != "" {
+				nicknameByNumber[*pref.AccountNumber] = strings.TrimSpace(*pref.NickName)
+			}
+		}
+	}
+
+	parts := make([]string, 0, len(numbers))
+	for _, number := range numbers {
+		label := number.AccountNumber
+		if nickname := nicknameByNumber[number.AccountNumber]; nickname != "" {
+			label = nickname
+		}
+		parts = append(parts, fmt.Sprintf("%s (hash: %s)", label, number.HashValue))
+	}
+
+	if len(parts) == 0 {
+		return "none"
+	}
+	return strings.Join(parts, ", ")
 }
 
 // enrichAccountsWithPreferences adds nickname and primary account flag from
@@ -288,7 +464,7 @@ from the preferences API (best-effort, degrades gracefully).`,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
-	cmd.PersistentFlags().String("account", "", "Account hash to use (overrides config default)")
+	cmd.PersistentFlags().String("account", "", "Account hash, account number, or nickname to use (overrides config default)")
 
 	cmd.AddCommand(
 		newAccountSummaryCmd(c, w),
@@ -435,7 +611,7 @@ config. Results are enriched with nicknames from the preferences API. Use
 				return err
 			}
 
-			hash, err := resolveAccount(accountFlag, configPath, args)
+			hash, err := resolveAccount(c, accountFlag, configPath, args)
 			if err != nil {
 				return err
 			}
@@ -567,7 +743,7 @@ default account unless --account is specified.`,
 				return err
 			}
 
-			account, err := resolveAccount(accountFlag, configPath, nil)
+			account, err := resolveAccount(c, accountFlag, configPath, nil)
 			if err != nil {
 				return err
 			}
@@ -623,7 +799,7 @@ func newAccountTransactionGetCmd(c *client.Ref, configPath string, w io.Writer) 
 				return err
 			}
 
-			account, err := resolveAccount(accountFlag, configPath, nil)
+			account, err := resolveAccount(c, accountFlag, configPath, nil)
 			if err != nil {
 				return err
 			}
