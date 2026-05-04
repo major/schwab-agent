@@ -129,8 +129,10 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 | order_build.go | order build | equity, option, bracket, oco, vertical, iron-condor, straddle, strangle, covered-call, collar, calendar, diagonal, butterfly, condor, vertical-roll, back-ratio, double-diagonal, fts |
 | chain.go | chain | get, expiration |
 | option_ticket.go | option | ticket get |
-| history.go | history | get |
+| history.go | history | get (alias: price-history) |
 | instrument.go | instrument | search, get |
 | market.go | market | hours, movers |
 | symbol.go | symbol | build, parse |
 | ta.go | ta | sma, ema, rsi, macd, atr, bbands, stoch, adx, vwap, hv, expected-move |
+| indicators.go | indicators | (shortcut for ta dashboard) |
+| analyze.go | analyze | (quote + ta dashboard composite) |
