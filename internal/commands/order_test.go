@@ -2348,6 +2348,8 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/67890":
 			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "AAPL")
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "AAPL")
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
@@ -2388,9 +2390,11 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "replace", data["action"])
 	assert.Equal(t, float64(67890), data["orderId"])
+	assert.Equal(t, float64(12345), data["originalOrderId"])
 	assert.Equal(t, true, data["replaced"])
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "QUEUED", data["orderStatus"])
+	assert.Equal(t, "REPLACED", data["originalOrderStatus"])
 	submittedOrder, ok := data["submittedOrder"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "LIMIT", submittedOrder["orderType"])
@@ -2398,6 +2402,10 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, float64(67890), order["orderId"])
 	assert.Equal(t, "QUEUED", order["status"])
+	originalOrder, ok := data["originalOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(12345), originalOrder["orderId"])
+	assert.Equal(t, "REPLACED", originalOrder["status"])
 }
 
 func TestNewOrderCmdReplaceOrderIDFlagSuccess(t *testing.T) {
@@ -2444,13 +2452,52 @@ func TestNewOrderCmdReplaceOrderIDFlagSuccess(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "replace", data["action"])
 	assert.Equal(t, float64(1234567890), data["orderId"])
+	assert.Equal(t, float64(1234567890), data["originalOrderId"])
 	assert.Equal(t, true, data["replaced"])
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "REPLACED", data["orderStatus"])
+	assert.Equal(t, "REPLACED", data["originalOrderStatus"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(1234567890), order["orderId"])
 	assert.Equal(t, "REPLACED", order["status"])
+	originalOrder, ok := data["originalOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1234567890), originalOrder["orderId"])
+}
+
+func TestNewOrderCmdReplaceOriginalStatusMismatchReturnsPartialSuccess(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/67890":
+			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "AAPL")
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			writeTestOrderResponse(t, w, 12345, models.OrderStatusPendingReplace, "AAPL")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := testClient(t, server)
+
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "replace", "12345", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10")
+	require.NoError(t, err)
+
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "partial", data["verificationState"])
+	assert.Equal(t, "PENDING_REPLACE", data["originalOrderStatus"])
+	require.Len(t, envelope.Errors, 1)
+	assert.Contains(t, envelope.Errors[0], "expected REPLACED")
 }
 
 func TestNewOrderCmdReplaceMutableDisabled(t *testing.T) {

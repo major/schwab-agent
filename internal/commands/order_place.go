@@ -24,13 +24,16 @@ import (
 type orderActionData struct {
 	Action               string               `json:"action"`
 	OrderID              int64                `json:"orderId"`
+	OriginalOrderID      *int64               `json:"originalOrderId,omitempty"`
 	SubmittedOrder       *models.OrderRequest `json:"submittedOrder,omitempty"`
 	Canceled             bool                 `json:"canceled,omitempty"`
 	Replaced             bool                 `json:"replaced,omitempty"`
 	OrderStatus          *models.OrderStatus  `json:"orderStatus,omitempty"`
+	OriginalOrderStatus  *models.OrderStatus  `json:"originalOrderStatus,omitempty"`
 	VerificationState    string               `json:"verificationState"`
 	VerificationFailures []string             `json:"verificationFailures,omitempty"`
 	Order                *models.Order        `json:"order,omitempty"`
+	OriginalOrder        *models.Order        `json:"originalOrder,omitempty"`
 }
 
 // orderPreviewData wraps an order preview response.
@@ -98,6 +101,52 @@ func fetchOrderActionData(cmd *cobra.Command, c *client.Ref, account string, act
 	data.OrderStatus = order.Status
 	data.VerificationState = "verified"
 	return data, nil
+}
+
+// fetchReplaceActionData verifies both sides of Schwab's replace workflow when
+// the API exposes a distinct replacement order ID. A replace creates a new order
+// and marks the original as REPLACED, but Schwab sometimes omits the Location
+// header. In that fallback case the client only knows the original ID, so we
+// avoid a duplicate GET and report the original order as the best available
+// verification target.
+func fetchReplaceActionData(cmd *cobra.Command, c *client.Ref, account string, originalOrderID, replacementOrderID int64, submittedOrder *models.OrderRequest) (orderActionData, []string) {
+	data, errs := fetchOrderActionData(cmd, c, account, "replace", replacementOrderID, submittedOrder)
+	data.Replaced = true
+	data.OriginalOrderID = &originalOrderID
+
+	if replacementOrderID == originalOrderID {
+		data.OriginalOrder = data.Order
+		data.OriginalOrderStatus = data.OrderStatus
+		return data, errs
+	}
+
+	originalOrder, err := c.GetOrder(cmd.Context(), account, originalOrderID)
+	if err != nil {
+		failure := fmt.Sprintf("original order details unavailable after successful replace: %v", err)
+		data.VerificationFailures = append(data.VerificationFailures, failure)
+		data.VerificationState = "partial"
+		return data, append(errs, failure)
+	}
+
+	data.OriginalOrder = originalOrder
+	data.OriginalOrderStatus = originalOrder.Status
+	if originalOrder.Status == nil || *originalOrder.Status != models.OrderStatusReplaced {
+		status := "missing"
+		if originalOrder.Status != nil {
+			status = string(*originalOrder.Status)
+		}
+		failure := fmt.Sprintf("original order status is %s after replace, expected REPLACED", status)
+		data.VerificationFailures = append(data.VerificationFailures, failure)
+		data.VerificationState = "partial"
+		return data, append(errs, failure)
+	}
+
+	if data.VerificationState == "verified" {
+		return data, errs
+	}
+
+	data.VerificationState = "partial"
+	return data, errs
 }
 
 // writeOrderActionResult emits a normal success envelope when the canonical
@@ -599,8 +648,7 @@ original order status becomes REPLACED after the new order is created.`,
 				return err
 			}
 
-			data, errs := fetchOrderActionData(cmd, c, account, "replace", response.OrderID, order)
-			data.Replaced = true
+			data, errs := fetchReplaceActionData(cmd, c, account, orderID, response.OrderID, order)
 			return writeOrderActionResult(w, data, errs)
 		},
 	}
