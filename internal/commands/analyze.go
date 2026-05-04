@@ -96,6 +96,12 @@ func writeAnalyzeResults(
 	for _, symbol := range symbols {
 		result, err := buildAnalyzeResult(ctx, c, symbol, interval, points)
 		if err != nil {
+			// Check if result has any partial data (quote or analysis succeeded).
+			// If either field is non-nil, include the partial result and report the error.
+			// Only skip the symbol entirely if both fields are nil (total failure).
+			if result.Quote != nil || result.Analysis != nil {
+				data[symbol] = result
+			}
 			partialErrors = append(partialErrors, fmt.Sprintf("%s: %v", symbol, err))
 			joinedErrors = append(joinedErrors, fmt.Errorf("%s: %w", symbol, err))
 			continue

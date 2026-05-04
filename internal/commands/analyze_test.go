@@ -183,8 +183,9 @@ func TestNewAnalyzeCmd_MultiSymbol(t *testing.T) {
 }
 
 func TestNewAnalyzeCmd_PartialFailure_QuoteFails(t *testing.T) {
-	// Arrange - quote returns 404 for INVALID but price-history works for AAPL.
-	// We test two symbols: AAPL (both succeed) and INVALID (quote fails, TA fails).
+	// Arrange - test partial failure: AAPL succeeds completely, INVALID has quote
+	// succeed but TA fail (empty candles). This verifies that partial data (quote
+	// present, analysis nil) is included in the output even when there's an error.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -192,10 +193,10 @@ func TestNewAnalyzeCmd_PartialFailure_QuoteFails(t *testing.T) {
 		case strings.Contains(r.URL.Path, "AAPL/quotes"):
 			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
 		case strings.Contains(r.URL.Path, "INVALID/quotes"):
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = w.Write([]byte(`{"error":"not found"}`))
+			// Quote succeeds for INVALID
+			_, _ = w.Write([]byte(`{"INVALID":{"symbol":"INVALID","lastPrice":100.0}}`))
 		case strings.Contains(r.URL.Path, "/pricehistory"):
-			// Return valid candles for AAPL, empty for INVALID
+			// Return valid candles for AAPL, empty for INVALID (TA will fail)
 			sym := r.URL.Query().Get("symbol")
 			if sym == "INVALID" {
 				_, _ = w.Write([]byte(`{"symbol":"INVALID","empty":true,"candles":[]}`))
@@ -214,7 +215,7 @@ func TestNewAnalyzeCmd_PartialFailure_QuoteFails(t *testing.T) {
 	_, err := runTestCommand(t, cmd, "AAPL", "INVALID")
 	require.NoError(t, err)
 
-	// Assert - partial response: AAPL succeeds, INVALID has error
+	// Assert - partial response: AAPL succeeds, INVALID has partial data (quote present, analysis nil) + error
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 
@@ -222,10 +223,18 @@ func TestNewAnalyzeCmd_PartialFailure_QuoteFails(t *testing.T) {
 	require.True(t, ok)
 	assert.Contains(t, data, "AAPL", "AAPL should be in partial data")
 
-	// INVALID should be in errors, not in data
+	// INVALID should also be in data with partial result (quote succeeded, TA failed)
+	assert.Contains(t, data, "INVALID", "INVALID should be in data with partial result")
+	invalidData, ok := data["INVALID"].(map[string]any)
+	require.True(t, ok, "INVALID entry should be a map")
+	// Quote should be present, analysis should be nil (TA failed on empty candles)
+	assert.NotNil(t, invalidData["quote"], "INVALID quote should be present (quote succeeded)")
+	assert.Nil(t, invalidData["analysis"], "INVALID analysis should be nil (TA failed on empty candles)")
+
+	// Errors should be reported for INVALID
 	require.NotEmpty(t, envelope.Errors, "should have partial errors")
 	assert.Equal(t, 2, envelope.Metadata.Requested)
-	assert.Equal(t, 1, envelope.Metadata.Returned)
+	assert.Equal(t, 2, envelope.Metadata.Returned)
 }
 
 func TestNewAnalyzeCmd_InvalidInterval(t *testing.T) {
