@@ -27,6 +27,24 @@ type accountNumbersData struct {
 	Accounts []models.AccountNumber `json:"accounts"`
 }
 
+// accountSummaryData wraps a compact account list for agents that need a
+// one-command account picker instead of the full Schwab account payload.
+type accountSummaryData struct {
+	Accounts []accountSummaryEntry `json:"accounts"`
+}
+
+// accountSummaryEntry combines the hash values required by downstream commands
+// with the human-friendly labels stored in Schwab user preferences. Keeping this
+// shape small avoids forcing LLMs to inspect the large balance payload returned
+// by account list just to choose an account.
+type accountSummaryEntry struct {
+	AccountHash    string  `json:"accountHash"`
+	AccountNumber  string  `json:"accountNumber"`
+	NickName       *string `json:"nickName,omitempty"`
+	PrimaryAccount *bool   `json:"primaryAccount,omitempty"`
+	Type           *string `json:"type,omitempty"`
+}
+
 // transactionListData wraps the transaction list response.
 type transactionListData struct {
 	Transactions []models.Transaction `json:"transactions"`
@@ -116,8 +134,42 @@ func enrichAccountsWithPreferences(accounts []models.Account, prefs *models.User
 	}
 }
 
+// summarizeAccounts creates the compact account shape used by account summary.
+// The accountNumbers endpoint is the source of truth for hashes, while
+// userPreference is the only Schwab endpoint that exposes nicknames and primary
+// account flags. They must be joined client-side by plain account number.
+func summarizeAccounts(numbers []models.AccountNumber, prefs *models.UserPreference) []accountSummaryEntry {
+	prefMap := make(map[string]*models.UserPreferenceAccount)
+	if prefs != nil {
+		prefMap = make(map[string]*models.UserPreferenceAccount, len(prefs.Accounts))
+		for i := range prefs.Accounts {
+			if prefs.Accounts[i].AccountNumber != nil {
+				prefMap[*prefs.Accounts[i].AccountNumber] = &prefs.Accounts[i]
+			}
+		}
+	}
+
+	entries := make([]accountSummaryEntry, 0, len(numbers))
+	for _, number := range numbers {
+		entry := accountSummaryEntry{
+			AccountHash:   number.HashValue,
+			AccountNumber: number.AccountNumber,
+		}
+
+		if pref, ok := prefMap[number.AccountNumber]; ok {
+			entry.NickName = pref.NickName
+			entry.PrimaryAccount = pref.PrimaryAccount
+			entry.Type = pref.Type
+		}
+
+		entries = append(entries, entry)
+	}
+
+	return entries
+}
+
 // NewAccountCmd returns the Cobra parent command for account operations.
-// Subcommands: list, get, numbers, set-default, transaction.
+// Subcommands: summary, list, get, numbers, set-default, transaction.
 // The --account persistent flag overrides the default account hash for all subcommands.
 func NewAccountCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -135,6 +187,7 @@ from the preferences API (best-effort, degrades gracefully).`,
 	cmd.PersistentFlags().String("account", "", "Account hash to use (overrides config default)")
 
 	cmd.AddCommand(
+		newAccountSummaryCmd(c, w),
 		newAccountListCmd(c, w),
 		newAccountGetCmd(c, configPath, w),
 		newAccountNumbersCmd(c, w),
@@ -143,6 +196,43 @@ from the preferences API (best-effort, degrades gracefully).`,
 	)
 
 	return cmd
+}
+
+// newAccountSummaryCmd returns a compact account picker for agents.
+func newAccountSummaryCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "summary",
+		Short: "List compact account identifiers for agents",
+		Long: `List linked Schwab accounts in a compact, token-efficient shape for agents.
+Each entry includes the account hash required by other commands, the readable
+account number, and best-effort nickname/primary/type data from user preferences.
+Use account list when you need full balances or account list --positions when
+you need the full Schwab account payload with positions.`,
+		Example: "  schwab-agent account summary",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			numbers, err := c.AccountNumbers(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			var prefs *models.UserPreference
+			if len(numbers) > 0 {
+				// Preferences are best-effort: hashes are enough for the command to be
+				// useful, and failing this auxiliary call should not force the agent
+				// back into running multiple commands.
+				loadedPrefs, prefsErr := c.UserPreference(cmd.Context())
+				if prefsErr == nil {
+					prefs = loadedPrefs
+				}
+			}
+
+			accounts := summarizeAccounts(numbers, prefs)
+			meta := output.NewMetadata()
+			meta.Returned = len(accounts)
+
+			return output.WriteSuccess(w, accountSummaryData{Accounts: accounts}, meta)
+		},
+	}
 }
 
 // newAccountListCmd returns the Cobra subcommand for listing all accounts.
@@ -154,7 +244,9 @@ func newAccountListCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		Long: `List all linked Schwab accounts with nicknames and settings enriched from
 the preferences API. Use --positions to include current positions for each
 account in the response. Nicknames are loaded best-effort and omitted if
-the preferences API is unavailable.`,
+the preferences API is unavailable. Agents that only need account hashes,
+nicknames, and primary account markers should use account summary for a smaller
+one-command account picker.`,
 		Example: `  schwab-agent account list
   schwab-agent account list --positions`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -228,18 +320,18 @@ config. Results are enriched with nicknames from the preferences API. Use
 				return err
 			}
 
-		// Enrich with nickname from user preferences (best-effort).
-		prefs, prefsErr := c.UserPreference(cmd.Context())
-		if prefsErr == nil {
-			accounts := []models.Account{*account}
-			enrichAccountsWithPreferences(accounts, prefs)
-			account = &accounts[0]
-		}
+			// Enrich with nickname from user preferences (best-effort).
+			prefs, prefsErr := c.UserPreference(cmd.Context())
+			if prefsErr == nil {
+				accounts := []models.Account{*account}
+				enrichAccountsWithPreferences(accounts, prefs)
+				account = &accounts[0]
+			}
 
-		meta := output.NewMetadata()
-		meta.Account = hash
+			meta := output.NewMetadata()
+			meta.Account = hash
 
-		return output.WriteSuccess(w, account, meta)
+			return output.WriteSuccess(w, account, meta)
 		},
 	}
 

@@ -9,14 +9,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/leodido/structcli"
 	"github.com/leodido/structcli/debug"
 	structclimcp "github.com/leodido/structcli/mcp"
 	"github.com/spf13/cobra"
 
-	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/commands"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -27,15 +25,13 @@ var version = "dev"
 func main() {
 	root := buildApp(os.Stdout)
 
-	if err := root.Execute(); err != nil {
-		// Cobra returns plain fmt.Errorf errors for unknown commands. Wrap them
-		// in ValidationError so the JSON output uses VALIDATION_ERROR instead of
-		// UNKNOWN, which is more useful for agents parsing the output.
-		if strings.HasPrefix(err.Error(), "unknown command") {
-			err = apperr.NewValidationError(err.Error(), err)
+	cmd, err := structcli.ExecuteC(root)
+	if err != nil {
+		exitCode, writeErr := output.WriteCommandError(os.Stdout, cmd, err)
+		if writeErr != nil {
+			os.Exit(1)
 		}
-		_ = output.WriteError(os.Stdout, err)
-		os.Exit(apperr.ExitCodeFor(err))
+		os.Exit(exitCode)
 	}
 }
 

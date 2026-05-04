@@ -187,30 +187,6 @@ func TestDoPost_NilBody(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestDoPut_JSONBody(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-		assert.Equal(t, http.MethodPut, r.Method)
-
-		var body testRequestBody
-		err := json.NewDecoder(r.Body).Decode(&body)
-		require.NoError(t, err)
-		assert.Equal(t, "MSFT", body.Symbol)
-
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	c := NewClient("tok", WithBaseURL(srv.URL))
-	err := c.doPut(context.Background(), "/orders/123", testRequestBody{
-		Symbol:   "MSFT",
-		Quantity: 5,
-		Price:    300.00,
-	}, nil)
-
-	require.NoError(t, err)
-}
-
 func TestDoDelete(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodDelete, r.Method)

@@ -112,6 +112,28 @@ func mustMarshalJSON(t *testing.T, value any) string {
 	return string(encoded)
 }
 
+// writeTestOrderResponse writes a compact order fixture for action command tests.
+func writeTestOrderResponse(t *testing.T, w http.ResponseWriter, orderID int64, status models.OrderStatus, symbol string) {
+	t.Helper()
+
+	w.Header().Set("Content-Type", "application/json")
+	response := models.Order{
+		OrderID:           &orderID,
+		Status:            &status,
+		OrderType:         models.OrderTypeLimit,
+		OrderStrategyType: models.OrderStrategyTypeSingle,
+		OrderLegCollection: []models.OrderLegCollection{{
+			Instruction: models.InstructionBuy,
+			Quantity:    10,
+			Instrument: models.OrderInstrument{
+				AssetType: models.AssetTypeEquity,
+				Symbol:    symbol,
+			},
+		}},
+	}
+	require.NoError(t, json.NewEncoder(w).Encode(response))
+}
+
 func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 	t.Parallel()
 
@@ -224,15 +246,20 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 
 	var received models.OrderRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, "/trader/v1/accounts/default-hash/orders", r.URL.Path)
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/default-hash/orders":
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &received))
 
-		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		require.NoError(t, json.Unmarshal(body, &received))
-
-		w.Header().Set("Location", "/trader/v1/accounts/default-hash/orders/67890")
-		w.WriteHeader(http.StatusCreated)
+			w.Header().Set("Location", "/trader/v1/accounts/default-hash/orders/67890")
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/default-hash/orders/67890":
+			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "AAPL")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -266,6 +293,10 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(67890), data["orderId"])
+	order, ok := data["order"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(67890), order["orderId"])
+	assert.Equal(t, "QUEUED", order["status"])
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
@@ -274,15 +305,20 @@ func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 
 	var received models.OrderRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, "/trader/v1/accounts/hash123/orders", r.URL.Path)
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/hash123/orders":
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &received))
 
-		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		require.NoError(t, json.Unmarshal(body, &received))
-
-		w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/24680")
-		w.WriteHeader(http.StatusCreated)
+			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/24680")
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/24680":
+			writeTestOrderResponse(t, w, 24680, models.OrderStatusQueued, "MSFT")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -308,6 +344,52 @@ func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(24680), data["orderId"])
+	order, ok := data["order"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(24680), order["orderId"])
+	assert.Equal(t, "QUEUED", order["status"])
+}
+
+func TestNewOrderCmdPlaceNoLocationReturnsPartialSuccess(t *testing.T) {
+	t.Parallel()
+
+	var getRequests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/hash123/orders":
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodGet:
+			getRequests++
+			t.Errorf("unexpected follow-up GET without an order ID: %s", r.URL.Path)
+			http.NotFound(w, r)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
+	orderRequest, err := orderbuilder.BuildEquityOrder(&orderbuilder.EquityParams{
+		Symbol:    "MSFT",
+		Action:    models.InstructionBuy,
+		Quantity:  2,
+		OrderType: models.OrderTypeMarket,
+	})
+	require.NoError(t, err)
+
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "place", "--spec", mustMarshalJSON(t, orderRequest))
+	require.NoError(t, err)
+
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(0), data["orderId"])
+	assert.NotContains(t, data, "order")
+	assert.Equal(t, 0, getRequests)
+	require.Len(t, envelope.Errors, 1)
+	assert.Contains(t, envelope.Errors[0], "did not return an order ID")
 }
 
 func TestNewOrderCmdPlaceUnknownFlagSuggestsSubcommand(t *testing.T) {
@@ -497,15 +579,20 @@ func TestNewOrderCmdPlaceOCOPipeline(t *testing.T) {
 
 	var received models.OrderRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, "/trader/v1/accounts/default-hash/orders", r.URL.Path)
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/default-hash/orders":
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &received))
 
-		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		require.NoError(t, json.Unmarshal(body, &received))
-
-		w.Header().Set("Location", "/trader/v1/accounts/default-hash/orders/55555")
-		w.WriteHeader(http.StatusCreated)
+			w.Header().Set("Location", "/trader/v1/accounts/default-hash/orders/55555")
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/default-hash/orders/55555":
+			writeTestOrderResponse(t, w, 55555, models.OrderStatusQueued, "AAPL")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -534,6 +621,9 @@ func TestNewOrderCmdPlaceOCOPipeline(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(55555), data["orderId"])
+	order, ok := data["order"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(55555), order["orderId"])
 }
 
 // --- Spread build tests (iron condor, vertical, strangle, straddle, covered call) ---
@@ -1864,9 +1954,15 @@ func TestNewOrderCmdCancelSuccess(t *testing.T) {
 
 	// Arrange
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodDelete, r.Method)
-		assert.Equal(t, "/trader/v1/accounts/hash123/orders/12345", r.URL.Path)
-		w.WriteHeader(http.StatusOK)
+		switch {
+		case r.Method == http.MethodDelete && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			writeTestOrderResponse(t, w, 12345, models.OrderStatusCanceled, "AAPL")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -1883,6 +1979,10 @@ func TestNewOrderCmdCancelSuccess(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, float64(12345), data["orderId"])
 	assert.Equal(t, true, data["canceled"])
+	order, ok := data["order"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(12345), order["orderId"])
+	assert.Equal(t, "CANCELED", order["status"])
 }
 
 func TestNewOrderCmdCancelOrderIDFlagSuccess(t *testing.T) {
@@ -1890,9 +1990,15 @@ func TestNewOrderCmdCancelOrderIDFlagSuccess(t *testing.T) {
 
 	// Arrange
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodDelete, r.Method)
-		assert.Equal(t, "/trader/v1/accounts/hash123/orders/1234567890", r.URL.Path)
-		w.WriteHeader(http.StatusOK)
+		switch {
+		case r.Method == http.MethodDelete && r.URL.Path == "/trader/v1/accounts/hash123/orders/1234567890":
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/1234567890":
+			writeTestOrderResponse(t, w, 1234567890, models.OrderStatusCanceled, "AAPL")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -1909,6 +2015,42 @@ func TestNewOrderCmdCancelOrderIDFlagSuccess(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, float64(1234567890), data["orderId"])
 	assert.Equal(t, true, data["canceled"])
+	order, ok := data["order"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1234567890), order["orderId"])
+	assert.Equal(t, "CANCELED", order["status"])
+}
+
+func TestNewOrderCmdCancelGetFailureReturnsPartialSuccess(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodDelete && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			http.Error(w, "eventual consistency", http.StatusInternalServerError)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := testClient(t, server)
+
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "cancel", "12345")
+	require.NoError(t, err)
+
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(12345), data["orderId"])
+	assert.Equal(t, true, data["canceled"])
+	assert.NotContains(t, data, "order")
+	require.Len(t, envelope.Errors, 1)
+	assert.Contains(t, envelope.Errors[0], "order details unavailable")
 }
 
 func TestNewOrderCmdCancelMutableDisabled(t *testing.T) {
@@ -1959,14 +2101,20 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 	// Arrange
 	var received models.OrderRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPut, r.Method)
-		assert.Equal(t, "/trader/v1/accounts/hash123/orders/12345", r.URL.Path)
+		switch {
+		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &received))
 
-		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		require.NoError(t, json.Unmarshal(body, &received))
-
-		w.WriteHeader(http.StatusOK)
+			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/67890":
+			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "AAPL")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -2001,8 +2149,12 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(12345), data["orderId"])
+	assert.Equal(t, float64(67890), data["orderId"])
 	assert.Equal(t, true, data["replaced"])
+	order, ok := data["order"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(67890), order["orderId"])
+	assert.Equal(t, "QUEUED", order["status"])
 }
 
 func TestNewOrderCmdReplaceOrderIDFlagSuccess(t *testing.T) {
@@ -2010,9 +2162,15 @@ func TestNewOrderCmdReplaceOrderIDFlagSuccess(t *testing.T) {
 
 	// Arrange
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPut, r.Method)
-		assert.Equal(t, "/trader/v1/accounts/hash123/orders/1234567890", r.URL.Path)
-		w.WriteHeader(http.StatusOK)
+		switch {
+		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/1234567890":
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/1234567890":
+			writeTestOrderResponse(t, w, 1234567890, models.OrderStatusReplaced, "AAPL")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -2043,6 +2201,10 @@ func TestNewOrderCmdReplaceOrderIDFlagSuccess(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, float64(1234567890), data["orderId"])
 	assert.Equal(t, true, data["replaced"])
+	order, ok := data["order"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1234567890), order["orderId"])
+	assert.Equal(t, "REPLACED", order["status"])
 }
 
 func TestNewOrderCmdReplaceMutableDisabled(t *testing.T) {

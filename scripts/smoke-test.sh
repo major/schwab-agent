@@ -134,6 +134,7 @@ run_help_test "auth login"        auth login
 run_help_test "auth status"       auth status
 run_help_test "auth refresh"      auth refresh
 run_help_test "account"           account
+run_help_test "account summary"   account summary
 run_help_test "account list"      account list
 run_help_test "account get"       account get
 run_help_test "account numbers"   account numbers
@@ -534,6 +535,7 @@ run_test "auth status" auth status
 
 section "Account"
 
+run_test "account summary" account summary
 run_test "account list" account list
 run_test "account numbers" account numbers
 run_test "account list --positions" account list --positions

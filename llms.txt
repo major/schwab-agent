@@ -4,6 +4,14 @@ https://github.com/major/schwab-agent
 
 > CLI tool for AI agents to trade via Schwab APIs
 
+## Discovery
+
+Run `schwab-agent --jsonschema=tree` first when you need to discover commands, flags, enum values, defaults, config keys, or environment variable bindings. Treat that JSON Schema tree as the authoritative shell command contract. Use this file for workflow guidance and static context after choosing the command and flags from the schema.
+
+```bash
+schwab-agent --jsonschema=tree
+```
+
 ## Commands
 
 - [schwab-agent](#schwab-agent): CLI tool for AI agents to trade via Schwab APIs
@@ -11,6 +19,9 @@ https://github.com/major/schwab-agent
 details, look up account numbers and hash values, set a default account, and
 query transaction history. Account list and get enrich results with nicknames
 from the preferences API (best-effort, degrades gracefully).
+- [schwab-agent account summary](#schwab-agent-account-summary): List compact account identifiers for agents. Returns account hashes from the
+account numbers endpoint and best-effort nickname, primary-account marker, and
+account type from user preferences without fetching balances or positions.
 - [schwab-agent account get](#schwab-agent-account-get): Get details for a single account by hash value. The hash can be passed as a
 positional argument, via --account, or resolved from the default_account
 config. Results are enriched with nicknames from the preferences API. Use
@@ -277,6 +288,16 @@ Manage Schwab trading accounts. List accounts with nicknames, view account
 details, look up account numbers and hash values, set a default account, and
 query transaction history. Account list and get enrich results with nicknames
 from the preferences API (best-effort, degrades gracefully).
+
+## schwab-agent account summary
+
+List compact account identifiers for agents. This is the smallest account picker
+for LLM workflows: it returns accountHash, accountNumber, nickName,
+primaryAccount, and type when preferences are available. It calls accountNumbers
+for hashes, joins optional userPreference fields by account number, and does not
+fetch balances or positions. It has no command-specific flags, enum values,
+config keys, or environment bindings; use root flags like --config and --token
+from the schema tree when needed.
 
 ## schwab-agent account get
 

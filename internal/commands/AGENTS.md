@@ -120,7 +120,7 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 | File | Command | Subcommands |
 |---|---|---|
 | auth.go | auth | login, status, refresh |
-| account.go | account | list, get, numbers, set-default, transaction (list, get) |
+| account.go | account | summary, list, get, numbers, set-default, transaction (list, get) |
 | position.go | position | list (--all-accounts, --account) |
 | quote.go | quote | get |
 | order.go | order | list, get |

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -81,8 +82,9 @@ func TestWriteErrorAuthRequired(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, "AUTH_REQUIRED", errorEnvelope.Error.Code)
-	assert.Equal(t, "authentication required", errorEnvelope.Error.Message)
+	assert.Equal(t, "auth_required", errorEnvelope.Error)
+	assert.Equal(t, "authentication required", errorEnvelope.Message)
+	assert.Equal(t, 3, errorEnvelope.ExitCode)
 }
 
 func TestWriteErrorAuthExpired(t *testing.T) {
@@ -96,8 +98,9 @@ func TestWriteErrorAuthExpired(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, "AUTH_EXPIRED", errorEnvelope.Error.Code)
-	assert.Equal(t, "auth expired", errorEnvelope.Error.Message)
+	assert.Equal(t, "auth_expired", errorEnvelope.Error)
+	assert.Equal(t, "auth expired", errorEnvelope.Message)
+	assert.Equal(t, 3, errorEnvelope.ExitCode)
 }
 
 func TestWriteErrorAuthCallback(t *testing.T) {
@@ -111,8 +114,9 @@ func TestWriteErrorAuthCallback(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, "AUTH_CALLBACK", errorEnvelope.Error.Code)
-	assert.Equal(t, "callback failed", errorEnvelope.Error.Message)
+	assert.Equal(t, "auth_callback", errorEnvelope.Error)
+	assert.Equal(t, "callback failed", errorEnvelope.Message)
+	assert.Equal(t, 3, errorEnvelope.ExitCode)
 }
 
 func TestWriteErrorOrderRejected(t *testing.T) {
@@ -126,8 +130,9 @@ func TestWriteErrorOrderRejected(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, "ORDER_REJECTED", errorEnvelope.Error.Code)
-	assert.Equal(t, "order rejected", errorEnvelope.Error.Message)
+	assert.Equal(t, "order_rejected", errorEnvelope.Error)
+	assert.Equal(t, "order rejected", errorEnvelope.Message)
+	assert.Equal(t, 5, errorEnvelope.ExitCode)
 }
 
 func TestWriteErrorSymbolNotFound(t *testing.T) {
@@ -141,8 +146,9 @@ func TestWriteErrorSymbolNotFound(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, "SYMBOL_NOT_FOUND", errorEnvelope.Error.Code)
-	assert.Equal(t, "symbol not found", errorEnvelope.Error.Message)
+	assert.Equal(t, "symbol_not_found", errorEnvelope.Error)
+	assert.Equal(t, "symbol not found", errorEnvelope.Message)
+	assert.Equal(t, 2, errorEnvelope.ExitCode)
 }
 
 func TestWriteErrorAccountNotFound(t *testing.T) {
@@ -156,8 +162,9 @@ func TestWriteErrorAccountNotFound(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, "ACCOUNT_NOT_FOUND", errorEnvelope.Error.Code)
-	assert.Equal(t, "account not found", errorEnvelope.Error.Message)
+	assert.Equal(t, "account_not_found", errorEnvelope.Error)
+	assert.Equal(t, "account not found", errorEnvelope.Message)
+	assert.Equal(t, 2, errorEnvelope.ExitCode)
 }
 
 func TestWriteErrorHTTPError(t *testing.T) {
@@ -171,9 +178,11 @@ func TestWriteErrorHTTPError(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, "HTTP_ERROR", errorEnvelope.Error.Code)
-	assert.Equal(t, "http error", errorEnvelope.Error.Message)
-	assert.Contains(t, errorEnvelope.Error.Details, "500")
+	assert.Equal(t, "http_error", errorEnvelope.Error)
+	assert.Equal(t, "http error", errorEnvelope.Message)
+	assert.Equal(t, 4, errorEnvelope.ExitCode)
+	assert.Contains(t, errorEnvelope.Got, "500")
+	assert.Equal(t, "2xx response", errorEnvelope.Expected)
 }
 
 func TestWriteErrorValidationError(t *testing.T) {
@@ -187,8 +196,9 @@ func TestWriteErrorValidationError(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, "VALIDATION_ERROR", errorEnvelope.Error.Code)
-	assert.Equal(t, "validation failed", errorEnvelope.Error.Message)
+	assert.Equal(t, "validation_error", errorEnvelope.Error)
+	assert.Equal(t, "validation failed", errorEnvelope.Message)
+	assert.Equal(t, 1, errorEnvelope.ExitCode)
 }
 
 func TestWriteErrorOrderBuildError(t *testing.T) {
@@ -202,8 +212,9 @@ func TestWriteErrorOrderBuildError(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, "ORDER_BUILD_ERROR", errorEnvelope.Error.Code)
-	assert.Equal(t, "order build failed", errorEnvelope.Error.Message)
+	assert.Equal(t, "order_build_error", errorEnvelope.Error)
+	assert.Equal(t, "order build failed", errorEnvelope.Message)
+	assert.Equal(t, 1, errorEnvelope.ExitCode)
 }
 
 func TestWriteErrorGenericError(t *testing.T) {
@@ -217,8 +228,38 @@ func TestWriteErrorGenericError(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, "UNKNOWN", errorEnvelope.Error.Code)
-	assert.Equal(t, "unknown error", errorEnvelope.Error.Message)
+	assert.Equal(t, "error", errorEnvelope.Error)
+	assert.Equal(t, "unknown error", errorEnvelope.Message)
+	assert.Equal(t, 1, errorEnvelope.ExitCode)
+}
+
+func TestWriteCommandErrorUnknownFlag(t *testing.T) {
+	buf := &bytes.Buffer{}
+	cmd := &cobra.Command{
+		Use:           "test",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return nil
+		},
+	}
+	cmd.SetArgs([]string{"--bogus"})
+
+	executed, err := cmd.ExecuteC()
+	require.Error(t, err)
+
+	exitCode, writeErr := WriteCommandError(buf, executed, err)
+	require.NoError(t, writeErr)
+
+	var errorEnvelope ErrorEnvelope
+	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
+	require.NoError(t, unmarshalErr)
+
+	assert.Equal(t, "unknown_flag", errorEnvelope.Error)
+	assert.Equal(t, 12, exitCode)
+	assert.Equal(t, 12, errorEnvelope.ExitCode)
+	assert.Equal(t, "bogus", errorEnvelope.Flag)
+	assert.Equal(t, "test", errorEnvelope.Command)
 }
 
 func TestWriteErrorWithDetails(t *testing.T) {
@@ -232,7 +273,7 @@ func TestWriteErrorWithDetails(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, "additional context", errorEnvelope.Error.Details)
+	assert.Equal(t, "additional context", errorEnvelope.Hint)
 }
 
 func TestWritePartial(t *testing.T) {
@@ -346,9 +387,8 @@ func TestErrorEnvelopeJSONStructure(t *testing.T) {
 	require.NoError(t, unmarshalErr)
 
 	assert.Contains(t, raw, "error")
-	errorObj := raw["error"].(map[string]any)
-	assert.Contains(t, errorObj, "code")
-	assert.Contains(t, errorObj, "message")
+	assert.Contains(t, raw, "exit_code")
+	assert.Contains(t, raw, "message")
 }
 
 func TestWriteSuccessWithEmptyMetadata(t *testing.T) {

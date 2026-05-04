@@ -84,7 +84,7 @@ schwab-agent auth status
 
 ## Usage
 
-Every command returns structured JSON. Success responses use a `{"data": ..., "metadata": ...}` envelope. Errors use `{"error": {"code": ..., "message": ..., "details": ...}}`.
+Every command returns structured JSON. Success responses use a `{"data": ..., "metadata": ...}` envelope. Errors use structcli's top-level `StructuredError` shape, for example `{"error":"unknown_flag","exit_code":12,"message":"unknown flag: --bogus","command":"schwab-agent quote get","flag":"bogus"}`. Domain errors use the same shape, with remediation text in `hint` when available.
 
 Run any command with `--help` to see detailed usage, examples, and available flags.
 
@@ -94,7 +94,10 @@ Run any command with `--help` to see detailed usage, examples, and available fla
 # Get a quote
 schwab-agent quote get AAPL
 
-# List accounts
+# List compact account identifiers for agent workflows
+schwab-agent account summary
+
+# List full account details and balances
 schwab-agent account list
 
 # Get option chains
@@ -108,7 +111,7 @@ schwab-agent order place equity \
   --symbol AAPL \
   --action BUY \
   --quantity 10 \
-  --order-type LIMIT \
+  --type LIMIT \
   --price 150.00 \
   --duration DAY
 
@@ -117,14 +120,14 @@ schwab-agent order preview equity \
   --symbol AAPL \
   --action BUY \
   --quantity 10 \
-  --order-type MARKET
+  --type MARKET
 
 # Build order JSON offline
 schwab-agent order build equity \
   --symbol AAPL \
   --action BUY \
   --quantity 10 \
-  --order-type LIMIT \
+  --type LIMIT \
   --price 150.00 \
   --duration DAY
 
@@ -137,7 +140,7 @@ schwab-agent order place --spec @order.json
 | Command | Description |
 |---|---|
 | `auth` | Login, status, token refresh |
-| `account` | List (with nicknames), get details, set default, transactions |
+| `account` | Compact summaries, full account details, hashes, set default, transactions |
 | `position` | List positions for one or all accounts (with computed cost basis and P&L) |
 | `quote` | Get quotes for one or more symbols |
 | `order` | List, get, place, preview, build, cancel, replace |
@@ -167,17 +170,17 @@ This prevents accidental trades from misconfigured agents.
 
 ## Agent integration
 
-Every command includes detailed `--help` output with usage descriptions and concrete examples that agents can reference. The `--jsonschema` flag provides machine-readable CLI introspection:
+For LLM agents: run `schwab-agent --jsonschema=tree` first when you need to discover commands, flags, enum values, defaults, config keys, or environment variable bindings. Treat this JSON Schema tree as the authoritative command contract for shell-based automation. Use `llms.txt`, `SKILL.md`, and `--help` for workflow guidance and examples after choosing the command and flags from the schema.
 
 ```bash
-# Full JSON Schema for the entire CLI
-schwab-agent --jsonschema
-
-# Tree view showing all commands with their flags
+# Canonical shell-agent discovery path for the full CLI contract
 schwab-agent --jsonschema=tree
 
 # Schema for a specific subcommand
 schwab-agent quote --jsonschema
+
+# Flat JSON Schema for the entire CLI, useful for tools that do not need hierarchy
+schwab-agent --jsonschema
 ```
 
 ## Development
@@ -203,7 +206,7 @@ internal/
   apperr/               Typed error hierarchy with exit codes
   models/               API data structures
   orderbuilder/         Order construction and validation
-  output/               JSON envelope output
+  output/               JSON success envelopes and structured error output
 ```
 
 ## Exit codes
@@ -216,6 +219,8 @@ internal/
 | 3 | Authentication required, expired, or failed |
 | 4 | HTTP error from Schwab API |
 | 5 | Order rejected |
+| 10-19 | structcli input errors, such as missing flags, invalid flag values, and unknown commands |
+| 20-29 | structcli config or environment errors |
 
 ## License
 

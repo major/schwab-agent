@@ -48,7 +48,7 @@ CI runs lint (golangci-lint v2.11), test (race detector + coverage + build verif
 
 Shell script at `scripts/smoke-test.sh`. Two tiers:
 
-- **Tier 1** (no auth, CI-safe): help text for all 64 commands/subcommands, symbol build/parse, all 13 order build sub-types with full permutations (135 tests). Runs in CI and locally via `make smoke-ci`.
+- **Tier 1** (no auth, CI-safe): help text for all 65 commands/subcommands, symbol build/parse, all 13 order build sub-types with full permutations (136 tests). Runs in CI and locally via `make smoke-ci`.
 - **Tier 2** (auth required, local only): read-only API commands (account, position, quote, order list, chain, history, instrument, market, all 11 TA indicators). Requires a valid token. Runs locally via `make smoke` (both tiers) or `SMOKE_TIER=2 ./scripts/smoke-test.sh` (tier 2 only).
 
 Each test validates exit code 0, valid JSON output, and the correct envelope structure (`.data` for API commands, raw JSON for order builds). `SMOKE_BIN` env var overrides the binary path.
@@ -90,7 +90,7 @@ spf13/cobra + leodido/structcli. `buildApp()` in main.go constructs the command 
 
 Command flags use structcli struct tags (`flag`, `flagdescr`, `default`, `flagshort`) with `Define()` for registration and `Unmarshal()` in RunE for parsing. Most order commands use `defineAndConstrain[O]()` from helpers.go, which wraps `Define()` + `MarkFlagsMutuallyExclusive`/`MarkFlagsOneRequired` in a single call. Root persistent flags (--account, --verbose, --config, --token) stay as manual Cobra registrations.
 
-11 subcommands: auth (setup/login/status), account (list/get/numbers/set-default/transaction), position (list with --all-accounts/--account), quote (get), order (list/get/place/preview/build/cancel/replace; place/build sub-types: equity/option/bracket/oco), chain, history, instrument, market (hours/movers), symbol (build/parse), ta (sma/ema/rsi/macd/atr/bbands/stoch/adx/vwap/hv/expected-move). Account list/get enriches results with nicknames from the preferences API (best-effort, degrades gracefully). Position list enriches with nicknames and adds computed cost basis / P&L fields. Order list defaults to non-terminal statuses (use --status all for everything).
+11 subcommands: auth (login/status/refresh), account (summary/list/get/numbers/set-default/transaction), position (list with --all-accounts/--account), quote (get), order (list/get/place/preview/build/cancel/replace; place/build sub-types: equity/option/bracket/oco), chain, history, instrument, market (hours/movers), symbol (build/parse), ta (sma/ema/rsi/macd/atr/bbands/stoch/adx/vwap/hv/expected-move). Account summary is the token-efficient account picker for agents: it joins account hashes from account numbers with nicknames/primary/type from user preferences without fetching full balances. Account list/get enrich full results with nicknames from the preferences API (best-effort, degrades gracefully). Position list enriches with nicknames and adds computed cost basis / P&L fields. Order list defaults to non-terminal statuses (use --status all for everything).
 
 ## Config
 
