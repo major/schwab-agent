@@ -649,6 +649,100 @@ func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 	assert.Equal(t, "QUEUED", order["status"])
 }
 
+func TestNewOrderCmdPreviewSaveAndPlaceFromPreview(t *testing.T) {
+	orderID := int64(13579)
+	previewResponse := models.PreviewOrder{OrderID: &orderID}
+	var previewedOrder models.OrderRequest
+	var placedOrder models.OrderRequest
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/hash123/previewOrder":
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &previewedOrder))
+
+			w.Header().Set("Content-Type", "application/json")
+			require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
+		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/hash123/orders":
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &placedOrder))
+
+			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/13579")
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/13579":
+			writeTestOrderResponse(t, w, 13579, models.OrderStatusQueued, "AAPL")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	t.Setenv("SCHWAB_AGENT_STATE_DIR", t.TempDir())
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
+
+	previewStdout, err := runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order", "preview", "equity",
+		"--symbol", "AAPL",
+		"--action", "BUY",
+		"--quantity", "10",
+		"--type", "LIMIT",
+		"--price", "185.25",
+		"--save-preview",
+	)
+	require.NoError(t, err)
+
+	previewEnvelope := decodeEnvelope(t, previewStdout)
+	previewData, ok := previewEnvelope.Data.(map[string]any)
+	require.True(t, ok)
+	digestData, ok := previewData["previewDigest"].(map[string]any)
+	require.True(t, ok)
+	digest, ok := digestData["digest"].(string)
+	require.True(t, ok)
+	require.Len(t, digest, 64)
+	assert.Equal(t, "hash123", digestData["account"])
+	assert.Equal(t, "order.place", digestData["operation"])
+
+	placeStdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "place", "--from-preview", digest)
+	require.NoError(t, err)
+
+	assert.Equal(t, previewedOrder, placedOrder)
+	placeEnvelope := decodeEnvelope(t, placeStdout)
+	placeData, ok := placeEnvelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "place", placeData["action"])
+	assert.Equal(t, float64(13579), placeData["orderId"])
+	assert.Equal(t, digest, placeData["previewDigest"])
+	assert.Equal(t, "verified", placeData["verificationState"])
+}
+
+func TestNewOrderCmdPlaceFromPreviewRejectsAccountMismatch(t *testing.T) {
+	t.Setenv("SCHWAB_AGENT_STATE_DIR", t.TempDir())
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := &client.Ref{}
+	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil)
+	require.NoError(t, err)
+
+	_, err = runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order", "place",
+		"--account", "hash999",
+		"--from-preview", digestData.Digest,
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not match")
+}
+
 func TestNewOrderCmdPlaceNoLocationReturnsPartialSuccess(t *testing.T) {
 	t.Parallel()
 

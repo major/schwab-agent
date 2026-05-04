@@ -1125,26 +1125,31 @@ schwab-agent order list
 
 #### `schwab-agent order place`
 
-Place an order via subcommand (equity, option, bracket, oco) or from a JSON spec
-with --spec. Requires "i-also-like-to-live-dangerously" set to true in config.json.
-Recommended workflow: check the price with quote get, build the order JSON with
-order build, preview it with order preview, then place.
+Place an order via subcommand (equity, option, bracket, oco), from a JSON spec
+with --spec, or from an exact saved preview with --from-preview. Requires
+"i-also-like-to-live-dangerously" set to true in config.json. The safest workflow
+is to run order preview --save-preview, inspect the response, then place with the
+returned previewDigest.digest value.
 
 **Flags:**
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--spec` | string | - | yes | Inline JSON, @file, or - for stdin |
+| `--from-preview` | string | - | no | Place the exact order payload saved by order preview --save-preview |
+| `--spec` | string | - | no | Inline JSON, @file, or - for stdin |
 
 **Example:**
 
 ```bash
 # Place from a JSON file
-   schwab-agent order place --spec @order.json
-   # Place from stdin (piped from order build)
-   schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -
-   # Place from inline JSON
-   schwab-agent order place --spec '{"orderType":"LIMIT",...}'
+  schwab-agent order place --spec @order.json
+  # Place the exact payload saved by a previous preview
+  schwab-agent order preview equity --account abc123 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --save-preview
+  schwab-agent order place --from-preview <digest>
+  # Place from stdin (piped from order build)
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -
+  # Place from inline JSON
+  schwab-agent order place --spec '{"orderType":"LIMIT",...}'
 ```
 
 #### `schwab-agent order place bracket`
@@ -1295,19 +1300,22 @@ Preview an order from a JSON spec or typed subcommand flags without placing it.
 Typed preview subcommands reuse the same local builders as order place, then
 return both the built order request and Schwab preview response in one envelope.
 This removes the build-then-preview round trip while keeping placement explicit.
-Does not require safety guards since no order is actually placed.
+Use --save-preview to store the exact reviewed payload locally and return a
+previewDigest.digest value for order place --from-preview. Does not require
+safety guards since no order is actually placed.
 
 **Flags:**
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
+| `--save-preview` | bool | false | no | Save this preview locally and return a digest for order place --from-preview |
 | `--spec` | string | - | yes | Inline JSON, @file, or - for stdin |
 
 **Example:**
 
 ```bash
 schwab-agent order preview --spec @order.json
-  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200
+  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --save-preview
   schwab-agent order preview option --underlying AAPL --expiration 2026-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
   schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -
 ```
@@ -1326,6 +1334,7 @@ order and Schwab's validation, fee, and commission details.
 | `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
 | `--price` | float64 | 0 | no | Entry price |
 | `--quantity` | float64 | 0 | yes | Share quantity |
+| `--save-preview` | bool | false | no | Save this preview locally and return a digest for order place --from-preview |
 | `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
 | `--stop-loss` | float64 | 0 | no | Stop-loss exit price |
 | `--symbol` | string | - | yes | Equity symbol |
@@ -1344,7 +1353,8 @@ schwab-agent order preview bracket --symbol NVDA --action BUY --quantity 10 --ty
 Preview an equity (stock) order without placing it. Supports the same flags
 as order place equity, but skips the mutable-operation safety gate because no
 order is submitted. The response includes the built order request plus Schwab's
-preview details so agents can inspect both in one call.
+preview details so agents can inspect both in one call. Add --save-preview to
+return a digest for exact-payload placement.
 
 **Flags:**
 
@@ -1358,6 +1368,7 @@ preview details so agents can inspect both in one call.
 | `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
 | `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
 | `--quantity` | float64 | 0 | yes | Share quantity |
+| `--save-preview` | bool | false | no | Save this preview locally and return a digest for order place --from-preview |
 | `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
 | `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
 | `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
@@ -1388,6 +1399,7 @@ will validate during preview.
 | `--action` | string | - | yes | Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
 | `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
 | `--quantity` | float64 | 0 | yes | Share quantity |
+| `--save-preview` | bool | false | no | Save this preview locally and return a digest for order place --from-preview |
 | `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
 | `--stop-loss` | float64 | 0 | no | Stop-loss exit price (stop order) |
 | `--symbol` | string | - | yes | Equity symbol |
@@ -1404,7 +1416,8 @@ schwab-agent order preview oco --symbol AAPL --action SELL --quantity 100 --take
 
 Preview a single-leg option order without placing it. Requires --underlying,
 --expiration, --strike, and exactly one of --call or --put. The response includes
-the locally built OCC order request and Schwab's preview response.
+the locally built OCC order request and Schwab's preview response. Add
+--save-preview to return a digest for exact-payload placement.
 
 **Flags:**
 
@@ -1420,6 +1433,7 @@ the locally built OCC order request and Schwab's preview response.
 | `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
 | `--put` | bool | false | no | Put option |
 | `--quantity` | float64 | 0 | yes | Contract quantity |
+| `--save-preview` | bool | false | no | Save this preview locally and return a digest for order place --from-preview |
 | `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
 | `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
 | `--strike` | float64 | 0 | yes | Strike price |
@@ -2180,11 +2194,14 @@ schwab-agent order list
 
 ```bash
 # Place from a JSON file
-   schwab-agent order place --spec @order.json
-   # Place from stdin (piped from order build)
-   schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -
-   # Place from inline JSON
-   schwab-agent order place --spec '{"orderType":"LIMIT",...}'
+  schwab-agent order place --spec @order.json
+  # Place the exact payload saved by a previous preview
+  schwab-agent order preview equity --account abc123 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --save-preview
+  schwab-agent order place --from-preview <digest>
+  # Place from stdin (piped from order build)
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -
+  # Place from inline JSON
+  schwab-agent order place --spec '{"orderType":"LIMIT",...}'
 ```
 
 #### schwab-agent order place bracket
@@ -2237,7 +2254,7 @@ schwab-agent order list
 
 ```bash
 schwab-agent order preview --spec @order.json
-  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200
+  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --save-preview
   schwab-agent order preview option --underlying AAPL --expiration 2026-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
   schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -
 ```
