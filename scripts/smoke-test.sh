@@ -115,23 +115,6 @@ run_error_test() {
     fi
 }
 
-# run_error_test_exit_code validates that a command exits with a specific exit code.
-# Usage: run_error_test_exit_code "test name" expected_exit_code command args...
-run_error_test_exit_code() {
-    local name="$1"
-    local expected_code="$2"
-    shift 2
-    "$BINARY" "$@" > /dev/null 2>&1
-    local actual_code=$?
-    if [ "$actual_code" -eq "$expected_code" ]; then
-        printf "${GREEN}PASS${NC} %s (exit %d)\n" "$name" "$actual_code"
-        PASS=$((PASS + 1))
-    else
-        printf "${RED}FAIL${NC} %s (expected exit %d, got %d)\n" "$name" "$expected_code" "$actual_code"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
 # run_dispatch_test validates that a shorthand command dispatches correctly.
 # Dispatch succeeds if exit code is NOT 1 (validation error). Exit 0 (success with
 # token) or exit 3 (auth error without token) both prove dispatch happened.
