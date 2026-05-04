@@ -87,13 +87,18 @@ func TestNewIndicatorsCmd_ValidEnvelope(t *testing.T) {
 	cmd := NewIndicatorsCmd(testClient(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "AAPL")
 	require.NoError(t, err)
+	outputBytes := append([]byte(nil), buf.Bytes()...)
 
 	// Assert
-	envelope, data := decodeTAEnvelope(t, &buf)
+	envelope, data := decodeTAEnvelope(t, bytes.NewBuffer(outputBytes))
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	assert.Equal(t, "dashboard", data["indicator"])
 	assert.Equal(t, "AAPL", data["symbol"])
 	assert.Equal(t, "daily", data["interval"])
+
+	_, root := decodeTAEnvelopeRoot(t, bytes.NewBuffer(outputBytes))
+	_, ok := root["AAPL"].(map[string]any)
+	require.True(t, ok, "indicators shortcut should return the normalized symbol map")
 }
 
 func TestNewIndicatorsCmd_IntervalFlag(t *testing.T) {

@@ -27,7 +27,7 @@ volume context, and 20/252-candle high-low ranges.`,
   schwab-agent indicators NVDA --interval weekly --points 10
   schwab-agent indicators AAPL MSFT NVDA`,
 		GroupID: "market-data",
-		Args:   cobra.MinimumNArgs(1),
+		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err

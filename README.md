@@ -112,7 +112,8 @@ schwab-agent chain get AAPL
 # Get a compact option planning ticket
 schwab-agent option ticket get AAPL --expiration <YYYY-MM-DD> --strike 200 --call
 
-# Get the latest row for multiple moving averages in one technical-analysis run
+# Get the latest row for multiple moving averages in one technical-analysis run.
+# Technical-analysis output is always keyed by symbol under data.<SYMBOL>.
 schwab-agent ta sma AAPL --period 21,50,200
 
 # Batch the latest technical indicator row across several symbols
@@ -198,8 +199,8 @@ schwab-agent order place --spec @order.json
 | `chain` | Option chain data (`get`, `expiration`) |
 | `option` | Option planning tickets that combine quote, chain, and OCC symbol context |
 | `history` | Price history for a symbol (alias: `price-history`) |
-| `ta` | Technical analysis (dashboard, sma, ema, rsi, macd, atr, bbands, stoch, adx, vwap, hv, expected-move) |
-| `indicators` | Technical analysis dashboard shortcut |
+| `ta` | Technical analysis with symbol-keyed JSON output (dashboard, sma, ema, rsi, macd, atr, bbands, stoch, adx, vwap, hv, expected-move) |
+| `indicators` | Technical analysis dashboard shortcut with symbol-keyed JSON output |
 | `analyze` | Combined quote and technical analysis dashboard |
 | `market` | Market hours and top movers |
 | `symbol` | Build and parse OCC option symbols (no auth required) |

@@ -293,8 +293,10 @@ constructed symbol and its components.
 - [schwab-agent symbol parse](#schwab-agent-symbol-parse): Parse an OCC option symbol string into its underlying, expiration date, strike
 price, and contract type components. No API call or authentication required.
 - [schwab-agent ta](#schwab-agent-ta): Compute technical analysis indicators from Schwab price history. All indicators
-are calculated locally after fetching candles. Use --interval to select data
-frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
+are calculated locally after fetching candles. Results are always keyed by
+symbol under data.<SYMBOL>, even when one symbol is requested, so agents can use
+the same parser for single-symbol and batch analysis. Use --interval to select
+data frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
 default --points to 1 for token-efficient latest-value output; use --points 0
 when you need the full computed series.
 - [schwab-agent ta adx](#schwab-agent-ta-adx): Compute Average Directional Index for a symbol. ADX above 25 indicates a
@@ -1418,8 +1420,10 @@ price, and contract type components. No API call or authentication required.
 ## schwab-agent ta
 
 Compute technical analysis indicators from Schwab price history. All indicators
-are calculated locally after fetching candles. Use --interval to select data
-frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
+are calculated locally after fetching candles. Results are always keyed by
+symbol under data.<SYMBOL>, even when one symbol is requested, so agents can use
+the same parser for single-symbol and batch analysis. Use --interval to select
+data frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
 default --points to 1 for token-efficient latest-value output; use --points 0
 when you need the full computed series.
 
