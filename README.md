@@ -128,6 +128,9 @@ schwab-agent order preview equity \
   --quantity 10 \
   --type MARKET
 
+# Show recent order activity, including filled/canceled/replaced orders
+schwab-agent order list --recent
+
 # Build order JSON offline
 schwab-agent order build equity \
   --symbol AAPL \

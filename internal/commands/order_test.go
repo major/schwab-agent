@@ -1969,6 +1969,43 @@ func TestNewOrderCmdListStatusAllDisablesFiltering(t *testing.T) {
 	require.Len(t, orders, 3, "should return all orders when --status all")
 }
 
+func TestNewOrderCmdListRecentIncludesTerminalStatuses(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/trader/v1/orders", r.URL.Path)
+		assert.Empty(t, r.URL.Query().Get("status"), "recent with no explicit status should request all activity")
+
+		from := r.URL.Query().Get("fromEnteredTime")
+		require.NotEmpty(t, from)
+		parsedFrom, err := time.Parse(time.RFC3339, from)
+		require.NoError(t, err)
+		assert.WithinDuration(t, time.Now().UTC().Add(-24*time.Hour), parsedFrom, 2*time.Second)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err = w.Write([]byte(`[
+			{"orderId":1,"status":"FILLED"},
+			{"orderId":2,"status":"CANCELED"},
+			{"orderId":3,"status":"WORKING"}
+		]`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "list", "--recent")
+	require.NoError(t, err)
+
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	orders, ok := data["orders"].([]any)
+	require.True(t, ok)
+	require.Len(t, orders, 3, "recent mode should retain terminal activity")
+}
+
 func TestNewOrderCmdListExplicitStatusBypassesDefault(t *testing.T) {
 	t.Parallel()
 

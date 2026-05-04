@@ -3,6 +3,7 @@ package commands
 import (
 	"io"
 	"strings"
+	"time"
 
 	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
@@ -30,6 +31,7 @@ type orderListOpts struct {
 	Status []string `flag:"status" flagdescr:"Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc."`
 	From   string   `flag:"from" flagdescr:"Filter by entered time lower bound"`
 	To     string   `flag:"to" flagdescr:"Filter by entered time upper bound"`
+	Recent bool     `flag:"recent" flagdescr:"Show recent order activity, including terminal statuses, from the last 24 hours unless --from is set"`
 }
 
 // Attach implements structcli.Options interface.
@@ -101,9 +103,12 @@ func newOrderListCmd(c *client.Ref, _ string, w io.Writer) *cobra.Command {
 		Long: `List orders for the current account, or all accounts when no --account is set.
 By default, terminal statuses (FILLED, CANCELED, REJECTED, EXPIRED, REPLACED)
 are filtered out to show only actionable orders. Use --status all to see
-everything. Multiple --status values fan out into separate API calls with
-merged, deduplicated results.`,
+everything. Use --recent for an agent-friendly recent activity view that keeps
+terminal statuses and narrows the default lookback to 24 hours. Multiple
+--status values fan out into separate API calls with merged, deduplicated
+results.`,
 		Example: `  schwab-agent order list
+  schwab-agent order list --recent
   schwab-agent order list --status all
   schwab-agent order list --status WORKING --status PENDING_ACTIVATION
   schwab-agent order list --status WORKING,FILLED,EXPIRED
@@ -123,7 +128,7 @@ merged, deduplicated results.`,
 				}
 			}
 
-			showAll := false
+			showAll := opts.Recent && len(statuses) == 0
 			for _, s := range statuses {
 				if err := validateOrderStatusFilter(s); err != nil {
 					return err
@@ -140,9 +145,17 @@ merged, deduplicated results.`,
 				apiStatuses = statuses
 			}
 
+			from := strings.TrimSpace(opts.From)
+			if opts.Recent && from == "" {
+				// Recent activity is meant for post-mutation verification. A 24-hour
+				// lookback keeps filled/canceled/replaced orders visible without the
+				// noisier 60-day default used by the underlying Schwab endpoint.
+				from = time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339)
+			}
+
 			params := client.OrderListParams{
 				Statuses:        apiStatuses,
-				FromEnteredTime: strings.TrimSpace(opts.From),
+				FromEnteredTime: from,
 				ToEnteredTime:   strings.TrimSpace(opts.To),
 			}
 
@@ -162,7 +175,7 @@ merged, deduplicated results.`,
 				return err
 			}
 
-			if len(statuses) == 0 {
+			if len(statuses) == 0 && !opts.Recent {
 				orders = filterNonTerminalOrders(orders)
 			}
 
