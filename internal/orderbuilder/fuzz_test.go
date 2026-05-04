@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/major/schwab-agent/internal/models"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // FuzzParseOCCSymbol verifies that ParseOCCSymbol never panics on arbitrary input.
@@ -35,25 +37,20 @@ func FuzzParseOCCSymbol(f *testing.F) {
 		}
 
 		// If parsing succeeded, verify invariants.
-		if result.Underlying == "" {
-			t.Error("parsed successfully but underlying is empty")
-		}
+		assert.NotEmpty(t, result.Underlying, "parsed successfully but underlying is empty")
 
-		if result.PutCall != "CALL" && result.PutCall != "PUT" {
-			t.Errorf("parsed successfully but put/call is %q", result.PutCall)
-		}
+		assert.True(
+			t,
+			result.PutCall == "CALL" || result.PutCall == "PUT",
+			"parsed successfully but put/call is %q",
+			result.PutCall,
+		)
 
-		if result.Strike <= 0 {
-			t.Errorf("parsed successfully but strike is %f", result.Strike)
-		}
+		assert.Greater(t, result.Strike, 0.0, "parsed successfully but strike is non-positive")
 
-		if result.Expiration.IsZero() {
-			t.Error("parsed successfully but expiration is zero")
-		}
+		assert.False(t, result.Expiration.IsZero(), "parsed successfully but expiration is zero")
 
-		if result.Symbol != input {
-			t.Errorf("parsed successfully but Symbol field is %q, want %q", result.Symbol, input)
-		}
+		assert.Equal(t, input, result.Symbol, "parsed Symbol field mismatch")
 	})
 }
 
@@ -113,30 +110,18 @@ func FuzzBuildParseOCCRoundTrip(f *testing.F) {
 		symbol := BuildOCCSymbol(trimmed, expiration, strike, putCall)
 
 		parsed, err := ParseOCCSymbol(symbol)
-		if err != nil {
-			t.Fatalf("BuildOCCSymbol produced unparseable symbol %q: %v", symbol, err)
-		}
+		require.NoError(t, err, "BuildOCCSymbol produced unparseable symbol %q", symbol)
 
 		// BuildOCCSymbol right-pads to 6 chars, ParseOCCSymbol trims.
 		// Compare against the trimmed input to account for this.
-		if parsed.Underlying != trimmed {
-			t.Errorf("underlying: got %q, want %q", parsed.Underlying, trimmed)
-		}
+		assert.Equal(t, trimmed, parsed.Underlying, "underlying mismatch")
 
-		if parsed.PutCall != putCall {
-			t.Errorf("putCall: got %q, want %q", parsed.PutCall, putCall)
-		}
+		assert.Equal(t, putCall, parsed.PutCall, "putCall mismatch")
 
-		if parsed.Expiration.Year() != year {
-			t.Errorf("year: got %d, want %d", parsed.Expiration.Year(), year)
-		}
+		assert.Equal(t, year, parsed.Expiration.Year(), "year mismatch")
 
-		if parsed.Expiration.Month() != time.Month(month) {
-			t.Errorf("month: got %v, want %v", parsed.Expiration.Month(), time.Month(month))
-		}
+		assert.Equal(t, time.Month(month), parsed.Expiration.Month(), "month mismatch")
 
-		if parsed.Expiration.Day() != day {
-			t.Errorf("day: got %d, want %d", parsed.Expiration.Day(), day)
-		}
+		assert.Equal(t, day, parsed.Expiration.Day(), "day mismatch")
 	})
 }
