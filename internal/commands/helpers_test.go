@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/leodido/structcli"
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/spf13/cobra"
@@ -19,8 +20,15 @@ type defineAndConstrainTestOpts struct {
 	Put  bool `flag:"put" flagdescr:"Put option"`
 }
 
+type flagValidationTestOpts struct {
+	Interval taInterval `flag:"interval" flagdescr:"Data interval" default:"daily"`
+}
+
 // Attach implements structcli.Options for defineAndConstrainTestOpts.
 func (o *defineAndConstrainTestOpts) Attach(_ *cobra.Command) error { return nil }
+
+// Attach implements structcli.Options for flagValidationTestOpts.
+func (o *flagValidationTestOpts) Attach(_ *cobra.Command) error { return nil }
 
 // testClient creates a *client.Ref backed by the given httptest server.
 func testClient(t *testing.T, server *httptest.Server) *client.Ref {
@@ -147,4 +155,61 @@ func TestDefineAndConstrain(t *testing.T) {
 	_, err = runTestCommand(t, cmd, "--call", "--put")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "if any flags in the group [call put] are set none of the others can be")
+}
+
+func TestNormalizeFlagValidationError(t *testing.T) {
+	t.Run("invalid enum includes bad value and valid values", func(t *testing.T) {
+		// Arrange - structcli annotates registered enum flags with the canonical
+		// values that should appear in remediation text.
+		cmd := &cobra.Command{
+			Use:  "indicator",
+			RunE: func(_ *cobra.Command, _ []string) error { return nil },
+		}
+		cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
+		require.NoError(t, structcli.Define(cmd, &flagValidationTestOpts{}))
+
+		// Act
+		_, err := runTestCommand(t, cmd, "--interval", "bogus")
+
+		// Assert
+		var valErr *apperr.ValidationError
+		require.ErrorAs(t, err, &valErr)
+		assert.Equal(t, `invalid interval: "bogus" (valid: 15min, 1min, 30min, 5min, daily, weekly)`, valErr.Error())
+	})
+
+	t.Run("non-enum invalid value passes through unchanged", func(t *testing.T) {
+		// Arrange
+		cmd := &cobra.Command{Use: "counter"}
+		cmd.Flags().Int("count", 0, "Count")
+
+		rawErr := errors.New(`invalid argument "bogus" for "--count" flag: invalid value`)
+
+		// Act
+		err := normalizeFlagValidationErrorFunc(cmd, rawErr)
+
+		// Assert
+		assert.Same(t, rawErr, err)
+	})
+
+	t.Run("unknown flag passes through unchanged", func(t *testing.T) {
+		// Arrange
+		rawErr := errors.New("unknown flag: --bogus")
+
+		// Act
+		err := normalizeFlagValidationError(rawErr)
+
+		// Assert
+		assert.Same(t, rawErr, err)
+	})
+
+	t.Run("missing flag argument passes through unchanged", func(t *testing.T) {
+		// Arrange
+		rawErr := errors.New("flag needs an argument: --symbol")
+
+		// Act
+		err := normalizeFlagValidationError(rawErr)
+
+		// Assert
+		assert.Same(t, rawErr, err)
+	})
 }

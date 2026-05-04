@@ -11,6 +11,8 @@ import (
 	"github.com/major/schwab-agent/internal/apperr"
 )
 
+const structcliFlagEnumAnnotation = "leodido/structcli/flag-enum"
+
 // requireArg returns a ValidationError if value is empty.
 // Use this for required positional arguments and flag values.
 func requireArg(value, name string) error {
@@ -151,9 +153,19 @@ func suggestSubcommands(cmd *cobra.Command, err error) error {
 // command-level validation messages while still letting structcli/pflag reject
 // invalid enum values before RunE starts.
 func normalizeFlagValidationError(err error) error {
+	return normalizeFlagValidationErrorWithCommand(nil, err)
+}
+
+func normalizeFlagValidationErrorWithCommand(cmd *cobra.Command, err error) error {
 	message := err.Error()
 	if !strings.Contains(message, "invalid value") || !strings.Contains(message, " for \"--") {
 		return err
+	}
+
+	invalidValue := ""
+	if before, after, ok := strings.Cut(message, "invalid argument \""); ok {
+		_ = before
+		invalidValue, _, _ = strings.Cut(after, "\"")
 	}
 
 	_, after, ok := strings.Cut(message, " for \"--")
@@ -165,11 +177,68 @@ func normalizeFlagValidationError(err error) error {
 		return err
 	}
 
-	return newValidationError("invalid " + flagName)
+	validValues := enumValuesForFlag(cmd, flagName)
+	if len(validValues) == 0 {
+		validValues = enumValuesFromMessage(message)
+	}
+	if invalidValue == "" || len(validValues) == 0 {
+		return err
+	}
+
+	return newValidationError(fmt.Sprintf("invalid %s: %q (valid: %s)", flagName, invalidValue, validEnumString(validValues)))
 }
 
-func normalizeFlagValidationErrorFunc(_ *cobra.Command, err error) error {
-	return normalizeFlagValidationError(err)
+func normalizeFlagValidationErrorFunc(cmd *cobra.Command, err error) error {
+	if cmd == nil {
+		return normalizeFlagValidationError(err)
+	}
+
+	return normalizeFlagValidationErrorWithCommand(cmd, err)
+}
+
+func enumValuesForFlag(cmd *cobra.Command, flagName string) []string {
+	if cmd == nil {
+		return nil
+	}
+
+	flag := cmd.Flags().Lookup(flagName)
+	if flag == nil {
+		flag = cmd.InheritedFlags().Lookup(flagName)
+	}
+	if flag == nil || flag.Annotations == nil {
+		return nil
+	}
+
+	return cleanEnumValues(flag.Annotations[structcliFlagEnumAnnotation])
+}
+
+func enumValuesFromMessage(message string) []string {
+	_, after, ok := strings.Cut(message, "(allowed: ")
+	if !ok {
+		return nil
+	}
+	values, _, ok := strings.Cut(after, ")")
+	if !ok {
+		return nil
+	}
+
+	return cleanEnumValues(strings.Split(values, ","))
+}
+
+func cleanEnumValues(values []string) []string {
+	clean := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		// structcli registrations for optional enum flags include an empty value so
+		// the flag can be omitted. That zero value is implementation detail, not
+		// useful remediation text for someone who typed a bad explicit value.
+		if value == "" {
+			continue
+		}
+		clean = append(clean, value)
+	}
+
+	return clean
 }
 
 // visibleSubcommandNames returns only invokable subcommands for user-facing
