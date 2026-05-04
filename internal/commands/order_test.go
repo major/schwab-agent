@@ -264,6 +264,83 @@ func TestNewOrderCmdSpecSemanticValidation(t *testing.T) {
 	assert.Zero(t, requests)
 }
 
+func TestNewOrderCmdPreviewSpecAcceptsTriggerOrders(t *testing.T) {
+	t.Parallel()
+
+	var requestBodies []string
+	orderID := int64(4244)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/trader/v1/accounts/hash123/previewOrder", r.URL.Path)
+
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		requestBodies = append(requestBodies, string(body))
+
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{OrderID: &orderID}))
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
+	bracket, err := orderbuilder.BuildBracketOrder(&orderbuilder.BracketParams{
+		Symbol:     "AAPL",
+		Action:     models.InstructionBuy,
+		Quantity:   10,
+		OrderType:  models.OrderTypeLimit,
+		Price:      150,
+		TakeProfit: 160,
+		StopLoss:   140,
+	})
+	require.NoError(t, err)
+	primary, err := orderbuilder.BuildEquityOrder(&orderbuilder.EquityParams{
+		Symbol:    "MSFT",
+		Action:    models.InstructionBuy,
+		Quantity:  1,
+		OrderType: models.OrderTypeMarket,
+	})
+	require.NoError(t, err)
+	secondary, err := orderbuilder.BuildEquityOrder(&orderbuilder.EquityParams{
+		Symbol:    "NVDA",
+		Action:    models.InstructionBuy,
+		Quantity:  1,
+		OrderType: models.OrderTypeMarket,
+	})
+	require.NoError(t, err)
+	fts, err := orderbuilder.BuildFTSOrder(&orderbuilder.FTSParams{Primary: *primary, Secondary: *secondary})
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name string
+		spec string
+	}{
+		{name: "bracket", spec: mustMarshalJSON(t, bracket)},
+		{name: "fts", spec: mustMarshalJSON(t, &fts)},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "preview", "--spec", testCase.spec)
+			require.NoError(t, err)
+
+			envelope := decodeEnvelope(t, stdout)
+			data, ok := envelope.Data.(map[string]any)
+			require.True(t, ok)
+			assert.Equal(t, float64(4244), data["orderId"])
+		})
+	}
+
+	require.Len(t, requestBodies, len(testCases))
+	for _, body := range requestBodies {
+		var order models.OrderRequest
+		require.NoError(t, json.Unmarshal([]byte(body), &order))
+		assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
+		require.NotEmpty(t, order.OrderLegCollection)
+		require.NotEmpty(t, order.ChildOrderStrategies)
+	}
+}
+
 func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
 	orderID := int64(4243)
 	previewResponse := models.PreviewOrder{OrderID: &orderID}
