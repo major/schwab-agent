@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
@@ -115,6 +117,30 @@ type expectedMoveOutput struct {
 	Lower1x         float64 `json:"lower_1x"`
 	Upper2x         float64 `json:"upper_2x"`
 	Lower2x         float64 `json:"lower_2x"`
+}
+
+type dashboardParameters struct {
+	SMAPeriods   []int   `json:"sma_periods"`
+	RSIPeriod    int     `json:"rsi_period"`
+	MACDFast     int     `json:"macd_fast"`
+	MACDSlow     int     `json:"macd_slow"`
+	MACDSignal   int     `json:"macd_signal"`
+	ATRPeriod    int     `json:"atr_period"`
+	BBandsPeriod int     `json:"bbands_period"`
+	BBandsStdDev float64 `json:"bbands_std_dev"`
+	VolumePeriod int     `json:"volume_period"`
+	RangePeriod  int     `json:"range_period"`
+	LongRange    int     `json:"long_range"`
+}
+
+type dashboardOutput struct {
+	Indicator  string              `json:"indicator"`
+	Symbol     string              `json:"symbol"`
+	Interval   string              `json:"interval"`
+	Parameters dashboardParameters `json:"parameters"`
+	Latest     map[string]any      `json:"latest"`
+	Signals    map[string]any      `json:"signals"`
+	Values     []map[string]any    `json:"values"`
 }
 
 // taOutput is the common envelope for single-value time series indicators (SMA, EMA, RSI, etc.).
@@ -288,6 +314,15 @@ type expectedMoveOpts struct {
 // Attach implements structcli.Options interface.
 func (o *expectedMoveOpts) Attach(_ *cobra.Command) error { return nil }
 
+// dashboardOpts holds CLI flags for the opinionated TA dashboard command.
+type dashboardOpts struct {
+	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+}
+
+// Attach implements structcli.Options interface.
+func (o *dashboardOpts) Attach(_ *cobra.Command) error { return nil }
+
 // NewTACmd returns the Cobra command for technical analysis indicators.
 func NewTACmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -303,6 +338,7 @@ output to the N most recent values.`,
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
 	cmd.AddCommand(
+		cobraTADashboardCommand(c, w),
 		makeCobraSimpleTACommand(&simpleTAConfig{
 			name:  "sma",
 			usage: "Simple Moving Average",
@@ -424,6 +460,357 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
+}
+
+func cobraTADashboardCommand(c *client.Ref, w io.Writer) *cobra.Command {
+	opts := &dashboardOpts{}
+	cmd := &cobra.Command{
+		Use:   "dashboard SYMBOL",
+		Short: "Opinionated TA dashboard for agent trade analysis",
+		Long: `Compute an opinionated technical-analysis dashboard for a symbol with one
+price-history fetch. The dashboard includes SMA 21/50/200 trend context, RSI 14,
+MACD 12/26/9, ATR 14, Bollinger Bands 20/2, volume context, and 20/252-candle
+high-low ranges. Signals are neutral factual labels for agents, not trading advice.`,
+		Example: `  schwab-agent ta dashboard AAPL
+  schwab-agent ta dashboard AAPL --points 5
+  schwab-agent ta dashboard NVDA --interval weekly --points 10`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
+			return writeTADashboard(cmd.Context(), c, w, args[0], string(opts.Interval), opts.Points)
+		},
+	}
+
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
+
+	return cmd
+}
+
+func writeTADashboard(ctx context.Context, c *client.Ref, w io.Writer, symbol, interval string, points int) error {
+	const (
+		smaFastPeriod    = 21
+		smaMediumPeriod  = 50
+		smaLongPeriod    = 200
+		rsiPeriod        = 14
+		macdFastPeriod   = 12
+		macdSlowPeriod   = 26
+		macdSignalPeriod = 9
+		atrPeriod        = 14
+		bbandsPeriod     = 20
+		bbandsStdDev     = 2.0
+		volumePeriod     = 20
+		rangePeriod      = 20
+		longRangePeriod  = 252
+	)
+
+	requestedRows := 1
+	if points > 0 {
+		requestedRows = points
+	}
+	dashboardMinCandles := longRangePeriod + requestedRows - 1
+
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, dashboardMinCandles, "dashboard")
+	if err != nil {
+		return err
+	}
+
+	opens, err := ta.ExtractOpen(candles)
+	if err != nil {
+		return err
+	}
+	highs, err := ta.ExtractHigh(candles)
+	if err != nil {
+		return err
+	}
+	lows, err := ta.ExtractLow(candles)
+	if err != nil {
+		return err
+	}
+	closes, err := ta.ExtractClose(candles)
+	if err != nil {
+		return err
+	}
+	volumes, err := ta.ExtractVolume(candles)
+	if err != nil {
+		return err
+	}
+
+	sma21, err := ta.SMA(closes, smaFastPeriod)
+	if err != nil {
+		return err
+	}
+	sma50, err := ta.SMA(closes, smaMediumPeriod)
+	if err != nil {
+		return err
+	}
+	sma200, err := ta.SMA(closes, smaLongPeriod)
+	if err != nil {
+		return err
+	}
+	rsi14, err := ta.RSI(closes, rsiPeriod)
+	if err != nil {
+		return err
+	}
+	macdVals, macdSignalVals, macdHistVals, err := ta.MACD(closes, macdFastPeriod, macdSlowPeriod, macdSignalPeriod)
+	if err != nil {
+		return err
+	}
+	atr14, err := ta.ATR(highs, lows, closes, atrPeriod)
+	if err != nil {
+		return err
+	}
+	bbandsUpper, bbandsMiddle, bbandsLower, err := ta.BBands(closes, bbandsPeriod, bbandsStdDev)
+	if err != nil {
+		return err
+	}
+	avgVolume20, err := ta.SMA(volumes, volumePeriod)
+	if err != nil {
+		return err
+	}
+
+	// The series begins where the 252-candle range is complete. SMA 200 becomes
+	// available earlier, but labeling partial windows as range_252_* would mislead
+	// agents about long-range highs and lows.
+	baseStart := longRangePeriod - 1
+	rowCount := len(candles) - baseStart
+	rows := make([]map[string]any, rowCount)
+	for i := range rowCount {
+		candleIndex := baseStart + i
+		rows[i] = map[string]any{
+			"datetime": timestamps[candleIndex],
+			"open":     opens[candleIndex],
+			"high":     highs[candleIndex],
+			"low":      lows[candleIndex],
+			"close":    closes[candleIndex],
+			"volume":   volumes[candleIndex],
+		}
+	}
+
+	for key, values := range map[string][]float64{
+		"sma_21":         sma21,
+		"sma_50":         sma50,
+		"sma_200":        sma200,
+		"rsi_14":         rsi14,
+		"macd":           macdVals,
+		"macd_signal":    macdSignalVals,
+		"macd_histogram": macdHistVals,
+		"atr_14":         atr14,
+		"bbands_upper":   bbandsUpper,
+		"bbands_middle":  bbandsMiddle,
+		"bbands_lower":   bbandsLower,
+		"avg_volume_20":  avgVolume20,
+	} {
+		if err := addTailAlignedFloat(rows, key, values); err != nil {
+			return err
+		}
+	}
+
+	for i := range rows {
+		closePrice := rows[i]["close"].(float64)
+		atrValue := rows[i]["atr_14"].(float64)
+		avgVolume := rows[i]["avg_volume_20"].(float64)
+		volume := rows[i]["volume"].(float64)
+		candleIndex := baseStart + i
+		rangeHigh20, rangeLow20 := highLowWindow(highs, lows, candleIndex, rangePeriod)
+		rangeHigh252, rangeLow252 := highLowWindow(highs, lows, candleIndex, longRangePeriod)
+
+		rows[i]["atr_percent"] = percentOf(atrValue, closePrice)
+		rows[i]["relative_volume"] = ratio(volume, avgVolume)
+		rows[i]["range_20_high"] = rangeHigh20
+		rows[i]["range_20_low"] = rangeLow20
+		rows[i]["range_252_high"] = rangeHigh252
+		rows[i]["range_252_low"] = rangeLow252
+		rows[i]["distance_from_sma_21_percent"] = percentChange(closePrice, rows[i]["sma_21"].(float64))
+		rows[i]["distance_from_sma_50_percent"] = percentChange(closePrice, rows[i]["sma_50"].(float64))
+		rows[i]["distance_from_sma_200_percent"] = percentChange(closePrice, rows[i]["sma_200"].(float64))
+		rows[i]["distance_from_range_20_high_percent"] = percentChange(closePrice, rangeHigh20)
+		rows[i]["distance_from_range_252_high_percent"] = percentChange(closePrice, rangeHigh252)
+	}
+
+	latest := cloneDashboardRow(rows[len(rows)-1])
+	data := dashboardOutput{
+		Indicator: "dashboard",
+		Symbol:    symbol,
+		Interval:  interval,
+		Parameters: dashboardParameters{
+			SMAPeriods:   []int{smaFastPeriod, smaMediumPeriod, smaLongPeriod},
+			RSIPeriod:    rsiPeriod,
+			MACDFast:     macdFastPeriod,
+			MACDSlow:     macdSlowPeriod,
+			MACDSignal:   macdSignalPeriod,
+			ATRPeriod:    atrPeriod,
+			BBandsPeriod: bbandsPeriod,
+			BBandsStdDev: bbandsStdDev,
+			VolumePeriod: volumePeriod,
+			RangePeriod:  rangePeriod,
+			LongRange:    longRangePeriod,
+		},
+		Latest:  latest,
+		Signals: dashboardSignals(latest),
+		Values:  limitDashboardRows(rows, points),
+	}
+
+	return output.WriteSuccess(w, data, output.NewMetadata())
+}
+
+func addTailAlignedFloat(rows []map[string]any, key string, values []float64) error {
+	// TA-Lib returns leading zero placeholders before an indicator warms up. The
+	// ta package strips those placeholders, but an all-zero valid series, such as
+	// flat-price MACD or ATR, becomes empty. Treat an empty indicator result as a
+	// valid zero-valued tail so a quiet market produces JSON instead of a panic.
+	if len(values) == 0 {
+		for i := range rows {
+			rows[i][key] = 0.0
+		}
+		return nil
+	}
+
+	if len(values) < len(rows) {
+		return apperr.NewValidationError(
+			fmt.Sprintf("dashboard %s series has %d values for %d output rows", key, len(values), len(rows)),
+			nil,
+		)
+	}
+
+	start := len(values) - len(rows)
+	for i := range rows {
+		rows[i][key] = values[start+i]
+	}
+	return nil
+}
+
+func limitDashboardRows(rows []map[string]any, points int) []map[string]any {
+	if points > 0 && points < len(rows) {
+		rows = rows[len(rows)-points:]
+	}
+
+	out := make([]map[string]any, len(rows))
+	for i, row := range rows {
+		out[i] = cloneDashboardRow(row)
+	}
+	return out
+}
+
+func cloneDashboardRow(row map[string]any) map[string]any {
+	clone := make(map[string]any, len(row))
+	maps.Copy(clone, row)
+	return clone
+}
+
+func highLowWindow(highs, lows []float64, endIndex, window int) (highest, lowest float64) {
+	start := max(0, endIndex-window+1)
+	highest = highs[start]
+	lowest = lows[start]
+	for i := start + 1; i <= endIndex; i++ {
+		if highs[i] > highest {
+			highest = highs[i]
+		}
+		if lows[i] < lowest {
+			lowest = lows[i]
+		}
+	}
+	return highest, lowest
+}
+
+func percentOf(value, base float64) float64 {
+	if base == 0 {
+		return 0
+	}
+	return value / base * 100
+}
+
+func percentChange(value, base float64) float64 {
+	if base == 0 {
+		return 0
+	}
+	return (value - base) / base * 100
+}
+
+func ratio(value, base float64) float64 {
+	if base == 0 {
+		return 0
+	}
+	return value / base
+}
+
+func dashboardSignals(latest map[string]any) map[string]any {
+	closePrice := latest["close"].(float64)
+	sma21 := latest["sma_21"].(float64)
+	sma50 := latest["sma_50"].(float64)
+	sma200 := latest["sma_200"].(float64)
+	rsi14 := latest["rsi_14"].(float64)
+	macdHist := latest["macd_histogram"].(float64)
+	atrPercent := latest["atr_percent"].(float64)
+	relativeVolume := latest["relative_volume"].(float64)
+
+	return map[string]any{
+		"trend":                   trendSignal(closePrice, sma21, sma50, sma200),
+		"momentum":                momentumSignal(rsi14, macdHist),
+		"volatility":              volatilitySignal(atrPercent),
+		"volume":                  volumeSignal(relativeVolume),
+		"close_above_sma_21":      closePrice > sma21,
+		"close_above_sma_50":      closePrice > sma50,
+		"close_above_sma_200":     closePrice > sma200,
+		"sma_21_above_sma_50":     sma21 > sma50,
+		"sma_50_above_sma_200":    sma50 > sma200,
+		"rsi_overbought":          rsi14 >= 70,
+		"rsi_oversold":            rsi14 <= 30,
+		"macd_histogram_positive": macdHist > 0,
+	}
+}
+
+func trendSignal(closePrice, sma21, sma50, sma200 float64) string {
+	switch {
+	case closePrice > sma21 && sma21 > sma50 && sma50 > sma200:
+		return "bullish"
+	case closePrice < sma21 && sma21 < sma50 && sma50 < sma200:
+		return "bearish"
+	default:
+		return "mixed"
+	}
+}
+
+func momentumSignal(rsi14, macdHistogram float64) string {
+	switch {
+	case rsi14 >= 70:
+		return "overbought"
+	case rsi14 <= 30:
+		return "oversold"
+	case macdHistogram > 0:
+		return "bullish"
+	case macdHistogram < 0:
+		return "bearish"
+	default:
+		return "neutral"
+	}
+}
+
+func volatilitySignal(atrPercent float64) string {
+	switch {
+	case atrPercent >= 5:
+		return "elevated"
+	case atrPercent <= 2:
+		return "compressed"
+	default:
+		return "normal"
+	}
+}
+
+func volumeSignal(relativeVolume float64) string {
+	switch {
+	case relativeVolume >= 1.5:
+		return "elevated"
+	case relativeVolume <= 0.75:
+		return "light"
+	default:
+		return "normal"
+	}
 }
 
 func cobraTAMACDCommand(c *client.Ref, w io.Writer) *cobra.Command {
