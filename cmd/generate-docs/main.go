@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/leodido/structcli"
 	"github.com/leodido/structcli/generate"
@@ -69,6 +70,8 @@ func run() error {
 		return fmt.Errorf("generating SKILL.md: %w", err)
 	}
 
+	skill = labelSkillCodeFences(skill)
+
 	//nolint:gosec // G306: public documentation files should be world-readable
 	if err := os.WriteFile(filepath.Join(outDir, "SKILL.md"), skill, 0o644); err != nil {
 		return fmt.Errorf("writing SKILL.md: %w", err)
@@ -94,6 +97,29 @@ func run() error {
 	fmt.Fprintf(os.Stderr, "wrote %s\n", filepath.Join(outDir, "llms.txt"))
 
 	return nil
+}
+
+func labelSkillCodeFences(content []byte) []byte {
+	lines := strings.Split(string(content), "\n")
+	inFence := false
+	for i, line := range lines {
+		if line != "```" {
+			continue
+		}
+
+		if inFence {
+			inFence = false
+			continue
+		}
+
+		// structcli generates shell examples in SKILL.md with bare opening
+		// fences. Add a language tag here so generated docs satisfy markdownlint
+		// without forking or post-editing the generated file by hand.
+		lines[i] = "```bash"
+		inFence = true
+	}
+
+	return []byte(strings.Join(lines, "\n"))
 }
 
 // projectRoot returns the repository root by walking up from this source

@@ -430,6 +430,39 @@ schwab-agent market movers '$SPX' --sort PERCENT_CHANGE_UP
   schwab-agent market movers EQUITY_ALL --sort PERCENT_CHANGE_UP
 ```
 
+#### `schwab-agent option`
+
+Option planning workflows that combine quote, chain, and symbol context for agents.
+
+#### `schwab-agent option ticket`
+
+Build an option planning ticket from live market data. The ticket combines
+the underlying quote, a narrowly filtered option chain, the matching contract,
+and the OCC symbol in one read-only command. Use order preview option when you
+are ready to turn the ticket into a Schwab preview request.
+
+#### `schwab-agent option ticket get`
+
+Get a compact option ticket for one underlying, expiration, strike, and
+contract side. This collapses the common agent workflow of quote lookup, chain
+lookup, and OCC symbol construction into one read-only CLI call.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--call` | bool | false | no | Select the call contract |
+| `--expiration` | string | - | no | Option expiration date (YYYY-MM-DD) |
+| `--put` | bool | false | no | Select the put contract |
+| `--strike` | float64 | 0 | no | Option strike price |
+
+**Example:**
+
+```bash
+schwab-agent option ticket get AAPL --expiration 2026-01-16 --strike 200 --call
+  schwab-agent option ticket get TSLA --expiration 2026-03-20 --strike 180 --put
+```
+
 #### `schwab-agent order`
 
 Manage orders across your Schwab accounts. Supports listing, viewing, placing,
@@ -1019,14 +1052,17 @@ schwab-agent order get 1234567890
 List orders for the current account, or all accounts when no --account is set.
 By default, terminal statuses (FILLED, CANCELED, REJECTED, EXPIRED, REPLACED)
 are filtered out to show only actionable orders. Use --status all to see
-everything. Multiple --status values fan out into separate API calls with
-merged, deduplicated results.
+everything. Use --recent for an agent-friendly recent activity view that keeps
+terminal statuses and narrows the default lookback to 24 hours. Multiple
+--status values fan out into separate API calls with merged, deduplicated
+results.
 
 **Flags:**
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
 | `--from` | string | - | no | Filter by entered time lower bound |
+| `--recent` | bool | false | no | Show recent order activity, including terminal statuses, from the last 24 hours unless --from is set |
 | `--status` | stringSlice | [] | no | Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc. |
 | `--to` | string | - | no | Filter by entered time upper bound |
 
@@ -1034,6 +1070,7 @@ merged, deduplicated results.
 
 ```bash
 schwab-agent order list
+  schwab-agent order list --recent
   schwab-agent order list --status all
   schwab-agent order list --status WORKING --status PENDING_ACTIVATION
   schwab-agent order list --status WORKING,FILLED,EXPIRED
@@ -1208,10 +1245,11 @@ i-also-like-to-live-dangerously in config for placement.
 
 #### `schwab-agent order preview`
 
-Preview an order from a JSON spec without placing it. Returns estimated
-commissions, fees, and order details. Pipe output from order build for a
-build-then-preview workflow. Does not require safety guards since no order
-is actually placed.
+Preview an order from a JSON spec or typed subcommand flags without placing it.
+Typed preview subcommands reuse the same local builders as order place, then
+return both the built order request and Schwab preview response in one envelope.
+This removes the build-then-preview round trip while keeping placement explicit.
+Does not require safety guards since no order is actually placed.
 
 **Flags:**
 
@@ -1223,7 +1261,130 @@ is actually placed.
 
 ```bash
 schwab-agent order preview --spec @order.json
+  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200
+  schwab-agent order preview option --underlying AAPL --expiration 2026-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
   schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -
+```
+
+#### `schwab-agent order preview bracket`
+
+Preview a bracket order without placing it. At least one of --take-profit or
+--stop-loss is required. The preview response includes the locally built trigger
+order and Schwab's validation, fee, and commission details.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--price` | float64 | 0 | no | Entry price |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--stop-loss` | float64 | 0 | no | Stop-loss exit price |
+| `--symbol` | string | - | yes | Equity symbol |
+| `--take-profit` | float64 | 0 | no | Take-profit exit price |
+| `--type` | string | - | no | Entry order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+
+**Example:**
+
+```bash
+schwab-agent order preview bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
+	  schwab-agent order preview bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170
+```
+
+#### `schwab-agent order preview equity`
+
+Preview an equity (stock) order without placing it. Supports the same flags
+as order place equity, but skips the mutable-operation safety gate because no
+order is submitted. The response includes the built order request plus Schwab's
+preview details so agents can inspect both in one call.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--activation-price` | float64 | 0 | no | Price that activates the trailing stop |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--price` | float64 | 0 | no | Limit price |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
+| `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
+| `--stop-link-type` | string | - | no | Trailing stop offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--stop-offset` | float64 | 0 | no | Trailing stop offset amount |
+| `--stop-price` | float64 | 0 | no | Stop price |
+| `--stop-type` | string | - | no | Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) {,ASK,BID,LAST,MARK,STANDARD} |
+| `--symbol` | string | - | yes | Equity symbol |
+| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+
+**Example:**
+
+```bash
+schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10
+	  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC
+```
+
+#### `schwab-agent order preview oco`
+
+Preview a one-cancels-other order for an existing position without placing it.
+When both exits are present, the built order shows the OCO relationship Schwab
+will validate during preview.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--stop-loss` | float64 | 0 | no | Stop-loss exit price (stop order) |
+| `--symbol` | string | - | yes | Equity symbol |
+| `--take-profit` | float64 | 0 | no | Take-profit exit price (limit order) |
+
+**Example:**
+
+```bash
+schwab-agent order preview oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140
+	  schwab-agent order preview oco --symbol TSLA --action BUY --quantity 10 --stop-loss 250
+```
+
+#### `schwab-agent order preview option`
+
+Preview a single-leg option order without placing it. Requires --underlying,
+--expiration, --strike, and exactly one of --call or --put. The response includes
+the locally built OCC order request and Schwab's preview response.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--call` | bool | false | no | Call option |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
+| `--price` | float64 | 0 | no | Limit price |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--put` | bool | false | no | Put option |
+| `--quantity` | float64 | 0 | yes | Contract quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
+| `--strike` | float64 | 0 | yes | Strike price |
+| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--underlying` | string | - | yes | Underlying symbol |
+
+**Example:**
+
+```bash
+schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1
+	  schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50
 ```
 
 #### `schwab-agent order replace`
@@ -1425,6 +1586,28 @@ relatively low. Use --std-dev to widen or narrow the bands (default 2.0).
 schwab-agent ta bbands AAPL
   schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --points 10
   schwab-agent ta bbands AAPL --std-dev 1.5 --points 10
+```
+
+#### `schwab-agent ta dashboard`
+
+Compute an opinionated technical-analysis dashboard for a symbol with one
+price-history fetch. The dashboard includes SMA 21/50/200 trend context, RSI 14,
+MACD 12/26/9, ATR 14, Bollinger Bands 20/2, volume context, and 20/252-candle
+high-low ranges. Signals are neutral factual labels for agents, not trading advice.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--points` | int | 1 | no | Number of output points (0 = all) |
+
+**Example:**
+
+```bash
+schwab-agent ta dashboard AAPL
+  schwab-agent ta dashboard AAPL --points 5
+  schwab-agent ta dashboard NVDA --interval weekly --points 10
 ```
 
 #### `schwab-agent ta ema`
@@ -1733,6 +1916,13 @@ schwab-agent market movers '$SPX' --sort PERCENT_CHANGE_UP
   schwab-agent market movers EQUITY_ALL --sort PERCENT_CHANGE_UP
 ```
 
+#### schwab-agent option ticket get
+
+```bash
+schwab-agent option ticket get AAPL --expiration 2026-01-16 --strike 200 --call
+  schwab-agent option ticket get TSLA --expiration 2026-03-20 --strike 180 --put
+```
+
 #### schwab-agent order build back-ratio
 
 ```bash
@@ -1870,6 +2060,7 @@ schwab-agent order get 1234567890
 
 ```bash
 schwab-agent order list
+  schwab-agent order list --recent
   schwab-agent order list --status all
   schwab-agent order list --status WORKING --status PENDING_ACTIVATION
   schwab-agent order list --status WORKING,FILLED,EXPIRED
@@ -1937,7 +2128,37 @@ schwab-agent order list
 
 ```bash
 schwab-agent order preview --spec @order.json
+  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200
+  schwab-agent order preview option --underlying AAPL --expiration 2026-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
   schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -
+```
+
+#### schwab-agent order preview bracket
+
+```bash
+schwab-agent order preview bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
+	  schwab-agent order preview bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170
+```
+
+#### schwab-agent order preview equity
+
+```bash
+schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10
+	  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC
+```
+
+#### schwab-agent order preview oco
+
+```bash
+schwab-agent order preview oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140
+	  schwab-agent order preview oco --symbol TSLA --action BUY --quantity 10 --stop-loss 250
+```
+
+#### schwab-agent order preview option
+
+```bash
+schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1
+	  schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50
 ```
 
 #### schwab-agent order replace
@@ -1997,6 +2218,14 @@ schwab-agent ta atr AAPL
 schwab-agent ta bbands AAPL
   schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --points 10
   schwab-agent ta bbands AAPL --std-dev 1.5 --points 10
+```
+
+#### schwab-agent ta dashboard
+
+```bash
+schwab-agent ta dashboard AAPL
+  schwab-agent ta dashboard AAPL --points 5
+  schwab-agent ta dashboard NVDA --interval weekly --points 10
 ```
 
 #### schwab-agent ta ema
