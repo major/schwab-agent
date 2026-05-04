@@ -3,6 +3,8 @@ package commands
 import (
 	"context"
 	"io"
+	"sort"
+	"strings"
 
 	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
@@ -33,9 +35,20 @@ type positionListData struct {
 	Positions []positionEntry `json:"positions"`
 }
 
+// positionFilters captures normalized position-list filters after structcli
+// has unmarshaled flags. Optional numeric filters stay as pointers so callers
+// can distinguish an omitted bound from an explicit zero-dollar threshold.
+type positionFilters struct {
+	Symbols    map[string]struct{}
+	LosersOnly bool
+	MinPnL     *float64
+	MaxPnL     *float64
+	Sort       positionSort
+}
+
 // listAllAccountPositions fetches positions from all linked accounts and
 // returns a flat list with account identifiers and computed P&L fields.
-func listAllAccountPositions(ctx context.Context, c *client.Ref, w io.Writer) error {
+func listAllAccountPositions(ctx context.Context, c *client.Ref, filters positionFilters, w io.Writer) error {
 	accounts, err := c.Accounts(ctx, "positions")
 	if err != nil {
 		return err
@@ -60,7 +73,7 @@ func listAllAccountPositions(ctx context.Context, c *client.Ref, w io.Writer) er
 		enrichAccountsWithPreferences(accounts, prefs)
 	}
 
-	entries := flattenAccountPositions(accounts, numberToHash)
+	entries := filterAndSortPositionEntries(flattenAccountPositions(accounts, numberToHash), filters)
 
 	meta := output.NewMetadata()
 	meta.Returned = len(entries)
@@ -187,7 +200,12 @@ func NewPositionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comman
 
 // positionListOpts holds the options for the position list subcommand.
 type positionListOpts struct {
-	AllAccounts bool `flag:"all-accounts" flagdescr:"Show positions across all linked accounts"`
+	AllAccounts bool         `flag:"all-accounts" flagdescr:"Show positions across all linked accounts"`
+	Symbols     []string     `flag:"symbol" flagdescr:"Filter by symbol (repeatable, comma-separated values allowed)"`
+	LosersOnly  bool         `flag:"losers-only" flagdescr:"Show only positions with negative unrealized P&L"`
+	MinPnL      float64      `flag:"min-pnl" flagdescr:"Minimum unrealized P&L to include when set"`
+	MaxPnL      float64      `flag:"max-pnl" flagdescr:"Maximum unrealized P&L to include when set"`
+	Sort        positionSort `flag:"sort" flagdescr:"Sort positions by pnl-desc, pnl-asc, or value-desc"`
 }
 
 // Attach implements structcli.Options interface.
@@ -205,12 +223,21 @@ func newPositionListCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Co
 		Long: `List positions as a flat list with account identifiers and computed cost basis
 and P&L fields that Schwab's API does not provide directly. Uses the default
 account unless --account or --all-accounts is specified. Computed fields
-include totalCostBasis, unrealizedPnL, and unrealizedPnLPct.`,
+include totalCostBasis, unrealizedPnL, and unrealizedPnLPct. Apply local symbol,
+P&L, and sort filters to shrink output for portfolio triage workflows.`,
 		Example: `  schwab-agent position list
-  schwab-agent position list --account ABCDEF1234567890
-  schwab-agent position list --all-accounts`,
+	  schwab-agent position list --account ABCDEF1234567890
+	  schwab-agent position list --all-accounts
+	  schwab-agent position list --symbol AAPL --symbol MSFT
+	  schwab-agent position list --losers-only --sort pnl-asc
+	  schwab-agent position list --min-pnl -100 --max-pnl 500 --sort value-desc`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
+			filters, err := newPositionFilters(cmd, opts)
+			if err != nil {
 				return err
 			}
 
@@ -224,10 +251,10 @@ include totalCostBasis, unrealizedPnL, and unrealizedPnLPct.`,
 			}
 
 			if opts.AllAccounts {
-				return listAllAccountPositions(cmd.Context(), c, w)
+				return listAllAccountPositions(cmd.Context(), c, filters, w)
 			}
 
-			return cobraListSingleAccountPositions(cmd.Context(), c, configPath, account, w)
+			return cobraListSingleAccountPositions(cmd.Context(), c, configPath, account, filters, w)
 		},
 	}
 
@@ -246,6 +273,7 @@ func cobraListSingleAccountPositions(
 	ctx context.Context,
 	c *client.Ref,
 	configPath, accountFlag string,
+	filters positionFilters,
 	w io.Writer,
 ) error {
 	hash, err := resolveAccount(c, accountFlag, configPath, nil)
@@ -288,10 +316,146 @@ func cobraListSingleAccountPositions(
 	if entries == nil {
 		entries = []positionEntry{}
 	}
+	entries = filterAndSortPositionEntries(entries, filters)
 
 	meta := output.NewMetadata()
 	meta.Account = hash
 	meta.Returned = len(entries)
 
 	return output.WriteSuccess(w, positionListData{Positions: entries}, meta)
+}
+
+// newPositionFilters normalizes local filtering flags once so the fetch paths
+// can share identical behavior across single-account and all-account modes.
+func newPositionFilters(cmd *cobra.Command, opts *positionListOpts) (positionFilters, error) {
+	filters := positionFilters{
+		Symbols:    make(map[string]struct{}),
+		LosersOnly: opts.LosersOnly,
+		Sort:       opts.Sort,
+	}
+
+	for _, raw := range opts.Symbols {
+		for part := range strings.SplitSeq(raw, ",") {
+			trimmed := strings.TrimSpace(part)
+			if trimmed != "" {
+				filters.Symbols[strings.ToUpper(trimmed)] = struct{}{}
+			}
+		}
+	}
+
+	minChanged := cmd.Flags().Changed("min-pnl")
+	maxChanged := cmd.Flags().Changed("max-pnl")
+	if minChanged {
+		minPnL := opts.MinPnL
+		filters.MinPnL = &minPnL
+	}
+	if maxChanged {
+		maxPnL := opts.MaxPnL
+		filters.MaxPnL = &maxPnL
+	}
+	if minChanged && maxChanged && opts.MinPnL > opts.MaxPnL {
+		return positionFilters{}, apperr.NewValidationError("--min-pnl cannot be greater than --max-pnl", nil)
+	}
+
+	return filters, nil
+}
+
+// filterAndSortPositionEntries applies local filters and optional sorting while
+// preserving a non-nil empty slice for stable JSON output.
+func filterAndSortPositionEntries(entries []positionEntry, filters positionFilters) []positionEntry {
+	filtered := make([]positionEntry, 0, len(entries))
+	for i := range entries {
+		if matchesPositionFilters(&entries[i], filters) {
+			filtered = append(filtered, entries[i])
+		}
+	}
+
+	sortPositionEntries(filtered, filters.Sort)
+
+	if filtered == nil {
+		return []positionEntry{}
+	}
+
+	return filtered
+}
+
+// matchesPositionFilters returns true when a position satisfies every active
+// local filter. P&L filters exclude entries without computed P&L because those
+// positions cannot be proven inside the requested numeric range.
+func matchesPositionFilters(entry *positionEntry, filters positionFilters) bool {
+	if len(filters.Symbols) > 0 && !matchesPositionSymbol(entry, filters.Symbols) {
+		return false
+	}
+
+	if filters.LosersOnly || filters.MinPnL != nil || filters.MaxPnL != nil {
+		if entry.UnrealizedPnL == nil {
+			return false
+		}
+
+		pnl := *entry.UnrealizedPnL
+		if filters.LosersOnly && pnl >= 0 {
+			return false
+		}
+		if filters.MinPnL != nil && pnl < *filters.MinPnL {
+			return false
+		}
+		if filters.MaxPnL != nil && pnl > *filters.MaxPnL {
+			return false
+		}
+	}
+
+	return true
+}
+
+// matchesPositionSymbol compares symbols case-insensitively because the Schwab
+// API and human-entered CLI values may differ in casing for equities and ETFs.
+func matchesPositionSymbol(entry *positionEntry, symbols map[string]struct{}) bool {
+	if entry.Instrument == nil || entry.Instrument.Symbol == nil {
+		return false
+	}
+
+	symbol := strings.ToUpper(strings.TrimSpace(*entry.Instrument.Symbol))
+	_, ok := symbols[symbol]
+	return ok
+}
+
+// sortPositionEntries applies stable sorting so equal or unknown values retain
+// the Schwab response order. Unknown numeric fields always sort last.
+func sortPositionEntries(entries []positionEntry, sortBy positionSort) {
+	switch sortBy {
+	case positionSortPnLDesc:
+		sort.SliceStable(entries, func(i, j int) bool {
+			return optionalFloatLess(entries[i].UnrealizedPnL, entries[j].UnrealizedPnL, true)
+		})
+	case positionSortPnLAsc:
+		sort.SliceStable(entries, func(i, j int) bool {
+			return optionalFloatLess(entries[i].UnrealizedPnL, entries[j].UnrealizedPnL, false)
+		})
+	case positionSortValueDesc:
+		sort.SliceStable(entries, func(i, j int) bool {
+			return optionalFloatLess(entries[i].MarketValue, entries[j].MarketValue, true)
+		})
+	}
+}
+
+// optionalFloatLess compares optional numeric values for sort.SliceStable.
+// Nil values sort last in both directions because missing P&L or market value
+// should not outrank known portfolio data.
+func optionalFloatLess(left, right *float64, desc bool) bool {
+	if left == nil && right == nil {
+		return false
+	}
+	if left == nil {
+		return false
+	}
+	if right == nil {
+		return true
+	}
+	if *left == *right {
+		return false
+	}
+	if desc {
+		return *left > *right
+	}
+	return *left < *right
 }

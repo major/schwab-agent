@@ -1514,20 +1514,29 @@ View positions across accounts
 List positions as a flat list with account identifiers and computed cost basis
 and P&L fields that Schwab's API does not provide directly. Uses the default
 account unless --account or --all-accounts is specified. Computed fields
-include totalCostBasis, unrealizedPnL, and unrealizedPnLPct.
+include totalCostBasis, unrealizedPnL, and unrealizedPnLPct. Apply local symbol,
+P&L, and sort filters to shrink output for portfolio triage workflows.
 
 **Flags:**
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
 | `--all-accounts` | bool | false | no | Show positions across all linked accounts |
+| `--losers-only` | bool | false | no | Show only positions with negative unrealized P&L |
+| `--max-pnl` | float64 | 0 | no | Maximum unrealized P&L to include when set |
+| `--min-pnl` | float64 | 0 | no | Minimum unrealized P&L to include when set |
+| `--sort` | string | - | no | Sort positions by pnl-desc, pnl-asc, or value-desc {,pnl-asc,pnl-desc,value-desc} |
+| `--symbol` | stringSlice | [] | no | Filter by symbol (repeatable, comma-separated values allowed) |
 
 **Example:**
 
 ```bash
 schwab-agent position list
-  schwab-agent position list --account ABCDEF1234567890
-  schwab-agent position list --all-accounts
+	  schwab-agent position list --account ABCDEF1234567890
+	  schwab-agent position list --all-accounts
+	  schwab-agent position list --symbol AAPL --symbol MSFT
+	  schwab-agent position list --losers-only --sort pnl-asc
+	  schwab-agent position list --min-pnl -100 --max-pnl 500 --sort value-desc
 ```
 
 #### `schwab-agent quote`
@@ -2288,8 +2297,11 @@ schwab-agent order replace option 1234567890 --underlying AAPL --expiration 2026
 
 ```bash
 schwab-agent position list
-  schwab-agent position list --account ABCDEF1234567890
-  schwab-agent position list --all-accounts
+	  schwab-agent position list --account ABCDEF1234567890
+	  schwab-agent position list --all-accounts
+	  schwab-agent position list --symbol AAPL --symbol MSFT
+	  schwab-agent position list --losers-only --sort pnl-asc
+	  schwab-agent position list --min-pnl -100 --max-pnl 500 --sort value-desc
 ```
 
 #### schwab-agent quote get
