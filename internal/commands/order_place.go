@@ -377,9 +377,9 @@ return both the built order request and Schwab preview response in one envelope.
 This removes the build-then-preview round trip while keeping placement explicit.
 Does not require safety guards since no order is actually placed.`,
 		Example: `  schwab-agent order preview --spec @order.json
-	  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200
-	  schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
-	  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -`,
+  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200
+  schwab-agent order preview option --underlying AAPL --expiration 2026-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err

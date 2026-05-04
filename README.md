@@ -107,7 +107,7 @@ schwab-agent account list
 schwab-agent chain get AAPL
 
 # Get a compact option planning ticket
-schwab-agent option ticket get AAPL --expiration 2026-01-16 --strike 200 --call
+schwab-agent option ticket get AAPL --expiration <YYYY-MM-DD> --strike 200 --call
 
 # Get multiple moving averages in one technical-analysis run
 schwab-agent ta sma AAPL --period 21,50,200 --points 1

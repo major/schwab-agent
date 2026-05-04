@@ -146,7 +146,7 @@ func validateOrderRequestPricing(order *models.OrderRequest, path string) error 
 		}
 	}
 
-	if err := validateOrderRequestPriceLinkPair(order); err != nil {
+	if err := validateOrderRequestPriceLinkPair(order, path); err != nil {
 		return err
 	}
 
@@ -154,12 +154,12 @@ func validateOrderRequestPricing(order *models.OrderRequest, path string) error 
 }
 
 // validateOrderRequestPriceLinkPair checks pointer-based price-link fields from raw specs.
-func validateOrderRequestPriceLinkPair(order *models.OrderRequest) error {
+func validateOrderRequestPriceLinkPair(order *models.OrderRequest, path string) error {
 	basisSet := order.PriceLinkBasis != nil && *order.PriceLinkBasis != ""
 	typeSet := order.PriceLinkType != nil && *order.PriceLinkType != ""
 	if basisSet != typeSet {
 		return validationError(
-			"priceLinkBasis and priceLinkType must be specified together",
+			path+" priceLinkBasis and priceLinkType must be specified together",
 			"Set both priceLinkBasis and priceLinkType, or omit both fields",
 		)
 	}

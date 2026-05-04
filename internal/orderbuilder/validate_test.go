@@ -2559,6 +2559,30 @@ func TestValidateOrderRequestRejectsOCOParentLegs(t *testing.T) {
 	assertValidationError(t, err, "order OCO parent must not contain direct order legs", "Move executable legs into childOrderStrategies")
 }
 
+// TestValidateOrderRequestPriceLinkPathIncludesNestedChild verifies nested error paths.
+func TestValidateOrderRequestPriceLinkPathIncludesNestedChild(t *testing.T) {
+	t.Parallel()
+
+	order, err := BuildBracketOrder(&BracketParams{
+		Symbol:     "AAPL",
+		Action:     models.InstructionBuy,
+		Quantity:   10,
+		OrderType:  models.OrderTypeMarket,
+		TakeProfit: 160,
+		StopLoss:   140,
+	})
+	require.NoError(t, err)
+	priceLinkBasis := models.PriceLinkBasisBid
+	order.ChildOrderStrategies[0].ChildOrderStrategies[0].PriceLinkBasis = &priceLinkBasis
+
+	err = ValidateOrderRequest(order)
+
+	assertValidationError(t, err,
+		"order.childOrderStrategies[0].childOrderStrategies[0] priceLinkBasis and priceLinkType must be specified together",
+		"Set both priceLinkBasis and priceLinkType, or omit both fields",
+	)
+}
+
 // assertValidationError verifies message and fix suggestion for validation failures.
 func assertValidationError(t *testing.T, err error, expectedMessage, expectedDetails string) {
 	t.Helper()
