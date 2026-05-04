@@ -235,7 +235,7 @@ include totalCostBasis, unrealizedPnL, and unrealizedPnLPct.`,
 		panic(err)
 	}
 
-	cmd.PersistentFlags().String("account", "", "Account hash (overrides config default)")
+	cmd.PersistentFlags().String("account", "", "Account hash, account number, or nickname (overrides config default)")
 
 	return cmd
 }
@@ -248,7 +248,7 @@ func cobraListSingleAccountPositions(
 	configPath, accountFlag string,
 	w io.Writer,
 ) error {
-	hash, err := resolveAccount(accountFlag, configPath, nil)
+	hash, err := resolveAccount(c, accountFlag, configPath, nil)
 	if err != nil {
 		return err
 	}

@@ -1126,22 +1126,151 @@ func TestNewAccountCmd_NoSubcommand(t *testing.T) {
 
 // --- resolveAccount tests (framework-agnostic) ---
 
-func TestResolveAccount_FlagTakesPriority(t *testing.T) {
-	account, err := resolveAccount("flag-account", "/nonexistent/config.json", nil)
+func TestResolveAccount_HashInputSkipsAPICalls(t *testing.T) {
+	// Arrange
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	// Act
+	account, err := resolveAccount(testClient(t, srv), "  0123456789abcdef  ", "/nonexistent/config.json", nil)
+
+	// Assert
 	require.NoError(t, err)
-	assert.Equal(t, "flag-account", account)
+	assert.Equal(t, "0123456789abcdef", account)
+	assert.Zero(t, requestCount)
 }
 
-func TestResolveAccount_PositionalArgBeforeConfig(t *testing.T) {
-	account, err := resolveAccount("", "/nonexistent/config.json", []string{"positional-account"})
+func TestResolveAccount_AccountNumberResolution(t *testing.T) {
+	// Arrange
+	srv := accountMockServer(t, map[string]any{
+		"/trader/v1/accounts/accountNumbers": []map[string]string{
+			{"accountNumber": "12345", "hashValue": "ABCDEF1234567890"},
+			{"accountNumber": "67890", "hashValue": "FEDCBA0987654321"},
+		},
+	})
+	defer srv.Close()
+
+	// Act
+	account, err := resolveAccount(testClient(t, srv), "67890", "/nonexistent/config.json", nil)
+
+	// Assert
 	require.NoError(t, err)
-	assert.Equal(t, "positional-account", account)
+	assert.Equal(t, "FEDCBA0987654321", account)
+}
+
+func TestResolveAccount_NicknameResolution(t *testing.T) {
+	// Arrange
+	srv := accountMockServer(t, map[string]any{
+		"/trader/v1/accounts/accountNumbers": []map[string]string{
+			{"accountNumber": "12345", "hashValue": "ABCDEF1234567890"},
+			{"accountNumber": "67890", "hashValue": "FEDCBA0987654321"},
+		},
+		"/trader/v1/userPreference": map[string]any{"accounts": []map[string]string{
+			{"accountNumber": "12345", "nickName": "IRA"},
+			{"accountNumber": "67890", "nickName": "Joint Taxable"},
+		}},
+	})
+	defer srv.Close()
+
+	// Act
+	account, err := resolveAccount(testClient(t, srv), "joint taxable", "/nonexistent/config.json", nil)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "FEDCBA0987654321", account)
+}
+
+func TestResolveAccount_NicknameCollisionListsCandidates(t *testing.T) {
+	// Arrange
+	srv := accountMockServer(t, map[string]any{
+		"/trader/v1/accounts/accountNumbers": []map[string]string{
+			{"accountNumber": "12345", "hashValue": "ABCDEF1234567890"},
+			{"accountNumber": "67890", "hashValue": "FEDCBA0987654321"},
+		},
+		"/trader/v1/userPreference": map[string]any{"accounts": []map[string]string{
+			{"accountNumber": "12345", "nickName": "Trading"},
+			{"accountNumber": "67890", "nickName": "trading"},
+		}},
+	})
+	defer srv.Close()
+
+	// Act
+	account, err := resolveAccount(testClient(t, srv), "Trading", "/nonexistent/config.json", nil)
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, account)
+	var accountErr *apperr.AccountNotFoundError
+	assert.ErrorAs(t, err, &accountErr)
+	assert.Contains(t, err.Error(), "multiple accounts match nickname")
+	assert.Contains(t, err.Error(), "ABCDEF1234567890")
+	assert.Contains(t, err.Error(), "FEDCBA0987654321")
+}
+
+func TestResolveAccount_NoMatchListsAvailableAccounts(t *testing.T) {
+	// Arrange
+	srv := accountMockServer(t, map[string]any{
+		"/trader/v1/accounts/accountNumbers": []map[string]string{
+			{"accountNumber": "12345", "hashValue": "ABCDEF1234567890"},
+			{"accountNumber": "67890", "hashValue": "FEDCBA0987654321"},
+		},
+		"/trader/v1/userPreference": map[string]any{"accounts": []map[string]string{
+			{"accountNumber": "12345", "nickName": "IRA"},
+			{"accountNumber": "67890", "nickName": "Taxable"},
+		}},
+	})
+	defer srv.Close()
+
+	// Act
+	account, err := resolveAccount(testClient(t, srv), "Joint Taxable", "/nonexistent/config.json", nil)
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, account)
+	var accountErr *apperr.AccountNotFoundError
+	assert.ErrorAs(t, err, &accountErr)
+	assert.Contains(t, err.Error(), "Account 'Joint Taxable' not found")
+	assert.Contains(t, err.Error(), "IRA (hash: ABCDEF1234567890)")
+	assert.Contains(t, err.Error(), "Taxable (hash: FEDCBA0987654321)")
+}
+
+func TestResolveAccount_APIErrorHandling(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"server error"}`))
+	}))
+	defer srv.Close()
+
+	// Act
+	account, err := resolveAccount(testClient(t, srv), "12345", "/nonexistent/config.json", nil)
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, account)
+	var httpErr *apperr.HTTPError
+	assert.ErrorAs(t, err, &httpErr)
 }
 
 func TestResolveAccount_FlagBeforePositionalArg(t *testing.T) {
-	account, err := resolveAccount("flag-account", "/nonexistent/config.json", []string{"positional-account"})
+	// Arrange
+	srv := accountMockServer(t, map[string]any{
+		"/trader/v1/accounts/accountNumbers": []map[string]string{
+			{"accountNumber": "12345", "hashValue": "ABCDEF1234567890"},
+		},
+	})
+	defer srv.Close()
+
+	// Act
+	account, err := resolveAccount(testClient(t, srv), "12345", "/nonexistent/config.json", []string{"0123456789abcdef"})
+
+	// Assert
 	require.NoError(t, err)
-	assert.Equal(t, "flag-account", account)
+	assert.Equal(t, "ABCDEF1234567890", account)
 }
 
 func TestResolveAccount_FallbackToConfig(t *testing.T) {
@@ -1149,16 +1278,16 @@ func TestResolveAccount_FallbackToConfig(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 	// LoadConfig validates client_id/client_secret, so we must include them
 	// for the config to load successfully and expose default_account.
-	configData := []byte(`{"client_id":"test","client_secret":"test","default_account":"config-account"}`)
+	configData := []byte(`{"client_id":"test","client_secret":"test","default_account":"0123456789abcdef"}`)
 	require.NoError(t, os.WriteFile(configPath, configData, 0o600))
 
-	account, err := resolveAccount("", configPath, nil)
+	account, err := resolveAccount(nil, "", configPath, nil)
 	require.NoError(t, err)
-	assert.Equal(t, "config-account", account)
+	assert.Equal(t, "0123456789abcdef", account)
 }
 
 func TestResolveAccount_NoAccountError(t *testing.T) {
-	account, err := resolveAccount("", "/nonexistent/config.json", nil)
+	account, err := resolveAccount(nil, "", "/nonexistent/config.json", nil)
 	require.Error(t, err)
 	assert.Empty(t, account)
 
@@ -1166,21 +1295,15 @@ func TestResolveAccount_NoAccountError(t *testing.T) {
 	assert.ErrorAs(t, err, &accountErr)
 }
 
-func TestResolveAccount_TrimsWhitespace(t *testing.T) {
-	account, err := resolveAccount("  spaced-account  ", "/nonexistent/config.json", nil)
-	require.NoError(t, err)
-	assert.Equal(t, "spaced-account", account)
-}
-
 func TestResolveAccount_EmptyPositionalArgsSkipped(t *testing.T) {
 	// Empty positional args should be treated like nil - fall through to config/error.
-	account, err := resolveAccount("", "/nonexistent/config.json", []string{})
+	account, err := resolveAccount(nil, "", "/nonexistent/config.json", []string{})
 	require.Error(t, err)
 	assert.Empty(t, account)
 }
 
 func TestResolveAccount_WhitespaceOnlyPositionalArgSkipped(t *testing.T) {
-	account, err := resolveAccount("", "/nonexistent/config.json", []string{"  "})
+	account, err := resolveAccount(nil, "", "/nonexistent/config.json", []string{"  "})
 	require.Error(t, err)
 	assert.Empty(t, account)
 }

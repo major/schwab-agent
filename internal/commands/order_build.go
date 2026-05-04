@@ -37,6 +37,13 @@ func makeCobraBuildOrderCommand[O any, P any](
 		Use:   name,
 		Short: usage,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Resolve --instruction/--order-type aliases before Unmarshal
+			// picks up flag values into the opts struct. Safe no-op for
+			// multi-leg strategies that don't have alias flags registered.
+			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
+				return err
+			}
+
 			if err := structcli.Unmarshal(cmd, any(opts).(structcli.Options)); err != nil {
 				return err
 			}

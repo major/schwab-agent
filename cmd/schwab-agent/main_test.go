@@ -214,7 +214,10 @@ func TestJSONSchemaTreeIsCanonicalDiscoveryContract(t *testing.T) {
 
 	equitySchema := schemas["schwab-agent order build equity"]
 	require.NotNil(t, equitySchema)
-	assert.Subset(t, schemaStrings(t, equitySchema, "required"), []string{"action", "quantity", "symbol"})
+	// --action's required annotation is replaced by a OneRequired group with
+	// --instruction after alias registration, so only symbol and quantity
+	// remain individually required.
+	assert.Subset(t, schemaStrings(t, equitySchema, "required"), []string{"quantity", "symbol"})
 	assert.Subset(t, schemaStrings(t, schemaProperty(t, equitySchema, "action"), "enum"), []string{"BUY", "SELL"})
 	assert.Subset(t, schemaStrings(t, schemaProperty(t, equitySchema, "type"), "enum"), []string{"LIMIT", "MARKET"})
 

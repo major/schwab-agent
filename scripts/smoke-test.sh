@@ -102,6 +102,29 @@ run_help_test() {
     fi
 }
 
+# run_help_contains_test validates that --help includes specific command surface
+# text. This catches regressions where a command exists but required flags or
+# subcommands disappear from the visible CLI contract.
+run_help_contains_test() {
+    local name="$1"
+    local expected="$2"
+    shift 2
+    local output
+    if output=$("$BINARY" "$@" --help 2>&1); then
+        if printf "%s" "$output" | grep -F -- "$expected" > /dev/null 2>&1; then
+            printf "${GREEN}PASS${NC} %s --help contains %s\n" "$name" "$expected"
+            PASS=$((PASS + 1))
+        else
+            printf "${RED}FAIL${NC} %s --help missing %s\n" "$name" "$expected"
+            FAIL=$((FAIL + 1))
+        fi
+    else
+        local rc=$?
+        printf "${RED}FAIL${NC} %s --help (exit %d)\n" "$name" "$rc"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 # run_error_test validates that a command exits non-zero (expected error).
 run_error_test() {
     local name="$1"
@@ -184,6 +207,7 @@ run_help_test "order place"       order place
 run_help_test "order preview"     order preview
 run_help_test "order cancel"      order cancel
 run_help_test "order replace"     order replace
+run_help_test "order replace option" order replace option
 run_help_test "order build"       order build
 run_help_test "order build equity"       order build equity
 run_help_test "order build option"       order build option
@@ -233,6 +257,16 @@ run_help_test "indicators"        indicators
 run_help_test "analyze"           analyze
 run_help_test "price-history"     price-history
 run_help_test "price-history get" price-history get
+
+run_help_contains_test "order replace lists option subcommand" "option" order replace
+run_help_contains_test "order replace shows equity symbol flag" "--symbol" order replace
+run_help_contains_test "order replace option shows underlying flag" "--underlying" order replace option
+run_help_contains_test "order replace option shows call flag" "--call" order replace option
+run_help_contains_test "order replace option shows put flag" "--put" order replace option
+
+run_help_contains_test "quote get shows underlying flag" "--underlying" quote get
+run_help_contains_test "quote get shows call flag" "--call" quote get
+run_help_contains_test "quote get shows put flag" "--put" quote get
 
 # -------------------------------------------------------------------
 # Shorthand and alias error cases (no args)
@@ -592,6 +626,54 @@ trap 'rm -rf "$TMPDIR"' EXIT
 
 run_build_test "fts: equity entry + stop exit" \
     order build fts --primary "@$TMPDIR/primary.json" --secondary "@$TMPDIR/secondary.json"
+
+# -------------------------------------------------------------------
+# Order flag aliases: --instruction (alias for --action),
+#                     --order-type (alias for --type)
+# -------------------------------------------------------------------
+
+section "Order Flag Aliases"
+
+# Help text contains alias flags
+run_help_contains_test "build equity --help shows --instruction" "--instruction" order build equity
+run_help_contains_test "build equity --help shows --order-type" "--order-type" order build equity
+run_help_contains_test "build option --help shows --instruction" "--instruction" order build option
+run_help_contains_test "build option --help shows --order-type" "--order-type" order build option
+run_help_contains_test "build bracket --help shows --instruction" "--instruction" order build bracket
+run_help_contains_test "build bracket --help shows --order-type" "--order-type" order build bracket
+run_help_contains_test "build oco --help shows --instruction" "--instruction" order build oco
+
+# Alias flags produce valid order JSON
+run_build_test "alias: equity --instruction BUY --order-type MARKET" \
+    order build equity --symbol AAPL --instruction BUY --quantity 10 --order-type MARKET
+run_build_test "alias: equity --instruction SELL --order-type LIMIT" \
+    order build equity --symbol AAPL --instruction SELL --quantity 10 --order-type LIMIT --price 200
+run_build_test "alias: option --instruction BUY_TO_OPEN --order-type LIMIT" \
+    order build option --underlying AAPL --expiration 2026-06-19 --strike 200 --call \
+    --instruction BUY_TO_OPEN --quantity 1 --order-type LIMIT --price 5.00
+run_build_test "alias: bracket --instruction BUY --order-type MARKET" \
+    order build bracket --symbol NVDA --instruction BUY --quantity 10 \
+    --order-type MARKET --take-profit 150 --stop-loss 120
+run_build_test "alias: oco --instruction SELL (no --type)" \
+    order build oco --symbol AAPL --instruction SELL --quantity 100 \
+    --take-profit 160 --stop-loss 140
+
+# Conflict: primary and alias set simultaneously
+run_error_test "alias conflict: --action + --instruction" \
+    order build equity --symbol AAPL --action BUY --instruction SELL --quantity 10
+run_error_test "alias conflict: --type + --order-type" \
+    order build equity --symbol AAPL --action BUY --quantity 10 \
+    --type LIMIT --order-type MARKET --price 200
+
+# Multi-leg strategies must NOT have alias flags
+run_error_test "vertical rejects --instruction" \
+    order build vertical --underlying F --expiration 2026-06-18 \
+    --long-strike 12 --short-strike 14 --call --open --quantity 1 --price 0.50 \
+    --instruction BUY
+run_error_test "iron-condor rejects --order-type" \
+    order build iron-condor --underlying F --expiration 2026-06-18 \
+    --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 \
+    --open --quantity 1 --price 0.50 --order-type LIMIT
 
 fi  # end TIER 1
 

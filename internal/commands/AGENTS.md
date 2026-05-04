@@ -42,6 +42,10 @@ func (o *quoteGetOpts) Attach(_ *cobra.Command) error { return nil }
 - `defineAndConstrain[O](cmd, opts, exclusivePairs...)` from helpers.go wraps `Define()` + `MarkFlagsMutuallyExclusive`/`MarkFlagsOneRequired` for order commands with mutual exclusion constraints
 - Root persistent flags (--account, --verbose, --config, --token) remain as manual Cobra registrations
 
+### Flag Aliases
+
+Order subcommands that use `--action` and `--type` also accept `--instruction` and `--order-type` as aliases. `registerOrderFlagAliases()` adds the alias flags with mutual exclusivity constraints. `resolveOrderFlagAliasesViaFlags()` runs pre-Unmarshal in RunE, copying alias values to canonical flags via `cmd.Flags().Set()`. `RegisterOrderFlagAliasesOnTree(root)` walks the full command tree post-setup to register aliases on all 14 qualifying subcommands. Alias flags use a lowercase "alias for --" Usage prefix so structcli's JSON Schema generator skips them.
+
 ## Adding a New Command
 
 1. Create `<name>.go` with a public `<Name>Command()` constructor
@@ -71,12 +75,15 @@ if err := requireMutableEnabled(configPath); err != nil { return err }
 
 ## Account Resolution
 
-All commands needing an account use `resolveAccount(accountFlag, configPath, positionalArgs)` from account.go:
+All commands needing an account use `resolveAccount(c, accountFlag, configPath, positionalArgs)` from account.go:
 
 1. Check `--account` flag first
 2. Check positional args (if non-nil, used by `account get`)
 3. Fall back to `default_account` from config
-4. Return `AccountNotFoundError` if none found
+4. If the chosen identifier looks like a long hex Schwab hash, return it without API calls
+5. Try numeric resolution: call `AccountNumbers()` to match by account number
+6. Try nickname resolution: call `UserPreference()` to match by account nickname (case-insensitive)
+7. Return `AccountNotFoundError` if none found or multiple nickname matches exist
 
 Pass `nil` for `positionalArgs` when the command doesn't accept positional account arguments.
 
@@ -122,10 +129,12 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 | auth.go | auth | login, status, refresh |
 | account.go | account | summary, list, get, numbers, set-default, transaction (list, get) |
 | position.go | position | list (--all-accounts, --account) |
-| quote.go | quote | get |
+| quote.go | quote | get (positional symbols or structured option flags: --underlying, --expiration, --strike, --call/--put) |
 | order.go | order | list (--recent, --status), get |
-| order_place.go | order | place (equity/option/bracket/oco), preview, cancel, replace |
+| order_place.go | order | place (equity/option/bracket/oco), preview, cancel, replace (equity parent + option sub) |
 | order_helpers.go | (shared) | opts structs, enum parsing, flag definitions, validation helpers |
+| flag_aliases.go | (shared) | registerOrderFlagAliases, resolveOrderFlagAliasesViaFlags, RegisterOrderFlagAliasesOnTree |
+| symbol_builder.go | (shared) | buildOCCSymbol for option commands needing OCC symbol construction |
 | order_build.go | order build | equity, option, bracket, oco, vertical, iron-condor, straddle, strangle, covered-call, collar, calendar, diagonal, butterfly, condor, vertical-roll, back-ratio, double-diagonal, fts |
 | chain.go | chain | get, expiration |
 | option_ticket.go | option | ticket get |

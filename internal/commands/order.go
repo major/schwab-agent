@@ -216,7 +216,7 @@ priority. Requires a default account or --account flag.`,
 				return err
 			}
 
-			account, err := resolveAccount(accountFlag, configPath, nil)
+			account, err := resolveAccount(c, accountFlag, configPath, nil)
 			if err != nil {
 				return err
 			}
