@@ -78,6 +78,11 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 		panic(err)
 	}
 
+	// Register --instruction/--order-type flag aliases on qualifying commands.
+	// This must happen AFTER structcli.Setup() because adding non-structcli
+	// flags before Setup interferes with structcli's JSON Schema generation.
+	commands.RegisterOrderFlagAliasesOnTree(root)
+
 	return root
 }
 

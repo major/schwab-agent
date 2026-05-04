@@ -307,6 +307,12 @@ func makeCobraPlaceOrderCommand[O any, P any](
 		Use:   name,
 		Short: usage,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Resolve --instruction/--order-type aliases before Unmarshal
+			// picks up flag values into the opts struct.
+			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
+				return err
+			}
+
 			if err := structcli.Unmarshal(cmd, any(opts).(structcli.Options)); err != nil {
 				return err
 			}
@@ -476,6 +482,12 @@ func makeCobraPreviewOrderCommand[O any, P any](
 		Use:   name,
 		Short: usage,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Resolve --instruction/--order-type aliases before Unmarshal
+			// picks up flag values into the opts struct.
+			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
+				return err
+			}
+
 			if err := structcli.Unmarshal(cmd, any(opts).(structcli.Options)); err != nil {
 				return err
 			}
@@ -595,13 +607,16 @@ original order status becomes REPLACED after the new order is created.`,
 		Example: `  schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY
    schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Resolve --instruction/--order-type aliases before Unmarshal
+			// picks up flag values into the opts structs.
+			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
+				return err
+			}
+
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 			if err := structcli.Unmarshal(cmd, equityOpts); err != nil {
-				return err
-			}
-			if err := resolveOrderFlagAliases(cmd, &equityOpts.Action, &equityOpts.Type); err != nil {
 				return err
 			}
 
@@ -661,7 +676,6 @@ original order status becomes REPLACED after the new order is created.`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
-	registerOrderFlagAliases(cmd)
 
 	cmd.AddCommand(newOrderReplaceOptionCmd(c, configPath, w))
 
@@ -757,7 +771,6 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
-	registerOrderFlagAliases(cmd)
 
 	return cmd
 }

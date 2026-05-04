@@ -70,6 +70,9 @@ func runOrderCommand(t *testing.T, c *client.Ref, configPath, stdin string, args
 	cmd := NewOrderCmd(c, configPath, &stdout)
 	cmd.PersistentFlags().String("account", "", "Account hash value")
 	cmd.PersistentFlags().String("config", configPath, "Path to config file")
+	// Register --instruction/--order-type aliases (normally done by
+	// RegisterOrderFlagAliasesOnTree in buildAppWithDeps after Setup).
+	RegisterOrderFlagAliasesOnTree(cmd)
 	cmd.SetIn(strings.NewReader(stdin))
 
 	if len(args) > 0 && args[0] == "order" {
