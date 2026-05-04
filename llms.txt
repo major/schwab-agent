@@ -273,7 +273,8 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 - [schwab-agent position list](#schwab-agent-position-list): List positions as a flat list with account identifiers and computed cost basis
 and P&L fields that Schwab's API does not provide directly. Uses the default
 account unless --account or --all-accounts is specified. Computed fields
-include totalCostBasis, unrealizedPnL, and unrealizedPnLPct.
+include totalCostBasis, unrealizedPnL, and unrealizedPnLPct. Apply local symbol,
+P&L, and sort filters to shrink output for portfolio triage workflows.
 - [schwab-agent quote](#schwab-agent-quote): Get quotes for one or more symbols
 - [schwab-agent quote get](#schwab-agent-quote-get): Get quotes for one or more symbols. Multiple symbols return a partial response
 when some are missing. Use --fields to select specific data groups (quote,
@@ -1352,11 +1353,17 @@ View positions across accounts
 List positions as a flat list with account identifiers and computed cost basis
 and P&L fields that Schwab's API does not provide directly. Uses the default
 account unless --account or --all-accounts is specified. Computed fields
-include totalCostBasis, unrealizedPnL, and unrealizedPnLPct.
+include totalCostBasis, unrealizedPnL, and unrealizedPnLPct. Apply local symbol,
+P&L, and sort filters to shrink output for portfolio triage workflows.
 
 ### Flags
 
 - `--all-accounts` (bool, default: false): Show positions across all linked accounts
+- `--losers-only` (bool, default: false): Show only positions with negative unrealized P&L
+- `--max-pnl` (float64, default: 0): Maximum unrealized P&L to include when set
+- `--min-pnl` (float64, default: 0): Minimum unrealized P&L to include when set
+- `--sort` (string): Sort positions by pnl-desc, pnl-asc, or value-desc {,pnl-asc,pnl-desc,value-desc}
+- `--symbol` (stringSlice, default: []): Filter by symbol (repeatable, comma-separated values allowed)
 
 ## schwab-agent quote
 

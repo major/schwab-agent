@@ -428,9 +428,174 @@ func TestPositionListComputedFieldsInOutput(t *testing.T) {
 	assert.Equal(t, 16500.0, pos["marketValue"])
 }
 
+func TestPositionListFiltersSymbolsAndSortsByValue(t *testing.T) {
+	account := map[string]any{
+		"securitiesAccount": map[string]any{
+			"type":          "MARGIN",
+			"accountNumber": "12345",
+			"positions": []map[string]any{
+				{
+					"longQuantity":       100.0,
+					"averagePrice":       150.0,
+					"marketValue":        16000.0,
+					"longOpenProfitLoss": 1000.0,
+					"instrument":         map[string]any{"symbol": "AAPL", "assetType": "EQUITY"},
+				},
+				{
+					"longQuantity":       50.0,
+					"averagePrice":       200.0,
+					"marketValue":        11000.0,
+					"longOpenProfitLoss": -250.0,
+					"instrument":         map[string]any{"symbol": "MSFT", "assetType": "EQUITY"},
+				},
+				{
+					"longQuantity":       20.0,
+					"averagePrice":       300.0,
+					"marketValue":        4000.0,
+					"longOpenProfitLoss": -500.0,
+					"instrument":         map[string]any{"symbol": "TSLA", "assetType": "EQUITY"},
+				},
+			},
+		},
+	}
+
+	srv := accountMockServer(t, map[string]any{
+		"/trader/v1/accounts/HASH123": account,
+		"/trader/v1/userPreference":   map[string]any{"accounts": []any{}},
+	})
+	defer srv.Close()
+
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
+	configPath := writeAccountTestConfig(t, t.TempDir(), "")
+
+	var buf bytes.Buffer
+	cmd := NewPositionCmd(c, configPath, &buf)
+
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123", "--symbol", "msft,aapl", "--sort", "value-desc")
+	require.NoError(t, err)
+
+	env := decodeAccountEnvelope(t, buf.Bytes())
+	assert.Equal(t, 2, env.Metadata.Returned)
+
+	positions := positionListFromEnvelope(t, env.Data)
+	require.Len(t, positions, 2)
+	assert.Equal(t, "AAPL", positionSymbol(t, positions[0]))
+	assert.Equal(t, "MSFT", positionSymbol(t, positions[1]))
+}
+
+func TestPositionListFiltersPnLAndSortsAscending(t *testing.T) {
+	account := map[string]any{
+		"securitiesAccount": map[string]any{
+			"type":          "MARGIN",
+			"accountNumber": "12345",
+			"positions": []map[string]any{
+				{
+					"longQuantity":       100.0,
+					"averagePrice":       150.0,
+					"marketValue":        16000.0,
+					"longOpenProfitLoss": 1000.0,
+					"instrument":         map[string]any{"symbol": "AAPL", "assetType": "EQUITY"},
+				},
+				{
+					"longQuantity":       50.0,
+					"averagePrice":       200.0,
+					"marketValue":        11000.0,
+					"longOpenProfitLoss": -250.0,
+					"instrument":         map[string]any{"symbol": "MSFT", "assetType": "EQUITY"},
+				},
+				{
+					"longQuantity":       20.0,
+					"averagePrice":       300.0,
+					"marketValue":        4000.0,
+					"longOpenProfitLoss": -500.0,
+					"instrument":         map[string]any{"symbol": "TSLA", "assetType": "EQUITY"},
+				},
+				{
+					"longQuantity": 10.0,
+					"averagePrice": 50.0,
+					"marketValue":  500.0,
+					"instrument":   map[string]any{"symbol": "VTI", "assetType": "EQUITY"},
+				},
+			},
+		},
+	}
+
+	srv := accountMockServer(t, map[string]any{
+		"/trader/v1/accounts/HASH123": account,
+		"/trader/v1/userPreference":   map[string]any{"accounts": []any{}},
+	})
+	defer srv.Close()
+
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
+	configPath := writeAccountTestConfig(t, t.TempDir(), "")
+
+	var buf bytes.Buffer
+	cmd := NewPositionCmd(c, configPath, &buf)
+
+	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123", "--losers-only", "--min-pnl", "-600", "--max-pnl", "-100", "--sort", "pnl-asc")
+	require.NoError(t, err)
+
+	env := decodeAccountEnvelope(t, buf.Bytes())
+	assert.Equal(t, 2, env.Metadata.Returned)
+
+	positions := positionListFromEnvelope(t, env.Data)
+	require.Len(t, positions, 2)
+	assert.Equal(t, "TSLA", positionSymbol(t, positions[0]))
+	assert.Equal(t, -500.0, positions[0]["unrealizedPnL"])
+	assert.Equal(t, "MSFT", positionSymbol(t, positions[1]))
+	assert.Equal(t, -250.0, positions[1]["unrealizedPnL"])
+}
+
+func TestPositionListRejectsInvalidPnLRange(t *testing.T) {
+	srv := accountMockServer(t, map[string]any{})
+	defer srv.Close()
+
+	c := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(srv.URL))}
+	configPath := writeAccountTestConfig(t, t.TempDir(), "HASH123")
+
+	var buf bytes.Buffer
+	cmd := NewPositionCmd(c, configPath, &buf)
+
+	_, err := runTestCommand(t, cmd, "list", "--min-pnl", "100", "--max-pnl", "-100")
+	require.Error(t, err)
+
+	var ve *apperr.ValidationError
+	require.ErrorAs(t, err, &ve)
+	assert.Contains(t, err.Error(), "--min-pnl cannot be greater than --max-pnl")
+}
+
 // ---------------------------------------------------------------------------
 // Pure unit tests (framework-agnostic, no migration needed)
 // ---------------------------------------------------------------------------
+
+func positionListFromEnvelope(t *testing.T, data any) []map[string]any {
+	t.Helper()
+
+	dataMap, ok := data.(map[string]any)
+	require.True(t, ok, "expected data to be map[string]any")
+	positionsRaw, ok := dataMap["positions"].([]any)
+	require.True(t, ok, "expected positions to be []any")
+
+	positions := make([]map[string]any, 0, len(positionsRaw))
+	for _, raw := range positionsRaw {
+		position, ok := raw.(map[string]any)
+		require.True(t, ok, "expected position to be map[string]any")
+		positions = append(positions, position)
+	}
+
+	return positions
+}
+
+func positionSymbol(t *testing.T, position map[string]any) string {
+	t.Helper()
+
+	instrument, ok := position["instrument"].(map[string]any)
+	require.True(t, ok, "expected instrument to be map[string]any")
+	symbol, ok := instrument["symbol"].(string)
+	require.True(t, ok, "expected instrument symbol to be string")
+
+	return symbol
+}
 
 func TestComputePositionFields(t *testing.T) {
 	t.Run("long position with P&L", func(t *testing.T) {

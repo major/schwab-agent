@@ -178,6 +178,10 @@ schwab-agent order replace option 123456789 \
 schwab-agent account get -a "My Roth IRA"
 schwab-agent position list -a 12345678
 
+# Filter holdings for portfolio triage
+schwab-agent position list --all-accounts --symbol AAPL --symbol MSFT --sort value-desc
+schwab-agent position list --losers-only --min-pnl -500 --sort pnl-asc
+
 # Place from a JSON spec
 schwab-agent order place --spec @order.json
 ```
@@ -188,7 +192,7 @@ schwab-agent order place --spec @order.json
 |---|---|
 | `auth` | Login, status, token refresh |
 | `account` | Compact summaries, full account details, hashes, set default, transactions |
-| `position` | List positions for one or all accounts (with computed cost basis and P&L) |
+| `position` | List, filter, and sort positions for one or all accounts (with computed cost basis and P&L) |
 | `quote` | Get quotes for one or more symbols (supports structured option flags) |
 | `order` | List, get, place, preview, build, cancel, replace (equity and option) |
 | `chain` | Option chain data (`get`, `expiration`) |

@@ -112,6 +112,17 @@ const (
 	moversFrequency60 moversFrequency = "60"
 )
 
+// positionSort is a CLI-only enum for local position-list sorting. Schwab does
+// not sort account positions for us, so these values describe deterministic
+// client-side orderings applied after all filters run.
+type positionSort string
+
+const (
+	positionSortPnLDesc   positionSort = "pnl-desc"
+	positionSortPnLAsc    positionSort = "pnl-asc"
+	positionSortValueDesc positionSort = "value-desc"
+)
+
 // taInterval is a CLI-only enum shared by technical-analysis commands.
 type taInterval string
 
@@ -162,6 +173,7 @@ func init() {
 	structcli.RegisterEnum(enumMap([]instrumentProjection{instrumentProjectionSymbolSearch, instrumentProjectionSymbolRegex, instrumentProjectionDescSearch, instrumentProjectionDescRegex, instrumentProjectionSearch, instrumentProjectionFundamental}))
 	structcli.RegisterEnum(enumMapWithEmpty([]moversSort{moversSortVolume, moversSortTrades, moversSortPercentChangeUp, moversSortPercentChangeDown}))
 	structcli.RegisterEnum(enumMapWithEmpty([]moversFrequency{moversFrequency0, moversFrequency1, moversFrequency5, moversFrequency10, moversFrequency30, moversFrequency60}))
+	structcli.RegisterEnum(enumMapWithEmpty([]positionSort{positionSortPnLDesc, positionSortPnLAsc, positionSortValueDesc}))
 	structcli.RegisterEnum(enumMap([]taInterval{taIntervalDaily, taIntervalWeekly, taInterval1Min, taInterval5Min, taInterval15Min, taInterval30Min}))
 }
 
