@@ -385,7 +385,7 @@ func TestCallbackHandler_Idempotency_OnlyProcessesFirstRequest(t *testing.T) {
 	// Channel should be empty - second request did not send a result
 	select {
 	case r := <-resultCh:
-		t.Fatalf("second request should not have sent a result, got: %+v", r)
+		require.Failf(t, "unexpected channel result", "second request should not have sent a result, got: %+v", r)
 	default:
 		// expected: sync.Once prevented second write
 	}

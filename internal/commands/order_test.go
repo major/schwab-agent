@@ -220,7 +220,7 @@ func TestNewOrderCmdSpecSemanticValidation(t *testing.T) {
 	var requests int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
-		t.Errorf("unexpected API request for invalid spec: %s %s", r.Method, r.URL.Path)
+		assert.Failf(t, "unexpected API request for invalid spec", "%s %s", r.Method, r.URL.Path)
 		http.NotFound(w, r)
 	}))
 	defer server.Close()
@@ -544,7 +544,7 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/default-hash/orders/67890":
 			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "AAPL")
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -609,7 +609,7 @@ func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/24680":
 			writeTestOrderResponse(t, w, 24680, models.OrderStatusQueued, "MSFT")
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -674,7 +674,7 @@ func TestNewOrderCmdPreviewSaveAndPlaceFromPreview(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/13579":
 			writeTestOrderResponse(t, w, 13579, models.OrderStatusQueued, "AAPL")
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -753,10 +753,10 @@ func TestNewOrderCmdPlaceNoLocationReturnsPartialSuccess(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 		case r.Method == http.MethodGet:
 			getRequests++
-			t.Errorf("unexpected follow-up GET without an order ID: %s", r.URL.Path)
+			assert.Failf(t, "unexpected follow-up GET", "request without order ID: %s", r.URL.Path)
 			http.NotFound(w, r)
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -989,7 +989,7 @@ func TestNewOrderCmdPlaceOCOPipeline(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/default-hash/orders/55555":
 			writeTestOrderResponse(t, w, 55555, models.OrderStatusQueued, "AAPL")
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -1976,7 +1976,7 @@ func TestNewOrderCmdListMultipleStatuses(t *testing.T) {
 			_, err := w.Write([]byte(`[{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":222,"status":"FILLED","orderLegCollection":[{"instruction":"SELL","quantity":5,"instrument":{"assetType":"EQUITY","symbol":"MSFT"}}]}]`))
 			require.NoError(t, err)
 		default:
-			t.Errorf("unexpected status filter: %q", status)
+			assert.Failf(t, "unexpected status filter", "got status %q", status)
 		}
 	}))
 	defer server.Close()
@@ -2396,7 +2396,7 @@ func TestNewOrderCmdCancelSuccess(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			writeTestOrderResponse(t, w, 12345, models.OrderStatusCanceled, "AAPL")
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -2435,7 +2435,7 @@ func TestNewOrderCmdCancelOrderIDFlagSuccess(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/1234567890":
 			writeTestOrderResponse(t, w, 1234567890, models.OrderStatusCanceled, "AAPL")
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -2473,7 +2473,7 @@ func TestNewOrderCmdCancelGetFailureReturnsPartialSuccess(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			http.Error(w, "eventual consistency", http.StatusInternalServerError)
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -2562,7 +2562,7 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "AAPL")
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -2630,7 +2630,7 @@ func TestNewOrderCmdReplaceOrderIDFlagSuccess(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/1234567890":
 			writeTestOrderResponse(t, w, 1234567890, models.OrderStatusReplaced, "AAPL")
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -2690,7 +2690,7 @@ func TestNewOrderCmdReplaceOriginalStatusMismatchReturnsPartialSuccess(t *testin
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			writeTestOrderResponse(t, w, 12345, models.OrderStatusPendingReplace, "AAPL")
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -2771,7 +2771,7 @@ func TestOrderReplaceEquityFlagAliases(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "AAPL")
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -2818,7 +2818,7 @@ func TestOrderReplaceOptionSuccess(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "AAPL")
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))

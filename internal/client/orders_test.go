@@ -124,7 +124,7 @@ func TestListOrders_MultipleStatuses(t *testing.T) {
 			}}
 			require.NoError(t, json.NewEncoder(w).Encode(response))
 		default:
-			t.Errorf("unexpected status filter: %q", status)
+			assert.Failf(t, "unexpected status filter", "got status %q", status)
 		}
 	}))
 	defer srv.Close()

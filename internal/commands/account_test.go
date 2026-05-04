@@ -290,10 +290,10 @@ func TestNewAccountCmd_Summary_Success(t *testing.T) {
 				{"accountNumber":"67890","nickName":"Joint Taxable","primaryAccount":false,"type":"CASH"}
 			]}`))
 		case "/trader/v1/accounts":
-			t.Errorf("account summary should not fetch the full account payload")
+			assert.Fail(t, "account summary should not fetch the full account payload")
 			w.WriteHeader(http.StatusInternalServerError)
 		default:
-			t.Errorf("unexpected request: %s", r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
@@ -366,7 +366,7 @@ func TestNewAccountCmd_Summary_WithPositionsFlag(t *testing.T) {
 				}
 			}]`))
 		default:
-			t.Errorf("unexpected request: %s", r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
@@ -425,10 +425,10 @@ func TestNewAccountCmd_Summary_WithPositionsFlag_EmptyAccountsSkipsPositions(t *
 			_, _ = w.Write([]byte(`[]`))
 		case "/trader/v1/accounts":
 			accountPayloadRequests++
-			t.Errorf("empty account summary should not fetch positions")
+			assert.Fail(t, "empty account summary should not fetch positions")
 			w.WriteHeader(http.StatusInternalServerError)
 		default:
-			t.Errorf("unexpected request: %s", r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
@@ -466,7 +466,7 @@ func TestNewAccountCmd_Summary_PreferencesFailure_StillReturnsPositions(t *testi
 				}
 			}]`))
 		default:
-			t.Errorf("unexpected request: %s", r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
@@ -510,10 +510,10 @@ func TestNewAccountCmd_Summary_PreferencesFailure_StillReturnsHashes(t *testing.
 		case "/trader/v1/userPreference":
 			w.WriteHeader(http.StatusInternalServerError)
 		case "/trader/v1/accounts":
-			t.Errorf("account summary should not fetch the full account payload")
+			assert.Fail(t, "account summary should not fetch the full account payload")
 			w.WriteHeader(http.StatusInternalServerError)
 		default:
-			t.Errorf("unexpected request: %s", r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
@@ -554,10 +554,10 @@ func TestNewAccountCmd_Summary_EmptyAccountsSkipsPreferences(t *testing.T) {
 			_, _ = w.Write([]byte(`[]`))
 		case "/trader/v1/userPreference":
 			preferenceRequests++
-			t.Errorf("empty account summary should not fetch preferences")
+			assert.Fail(t, "empty account summary should not fetch preferences")
 			w.WriteHeader(http.StatusInternalServerError)
 		default:
-			t.Errorf("unexpected request: %s", r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
