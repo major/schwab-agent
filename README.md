@@ -109,8 +109,11 @@ schwab-agent chain get AAPL
 # Get a compact option planning ticket
 schwab-agent option ticket get AAPL --expiration <YYYY-MM-DD> --strike 200 --call
 
-# Get multiple moving averages in one technical-analysis run
-schwab-agent ta sma AAPL --period 21,50,200 --points 1
+# Get the latest row for multiple moving averages in one technical-analysis run
+schwab-agent ta sma AAPL --period 21,50,200
+
+# Batch the latest technical indicator row across several symbols
+schwab-agent ta atr AAPL MSFT NVDA
 
 # Get a compact technical-analysis dashboard in one history fetch
 schwab-agent ta dashboard AAPL

@@ -269,6 +269,23 @@ func TestNewQuoteGetInvalidField(t *testing.T) {
 	assert.Empty(t, buf.String())
 }
 
+func TestNewQuoteGetTechnicalFieldSuggestsTAHelp(t *testing.T) {
+	server := jsonServer(`{}`)
+	defer server.Close()
+
+	var buf bytes.Buffer
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "get",
+		"--fields", "technical",
+		"AAPL",
+	)
+	require.Error(t, err)
+
+	assert.Contains(t, err.Error(), `invalid field "technical"`)
+	assert.Contains(t, err.Error(), "schwab-agent ta --help")
+	assert.Empty(t, buf.String())
+}
+
 func TestNewQuoteGetNoFlagsNoExtraParams(t *testing.T) {
 	// When no --fields or --indicative flags are provided, no extra
 	// query parameters should appear in the request URL.

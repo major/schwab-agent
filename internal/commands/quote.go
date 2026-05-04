@@ -65,7 +65,7 @@ func (o *quoteGetOpts) Validate(_ context.Context) []error {
 			}
 			lower := strings.ToLower(trimmed)
 			if !validQuoteFields[lower] {
-				errs = append(errs, fmt.Errorf("invalid field %q: must be one of %s", trimmed, sortedQuoteFieldNames()))
+				errs = append(errs, fmt.Errorf("%s", invalidQuoteFieldMessage(trimmed, lower)))
 			}
 		}
 	}
@@ -75,6 +75,17 @@ func (o *quoteGetOpts) Validate(_ context.Context) []error {
 	}
 
 	return nil
+}
+
+// invalidQuoteFieldMessage explains invalid quote fields and gives the most
+// common remediation for agents that guess technical after seeing fundamental.
+func invalidQuoteFieldMessage(field, lower string) string {
+	message := fmt.Sprintf("invalid field %q: must be one of %s", field, sortedQuoteFieldNames())
+	if lower == "technical" {
+		return message + ". For technical indicators (ATR, RSI, SMA), see: schwab-agent ta --help"
+	}
+
+	return message
 }
 
 // newQuoteGetCmd returns the Cobra subcommand for retrieving quotes.
