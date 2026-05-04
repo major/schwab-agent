@@ -15,6 +15,11 @@ func registerOrderFlagAliases(cmd *cobra.Command) {
 	if cmd.Flags().Lookup("action") != nil {
 		var instructionAlias string
 		cmd.Flags().StringVar(&instructionAlias, "instruction", "", "Alias for --action")
+		// structcli marks --action required before aliases exist. Clear Cobra's
+		// required annotation so alias-only commands can reach RunE, where
+		// resolveOrderFlagAliases copies --instruction into Action and the normal
+		// typed parser still enforces that one action value is present.
+		delete(cmd.Flags().Lookup("action").Annotations, cobra.BashCompOneRequiredFlag)
 	}
 
 	// Register --order-type alias only if --type exists

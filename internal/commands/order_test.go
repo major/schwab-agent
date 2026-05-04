@@ -2656,6 +2656,165 @@ func TestNewOrderCmdReplaceAPIError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
 }
 
+func TestOrderReplaceEquityFlagAliases(t *testing.T) {
+	t.Parallel()
+
+	var received models.OrderRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &received))
+
+			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/67890":
+			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "AAPL")
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "AAPL")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := testClient(t, server)
+
+	stdout, err := runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order", "replace", "12345",
+		"--symbol", "AAPL",
+		"--instruction", "BUY",
+		"--quantity", "10",
+		"--order-type", "LIMIT",
+		"--price", "185.25",
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
+	require.Len(t, received.OrderLegCollection, 1)
+	assert.Equal(t, models.InstructionBuy, received.OrderLegCollection[0].Instruction)
+	assert.NotEmpty(t, stdout)
+}
+
+func TestOrderReplaceOptionSuccess(t *testing.T) {
+	t.Parallel()
+
+	var received models.OrderRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &received))
+
+			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/67890":
+			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "AAPL  "+testFutureExpTime.Format("060102")+"C00200000")
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "AAPL")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := testClient(t, server)
+
+	stdout, err := runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order", "replace", "option", "12345",
+		"--underlying", "AAPL",
+		"--expiration", testFutureExpDate,
+		"--strike", "200",
+		"--call",
+		"--instruction", "BUY_TO_OPEN",
+		"--quantity", "1",
+		"--order-type", "LIMIT",
+		"--price", "5.00",
+		"--duration", "DAY",
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
+	require.NotNil(t, received.Price)
+	assert.Equal(t, 5.00, *received.Price)
+	require.Len(t, received.OrderLegCollection, 1)
+	leg := received.OrderLegCollection[0]
+	assert.Equal(t, models.AssetTypeOption, leg.Instrument.AssetType)
+	assert.Equal(t, models.InstructionBuyToOpen, leg.Instruction)
+	assert.Equal(t, "AAPL  "+testFutureExpTime.Format("060102")+"C00200000", leg.Instrument.Symbol)
+
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "replace", data["action"])
+	assert.Equal(t, float64(67890), data["orderId"])
+	assert.Equal(t, true, data["replaced"])
+}
+
+func TestOrderReplaceOptionCallPutMutuallyExclusive(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	stdout, err := runOrderCommand(
+		t,
+		nil,
+		configPath,
+		"",
+		"order", "replace", "option", "12345",
+		"--underlying", "AAPL",
+		"--expiration", testFutureExpDate,
+		"--strike", "200",
+		"--call",
+		"--put",
+		"--action", "BUY_TO_OPEN",
+		"--quantity", "1",
+	)
+
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	assert.Contains(t, err.Error(), "call")
+	assert.Contains(t, err.Error(), "put")
+}
+
+func TestOrderReplaceOptionMutableGuard(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeTestConfig(t, "hash123")
+	stdout, err := runOrderCommand(
+		t,
+		nil,
+		configPath,
+		"",
+		"order", "replace", "option", "12345",
+		"--underlying", "AAPL",
+		"--expiration", testFutureExpDate,
+		"--strike", "200",
+		"--call",
+		"--action", "BUY_TO_OPEN",
+		"--quantity", "1",
+	)
+
+	require.Error(t, err)
+	assert.Empty(t, stdout)
+	var validationErr *apperr.ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, mutableDisabledMessage, validationErr.Error())
+}
+
 func TestParseRequiredOrderID(t *testing.T) {
 	t.Parallel()
 

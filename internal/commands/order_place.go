@@ -601,6 +601,9 @@ original order status becomes REPLACED after the new order is created.`,
 			if err := structcli.Unmarshal(cmd, equityOpts); err != nil {
 				return err
 			}
+			if err := resolveOrderFlagAliases(cmd, &equityOpts.Action, &equityOpts.Type); err != nil {
+				return err
+			}
 
 			configFlag, err := cmd.Flags().GetString("config")
 			if err != nil {
@@ -658,6 +661,103 @@ original order status becomes REPLACED after the new order is created.`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	registerOrderFlagAliases(cmd)
+
+	cmd.AddCommand(newOrderReplaceOptionCmd(c, configPath, w))
+
+	return cmd
+}
+
+// newOrderReplaceOptionCmd replaces an existing order with a new single-leg
+// option payload built from structured contract flags.
+func newOrderReplaceOptionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	opts := &orderReplaceOpts{}
+	optionOpts := &optionPlaceOpts{}
+	cmd := &cobra.Command{
+		Use:   "option [order-id]",
+		Short: "Replace an order with a new option order spec",
+		Long: `Replace an existing order with a new single-leg option order. The option
+contract is built from --underlying, --expiration, --strike, and exactly one of
+--call or --put, then submitted through Schwab's replace endpoint. Requires the
+"i-also-like-to-live-dangerously" config flag.`,
+		Example: `  schwab-agent order replace option 1234567890 --underlying AAPL --expiration 2026-06-19 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
+   schwab-agent order replace option --order-id 1234567890 --underlying AAPL --expiration 2026-06-19 --strike 190 --put --instruction SELL_TO_OPEN --quantity 1 --order-type LIMIT --price 3.50`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+			if err := structcli.Unmarshal(cmd, optionOpts); err != nil {
+				return err
+			}
+			if err := resolveOrderFlagAliases(cmd, &optionOpts.Action, &optionOpts.Type); err != nil {
+				return err
+			}
+
+			configFlag, err := cmd.Flags().GetString("config")
+			if err != nil {
+				return err
+			}
+			if configFlag == "" {
+				configFlag = configPath
+			}
+
+			if err := requireMutableEnabled(configFlag); err != nil {
+				return err
+			}
+
+			orderID, err := parseRequiredOrderID(opts.OrderID, args)
+			if err != nil {
+				return err
+			}
+
+			accountFlag, err := cmd.Flags().GetString("account")
+			if err != nil {
+				return err
+			}
+
+			account, err := resolveAccount(c, accountFlag, configFlag, nil)
+			if err != nil {
+				return err
+			}
+
+			occSymbol, err := buildOCCSymbol(optionOpts.Underlying, optionOpts.Expiration, optionOpts.Strike, optionOpts.Call, optionOpts.Put)
+			if err != nil {
+				return err
+			}
+
+			params, err := parseOptionParams(optionOpts, args)
+			if err != nil {
+				return err
+			}
+
+			if err := orderbuilder.ValidateOptionOrder(params); err != nil {
+				return err
+			}
+
+			order, err := orderbuilder.BuildOptionOrder(params)
+			if err != nil {
+				return err
+			}
+			// Keep the replacement path explicitly tied to the shared OCC builder so
+			// future option-build changes cannot accidentally drift from symbol build/parse.
+			order.OrderLegCollection[0].Instrument.Symbol = occSymbol
+
+			response, err := c.ReplaceOrder(cmd.Context(), account, orderID, order)
+			if err != nil {
+				return err
+			}
+
+			data, errs := fetchReplaceActionData(cmd, c, account, orderID, response.OrderID, order)
+			return writeOrderActionResult(w, &data, errs)
+		},
+	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
+
+	defineAndConstrain(cmd, optionOpts, []string{"call", "put"})
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
+	registerOrderFlagAliases(cmd)
 
 	return cmd
 }

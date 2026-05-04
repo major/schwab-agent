@@ -102,6 +102,29 @@ run_help_test() {
     fi
 }
 
+# run_help_contains_test validates that --help includes specific command surface
+# text. This catches regressions where a command exists but required flags or
+# subcommands disappear from the visible CLI contract.
+run_help_contains_test() {
+    local name="$1"
+    local expected="$2"
+    shift 2
+    local output
+    if output=$("$BINARY" "$@" --help 2>&1); then
+        if printf "%s" "$output" | grep -F -- "$expected" > /dev/null 2>&1; then
+            printf "${GREEN}PASS${NC} %s --help contains %s\n" "$name" "$expected"
+            PASS=$((PASS + 1))
+        else
+            printf "${RED}FAIL${NC} %s --help missing %s\n" "$name" "$expected"
+            FAIL=$((FAIL + 1))
+        fi
+    else
+        local rc=$?
+        printf "${RED}FAIL${NC} %s --help (exit %d)\n" "$name" "$rc"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 # run_error_test validates that a command exits non-zero (expected error).
 run_error_test() {
     local name="$1"
@@ -184,6 +207,7 @@ run_help_test "order place"       order place
 run_help_test "order preview"     order preview
 run_help_test "order cancel"      order cancel
 run_help_test "order replace"     order replace
+run_help_test "order replace option" order replace option
 run_help_test "order build"       order build
 run_help_test "order build equity"       order build equity
 run_help_test "order build option"       order build option
@@ -233,6 +257,12 @@ run_help_test "indicators"        indicators
 run_help_test "analyze"           analyze
 run_help_test "price-history"     price-history
 run_help_test "price-history get" price-history get
+
+run_help_contains_test "order replace lists option subcommand" "option" order replace
+run_help_contains_test "order replace shows equity symbol flag" "--symbol" order replace
+run_help_contains_test "order replace option shows underlying flag" "--underlying" order replace option
+run_help_contains_test "order replace option shows call flag" "--call" order replace option
+run_help_contains_test "order replace option shows put flag" "--put" order replace option
 
 # -------------------------------------------------------------------
 # Shorthand and alias error cases (no args)
