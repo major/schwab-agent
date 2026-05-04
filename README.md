@@ -112,6 +112,9 @@ schwab-agent option ticket get AAPL --expiration <YYYY-MM-DD> --strike 200 --cal
 # Get multiple moving averages in one technical-analysis run
 schwab-agent ta sma AAPL --period 21,50,200 --points 1
 
+# Get a compact technical-analysis dashboard in one history fetch
+schwab-agent ta dashboard AAPL
+
 # Place a limit order (requires safety config)
 schwab-agent order place equity \
   --symbol AAPL \
@@ -156,7 +159,7 @@ schwab-agent order place --spec @order.json
 | `chain` | Option chain data (`get`, `expiration`) |
 | `option` | Option planning tickets that combine quote, chain, and OCC symbol context |
 | `history` | Price history for a symbol |
-| `ta` | Technical analysis (sma, ema, rsi, macd, atr, bbands, stoch, adx, vwap, hv, expected-move) |
+| `ta` | Technical analysis (dashboard, sma, ema, rsi, macd, atr, bbands, stoch, adx, vwap, hv, expected-move) |
 | `market` | Market hours and top movers |
 | `symbol` | Build and parse OCC option symbols (no auth required) |
 | `instrument` | Search instruments |

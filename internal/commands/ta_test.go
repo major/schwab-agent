@@ -35,6 +35,22 @@ func mockCandleListJSON(symbol string, n int) string {
 	return fmt.Sprintf(`{"symbol":%q,"empty":false,"candles":[%s]}`, symbol, strings.Join(candles, ","))
 }
 
+// mockFlatCandleListJSON builds candles with no price movement. Flat histories
+// produce valid all-zero MACD/ATR-style outputs after warm-up, which guards the
+// dashboard against confusing "all zeros" with "no indicator data".
+func mockFlatCandleListJSON(symbol string, n int) string {
+	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	candles := make([]string, n)
+	for i := range n {
+		dt := base.AddDate(0, 0, i).Format(time.RFC3339)
+		candles[i] = fmt.Sprintf(
+			`{"open":100.0,"high":100.0,"low":100.0,"close":100.0,"volume":1000000,"datetimeISO8601":%q}`,
+			dt,
+		)
+	}
+	return fmt.Sprintf(`{"symbol":%q,"empty":false,"candles":[%s]}`, symbol, strings.Join(candles, ","))
+}
+
 // decodeTAEnvelope unmarshals the output buffer into an Envelope and extracts the data map.
 func decodeTAEnvelope(t *testing.T, buf *bytes.Buffer) (envelope output.Envelope, data map[string]any) {
 	t.Helper()
@@ -173,6 +189,146 @@ func optionChainHandler(t *testing.T, body string) http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(body))
 	})
+}
+
+func TestTADashboard_ValidEnvelope(t *testing.T) {
+	// Arrange: dashboard needs 252 candles for its long-range price context and
+	// SMA 200 while still making only one price-history request.
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
+		assert.Equal(t, "AAPL", r.URL.Query().Get("symbol"))
+		assert.Equal(t, "1", r.URL.Query().Get("period"), "252 daily candles should fit in one year")
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(mockCandleListJSON("AAPL", 252)))
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "dashboard", "AAPL")
+	require.NoError(t, err)
+
+	// Assert
+	envelope, data := decodeTAEnvelope(t, &buf)
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
+	assert.Equal(t, 1, requestCount, "dashboard should fetch price history once")
+	assert.Equal(t, "dashboard", data["indicator"])
+	assert.Equal(t, "AAPL", data["symbol"])
+	assert.Equal(t, "daily", data["interval"])
+
+	parameters, ok := data["parameters"].(map[string]any)
+	require.True(t, ok, "parameters should be an object")
+	assert.Equal(t, []any{float64(21), float64(50), float64(200)}, parameters["sma_periods"])
+	assert.InDelta(t, 14, parameters["rsi_period"], 0.1)
+	assert.InDelta(t, 12, parameters["macd_fast"], 0.1)
+	assert.InDelta(t, 26, parameters["macd_slow"], 0.1)
+	assert.InDelta(t, 9, parameters["macd_signal"], 0.1)
+	assert.InDelta(t, 20, parameters["bbands_period"], 0.1)
+	assert.InDelta(t, 252, parameters["long_range"], 0.1)
+
+	latest, ok := data["latest"].(map[string]any)
+	require.True(t, ok, "latest should be an object")
+	for _, key := range []string{
+		"datetime", "open", "high", "low", "close", "volume",
+		"sma_21", "sma_50", "sma_200", "rsi_14", "macd", "macd_signal", "macd_histogram",
+		"atr_14", "atr_percent", "bbands_upper", "bbands_middle", "bbands_lower",
+		"avg_volume_20", "relative_volume", "range_20_high", "range_20_low", "range_252_high", "range_252_low",
+		"distance_from_sma_21_percent", "distance_from_sma_50_percent", "distance_from_sma_200_percent",
+	} {
+		assert.Contains(t, latest, key)
+	}
+
+	signals, ok := data["signals"].(map[string]any)
+	require.True(t, ok, "signals should be an object")
+	assert.Contains(t, signals, "trend")
+	assert.Contains(t, signals, "momentum")
+	assert.Contains(t, signals, "volatility")
+	assert.Contains(t, signals, "volume")
+	assert.Contains(t, signals, "close_above_sma_200")
+	assert.Contains(t, signals, "macd_histogram_positive")
+
+	values, ok := data["values"].([]any)
+	require.True(t, ok, "values should be an array")
+	require.Len(t, values, 1, "dashboard defaults to the latest point")
+	assert.Equal(t, latest, values[0].(map[string]any), "default values row should match latest")
+}
+
+func TestTADashboard_PointsFlag(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(priceHistoryHandler(t, "MSFT", 254))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "dashboard", "--points", "3", "MSFT")
+	require.NoError(t, err)
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	assert.Equal(t, "dashboard", data["indicator"])
+	assert.Equal(t, "MSFT", data["symbol"])
+
+	values, ok := data["values"].([]any)
+	require.True(t, ok, "values should be an array")
+	require.Len(t, values, 3, "--points 3 should return three dashboard rows")
+
+	latest, ok := data["latest"].(map[string]any)
+	require.True(t, ok, "latest should be an object")
+	assert.Equal(t, latest, values[2].(map[string]any), "latest should match the final limited row")
+
+	first := values[0].(map[string]any)
+	assert.InDelta(t, 352.0, first["range_252_high"], 0.1, "first row should use candles 0-251")
+	assert.InDelta(t, 99.0, first["range_252_low"], 0.1, "first row should use candles 0-251")
+	assert.InDelta(t, 354.0, latest["range_252_high"], 0.1, "latest row should use candles 2-253")
+	assert.InDelta(t, 101.0, latest["range_252_low"], 0.1, "latest row should use candles 2-253")
+}
+
+func TestTADashboard_FlatHistoryDoesNotPanic(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(mockFlatCandleListJSON("FLAT", 252)))
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "dashboard", "FLAT")
+	require.NoError(t, err)
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	latest, ok := data["latest"].(map[string]any)
+	require.True(t, ok, "latest should be an object")
+	assert.InDelta(t, 0.0, latest["macd"], 0.1)
+	assert.InDelta(t, 0.0, latest["macd_signal"], 0.1)
+	assert.InDelta(t, 0.0, latest["macd_histogram"], 0.1)
+	assert.InDelta(t, 0.0, latest["atr_14"], 0.1)
+	assert.InDelta(t, 100.0, latest["range_252_high"], 0.1)
+	assert.InDelta(t, 100.0, latest["range_252_low"], 0.1)
+}
+
+func TestTADashboard_InsufficientHistory(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 100))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "dashboard", "AAPL")
+
+	// Assert
+	require.Error(t, err)
+	var validationErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &validationErr)
 }
 
 func TestTASMA_ValidEnvelope(t *testing.T) {
