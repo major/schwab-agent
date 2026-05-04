@@ -79,7 +79,7 @@ func (o *orderReplaceOpts) Attach(_ *cobra.Command) error { return nil }
 // action. The follow-up GET is deliberately best-effort: once Schwab accepts a
 // mutation, the CLI must not turn that successful trade action into a command
 // failure just because the read-after-write lookup is delayed or unavailable.
-func fetchOrderActionData(cmd *cobra.Command, c *client.Ref, account string, action string, orderID int64, submittedOrder *models.OrderRequest) (data orderActionData, errs []string) {
+func fetchOrderActionData(cmd *cobra.Command, c *client.Ref, account, action string, orderID int64, submittedOrder *models.OrderRequest) (data orderActionData, errs []string) {
 	data = orderActionData{
 		Action:            action,
 		OrderID:           orderID,
@@ -109,8 +109,8 @@ func fetchOrderActionData(cmd *cobra.Command, c *client.Ref, account string, act
 // header. In that fallback case the client only knows the original ID, so we
 // avoid a duplicate GET and report the original order as the best available
 // verification target.
-func fetchReplaceActionData(cmd *cobra.Command, c *client.Ref, account string, originalOrderID, replacementOrderID int64, submittedOrder *models.OrderRequest) (orderActionData, []string) {
-	data, errs := fetchOrderActionData(cmd, c, account, "replace", replacementOrderID, submittedOrder)
+func fetchReplaceActionData(cmd *cobra.Command, c *client.Ref, account string, originalOrderID, replacementOrderID int64, submittedOrder *models.OrderRequest) (data orderActionData, errs []string) {
+	data, errs = fetchOrderActionData(cmd, c, account, "replace", replacementOrderID, submittedOrder)
 	data.Replaced = true
 	data.OriginalOrderID = &originalOrderID
 
@@ -153,7 +153,7 @@ func fetchReplaceActionData(cmd *cobra.Command, c *client.Ref, account string, o
 // order lookup succeeds, or a partial envelope when Schwab accepted the mutation
 // but the follow-up details could not be fetched. That distinction lets agents
 // trust the order action occurred while still seeing why `data.order` is absent.
-func writeOrderActionResult(w io.Writer, data orderActionData, errs []string) error {
+func writeOrderActionResult(w io.Writer, data *orderActionData, errs []string) error {
 	metadata := output.NewMetadata()
 	if len(errs) > 0 {
 		return output.WritePartial(w, data, errs, metadata)
@@ -223,7 +223,7 @@ order build, preview it with order preview, then place.`,
 			}
 
 			data, errs := fetchOrderActionData(cmd, c, account, "place", response.OrderID, order)
-			return writeOrderActionResult(w, data, errs)
+			return writeOrderActionResult(w, &data, errs)
 		},
 	}
 
@@ -353,7 +353,7 @@ func makeCobraPlaceOrderCommand[O any, P any](
 			}
 
 			data, errs := fetchOrderActionData(cmd, c, account, "place", response.OrderID, order)
-			return writeOrderActionResult(w, data, errs)
+			return writeOrderActionResult(w, &data, errs)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
@@ -570,7 +570,7 @@ config flag. The order ID can be passed as a positional argument or with
 
 			data, errs := fetchOrderActionData(cmd, c, account, "cancel", orderID, nil)
 			data.Canceled = true
-			return writeOrderActionResult(w, data, errs)
+			return writeOrderActionResult(w, &data, errs)
 		},
 	}
 
@@ -649,7 +649,7 @@ original order status becomes REPLACED after the new order is created.`,
 			}
 
 			data, errs := fetchReplaceActionData(cmd, c, account, orderID, response.OrderID, order)
-			return writeOrderActionResult(w, data, errs)
+			return writeOrderActionResult(w, &data, errs)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
