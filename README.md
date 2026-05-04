@@ -106,6 +106,9 @@ schwab-agent account list
 # Get option chains
 schwab-agent chain get AAPL
 
+# Get a compact option planning ticket
+schwab-agent option ticket get AAPL --expiration <YYYY-MM-DD> --strike 200 --call
+
 # Get multiple moving averages in one technical-analysis run
 schwab-agent ta sma AAPL --period 21,50,200 --points 1
 
@@ -124,6 +127,9 @@ schwab-agent order preview equity \
   --action BUY \
   --quantity 10 \
   --type MARKET
+
+# Show recent order activity, including filled/canceled/replaced orders
+schwab-agent order list --recent
 
 # Build order JSON offline
 schwab-agent order build equity \
@@ -148,6 +154,7 @@ schwab-agent order place --spec @order.json
 | `quote` | Get quotes for one or more symbols |
 | `order` | List, get, place, preview, build, cancel, replace |
 | `chain` | Option chain data (`get`, `expiration`) |
+| `option` | Option planning tickets that combine quote, chain, and OCC symbol context |
 | `history` | Price history for a symbol |
 | `ta` | Technical analysis (sma, ema, rsi, macd, atr, bbands, stoch, adx, vwap, hv, expected-move) |
 | `market` | Market hours and top movers |

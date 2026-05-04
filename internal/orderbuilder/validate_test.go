@@ -2492,6 +2492,97 @@ func TestBracketExitInstructionInvertsAction(t *testing.T) {
 		"SELL entry should produce BUY exit")
 }
 
+// TestValidateOrderRequestAcceptsTriggerParentLegs verifies raw bracket specs remain valid.
+func TestValidateOrderRequestAcceptsTriggerParentLegs(t *testing.T) {
+	t.Parallel()
+
+	order, err := BuildBracketOrder(&BracketParams{
+		Symbol:     "AAPL",
+		Action:     models.InstructionBuy,
+		Quantity:   10,
+		OrderType:  models.OrderTypeLimit,
+		Price:      150,
+		TakeProfit: 160,
+		StopLoss:   140,
+	})
+	require.NoError(t, err)
+
+	err = ValidateOrderRequest(order)
+
+	require.NoError(t, err)
+}
+
+// TestValidateOrderRequestAcceptsFTSTriggerSpecs verifies first-triggers-second specs.
+func TestValidateOrderRequestAcceptsFTSTriggerSpecs(t *testing.T) {
+	t.Parallel()
+
+	primary, err := BuildEquityOrder(&EquityParams{
+		Symbol:    "AAPL",
+		Action:    models.InstructionBuy,
+		Quantity:  10,
+		OrderType: models.OrderTypeMarket,
+	})
+	require.NoError(t, err)
+	secondary, err := BuildEquityOrder(&EquityParams{
+		Symbol:    "MSFT",
+		Action:    models.InstructionBuy,
+		Quantity:  5,
+		OrderType: models.OrderTypeMarket,
+	})
+	require.NoError(t, err)
+	order, err := BuildFTSOrder(&FTSParams{Primary: *primary, Secondary: *secondary})
+	require.NoError(t, err)
+
+	err = ValidateOrderRequest(&order)
+
+	require.NoError(t, err)
+}
+
+// TestValidateOrderRequestRejectsOCOParentLegs preserves OCO container validation.
+func TestValidateOrderRequestRejectsOCOParentLegs(t *testing.T) {
+	t.Parallel()
+
+	order, err := BuildBracketOrder(&BracketParams{
+		Symbol:     "AAPL",
+		Action:     models.InstructionBuy,
+		Quantity:   10,
+		OrderType:  models.OrderTypeMarket,
+		TakeProfit: 160,
+		StopLoss:   140,
+	})
+	require.NoError(t, err)
+	ocoNode := order.ChildOrderStrategies[0]
+	ocoNode.OrderLegCollection = order.OrderLegCollection
+
+	err = ValidateOrderRequest(&ocoNode)
+
+	assertValidationError(t, err, "order OCO parent must not contain direct order legs", "Move executable legs into childOrderStrategies")
+}
+
+// TestValidateOrderRequestPriceLinkPathIncludesNestedChild verifies nested error paths.
+func TestValidateOrderRequestPriceLinkPathIncludesNestedChild(t *testing.T) {
+	t.Parallel()
+
+	order, err := BuildBracketOrder(&BracketParams{
+		Symbol:     "AAPL",
+		Action:     models.InstructionBuy,
+		Quantity:   10,
+		OrderType:  models.OrderTypeMarket,
+		TakeProfit: 160,
+		StopLoss:   140,
+	})
+	require.NoError(t, err)
+	priceLinkBasis := models.PriceLinkBasisBid
+	order.ChildOrderStrategies[0].ChildOrderStrategies[0].PriceLinkBasis = &priceLinkBasis
+
+	err = ValidateOrderRequest(order)
+
+	assertValidationError(t, err,
+		"order.childOrderStrategies[0].childOrderStrategies[0] priceLinkBasis and priceLinkType must be specified together",
+		"Set both priceLinkBasis and priceLinkType, or omit both fields",
+	)
+}
+
 // assertValidationError verifies message and fix suggestion for validation failures.
 func assertValidationError(t *testing.T, err error, expectedMessage, expectedDetails string) {
 	t.Helper()

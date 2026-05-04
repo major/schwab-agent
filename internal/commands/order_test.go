@@ -211,6 +211,236 @@ func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 	}
 }
 
+func TestNewOrderCmdSpecSemanticValidation(t *testing.T) {
+	t.Parallel()
+
+	var requests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		t.Errorf("unexpected API request for invalid spec: %s %s", r.Method, r.URL.Path)
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
+	invalidLimitSpec := mustMarshalJSON(t, &models.OrderRequest{
+		Session:           models.SessionNormal,
+		Duration:          models.DurationDay,
+		OrderType:         models.OrderTypeLimit,
+		OrderStrategyType: models.OrderStrategyTypeSingle,
+		OrderLegCollection: []models.OrderLegCollection{{
+			Instruction: models.InstructionBuy,
+			Quantity:    1,
+			Instrument: models.OrderInstrument{
+				AssetType: models.AssetTypeEquity,
+				Symbol:    "AAPL",
+			},
+		}},
+	})
+
+	testCases := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "preview",
+			args: []string{"order", "preview", "--spec", invalidLimitSpec},
+		},
+		{
+			name: "place",
+			args: []string{"order", "place", "--spec", invalidLimitSpec},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, err := runOrderCommand(t, cliClient, configPath, "", testCase.args...)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "LIMIT order requires a positive price")
+		})
+	}
+
+	assert.Zero(t, requests)
+}
+
+func TestNewOrderCmdPreviewSpecAcceptsTriggerOrders(t *testing.T) {
+	t.Parallel()
+
+	var requestBodies []string
+	orderID := int64(4244)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/trader/v1/accounts/hash123/previewOrder", r.URL.Path)
+
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		requestBodies = append(requestBodies, string(body))
+
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{OrderID: &orderID}))
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
+	bracket, err := orderbuilder.BuildBracketOrder(&orderbuilder.BracketParams{
+		Symbol:     "AAPL",
+		Action:     models.InstructionBuy,
+		Quantity:   10,
+		OrderType:  models.OrderTypeLimit,
+		Price:      150,
+		TakeProfit: 160,
+		StopLoss:   140,
+	})
+	require.NoError(t, err)
+	primary, err := orderbuilder.BuildEquityOrder(&orderbuilder.EquityParams{
+		Symbol:    "MSFT",
+		Action:    models.InstructionBuy,
+		Quantity:  1,
+		OrderType: models.OrderTypeMarket,
+	})
+	require.NoError(t, err)
+	secondary, err := orderbuilder.BuildEquityOrder(&orderbuilder.EquityParams{
+		Symbol:    "NVDA",
+		Action:    models.InstructionBuy,
+		Quantity:  1,
+		OrderType: models.OrderTypeMarket,
+	})
+	require.NoError(t, err)
+	fts, err := orderbuilder.BuildFTSOrder(&orderbuilder.FTSParams{Primary: *primary, Secondary: *secondary})
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name string
+		spec string
+	}{
+		{name: "bracket", spec: mustMarshalJSON(t, bracket)},
+		{name: "fts", spec: mustMarshalJSON(t, &fts)},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "preview", "--spec", testCase.spec)
+			require.NoError(t, err)
+
+			envelope := decodeEnvelope(t, stdout)
+			data, ok := envelope.Data.(map[string]any)
+			require.True(t, ok)
+			assert.Equal(t, float64(4244), data["orderId"])
+		})
+	}
+
+	require.Len(t, requestBodies, len(testCases))
+	for _, body := range requestBodies {
+		var order models.OrderRequest
+		require.NoError(t, json.Unmarshal([]byte(body), &order))
+		assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
+		require.NotEmpty(t, order.OrderLegCollection)
+		require.NotEmpty(t, order.ChildOrderStrategies)
+	}
+}
+
+func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
+	orderID := int64(4243)
+	previewResponse := models.PreviewOrder{OrderID: &orderID}
+	type requestRecord struct {
+		Path string
+		Body string
+	}
+	requestBodies := make([]requestRecord, 0, 4)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/trader/v1/accounts/hash123/previewOrder", r.URL.Path)
+
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		requestBodies = append(requestBodies, requestRecord{Path: r.URL.Path, Body: string(body)})
+
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
+
+	testCases := []struct {
+		name       string
+		args       []string
+		assertBody func(*testing.T, models.OrderRequest)
+	}{
+		{
+			name: "equity",
+			args: []string{"order", "preview", "equity", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10", "--type", "LIMIT", "--price", "185.25"},
+			assertBody: func(t *testing.T, order models.OrderRequest) {
+				t.Helper()
+
+				assert.Equal(t, models.OrderTypeLimit, order.OrderType)
+				require.Len(t, order.OrderLegCollection, 1)
+				assert.Equal(t, "AAPL", order.OrderLegCollection[0].Instrument.Symbol)
+				assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
+			},
+		},
+		{
+			name: "option",
+			args: []string{"order", "preview", "option", "--underlying", "AAPL", "--expiration", testFutureExpDate, "--strike", "200", "--call", "--action", "BUY_TO_OPEN", "--quantity", "1", "--type", "LIMIT", "--price", "5.00"},
+			assertBody: func(t *testing.T, order models.OrderRequest) {
+				t.Helper()
+
+				assert.Equal(t, models.OrderTypeLimit, order.OrderType)
+				require.Len(t, order.OrderLegCollection, 1)
+				assert.Equal(t, models.AssetTypeOption, order.OrderLegCollection[0].Instrument.AssetType)
+				assert.Contains(t, order.OrderLegCollection[0].Instrument.Symbol, "AAPL")
+				assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
+			},
+		},
+		{
+			name: "bracket",
+			args: []string{"order", "preview", "bracket", "--symbol", "NVDA", "--action", "BUY", "--quantity", "10", "--type", "MARKET", "--take-profit", "150", "--stop-loss", "120"},
+			assertBody: func(t *testing.T, order models.OrderRequest) {
+				t.Helper()
+
+				assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
+				require.Len(t, order.OrderLegCollection, 1)
+				assert.Equal(t, "NVDA", order.OrderLegCollection[0].Instrument.Symbol)
+				require.NotEmpty(t, order.ChildOrderStrategies)
+			},
+		},
+		{
+			name: "oco",
+			args: []string{"order", "preview", "oco", "--symbol", "TSLA", "--action", "SELL", "--quantity", "5", "--take-profit", "250", "--stop-loss", "200"},
+			assertBody: func(t *testing.T, order models.OrderRequest) {
+				t.Helper()
+
+				assert.Equal(t, models.OrderStrategyTypeOCO, order.OrderStrategyType)
+				require.Len(t, order.ChildOrderStrategies, 2)
+			},
+		},
+	}
+
+	for index, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			stdout, err := runOrderCommand(t, cliClient, configPath, "", testCase.args...)
+			require.NoError(t, err)
+
+			envelope := decodeEnvelope(t, stdout)
+			data, ok := envelope.Data.(map[string]any)
+			require.True(t, ok)
+			assert.Equal(t, float64(4243), data["orderId"])
+			require.Contains(t, data, "builtOrder")
+			require.Contains(t, data, "preview")
+
+			var order models.OrderRequest
+			require.NoError(t, json.Unmarshal([]byte(requestBodies[index].Body), &order))
+			testCase.assertBody(t, order)
+		})
+	}
+
+	require.Len(t, requestBodies, len(testCases))
+}
+
 func TestNewOrderCmdBuildEquityOutputsRequestJSON(t *testing.T) {
 	t.Parallel()
 
@@ -346,7 +576,13 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
+	assert.Equal(t, "place", data["action"])
 	assert.Equal(t, float64(67890), data["orderId"])
+	assert.Equal(t, "verified", data["verificationState"])
+	assert.Equal(t, "QUEUED", data["orderStatus"])
+	submittedOrder, ok := data["submittedOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "LIMIT", submittedOrder["orderType"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(67890), order["orderId"])
@@ -397,7 +633,13 @@ func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
+	assert.Equal(t, "place", data["action"])
 	assert.Equal(t, float64(24680), data["orderId"])
+	assert.Equal(t, "verified", data["verificationState"])
+	assert.Equal(t, "QUEUED", data["orderStatus"])
+	submittedOrder, ok := data["submittedOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "MARKET", submittedOrder["orderType"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(24680), order["orderId"])
@@ -439,7 +681,13 @@ func TestNewOrderCmdPlaceNoLocationReturnsPartialSuccess(t *testing.T) {
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
+	assert.Equal(t, "place", data["action"])
 	assert.Equal(t, float64(0), data["orderId"])
+	assert.Equal(t, "unverified", data["verificationState"])
+	verificationFailures, ok := data["verificationFailures"].([]any)
+	require.True(t, ok)
+	require.Len(t, verificationFailures, 1)
+	assert.Contains(t, verificationFailures[0], "did not return an order ID")
 	assert.NotContains(t, data, "order")
 	assert.Equal(t, 0, getRequests)
 	require.Len(t, envelope.Errors, 1)
@@ -1798,6 +2046,43 @@ func TestNewOrderCmdListStatusAllDisablesFiltering(t *testing.T) {
 	require.Len(t, orders, 3, "should return all orders when --status all")
 }
 
+func TestNewOrderCmdListRecentIncludesTerminalStatuses(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/trader/v1/orders", r.URL.Path)
+		assert.Empty(t, r.URL.Query().Get("status"), "recent with no explicit status should request all activity")
+
+		from := r.URL.Query().Get("fromEnteredTime")
+		require.NotEmpty(t, from)
+		parsedFrom, err := time.Parse(time.RFC3339, from)
+		require.NoError(t, err)
+		assert.WithinDuration(t, time.Now().UTC().Add(-24*time.Hour), parsedFrom, 2*time.Second)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err = w.Write([]byte(`[
+			{"orderId":1,"status":"FILLED"},
+			{"orderId":2,"status":"CANCELED"},
+			{"orderId":3,"status":"WORKING"}
+		]`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := testClient(t, server)
+
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "list", "--recent")
+	require.NoError(t, err)
+
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	orders, ok := data["orders"].([]any)
+	require.True(t, ok)
+	require.Len(t, orders, 3, "recent mode should retain terminal activity")
+}
+
 func TestNewOrderCmdListExplicitStatusBypassesDefault(t *testing.T) {
 	t.Parallel()
 
@@ -2031,8 +2316,11 @@ func TestNewOrderCmdCancelSuccess(t *testing.T) {
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
+	assert.Equal(t, "cancel", data["action"])
 	assert.Equal(t, float64(12345), data["orderId"])
 	assert.Equal(t, true, data["canceled"])
+	assert.Equal(t, "verified", data["verificationState"])
+	assert.Equal(t, "CANCELED", data["orderStatus"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(12345), order["orderId"])
@@ -2067,8 +2355,11 @@ func TestNewOrderCmdCancelOrderIDFlagSuccess(t *testing.T) {
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
+	assert.Equal(t, "cancel", data["action"])
 	assert.Equal(t, float64(1234567890), data["orderId"])
 	assert.Equal(t, true, data["canceled"])
+	assert.Equal(t, "verified", data["verificationState"])
+	assert.Equal(t, "CANCELED", data["orderStatus"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(1234567890), order["orderId"])
@@ -2100,8 +2391,14 @@ func TestNewOrderCmdCancelGetFailureReturnsPartialSuccess(t *testing.T) {
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
+	assert.Equal(t, "cancel", data["action"])
 	assert.Equal(t, float64(12345), data["orderId"])
 	assert.Equal(t, true, data["canceled"])
+	assert.Equal(t, "unverified", data["verificationState"])
+	verificationFailures, ok := data["verificationFailures"].([]any)
+	require.True(t, ok)
+	require.Len(t, verificationFailures, 1)
+	assert.Contains(t, verificationFailures[0], "order details unavailable")
 	assert.NotContains(t, data, "order")
 	require.Len(t, envelope.Errors, 1)
 	assert.Contains(t, envelope.Errors[0], "order details unavailable")
@@ -2165,6 +2462,8 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/67890":
 			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "AAPL")
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "AAPL")
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
@@ -2203,12 +2502,24 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
+	assert.Equal(t, "replace", data["action"])
 	assert.Equal(t, float64(67890), data["orderId"])
+	assert.Equal(t, float64(12345), data["originalOrderId"])
 	assert.Equal(t, true, data["replaced"])
+	assert.Equal(t, "verified", data["verificationState"])
+	assert.Equal(t, "QUEUED", data["orderStatus"])
+	assert.Equal(t, "REPLACED", data["originalOrderStatus"])
+	submittedOrder, ok := data["submittedOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "LIMIT", submittedOrder["orderType"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(67890), order["orderId"])
 	assert.Equal(t, "QUEUED", order["status"])
+	originalOrder, ok := data["originalOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(12345), originalOrder["orderId"])
+	assert.Equal(t, "REPLACED", originalOrder["status"])
 }
 
 func TestNewOrderCmdReplaceOrderIDFlagSuccess(t *testing.T) {
@@ -2253,12 +2564,54 @@ func TestNewOrderCmdReplaceOrderIDFlagSuccess(t *testing.T) {
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
+	assert.Equal(t, "replace", data["action"])
 	assert.Equal(t, float64(1234567890), data["orderId"])
+	assert.Equal(t, float64(1234567890), data["originalOrderId"])
 	assert.Equal(t, true, data["replaced"])
+	assert.Equal(t, "verified", data["verificationState"])
+	assert.Equal(t, "REPLACED", data["orderStatus"])
+	assert.Equal(t, "REPLACED", data["originalOrderStatus"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(1234567890), order["orderId"])
 	assert.Equal(t, "REPLACED", order["status"])
+	originalOrder, ok := data["originalOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1234567890), originalOrder["orderId"])
+}
+
+func TestNewOrderCmdReplaceOriginalStatusMismatchReturnsPartialSuccess(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/67890":
+			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "AAPL")
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			writeTestOrderResponse(t, w, 12345, models.OrderStatusPendingReplace, "AAPL")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := testClient(t, server)
+
+	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "replace", "12345", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10")
+	require.NoError(t, err)
+
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "partial", data["verificationState"])
+	assert.Equal(t, "PENDING_REPLACE", data["originalOrderStatus"])
+	require.Len(t, envelope.Errors, 1)
+	assert.Contains(t, envelope.Errors[0], "expected REPLACED")
 }
 
 func TestNewOrderCmdReplaceMutableDisabled(t *testing.T) {

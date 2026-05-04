@@ -22,16 +22,25 @@ import (
 // fallback for rare Schwab/proxy responses that accept the mutation without an
 // order Location header.
 type orderActionData struct {
-	OrderID  int64         `json:"orderId"`
-	Canceled bool          `json:"canceled,omitempty"`
-	Replaced bool          `json:"replaced,omitempty"`
-	Order    *models.Order `json:"order,omitempty"`
+	Action               string               `json:"action"`
+	OrderID              int64                `json:"orderId"`
+	OriginalOrderID      *int64               `json:"originalOrderId,omitempty"`
+	SubmittedOrder       *models.OrderRequest `json:"submittedOrder,omitempty"`
+	Canceled             bool                 `json:"canceled,omitempty"`
+	Replaced             bool                 `json:"replaced,omitempty"`
+	OrderStatus          *models.OrderStatus  `json:"orderStatus,omitempty"`
+	OriginalOrderStatus  *models.OrderStatus  `json:"originalOrderStatus,omitempty"`
+	VerificationState    string               `json:"verificationState"`
+	VerificationFailures []string             `json:"verificationFailures,omitempty"`
+	Order                *models.Order        `json:"order,omitempty"`
+	OriginalOrder        *models.Order        `json:"originalOrder,omitempty"`
 }
 
 // orderPreviewData wraps an order preview response.
 type orderPreviewData struct {
-	Preview *models.PreviewOrder `json:"preview"`
-	OrderID *int64               `json:"orderId,omitempty"`
+	BuiltOrder *models.OrderRequest `json:"builtOrder,omitempty"`
+	Preview    *models.PreviewOrder `json:"preview"`
+	OrderID    *int64               `json:"orderId,omitempty"`
 }
 
 // orderPlaceOpts holds local flags for top-level spec-based order placement.
@@ -70,26 +79,81 @@ func (o *orderReplaceOpts) Attach(_ *cobra.Command) error { return nil }
 // action. The follow-up GET is deliberately best-effort: once Schwab accepts a
 // mutation, the CLI must not turn that successful trade action into a command
 // failure just because the read-after-write lookup is delayed or unavailable.
-func fetchOrderActionData(cmd *cobra.Command, c *client.Ref, account string, orderID int64) (data orderActionData, errs []string) {
-	data = orderActionData{OrderID: orderID}
+func fetchOrderActionData(cmd *cobra.Command, c *client.Ref, account, action string, orderID int64, submittedOrder *models.OrderRequest) (data orderActionData, errs []string) {
+	data = orderActionData{
+		Action:            action,
+		OrderID:           orderID,
+		SubmittedOrder:    submittedOrder,
+		VerificationState: "unverified",
+	}
 	if orderID == 0 {
-		return data, []string{"order details unavailable: Schwab accepted the order action but did not return an order ID"}
+		data.VerificationFailures = []string{"order details unavailable: Schwab accepted the order action but did not return an order ID"}
+		return data, data.VerificationFailures
 	}
 
 	order, err := c.GetOrder(cmd.Context(), account, orderID)
 	if err != nil {
-		return data, []string{fmt.Sprintf("order details unavailable after successful order action: %v", err)}
+		data.VerificationFailures = []string{fmt.Sprintf("order details unavailable after successful order action: %v", err)}
+		return data, data.VerificationFailures
 	}
 
 	data.Order = order
+	data.OrderStatus = order.Status
+	data.VerificationState = "verified"
 	return data, nil
+}
+
+// fetchReplaceActionData verifies both sides of Schwab's replace workflow when
+// the API exposes a distinct replacement order ID. A replace creates a new order
+// and marks the original as REPLACED, but Schwab sometimes omits the Location
+// header. In that fallback case the client only knows the original ID, so we
+// avoid a duplicate GET and report the original order as the best available
+// verification target.
+func fetchReplaceActionData(cmd *cobra.Command, c *client.Ref, account string, originalOrderID, replacementOrderID int64, submittedOrder *models.OrderRequest) (data orderActionData, errs []string) {
+	data, errs = fetchOrderActionData(cmd, c, account, "replace", replacementOrderID, submittedOrder)
+	data.Replaced = true
+	data.OriginalOrderID = &originalOrderID
+
+	if replacementOrderID == originalOrderID {
+		data.OriginalOrder = data.Order
+		data.OriginalOrderStatus = data.OrderStatus
+		return data, errs
+	}
+
+	originalOrder, err := c.GetOrder(cmd.Context(), account, originalOrderID)
+	if err != nil {
+		failure := fmt.Sprintf("original order details unavailable after successful replace: %v", err)
+		data.VerificationFailures = append(data.VerificationFailures, failure)
+		data.VerificationState = "partial"
+		return data, append(errs, failure)
+	}
+
+	data.OriginalOrder = originalOrder
+	data.OriginalOrderStatus = originalOrder.Status
+	if originalOrder.Status == nil || *originalOrder.Status != models.OrderStatusReplaced {
+		status := "missing"
+		if originalOrder.Status != nil {
+			status = string(*originalOrder.Status)
+		}
+		failure := fmt.Sprintf("original order status is %s after replace, expected REPLACED", status)
+		data.VerificationFailures = append(data.VerificationFailures, failure)
+		data.VerificationState = "partial"
+		return data, append(errs, failure)
+	}
+
+	if data.VerificationState == "verified" {
+		return data, errs
+	}
+
+	data.VerificationState = "partial"
+	return data, errs
 }
 
 // writeOrderActionResult emits a normal success envelope when the canonical
 // order lookup succeeds, or a partial envelope when Schwab accepted the mutation
 // but the follow-up details could not be fetched. That distinction lets agents
 // trust the order action occurred while still seeing why `data.order` is absent.
-func writeOrderActionResult(w io.Writer, data orderActionData, errs []string) error {
+func writeOrderActionResult(w io.Writer, data *orderActionData, errs []string) error {
 	metadata := output.NewMetadata()
 	if len(errs) > 0 {
 		return output.WritePartial(w, data, errs, metadata)
@@ -149,14 +213,17 @@ order build, preview it with order preview, then place.`,
 			if err != nil {
 				return err
 			}
+			if err := orderbuilder.ValidateOrderRequest(order); err != nil {
+				return err
+			}
 
 			response, err := c.PlaceOrder(cmd.Context(), account, order)
 			if err != nil {
 				return err
 			}
 
-			data, errs := fetchOrderActionData(cmd, c, account, response.OrderID)
-			return writeOrderActionResult(w, data, errs)
+			data, errs := fetchOrderActionData(cmd, c, account, "place", response.OrderID, order)
+			return writeOrderActionResult(w, &data, errs)
 		},
 	}
 
@@ -285,8 +352,8 @@ func makeCobraPlaceOrderCommand[O any, P any](
 				return err
 			}
 
-			data, errs := fetchOrderActionData(cmd, c, account, response.OrderID)
-			return writeOrderActionResult(w, data, errs)
+			data, errs := fetchOrderActionData(cmd, c, account, "place", response.OrderID, order)
+			return writeOrderActionResult(w, &data, errs)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
@@ -303,12 +370,15 @@ func newOrderPreviewCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Co
 	opts := &orderPreviewOpts{}
 	cmd := &cobra.Command{
 		Use:   "preview",
-		Short: "Preview an order from JSON spec",
-		Long: `Preview an order from a JSON spec without placing it. Returns estimated
-commissions, fees, and order details. Pipe output from order build for a
-build-then-preview workflow. Does not require safety guards since no order
-is actually placed.`,
+		Short: "Preview an order from JSON spec or typed flags",
+		Long: `Preview an order from a JSON spec or typed subcommand flags without placing it.
+Typed preview subcommands reuse the same local builders as order place, then
+return both the built order request and Schwab preview response in one envelope.
+This removes the build-then-preview round trip while keeping placement explicit.
+Does not require safety guards since no order is actually placed.`,
 		Example: `  schwab-agent order preview --spec @order.json
+  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200
+  schwab-agent order preview option --underlying AAPL --expiration 2026-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
   schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
@@ -333,18 +403,119 @@ is actually placed.`,
 			if err != nil {
 				return err
 			}
+			if err := orderbuilder.ValidateOrderRequest(order); err != nil {
+				return err
+			}
 
 			preview, err := c.PreviewOrder(cmd.Context(), account, order)
 			if err != nil {
 				return err
 			}
 
-			return output.WriteSuccess(w, orderPreviewData{Preview: preview, OrderID: preview.OrderID}, output.NewMetadata())
+			return output.WriteSuccess(w, orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}, output.NewMetadata())
 		},
 	}
 
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
+	}
+
+	equityCmd := makeCobraPreviewOrderCommand(c, configPath, w, "equity", "Preview an equity order", func() *equityPlaceOpts { return &equityPlaceOpts{} }, func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) }, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
+	equityCmd.Long = `Preview an equity (stock) order without placing it. Supports the same flags
+as order place equity, but skips the mutable-operation safety gate because no
+order is submitted. The response includes the built order request plus Schwab's
+preview details so agents can inspect both in one call.`
+	equityCmd.Example = `  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10
+	  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC`
+
+	optionCmd := makeCobraPreviewOrderCommand(c, configPath, w, "option", "Preview an option order", func() *optionPlaceOpts { return &optionPlaceOpts{} }, func(cmd *cobra.Command, opts *optionPlaceOpts) {
+		defineAndConstrain(cmd, opts, []string{"call", "put"})
+	}, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder)
+	optionCmd.Long = `Preview a single-leg option order without placing it. Requires --underlying,
+--expiration, --strike, and exactly one of --call or --put. The response includes
+the locally built OCC order request and Schwab's preview response.`
+	optionCmd.Example = `  schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1
+	  schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50`
+
+	bracketCmd := makeCobraPreviewOrderCommand(c, configPath, w, "bracket", "Preview a bracket order", func() *bracketPlaceOpts { return &bracketPlaceOpts{} }, func(cmd *cobra.Command, opts *bracketPlaceOpts) { defineAndConstrain(cmd, opts) }, parseBracketParams, orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder)
+	bracketCmd.Long = `Preview a bracket order without placing it. At least one of --take-profit or
+--stop-loss is required. The preview response includes the locally built trigger
+order and Schwab's validation, fee, and commission details.`
+	bracketCmd.Example = `  schwab-agent order preview bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
+	  schwab-agent order preview bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170`
+
+	ocoCmd := makeCobraPreviewOrderCommand(c, configPath, w, "oco", "Preview a one-cancels-other order", func() *ocoPlaceOpts { return &ocoPlaceOpts{} }, func(cmd *cobra.Command, opts *ocoPlaceOpts) { defineAndConstrain(cmd, opts) }, parseOCOParams, orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder)
+	ocoCmd.Long = `Preview a one-cancels-other order for an existing position without placing it.
+When both exits are present, the built order shows the OCO relationship Schwab
+will validate during preview.`
+	ocoCmd.Example = `  schwab-agent order preview oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140
+	  schwab-agent order preview oco --symbol TSLA --action BUY --quantity 10 --stop-loss 250`
+
+	cmd.AddCommand(equityCmd, optionCmd, bracketCmd, ocoCmd)
+
+	return cmd
+}
+
+// makeCobraPreviewOrderCommand creates a typed preview subcommand that mirrors
+// the place subcommand parse/validate/build pipeline without crossing the
+// mutable-operation safety boundary. Preview still calls Schwab, but it never
+// submits an order, so agents can collapse build + preview into one CLI call.
+func makeCobraPreviewOrderCommand[O any, P any](
+	c *client.Ref,
+	configPath string,
+	w io.Writer,
+	name, usage string,
+	newOpts func() *O,
+	flagSetup func(*cobra.Command, *O),
+	parse func(*O, []string) (*P, error),
+	validate func(*P) error,
+	build func(*P) (*models.OrderRequest, error),
+) *cobra.Command {
+	opts := newOpts()
+	cmd := &cobra.Command{
+		Use:   name,
+		Short: usage,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, any(opts).(structcli.Options)); err != nil {
+				return err
+			}
+
+			accountFlag, err := cmd.Flags().GetString("account")
+			if err != nil {
+				return err
+			}
+
+			account, err := resolveAccount(accountFlag, configPath, nil)
+			if err != nil {
+				return err
+			}
+
+			params, err := parse(opts, args)
+			if err != nil {
+				return err
+			}
+
+			if err := validate(params); err != nil {
+				return err
+			}
+
+			order, err := build(params)
+			if err != nil {
+				return err
+			}
+
+			preview, err := c.PreviewOrder(cmd.Context(), account, order)
+			if err != nil {
+				return err
+			}
+
+			return output.WriteSuccess(w, orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}, output.NewMetadata())
+		},
+	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
+
+	if flagSetup != nil {
+		flagSetup(cmd, opts)
 	}
 
 	return cmd
@@ -397,9 +568,9 @@ config flag. The order ID can be passed as a positional argument or with
 				return err
 			}
 
-			data, errs := fetchOrderActionData(cmd, c, account, orderID)
+			data, errs := fetchOrderActionData(cmd, c, account, "cancel", orderID, nil)
 			data.Canceled = true
-			return writeOrderActionResult(w, data, errs)
+			return writeOrderActionResult(w, &data, errs)
 		},
 	}
 
@@ -477,9 +648,8 @@ original order status becomes REPLACED after the new order is created.`,
 				return err
 			}
 
-			data, errs := fetchOrderActionData(cmd, c, account, response.OrderID)
-			data.Replaced = true
-			return writeOrderActionResult(w, data, errs)
+			data, errs := fetchReplaceActionData(cmd, c, account, orderID, response.OrderID, order)
+			return writeOrderActionResult(w, &data, errs)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
