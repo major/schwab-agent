@@ -102,6 +102,19 @@ run_help_test() {
     fi
 }
 
+# run_error_test validates that a command exits non-zero (expected error).
+run_error_test() {
+    local name="$1"
+    shift
+    if ! "$BINARY" "$@" > /dev/null 2>&1; then
+        printf "${GREEN}PASS${NC} %s (expected error)\n" "$name"
+        PASS=$((PASS + 1))
+    else
+        printf "${RED}FAIL${NC} %s (expected non-zero exit, got 0)\n" "$name"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 section() {
     printf "\n${BOLD}--- %s ---${NC}\n" "$1"
 }
@@ -198,6 +211,22 @@ run_help_test "ta adx"            ta adx
 run_help_test "ta vwap"           ta vwap
 run_help_test "ta hv"             ta hv
 run_help_test "ta expected-move"  ta expected-move
+run_help_test "indicators"        indicators
+run_help_test "analyze"           analyze
+run_help_test "price-history"     price-history
+run_help_test "price-history get" price-history get
+
+# -------------------------------------------------------------------
+# Shorthand and alias error cases (no args)
+# -------------------------------------------------------------------
+
+section "Shorthand/Alias Error Cases"
+
+run_error_test "quote (no args)" quote
+run_error_test "history (no args)" history
+run_error_test "ta (no args)" ta
+run_error_test "indicators (no args)" indicators
+run_error_test "analyze (no args)" analyze
 
 # -------------------------------------------------------------------
 # Symbol build / parse
