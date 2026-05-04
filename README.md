@@ -91,8 +91,11 @@ Run any command with `--help` to see detailed usage, examples, and available fla
 ### Quick examples
 
 ```bash
-# Get a quote
+# Get a stock quote
 schwab-agent quote get AAPL
+
+# Get an option quote by contract details (instead of OCC symbol)
+schwab-agent quote get --underlying AAPL --expiration 2025-06-20 --strike 200 --call
 
 # List compact account identifiers for agent workflows
 schwab-agent account summary
@@ -146,6 +149,31 @@ schwab-agent order build equity \
   --price 150.00 \
   --duration DAY
 
+# Use flag aliases (--instruction for --action, --order-type for --type)
+schwab-agent order place equity \
+  --symbol AAPL \
+  --instruction BUY \
+  --quantity 10 \
+  --order-type LIMIT \
+  --price 150.00 \
+  --duration DAY
+
+# Replace an option order by contract details
+schwab-agent order replace option 123456789 \
+  --underlying AAPL \
+  --expiration 2025-06-20 \
+  --strike 200 \
+  --call \
+  --action BUY_TO_OPEN \
+  --quantity 5 \
+  --type LIMIT \
+  --price 3.50 \
+  --duration DAY
+
+# Use account nickname or number instead of hash
+schwab-agent account get -a "My Roth IRA"
+schwab-agent position list -a 12345678
+
 # Place from a JSON spec
 schwab-agent order place --spec @order.json
 ```
@@ -157,8 +185,8 @@ schwab-agent order place --spec @order.json
 | `auth` | Login, status, token refresh |
 | `account` | Compact summaries, full account details, hashes, set default, transactions |
 | `position` | List positions for one or all accounts (with computed cost basis and P&L) |
-| `quote` | Get quotes for one or more symbols |
-| `order` | List, get, place, preview, build, cancel, replace |
+| `quote` | Get quotes for one or more symbols (supports structured option flags) |
+| `order` | List, get, place, preview, build, cancel, replace (equity and option) |
 | `chain` | Option chain data (`get`, `expiration`) |
 | `option` | Option planning tickets that combine quote, chain, and OCC symbol context |
 | `history` | Price history for a symbol (alias: `price-history`) |

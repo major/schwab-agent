@@ -164,6 +164,29 @@ schwab-agent account transaction list
   schwab-agent account transaction list --from 2025-01-01T00:00:00Z --to 2025-01-31T23:59:59Z
 ```
 
+#### `schwab-agent analyze`
+
+Fetch a quote and compute an opinionated TA dashboard for each symbol in a
+single CLI call. Combines "quote get" and "ta dashboard" output into per-symbol
+nesting so agents get both market data and technical context without two
+round-trips. Partial failures are reported per-symbol: if the quote succeeds
+but TA fails, that symbol appears with its quote and a null analysis field.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--points` | int | 1 | no | Number of TA output points (default 1; 0 = all) |
+
+**Example:**
+
+```bash
+schwab-agent analyze AAPL
+  schwab-agent analyze AAPL NVDA
+  schwab-agent analyze AAPL --interval weekly --points 5
+```
+
 #### `schwab-agent auth`
 
 Manage OAuth2 authentication with the Schwab API. Login starts the OAuth flow,
@@ -353,6 +376,29 @@ schwab-agent history get AAPL
   schwab-agent history get AAPL --period-type month --period 3 --frequency-type daily --frequency 1
   schwab-agent history get AAPL --period-type day --period 5 --frequency-type minute --frequency 15
   schwab-agent history get AAPL --from 1735689600000 --to 1743379200000
+```
+
+#### `schwab-agent indicators`
+
+Shortcut for "ta dashboard". Computes an opinionated technical-analysis
+dashboard for one or more symbols with one price-history fetch per symbol.
+Includes SMA 21/50/200, RSI 14, MACD 12/26/9, ATR 14, Bollinger Bands 20/2,
+volume context, and 20/252-candle high-low ranges.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
+| `--points` | int | 1 | no | Number of output points (default 1; 0 = all) |
+
+**Example:**
+
+```bash
+schwab-agent indicators AAPL
+  schwab-agent indicators AAPL --points 5
+  schwab-agent indicators NVDA --interval weekly --points 10
+  schwab-agent indicators AAPL MSFT NVDA
 ```
 
 #### `schwab-agent instrument`
@@ -1424,6 +1470,41 @@ schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 -
    schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY
 ```
 
+#### `schwab-agent order replace option`
+
+Replace an existing order with a new single-leg option order. The option
+contract is built from --underlying, --expiration, --strike, and exactly one of
+--call or --put, then submitted through Schwab's replace endpoint. Requires the
+"i-also-like-to-live-dangerously" config flag.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--call` | bool | false | no | Call option |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
+| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
+| `--order-id` | string | - | no | Order ID |
+| `--price` | float64 | 0 | no | Limit price |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--put` | bool | false | no | Put option |
+| `--quantity` | float64 | 0 | yes | Contract quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
+| `--strike` | float64 | 0 | yes | Strike price |
+| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--underlying` | string | - | yes | Underlying symbol |
+
+**Example:**
+
+```bash
+schwab-agent order replace option 1234567890 --underlying AAPL --expiration 2026-06-19 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
+   schwab-agent order replace option --order-id 1234567890 --underlying AAPL --expiration 2026-06-19 --strike 190 --put --instruction SELL_TO_OPEN --quantity 1 --order-type LIMIT --price 3.50
+```
+
 #### `schwab-agent position`
 
 View positions across accounts
@@ -1461,12 +1542,21 @@ fundamental, extended, reference, regular). Key output fields include last
 price, bid/ask, volume, 52-week high/low, PE ratio, dividend yield, and
 market cap.
 
+Use --underlying, --expiration, --strike, and --call/--put to quote an option
+by its components instead of providing a raw OCC symbol. These flags are
+mutually exclusive with positional symbol arguments.
+
 **Flags:**
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
+| `--call` | bool | false | no | Call option |
+| `--expiration` | string | - | no | Expiration date (YYYY-MM-DD) for option quote |
 | `--fields` | stringSlice | [] | no | Quote fields to return (repeatable): quote, fundamental, extended, reference, regular |
 | `--indicative` | bool | false | no | Request indicative (non-tradeable) quotes |
+| `--put` | bool | false | no | Put option |
+| `--strike` | float64 | 0 | no | Strike price for option quote |
+| `--underlying` | string | - | no | Underlying symbol for option quote |
 
 **Example:**
 
@@ -1475,6 +1565,7 @@ schwab-agent quote get AAPL
   schwab-agent quote get AAPL NVDA TSLA
   schwab-agent quote get AAPL --fields quote,fundamental
   schwab-agent quote get AAPL --fields fundamental --indicative
+  schwab-agent quote get --underlying AMZN --expiration 2026-05-15 --strike 270 --call
 ```
 
 #### `schwab-agent symbol`
@@ -1843,6 +1934,14 @@ schwab-agent account transaction list
   schwab-agent account transaction list --from 2025-01-01T00:00:00Z --to 2025-01-31T23:59:59Z
 ```
 
+#### schwab-agent analyze
+
+```bash
+schwab-agent analyze AAPL
+  schwab-agent analyze AAPL NVDA
+  schwab-agent analyze AAPL --interval weekly --points 5
+```
+
 #### schwab-agent auth login
 
 ```bash
@@ -1885,6 +1984,15 @@ schwab-agent history get AAPL
   schwab-agent history get AAPL --period-type month --period 3 --frequency-type daily --frequency 1
   schwab-agent history get AAPL --period-type day --period 5 --frequency-type minute --frequency 15
   schwab-agent history get AAPL --from 1735689600000 --to 1743379200000
+```
+
+#### schwab-agent indicators
+
+```bash
+schwab-agent indicators AAPL
+  schwab-agent indicators AAPL --points 5
+  schwab-agent indicators NVDA --interval weekly --points 10
+  schwab-agent indicators AAPL MSFT NVDA
 ```
 
 #### schwab-agent instrument get
@@ -2169,6 +2277,13 @@ schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 -
    schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY
 ```
 
+#### schwab-agent order replace option
+
+```bash
+schwab-agent order replace option 1234567890 --underlying AAPL --expiration 2026-06-19 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
+   schwab-agent order replace option --order-id 1234567890 --underlying AAPL --expiration 2026-06-19 --strike 190 --put --instruction SELL_TO_OPEN --quantity 1 --order-type LIMIT --price 3.50
+```
+
 #### schwab-agent position list
 
 ```bash
@@ -2184,6 +2299,7 @@ schwab-agent quote get AAPL
   schwab-agent quote get AAPL NVDA TSLA
   schwab-agent quote get AAPL --fields quote,fundamental
   schwab-agent quote get AAPL --fields fundamental --indicative
+  schwab-agent quote get --underlying AMZN --expiration 2026-05-15 --strike 270 --call
 ```
 
 #### schwab-agent symbol build

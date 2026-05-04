@@ -264,6 +264,10 @@ run_help_contains_test "order replace option shows underlying flag" "--underlyin
 run_help_contains_test "order replace option shows call flag" "--call" order replace option
 run_help_contains_test "order replace option shows put flag" "--put" order replace option
 
+run_help_contains_test "quote get shows underlying flag" "--underlying" quote get
+run_help_contains_test "quote get shows call flag" "--call" quote get
+run_help_contains_test "quote get shows put flag" "--put" quote get
+
 # -------------------------------------------------------------------
 # Shorthand and alias error cases (no args)
 # -------------------------------------------------------------------

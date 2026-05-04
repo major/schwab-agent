@@ -40,6 +40,11 @@ and symbol.
 - [schwab-agent account transaction list](#schwab-agent-account-transaction-list): List transactions for an account with optional filtering by type, date range,
 and symbol. Date values use ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Uses the
 default account unless --account is specified.
+- [schwab-agent analyze](#schwab-agent-analyze): Fetch a quote and compute an opinionated TA dashboard for each symbol in a
+single CLI call. Combines "quote get" and "ta dashboard" output into per-symbol
+nesting so agents get both market data and technical context without two
+round-trips. Partial failures are reported per-symbol: if the quote succeeds
+but TA fails, that symbol appears with its quote and a null analysis field.
 - [schwab-agent auth](#schwab-agent-auth): Manage OAuth2 authentication with the Schwab API. Login starts the OAuth flow,
 status checks token expiration, and refresh forces a token refresh. Auth
 commands bypass the global auth check so they can run without existing tokens.
@@ -110,6 +115,10 @@ To load completions for every new session, execute once:
 - [schwab-agent history get](#schwab-agent-history-get): Get price history candles for a symbol. Supports configurable period types (day,
 month, year, ytd), frequency types (minute, daily, weekly, monthly), and
 date ranges via epoch milliseconds. Returns OHLCV candle data.
+- [schwab-agent indicators](#schwab-agent-indicators): Shortcut for "ta dashboard". Computes an opinionated technical-analysis
+dashboard for one or more symbols with one price-history fetch per symbol.
+Includes SMA 21/50/200, RSI 14, MACD 12/26/9, ATR 14, Bollinger Bands 20/2,
+volume context, and 20/252-candle high-low ranges.
 - [schwab-agent instrument](#schwab-agent-instrument): Search and look up instruments
 - [schwab-agent instrument get](#schwab-agent-instrument-get): Get instrument details by CUSIP identifier. Returns the instrument type,
 description, exchange, and other metadata for the specified CUSIP.
@@ -251,6 +260,10 @@ the locally built OCC order request and Schwab's preview response.
 canceled and a new one is created with a new ID. Only equity order flags are
 accepted. Requires the "i-also-like-to-live-dangerously" config flag. The
 original order status becomes REPLACED after the new order is created.
+- [schwab-agent order replace option](#schwab-agent-order-replace-option): Replace an existing order with a new single-leg option order. The option
+contract is built from --underlying, --expiration, --strike, and exactly one of
+--call or --put, then submitted through Schwab's replace endpoint. Requires the
+"i-also-like-to-live-dangerously" config flag.
 - [schwab-agent position](#schwab-agent-position): View positions across accounts
 - [schwab-agent position list](#schwab-agent-position-list): List positions as a flat list with account identifiers and computed cost basis
 and P&L fields that Schwab's API does not provide directly. Uses the default
@@ -262,6 +275,10 @@ when some are missing. Use --fields to select specific data groups (quote,
 fundamental, extended, reference, regular). Key output fields include last
 price, bid/ask, volume, 52-week high/low, PE ratio, dividend yield, and
 market cap.
+
+Use --underlying, --expiration, --strike, and --call/--put to quote an option
+by its components instead of providing a raw OCC symbol. These flags are
+mutually exclusive with positional symbol arguments.
 - [schwab-agent symbol](#schwab-agent-symbol): Build and parse OCC-format option symbols locally. These are pure computation
 commands that make no API calls and require no authentication.
 - [schwab-agent symbol build](#schwab-agent-symbol-build): Build an OCC option symbol from underlying, expiration date, strike price, and
@@ -400,6 +417,19 @@ default account unless --account is specified.
 - `--symbol` (string): Filter by symbol
 - `--to` (string): End date (YYYY-MM-DDTHH:MM:SSZ)
 - `--types` (string): Transaction type filter (TRADE, DIVIDEND, etc.)
+
+## schwab-agent analyze
+
+Fetch a quote and compute an opinionated TA dashboard for each symbol in a
+single CLI call. Combines "quote get" and "ta dashboard" output into per-symbol
+nesting so agents get both market data and technical context without two
+round-trips. Partial failures are reported per-symbol: if the quote succeeds
+but TA fails, that symbol appears with its quote and a null analysis field.
+
+### Flags
+
+- `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
+- `--points` (int, default: 1): Number of TA output points (default 1; 0 = all)
 
 ## schwab-agent auth
 
@@ -541,6 +571,18 @@ date ranges via epoch milliseconds. Returns OHLCV candle data.
 - `--period` (string): Number of periods
 - `--period-type` (string): Period type (day, month, year, ytd) {,day,month,year,ytd}
 - `--to` (string): End date (milliseconds since epoch)
+
+## schwab-agent indicators
+
+Shortcut for "ta dashboard". Computes an opinionated technical-analysis
+dashboard for one or more symbols with one price-history fetch per symbol.
+Includes SMA 21/50/200, RSI 14, MACD 12/26/9, ATR 14, Bollinger Bands 20/2,
+volume context, and 20/252-candle high-low ranges.
+
+### Flags
+
+- `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
+- `--points` (int, default: 1): Number of output points (default 1; 0 = all)
 
 ## schwab-agent instrument
 
@@ -1259,6 +1301,32 @@ original order status becomes REPLACED after the new order is created.
 - `--symbol` (string, required): Equity symbol
 - `--type` (string): Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
 
+## schwab-agent order replace option
+
+Replace an existing order with a new single-leg option order. The option
+contract is built from --underlying, --expiration, --strike, and exactly one of
+--call or --put, then submitted through Schwab's replace endpoint. Requires the
+"i-also-like-to-live-dangerously" config flag.
+
+### Flags
+
+- `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
+- `--call` (bool, default: false): Call option
+- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX}
+- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--expiration` (string, required): Expiration date (YYYY-MM-DD)
+- `--order-id` (string): Order ID
+- `--price` (float64, default: 0): Limit price
+- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
+- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--put` (bool, default: false): Put option
+- `--quantity` (float64, default: 0, required): Contract quantity
+- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE}
+- `--strike` (float64, default: 0, required): Strike price
+- `--type` (string): Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--underlying` (string, required): Underlying symbol
+
 ## schwab-agent position
 
 View positions across accounts
@@ -1286,10 +1354,19 @@ fundamental, extended, reference, regular). Key output fields include last
 price, bid/ask, volume, 52-week high/low, PE ratio, dividend yield, and
 market cap.
 
+Use --underlying, --expiration, --strike, and --call/--put to quote an option
+by its components instead of providing a raw OCC symbol. These flags are
+mutually exclusive with positional symbol arguments.
+
 ### Flags
 
+- `--call` (bool, default: false): Call option
+- `--expiration` (string): Expiration date (YYYY-MM-DD) for option quote
 - `--fields` (stringSlice, default: []): Quote fields to return (repeatable): quote, fundamental, extended, reference, regular
 - `--indicative` (bool, default: false): Request indicative (non-tradeable) quotes
+- `--put` (bool, default: false): Put option
+- `--strike` (float64, default: 0): Strike price for option quote
+- `--underlying` (string): Underlying symbol for option quote
 
 ## schwab-agent symbol
 
