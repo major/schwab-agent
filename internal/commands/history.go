@@ -35,6 +35,7 @@ func NewHistoryCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:        "history",
 		Short:      "Retrieve price history for a symbol",
+		Aliases:    []string{"price-history"},
 		SuggestFor: []string{"price-history"},
 		GroupID:    "market-data",
 		RunE:       requireSubcommand,

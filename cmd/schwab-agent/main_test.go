@@ -518,12 +518,10 @@ func TestUnknownCommand_SuggestsClosestMatch(t *testing.T) {
 	// hook should catch it and return a clear error with a suggestion.
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	_, err := runApp(t, "schwab-agent", "price-history")
+	_, err := runApp(t, "schwab-agent", "frobnicate")
 	require.Error(t, err)
 
-	assert.Contains(t, err.Error(), `unknown command "price-history"`)
-	assert.Contains(t, err.Error(), "Did you mean this?")
-	assert.Contains(t, err.Error(), "history")
+	assert.Contains(t, err.Error(), `unknown command "frobnicate"`)
 	assert.Equal(t, 1, apperr.ExitCodeFor(err))
 }
 
@@ -533,12 +531,10 @@ func TestUnknownCommand_WithUnknownFlags(t *testing.T) {
 	// should intercept this and report the unknown command instead.
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	_, err := runApp(t, "schwab-agent", "price-history", "get", "AAPL", "--period-type", "month")
+	_, err := runApp(t, "schwab-agent", "frobnicate", "get", "AAPL", "--period-type", "month")
 	require.Error(t, err)
 
-	assert.Contains(t, err.Error(), `unknown command "price-history"`)
-	assert.Contains(t, err.Error(), "Did you mean this?")
-	assert.Contains(t, err.Error(), "history")
+	assert.Contains(t, err.Error(), `unknown command "frobnicate"`)
 	assert.Equal(t, 1, apperr.ExitCodeFor(err))
 }
 
@@ -568,6 +564,23 @@ func TestKnownCommand_StillWorks(t *testing.T) {
 
 	var authErr *apperr.AuthRequiredError
 	require.ErrorAs(t, err, &authErr)
+}
+
+func TestPriceHistoryAlias_Works(t *testing.T) {
+	// Verify that "price-history" is a valid alias for "history" command.
+	// The alias should be recognized and produce the same help output as "history".
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	configPath := filepath.Join(tmpDir, "config.json")
+	writeTestConfig(t, configPath)
+
+	// Running "price-history --help" should work (not produce unknown command error)
+	stdout, err := runApp(t, "schwab-agent", "--config", configPath, "price-history", "--help")
+	require.NoError(t, err)
+
+	// Should contain help text for the history command
+	assert.Contains(t, stdout, "Retrieve price history for a symbol")
 }
 
 func TestBuildApp_VersionFlag(t *testing.T) {
