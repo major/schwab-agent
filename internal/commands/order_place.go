@@ -30,8 +30,9 @@ type orderActionData struct {
 
 // orderPreviewData wraps an order preview response.
 type orderPreviewData struct {
-	Preview *models.PreviewOrder `json:"preview"`
-	OrderID *int64               `json:"orderId,omitempty"`
+	BuiltOrder *models.OrderRequest `json:"builtOrder,omitempty"`
+	Preview    *models.PreviewOrder `json:"preview"`
+	OrderID    *int64               `json:"orderId,omitempty"`
 }
 
 // orderPlaceOpts holds local flags for top-level spec-based order placement.
@@ -303,13 +304,16 @@ func newOrderPreviewCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Co
 	opts := &orderPreviewOpts{}
 	cmd := &cobra.Command{
 		Use:   "preview",
-		Short: "Preview an order from JSON spec",
-		Long: `Preview an order from a JSON spec without placing it. Returns estimated
-commissions, fees, and order details. Pipe output from order build for a
-build-then-preview workflow. Does not require safety guards since no order
-is actually placed.`,
+		Short: "Preview an order from JSON spec or typed flags",
+		Long: `Preview an order from a JSON spec or typed subcommand flags without placing it.
+Typed preview subcommands reuse the same local builders as order place, then
+return both the built order request and Schwab preview response in one envelope.
+This removes the build-then-preview round trip while keeping placement explicit.
+Does not require safety guards since no order is actually placed.`,
 		Example: `  schwab-agent order preview --spec @order.json
-  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -`,
+	  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200
+	  schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
+	  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
@@ -339,12 +343,110 @@ is actually placed.`,
 				return err
 			}
 
-			return output.WriteSuccess(w, orderPreviewData{Preview: preview, OrderID: preview.OrderID}, output.NewMetadata())
+			return output.WriteSuccess(w, orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}, output.NewMetadata())
 		},
 	}
 
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
+	}
+
+	equityCmd := makeCobraPreviewOrderCommand(c, configPath, w, "equity", "Preview an equity order", func() *equityPlaceOpts { return &equityPlaceOpts{} }, func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) }, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
+	equityCmd.Long = `Preview an equity (stock) order without placing it. Supports the same flags
+as order place equity, but skips the mutable-operation safety gate because no
+order is submitted. The response includes the built order request plus Schwab's
+preview details so agents can inspect both in one call.`
+	equityCmd.Example = `  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10
+	  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC`
+
+	optionCmd := makeCobraPreviewOrderCommand(c, configPath, w, "option", "Preview an option order", func() *optionPlaceOpts { return &optionPlaceOpts{} }, func(cmd *cobra.Command, opts *optionPlaceOpts) {
+		defineAndConstrain(cmd, opts, []string{"call", "put"})
+	}, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder)
+	optionCmd.Long = `Preview a single-leg option order without placing it. Requires --underlying,
+--expiration, --strike, and exactly one of --call or --put. The response includes
+the locally built OCC order request and Schwab's preview response.`
+	optionCmd.Example = `  schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1
+	  schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50`
+
+	bracketCmd := makeCobraPreviewOrderCommand(c, configPath, w, "bracket", "Preview a bracket order", func() *bracketPlaceOpts { return &bracketPlaceOpts{} }, func(cmd *cobra.Command, opts *bracketPlaceOpts) { defineAndConstrain(cmd, opts) }, parseBracketParams, orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder)
+	bracketCmd.Long = `Preview a bracket order without placing it. At least one of --take-profit or
+--stop-loss is required. The preview response includes the locally built trigger
+order and Schwab's validation, fee, and commission details.`
+	bracketCmd.Example = `  schwab-agent order preview bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
+	  schwab-agent order preview bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170`
+
+	ocoCmd := makeCobraPreviewOrderCommand(c, configPath, w, "oco", "Preview a one-cancels-other order", func() *ocoPlaceOpts { return &ocoPlaceOpts{} }, func(cmd *cobra.Command, opts *ocoPlaceOpts) { defineAndConstrain(cmd, opts) }, parseOCOParams, orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder)
+	ocoCmd.Long = `Preview a one-cancels-other order for an existing position without placing it.
+When both exits are present, the built order shows the OCO relationship Schwab
+will validate during preview.`
+	ocoCmd.Example = `  schwab-agent order preview oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140
+	  schwab-agent order preview oco --symbol TSLA --action BUY --quantity 10 --stop-loss 250`
+
+	cmd.AddCommand(equityCmd, optionCmd, bracketCmd, ocoCmd)
+
+	return cmd
+}
+
+// makeCobraPreviewOrderCommand creates a typed preview subcommand that mirrors
+// the place subcommand parse/validate/build pipeline without crossing the
+// mutable-operation safety boundary. Preview still calls Schwab, but it never
+// submits an order, so agents can collapse build + preview into one CLI call.
+func makeCobraPreviewOrderCommand[O any, P any](
+	c *client.Ref,
+	configPath string,
+	w io.Writer,
+	name, usage string,
+	newOpts func() *O,
+	flagSetup func(*cobra.Command, *O),
+	parse func(*O, []string) (*P, error),
+	validate func(*P) error,
+	build func(*P) (*models.OrderRequest, error),
+) *cobra.Command {
+	opts := newOpts()
+	cmd := &cobra.Command{
+		Use:   name,
+		Short: usage,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, any(opts).(structcli.Options)); err != nil {
+				return err
+			}
+
+			accountFlag, err := cmd.Flags().GetString("account")
+			if err != nil {
+				return err
+			}
+
+			account, err := resolveAccount(accountFlag, configPath, nil)
+			if err != nil {
+				return err
+			}
+
+			params, err := parse(opts, args)
+			if err != nil {
+				return err
+			}
+
+			if err := validate(params); err != nil {
+				return err
+			}
+
+			order, err := build(params)
+			if err != nil {
+				return err
+			}
+
+			preview, err := c.PreviewOrder(cmd.Context(), account, order)
+			if err != nil {
+				return err
+			}
+
+			return output.WriteSuccess(w, orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}, output.NewMetadata())
+		},
+	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
+
+	if flagSetup != nil {
+		flagSetup(cmd, opts)
 	}
 
 	return cmd

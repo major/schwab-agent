@@ -211,6 +211,106 @@ func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 	}
 }
 
+func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
+	orderID := int64(4243)
+	previewResponse := models.PreviewOrder{OrderID: &orderID}
+	type requestRecord struct {
+		Path string
+		Body string
+	}
+	requestBodies := make([]requestRecord, 0, 4)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/trader/v1/accounts/hash123/previewOrder", r.URL.Path)
+
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		requestBodies = append(requestBodies, requestRecord{Path: r.URL.Path, Body: string(body)})
+
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfig(t, "hash123")
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
+
+	testCases := []struct {
+		name       string
+		args       []string
+		assertBody func(*testing.T, models.OrderRequest)
+	}{
+		{
+			name: "equity",
+			args: []string{"order", "preview", "equity", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10", "--type", "LIMIT", "--price", "185.25"},
+			assertBody: func(t *testing.T, order models.OrderRequest) {
+				t.Helper()
+
+				assert.Equal(t, models.OrderTypeLimit, order.OrderType)
+				require.Len(t, order.OrderLegCollection, 1)
+				assert.Equal(t, "AAPL", order.OrderLegCollection[0].Instrument.Symbol)
+				assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
+			},
+		},
+		{
+			name: "option",
+			args: []string{"order", "preview", "option", "--underlying", "AAPL", "--expiration", testFutureExpDate, "--strike", "200", "--call", "--action", "BUY_TO_OPEN", "--quantity", "1", "--type", "LIMIT", "--price", "5.00"},
+			assertBody: func(t *testing.T, order models.OrderRequest) {
+				t.Helper()
+
+				assert.Equal(t, models.OrderTypeLimit, order.OrderType)
+				require.Len(t, order.OrderLegCollection, 1)
+				assert.Equal(t, models.AssetTypeOption, order.OrderLegCollection[0].Instrument.AssetType)
+				assert.Contains(t, order.OrderLegCollection[0].Instrument.Symbol, "AAPL")
+				assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
+			},
+		},
+		{
+			name: "bracket",
+			args: []string{"order", "preview", "bracket", "--symbol", "NVDA", "--action", "BUY", "--quantity", "10", "--type", "MARKET", "--take-profit", "150", "--stop-loss", "120"},
+			assertBody: func(t *testing.T, order models.OrderRequest) {
+				t.Helper()
+
+				assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
+				require.Len(t, order.OrderLegCollection, 1)
+				assert.Equal(t, "NVDA", order.OrderLegCollection[0].Instrument.Symbol)
+				require.NotEmpty(t, order.ChildOrderStrategies)
+			},
+		},
+		{
+			name: "oco",
+			args: []string{"order", "preview", "oco", "--symbol", "TSLA", "--action", "SELL", "--quantity", "5", "--take-profit", "250", "--stop-loss", "200"},
+			assertBody: func(t *testing.T, order models.OrderRequest) {
+				t.Helper()
+
+				assert.Equal(t, models.OrderStrategyTypeOCO, order.OrderStrategyType)
+				require.Len(t, order.ChildOrderStrategies, 2)
+			},
+		},
+	}
+
+	for index, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			stdout, err := runOrderCommand(t, cliClient, configPath, "", testCase.args...)
+			require.NoError(t, err)
+
+			envelope := decodeEnvelope(t, stdout)
+			data, ok := envelope.Data.(map[string]any)
+			require.True(t, ok)
+			assert.Equal(t, float64(4243), data["orderId"])
+			require.Contains(t, data, "builtOrder")
+			require.Contains(t, data, "preview")
+
+			var order models.OrderRequest
+			require.NoError(t, json.Unmarshal([]byte(requestBodies[index].Body), &order))
+			testCase.assertBody(t, order)
+		})
+	}
+
+	require.Len(t, requestBodies, len(testCases))
+}
+
 func TestNewOrderCmdBuildEquityOutputsRequestJSON(t *testing.T) {
 	t.Parallel()
 
