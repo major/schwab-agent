@@ -295,9 +295,13 @@ List compact account identifiers for agents. This is the smallest account picker
 for LLM workflows: it returns accountHash, accountNumber, nickName,
 primaryAccount, and type when preferences are available. It calls accountNumbers
 for hashes, joins optional userPreference fields by account number, and does not
-fetch balances or positions. It has no command-specific flags, enum values,
-config keys, or environment bindings; use root flags like --config and --token
-from the schema tree when needed.
+fetch balances. Use --positions to fetch
+compact holdings in the same response with symbol, assetType, quantity,
+marketValue, averagePrice, totalCostBasis, unrealizedPnL, and unrealizedPnLPct.
+
+### Flags
+
+- `--positions` (bool, default: false): Include compact current positions for each account
 
 ## schwab-agent account get
 

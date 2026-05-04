@@ -97,6 +97,9 @@ schwab-agent quote get AAPL
 # List compact account identifiers for agent workflows
 schwab-agent account summary
 
+# List compact account identifiers and holdings in one response
+schwab-agent account summary --positions
+
 # List full account details and balances
 schwab-agent account list
 

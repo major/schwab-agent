@@ -536,6 +536,7 @@ run_test "auth status" auth status
 section "Account"
 
 run_test "account summary" account summary
+run_test "account summary --positions" account summary --positions
 run_test "account list" account list
 run_test "account numbers" account numbers
 run_test "account list --positions" account list --positions
