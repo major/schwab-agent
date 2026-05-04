@@ -211,6 +211,59 @@ func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 	}
 }
 
+func TestNewOrderCmdSpecSemanticValidation(t *testing.T) {
+	t.Parallel()
+
+	var requests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		t.Errorf("unexpected API request for invalid spec: %s %s", r.Method, r.URL.Path)
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
+	invalidLimitSpec := mustMarshalJSON(t, &models.OrderRequest{
+		Session:           models.SessionNormal,
+		Duration:          models.DurationDay,
+		OrderType:         models.OrderTypeLimit,
+		OrderStrategyType: models.OrderStrategyTypeSingle,
+		OrderLegCollection: []models.OrderLegCollection{{
+			Instruction: models.InstructionBuy,
+			Quantity:    1,
+			Instrument: models.OrderInstrument{
+				AssetType: models.AssetTypeEquity,
+				Symbol:    "AAPL",
+			},
+		}},
+	})
+
+	testCases := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "preview",
+			args: []string{"order", "preview", "--spec", invalidLimitSpec},
+		},
+		{
+			name: "place",
+			args: []string{"order", "place", "--spec", invalidLimitSpec},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, err := runOrderCommand(t, cliClient, configPath, "", testCase.args...)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "LIMIT order requires a positive price")
+		})
+	}
+
+	assert.Zero(t, requests)
+}
+
 func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
 	orderID := int64(4243)
 	previewResponse := models.PreviewOrder{OrderID: &orderID}

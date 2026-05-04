@@ -150,6 +150,9 @@ order build, preview it with order preview, then place.`,
 			if err != nil {
 				return err
 			}
+			if err := orderbuilder.ValidateOrderRequest(order); err != nil {
+				return err
+			}
 
 			response, err := c.PlaceOrder(cmd.Context(), account, order)
 			if err != nil {
@@ -335,6 +338,9 @@ Does not require safety guards since no order is actually placed.`,
 
 			order, err := parseSpecOrder(cmd, opts.Spec)
 			if err != nil {
+				return err
+			}
+			if err := orderbuilder.ValidateOrderRequest(order); err != nil {
 				return err
 			}
 
