@@ -1520,8 +1520,9 @@ schwab-agent symbol parse "AAPL  250620C00200000"
 
 Compute technical analysis indicators from Schwab price history. All indicators
 are calculated locally after fetching candles. Use --interval to select data
-frequency (daily, weekly, 1min, 5min, 15min, 30min) and --points to limit
-output to the N most recent values.
+frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
+default --points to 1 for token-efficient latest-value output; use --points 0
+when you need the full computed series.
 
 #### `schwab-agent ta adx`
 
@@ -1535,7 +1536,7 @@ plus_di, and minus_di for directional bias. Default period is 14.
 |------|------|---------|----------|-------------|
 | `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
 | `--period` | int | 14 | no | Indicator period |
-| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--points` | int | 1 | no | Number of output points (default 1; 0 = all) |
 
 **Example:**
 
@@ -1556,7 +1557,7 @@ data with Wilder smoothing. Default period is 14.
 |------|------|---------|----------|-------------|
 | `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
 | `--period` | int | 14 | no | Indicator period |
-| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--points` | int | 1 | no | Number of output points (default 1; 0 = all) |
 
 **Example:**
 
@@ -1577,7 +1578,7 @@ relatively low. Use --std-dev to widen or narrow the bands (default 2.0).
 |------|------|---------|----------|-------------|
 | `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
 | `--period` | int | 20 | no | BBands period |
-| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--points` | int | 1 | no | Number of output points (default 1; 0 = all) |
 | `--std-dev` | float64 | 2.0 | no | Standard deviations |
 
 **Example:**
@@ -1600,7 +1601,7 @@ high-low ranges. Signals are neutral factual labels for agents, not trading advi
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
 | `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
-| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--points` | int | 1 | no | Number of output points (default 1; 0 = all) |
 
 **Example:**
 
@@ -1623,7 +1624,7 @@ analysis).
 |------|------|---------|----------|-------------|
 | `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
 | `--period` | intSlice | 20 | no | Indicator period (repeatable or comma-separated) |
-| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--points` | int | 1 | no | Number of output points (default 1; 0 = all) |
 
 **Example:**
 
@@ -1687,7 +1688,7 @@ slow=26, signal=9.
 |------|------|---------|----------|-------------|
 | `--fast` | int | 12 | no | Fast EMA period |
 | `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
-| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--points` | int | 1 | no | Number of output points (default 1; 0 = all) |
 | `--signal` | int | 9 | no | Signal EMA period |
 | `--slow` | int | 26 | no | Slow EMA period |
 
@@ -1711,7 +1712,7 @@ can be repeated or comma-separated for multiple lookbacks. Default period is 14.
 |------|------|---------|----------|-------------|
 | `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
 | `--period` | intSlice | 14 | no | Indicator period (repeatable or comma-separated) |
-| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--points` | int | 1 | no | Number of output points (default 1; 0 = all) |
 
 **Example:**
 
@@ -1734,7 +1735,7 @@ with keys like sma_21, sma_50, sma_200.
 |------|------|---------|----------|-------------|
 | `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
 | `--period` | intSlice | 20 | no | Indicator period (repeatable or comma-separated) |
-| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--points` | int | 1 | no | Number of output points (default 1; 0 = all) |
 
 **Example:**
 
@@ -1757,7 +1758,7 @@ Configurable via --k-period, --smooth-k, and --d-period.
 | `--d-period` | int | 3 | no | Slow %D period |
 | `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
 | `--k-period` | int | 14 | no | Fast %K lookback period |
-| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--points` | int | 1 | no | Number of output points (default 1; 0 = all) |
 | `--smooth-k` | int | 3 | no | Slow %K smoothing period |
 
 **Example:**
@@ -1779,7 +1780,7 @@ suggests bearish.
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
 | `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
-| `--points` | int | 1 | no | Number of output points (0 = all) |
+| `--points` | int | 1 | no | Number of output points (default 1; 0 = all) |
 
 **Example:**
 

@@ -354,7 +354,7 @@ func TestTASMA_ValidEnvelope(t *testing.T) {
 
 	values, ok := data["values"].([]any)
 	require.True(t, ok, "values should be an array")
-	assert.NotEmpty(t, values)
+	assert.Len(t, values, 1, "TA time-series commands default to the latest point")
 
 	// Each value entry should have datetime and sma keys
 	first := values[0].(map[string]any)
@@ -772,6 +772,75 @@ func TestTAATR_ValidEnvelope(t *testing.T) {
 	}
 }
 
+func TestTAATR_MultipleSymbolsReturnsSymbolMap(t *testing.T) {
+	// Arrange: price history is single-symbol at the Schwab API, so the CLI loops
+	// over requested symbols and returns one symbol-keyed envelope to callers.
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
+		symbol := r.URL.Query().Get("symbol")
+		require.Contains(t, []string{"AAPL", "MSFT"}, symbol)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(mockCandleListJSON(symbol, 60)))
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "atr", "AAPL", "MSFT")
+	require.NoError(t, err)
+
+	// Assert
+	envelope, data := decodeTAEnvelope(t, &buf)
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
+	assert.Equal(t, 2, requestCount)
+	assert.Empty(t, envelope.Errors)
+
+	for _, symbol := range []string{"AAPL", "MSFT"} {
+		entry, ok := data[symbol].(map[string]any)
+		require.True(t, ok, "%s output should be an object", symbol)
+		assert.Equal(t, "atr", entry["indicator"])
+		assert.Equal(t, symbol, entry["symbol"])
+		assert.NotEmpty(t, entry["values"])
+	}
+}
+
+func TestTAATR_MultipleSymbolsPartialError(t *testing.T) {
+	// Arrange: one bad ticker should not discard successful indicator results for
+	// the rest of a portfolio-wide audit.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
+		symbol := r.URL.Query().Get("symbol")
+		if symbol == "BOGUS" {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"message":"symbol not found"}`))
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(mockCandleListJSON(symbol, 60)))
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "atr", "AAPL", "BOGUS")
+	require.NoError(t, err)
+
+	// Assert
+	envelope, data := decodeTAEnvelope(t, &buf)
+	assert.Equal(t, 2, envelope.Metadata.Requested)
+	assert.Equal(t, 1, envelope.Metadata.Returned)
+	require.Len(t, envelope.Errors, 1)
+	assert.Contains(t, envelope.Errors[0], "BOGUS")
+	assert.Contains(t, data, "AAPL")
+	assert.NotContains(t, data, "BOGUS")
+}
+
 func TestTAATR_MissingSymbol(t *testing.T) {
 	// Arrange
 	server := jsonServer(`{}`)
@@ -1022,22 +1091,23 @@ func TestTAVWAP_MissingSymbol(t *testing.T) {
 	assert.Contains(t, err.Error(), "arg")
 }
 
-func TestTAVWAP_NoPointsFlag(t *testing.T) {
-	// Arrange - use 80 candles, request only 5 points
+func TestTAVWAP_DefaultsToLatestPoint(t *testing.T) {
+	// Arrange - use 80 candles so the default proves it returns the latest point,
+	// not the whole computed series.
 	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 80))
 	defer srv.Close()
 
 	// Act
 	var buf bytes.Buffer
 	cmd := NewTACmd(testClient(t, srv), &buf)
-	_, err := runTestCommand(t, cmd, "vwap", "AAPL", "--points", "5")
+	_, err := runTestCommand(t, cmd, "vwap", "AAPL")
 	require.NoError(t, err)
 
 	// Assert
 	_, data := decodeTAEnvelope(t, &buf)
 	values, ok := data["values"].([]any)
 	require.True(t, ok)
-	assert.Len(t, values, 5)
+	assert.Len(t, values, 1)
 }
 
 func TestTAHV_ValidEnvelope(t *testing.T) {

@@ -3,6 +3,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -193,13 +194,53 @@ func maxPeriod(periods []int) int {
 	return largest
 }
 
+// writeTASymbolResults preserves the historical single-symbol TA response shape
+// while letting batched commands return the same symbol-keyed map pattern used by
+// quote get. Schwab's price-history API is single-symbol, so batching still makes
+// one API call per symbol, but agents only need one CLI invocation and can receive
+// partial data when a single ticker fails.
+func writeTASymbolResults(w io.Writer, symbols []string, compute func(symbol string) (any, error)) error {
+	if len(symbols) == 1 {
+		data, err := compute(symbols[0])
+		if err != nil {
+			return err
+		}
+		return output.WriteSuccess(w, data, output.NewMetadata())
+	}
+
+	data := make(map[string]any, len(symbols))
+	partialErrors := make([]string, 0)
+	joinedErrors := make([]error, 0)
+	for _, symbol := range symbols {
+		result, err := compute(symbol)
+		if err != nil {
+			partialErrors = append(partialErrors, fmt.Sprintf("%s: %v", symbol, err))
+			joinedErrors = append(joinedErrors, err)
+			continue
+		}
+		data[symbol] = result
+	}
+
+	if len(data) == 0 {
+		return errors.Join(joinedErrors...)
+	}
+	if len(partialErrors) > 0 {
+		meta := output.NewMetadata()
+		meta.Requested = len(symbols)
+		meta.Returned = len(data)
+		return output.WritePartial(w, data, partialErrors, meta)
+	}
+
+	return output.WriteSuccess(w, data, output.NewMetadata())
+}
+
 // simpleTAOpts holds CLI flags for factory-generated indicator commands (SMA, EMA, RSI).
 // Period is excluded from struct tags because its default varies per indicator
 // (cfg.defaultPeriod) and structcli tags require static defaults.
 type simpleTAOpts struct {
 	Period   []int
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -239,7 +280,7 @@ type macdOpts struct {
 	Slow     int        `flag:"slow" flagdescr:"Slow EMA period" default:"26" flaggroup:"indicator"`
 	Signal   int        `flag:"signal" flagdescr:"Signal EMA period" default:"9" flaggroup:"indicator"`
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -249,7 +290,7 @@ func (o *macdOpts) Attach(_ *cobra.Command) error { return nil }
 type atrOpts struct {
 	Period   int        `flag:"period" flagdescr:"Indicator period" default:"14" flaggroup:"indicator"`
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -260,7 +301,7 @@ type bbandsOpts struct {
 	Period   int        `flag:"period" flagdescr:"BBands period" default:"20" flaggroup:"indicator"`
 	StdDev   float64    `flag:"std-dev" flagdescr:"Standard deviations" default:"2.0" flaggroup:"indicator"`
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -272,7 +313,7 @@ type stochOpts struct {
 	SmoothK  int        `flag:"smooth-k" flagdescr:"Slow %K smoothing period" default:"3" flaggroup:"indicator"`
 	DPeriod  int        `flag:"d-period" flagdescr:"Slow %D period" default:"3" flaggroup:"indicator"`
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -282,7 +323,7 @@ func (o *stochOpts) Attach(_ *cobra.Command) error { return nil }
 type adxOpts struct {
 	Period   int        `flag:"period" flagdescr:"Indicator period" default:"14" flaggroup:"indicator"`
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -291,7 +332,7 @@ func (o *adxOpts) Attach(_ *cobra.Command) error { return nil }
 // vwapOpts holds CLI flags for the VWAP subcommand.
 type vwapOpts struct {
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -317,7 +358,7 @@ func (o *expectedMoveOpts) Attach(_ *cobra.Command) error { return nil }
 // dashboardOpts holds CLI flags for the opinionated TA dashboard command.
 type dashboardOpts struct {
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
 
 // Attach implements structcli.Options interface.
@@ -330,8 +371,9 @@ func NewTACmd(c *client.Ref, w io.Writer) *cobra.Command {
 		Short: "Technical analysis indicators",
 		Long: `Compute technical analysis indicators from Schwab price history. All indicators
 are calculated locally after fetching candles. Use --interval to select data
-frequency (daily, weekly, 1min, 5min, 15min, 30min) and --points to limit
-output to the N most recent values.`,
+frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
+default --points to 1 for token-efficient latest-value output; use --points 0
+when you need the full computed series.`,
 		GroupID: "market-data",
 		RunE:    requireSubcommand,
 	}
@@ -399,11 +441,11 @@ can be repeated or comma-separated for multiple lookbacks. Default period is 14.
 func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &simpleTAOpts{}
 	cmd := &cobra.Command{
-		Use:     cfg.name + " SYMBOL",
+		Use:     cfg.name + " SYMBOL [SYMBOL...]",
 		Short:   cfg.usage,
 		Long:    cfg.long,
 		Example: cfg.example,
-		Args:    cobra.ExactArgs(1),
+		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Unmarshal decodes flags and runs simpleTAOpts.Validate(),
 			// which rejects zero/negative and duplicate periods.
@@ -411,35 +453,9 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 				return err
 			}
 
-			symbol := args[0]
-			periods := opts.Period
-			period := maxPeriod(periods)
-
-			interval := string(opts.Interval)
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, period*cfg.multiplier, cfg.name)
-			if err != nil {
-				return err
-			}
-
-			closes, err := ta.ExtractClose(candles)
-			if err != nil {
-				return err
-			}
-
-			valuesByPeriod := make(map[int][]float64, len(periods))
-			for _, p := range periods {
-				values, err := cfg.compute(closes, p)
-				if err != nil {
-					return err
-				}
-				valuesByPeriod[p] = values
-			}
-
-			if len(periods) == 1 {
-				return writeTAOutput(w, cfg.name, symbol, interval, periods[0], opts.Points, timestamps, valuesByPeriod[periods[0]])
-			}
-
-			return writeMultiTAOutput(w, cfg.name, symbol, interval, periods, opts.Points, timestamps, valuesByPeriod)
+			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
+				return computeSimpleTAOutput(cmd.Context(), c, cfg, opts, symbol)
+			})
 		},
 	}
 
@@ -462,10 +478,46 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 	return cmd
 }
 
+func computeSimpleTAOutput(
+	ctx context.Context,
+	c *client.Ref,
+	cfg *simpleTAConfig,
+	opts *simpleTAOpts,
+	symbol string,
+) (any, error) {
+	periods := opts.Period
+	period := maxPeriod(periods)
+	interval := string(opts.Interval)
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, period*cfg.multiplier, cfg.name)
+	if err != nil {
+		return nil, err
+	}
+
+	closes, err := ta.ExtractClose(candles)
+	if err != nil {
+		return nil, err
+	}
+
+	valuesByPeriod := make(map[int][]float64, len(periods))
+	for _, p := range periods {
+		values, err := cfg.compute(closes, p)
+		if err != nil {
+			return nil, err
+		}
+		valuesByPeriod[p] = values
+	}
+
+	if len(periods) == 1 {
+		return buildTAOutput(cfg.name, symbol, interval, periods[0], opts.Points, timestamps, valuesByPeriod[periods[0]])
+	}
+
+	return buildMultiTAOutput(cfg.name, symbol, interval, periods, opts.Points, timestamps, valuesByPeriod), nil
+}
+
 func cobraTADashboardCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &dashboardOpts{}
 	cmd := &cobra.Command{
-		Use:   "dashboard SYMBOL",
+		Use:   "dashboard SYMBOL [SYMBOL...]",
 		Short: "Opinionated TA dashboard for agent trade analysis",
 		Long: `Compute an opinionated technical-analysis dashboard for a symbol with one
 price-history fetch. The dashboard includes SMA 21/50/200 trend context, RSI 14,
@@ -474,13 +526,15 @@ high-low ranges. Signals are neutral factual labels for agents, not trading advi
 		Example: `  schwab-agent ta dashboard AAPL
   schwab-agent ta dashboard AAPL --points 5
   schwab-agent ta dashboard NVDA --interval weekly --points 10`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 
-			return writeTADashboard(cmd.Context(), c, w, args[0], string(opts.Interval), opts.Points)
+			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
+				return buildTADashboard(cmd.Context(), c, symbol, string(opts.Interval), opts.Points)
+			})
 		},
 	}
 
@@ -492,7 +546,7 @@ high-low ranges. Signals are neutral factual labels for agents, not trading advi
 	return cmd
 }
 
-func writeTADashboard(ctx context.Context, c *client.Ref, w io.Writer, symbol, interval string, points int) error {
+func buildTADashboard(ctx context.Context, c *client.Ref, symbol, interval string, points int) (dashboardOutput, error) {
 	const (
 		smaFastPeriod    = 21
 		smaMediumPeriod  = 50
@@ -517,61 +571,61 @@ func writeTADashboard(ctx context.Context, c *client.Ref, w io.Writer, symbol, i
 
 	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, dashboardMinCandles, "dashboard")
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 
 	opens, err := ta.ExtractOpen(candles)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 	highs, err := ta.ExtractHigh(candles)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 	lows, err := ta.ExtractLow(candles)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 	closes, err := ta.ExtractClose(candles)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 	volumes, err := ta.ExtractVolume(candles)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 
 	sma21, err := ta.SMA(closes, smaFastPeriod)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 	sma50, err := ta.SMA(closes, smaMediumPeriod)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 	sma200, err := ta.SMA(closes, smaLongPeriod)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 	rsi14, err := ta.RSI(closes, rsiPeriod)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 	macdVals, macdSignalVals, macdHistVals, err := ta.MACD(closes, macdFastPeriod, macdSlowPeriod, macdSignalPeriod)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 	atr14, err := ta.ATR(highs, lows, closes, atrPeriod)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 	bbandsUpper, bbandsMiddle, bbandsLower, err := ta.BBands(closes, bbandsPeriod, bbandsStdDev)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 	avgVolume20, err := ta.SMA(volumes, volumePeriod)
 	if err != nil {
-		return err
+		return dashboardOutput{}, err
 	}
 
 	// The series begins where the 252-candle range is complete. SMA 200 becomes
@@ -607,7 +661,7 @@ func writeTADashboard(ctx context.Context, c *client.Ref, w io.Writer, symbol, i
 		"avg_volume_20":  avgVolume20,
 	} {
 		if err := addTailAlignedFloat(rows, key, values); err != nil {
-			return err
+			return dashboardOutput{}, err
 		}
 	}
 
@@ -656,7 +710,7 @@ func writeTADashboard(ctx context.Context, c *client.Ref, w io.Writer, symbol, i
 		Values:  limitDashboardRows(rows, points),
 	}
 
-	return output.WriteSuccess(w, data, output.NewMetadata())
+	return data, nil
 }
 
 func addTailAlignedFloat(rows []map[string]any, key string, values []float64) error {
@@ -816,7 +870,7 @@ func volumeSignal(relativeVolume float64) string {
 func cobraTAMACDCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &macdOpts{}
 	cmd := &cobra.Command{
-		Use:   "macd SYMBOL",
+		Use:   "macd SYMBOL [SYMBOL...]",
 		Short: "Moving Average Convergence/Divergence",
 		Long: `Compute MACD (Moving Average Convergence/Divergence) for a symbol. Uses
 --fast, --slow, and --signal periods instead of --period. Output keys include
@@ -825,58 +879,15 @@ slow=26, signal=9.`,
 		Example: `  schwab-agent ta macd AAPL
   schwab-agent ta macd AAPL --fast 12 --slow 26 --signal 9 --points 10
   schwab-agent ta macd NVDA --interval weekly --points 10`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 
-			symbol := args[0]
-
-			// MACD layers slow EMA + signal EMA; 2x the combined period provides convergence.
-			interval := string(opts.Interval)
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, (opts.Slow+opts.Signal)*2, "macd")
-			if err != nil {
-				return err
-			}
-
-			closes, err := ta.ExtractClose(candles)
-			if err != nil {
-				return err
-			}
-
-			macdVals, signalVals, histVals, err := ta.MACD(closes, opts.Fast, opts.Slow, opts.Signal)
-			if err != nil {
-				return err
-			}
-
-			// Align timestamps to MACD output length (shorter due to lookback)
-			timestamps = timestamps[len(timestamps)-len(macdVals):]
-
-			out := make([]macdPoint, len(macdVals))
-			for i := range macdVals {
-				out[i] = macdPoint{
-					Datetime:  timestamps[i],
-					MACD:      macdVals[i],
-					Signal:    signalVals[i],
-					Histogram: histVals[i],
-				}
-			}
-
-			if opts.Points > 0 && opts.Points < len(out) {
-				out = out[len(out)-opts.Points:]
-			}
-
-			data := macdOutput{
-				Indicator: "macd",
-				Symbol:    symbol,
-				Interval:  interval,
-				Fast:      opts.Fast,
-				Slow:      opts.Slow,
-				Signal:    opts.Signal,
-				Values:    out,
-			}
-			return output.WriteSuccess(w, data, output.NewMetadata())
+			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
+				return buildMACDOutput(cmd.Context(), c, opts, symbol)
+			})
 		},
 	}
 
@@ -888,50 +899,69 @@ slow=26, signal=9.`,
 	return cmd
 }
 
+func buildMACDOutput(ctx context.Context, c *client.Ref, opts *macdOpts, symbol string) (macdOutput, error) {
+	// MACD layers slow EMA + signal EMA; 2x the combined period provides convergence.
+	interval := string(opts.Interval)
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, (opts.Slow+opts.Signal)*2, "macd")
+	if err != nil {
+		return macdOutput{}, err
+	}
+
+	closes, err := ta.ExtractClose(candles)
+	if err != nil {
+		return macdOutput{}, err
+	}
+
+	macdVals, signalVals, histVals, err := ta.MACD(closes, opts.Fast, opts.Slow, opts.Signal)
+	if err != nil {
+		return macdOutput{}, err
+	}
+
+	timestamps = timestamps[len(timestamps)-len(macdVals):]
+	out := make([]macdPoint, len(macdVals))
+	for i := range macdVals {
+		out[i] = macdPoint{
+			Datetime:  timestamps[i],
+			MACD:      macdVals[i],
+			Signal:    signalVals[i],
+			Histogram: histVals[i],
+		}
+	}
+
+	if opts.Points > 0 && opts.Points < len(out) {
+		out = out[len(out)-opts.Points:]
+	}
+
+	return macdOutput{
+		Indicator: "macd",
+		Symbol:    symbol,
+		Interval:  interval,
+		Fast:      opts.Fast,
+		Slow:      opts.Slow,
+		Signal:    opts.Signal,
+		Values:    out,
+	}, nil
+}
+
 func cobraTAATRCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &atrOpts{}
 	cmd := &cobra.Command{
-		Use:   "atr SYMBOL",
+		Use:   "atr SYMBOL [SYMBOL...]",
 		Short: "Average True Range",
 		Long: `Compute Average True Range for a symbol. ATR measures volatility in price
 units: higher values indicate wider price swings. Uses high, low, and close
 data with Wilder smoothing. Default period is 14.`,
 		Example: `  schwab-agent ta atr AAPL
   schwab-agent ta atr AAPL --period 14 --interval daily --points 10`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 
-			symbol := args[0]
-
-			// ATR uses Wilder smoothing; 3x period provides convergence stability.
-			interval := string(opts.Interval)
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, opts.Period*3, "atr")
-			if err != nil {
-				return err
-			}
-
-			highs, err := ta.ExtractHigh(candles)
-			if err != nil {
-				return err
-			}
-			lows, err := ta.ExtractLow(candles)
-			if err != nil {
-				return err
-			}
-			closes, err := ta.ExtractClose(candles)
-			if err != nil {
-				return err
-			}
-
-			values, err := ta.ATR(highs, lows, closes, opts.Period)
-			if err != nil {
-				return err
-			}
-
-			return writeTAOutput(w, "atr", symbol, interval, opts.Period, opts.Points, timestamps, values)
+			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
+				return buildATROutput(cmd.Context(), c, opts, symbol)
+			})
 		},
 	}
 
@@ -943,10 +973,39 @@ data with Wilder smoothing. Default period is 14.`,
 	return cmd
 }
 
+func buildATROutput(ctx context.Context, c *client.Ref, opts *atrOpts, symbol string) (taOutput, error) {
+	// ATR uses Wilder smoothing; 3x period provides convergence stability.
+	interval := string(opts.Interval)
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.Period*3, "atr")
+	if err != nil {
+		return taOutput{}, err
+	}
+
+	highs, err := ta.ExtractHigh(candles)
+	if err != nil {
+		return taOutput{}, err
+	}
+	lows, err := ta.ExtractLow(candles)
+	if err != nil {
+		return taOutput{}, err
+	}
+	closes, err := ta.ExtractClose(candles)
+	if err != nil {
+		return taOutput{}, err
+	}
+
+	values, err := ta.ATR(highs, lows, closes, opts.Period)
+	if err != nil {
+		return taOutput{}, err
+	}
+
+	return buildTAOutput("atr", symbol, interval, opts.Period, opts.Points, timestamps, values)
+}
+
 func cobraTABBandsCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &bbandsOpts{}
 	cmd := &cobra.Command{
-		Use:   "bbands SYMBOL",
+		Use:   "bbands SYMBOL [SYMBOL...]",
 		Short: "Bollinger Bands",
 		Long: `Compute Bollinger Bands for a symbol. Output keys are upper, middle, and lower
 bands. Price near the upper band is relatively high, near the lower band is
@@ -954,56 +1013,15 @@ relatively low. Use --std-dev to widen or narrow the bands (default 2.0).`,
 		Example: `  schwab-agent ta bbands AAPL
   schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --points 10
   schwab-agent ta bbands AAPL --std-dev 1.5 --points 10`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 
-			symbol := args[0]
-
-			interval := string(opts.Interval)
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, opts.Period, "bbands")
-			if err != nil {
-				return err
-			}
-
-			closes, err := ta.ExtractClose(candles)
-			if err != nil {
-				return err
-			}
-
-			upper, middle, lower, err := ta.BBands(closes, opts.Period, opts.StdDev)
-			if err != nil {
-				return err
-			}
-
-			// Align timestamps to BBands output length (shorter due to lookback)
-			timestamps = timestamps[len(timestamps)-len(upper):]
-
-			out := make([]bbandsPoint, len(upper))
-			for i := range upper {
-				out[i] = bbandsPoint{
-					Datetime: timestamps[i],
-					Upper:    upper[i],
-					Middle:   middle[i],
-					Lower:    lower[i],
-				}
-			}
-
-			if opts.Points > 0 && opts.Points < len(out) {
-				out = out[len(out)-opts.Points:]
-			}
-
-			data := bbandsOutput{
-				Indicator: "bbands",
-				Symbol:    symbol,
-				Interval:  interval,
-				Period:    opts.Period,
-				StdDev:    opts.StdDev,
-				Values:    out,
-			}
-			return output.WriteSuccess(w, data, output.NewMetadata())
+			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
+				return buildBBandsOutput(cmd.Context(), c, opts, symbol)
+			})
 		},
 	}
 
@@ -1015,76 +1033,67 @@ relatively low. Use --std-dev to widen or narrow the bands (default 2.0).`,
 	return cmd
 }
 
+func buildBBandsOutput(ctx context.Context, c *client.Ref, opts *bbandsOpts, symbol string) (bbandsOutput, error) {
+	interval := string(opts.Interval)
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.Period, "bbands")
+	if err != nil {
+		return bbandsOutput{}, err
+	}
+
+	closes, err := ta.ExtractClose(candles)
+	if err != nil {
+		return bbandsOutput{}, err
+	}
+
+	upper, middle, lower, err := ta.BBands(closes, opts.Period, opts.StdDev)
+	if err != nil {
+		return bbandsOutput{}, err
+	}
+
+	timestamps = timestamps[len(timestamps)-len(upper):]
+	out := make([]bbandsPoint, len(upper))
+	for i := range upper {
+		out[i] = bbandsPoint{
+			Datetime: timestamps[i],
+			Upper:    upper[i],
+			Middle:   middle[i],
+			Lower:    lower[i],
+		}
+	}
+
+	if opts.Points > 0 && opts.Points < len(out) {
+		out = out[len(out)-opts.Points:]
+	}
+
+	return bbandsOutput{
+		Indicator: "bbands",
+		Symbol:    symbol,
+		Interval:  interval,
+		Period:    opts.Period,
+		StdDev:    opts.StdDev,
+		Values:    out,
+	}, nil
+}
+
 func cobraTAStochCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &stochOpts{}
 	cmd := &cobra.Command{
-		Use:   "stoch SYMBOL",
+		Use:   "stoch SYMBOL [SYMBOL...]",
 		Short: "Stochastic Oscillator",
 		Long: `Compute Stochastic Oscillator for a symbol. Output keys are slowk and slowd,
 both ranging 0-100. Above 80 and below 20 are common signal thresholds.
 Configurable via --k-period, --smooth-k, and --d-period.`,
 		Example: `  schwab-agent ta stoch AAPL
   schwab-agent ta stoch AAPL --k-period 14 --smooth-k 3 --d-period 3 --points 10`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 
-			symbol := args[0]
-
-			// Stochastic chains three windowed ops (raw %K, smoothed %K, %D);
-			// total depth is the sum of all window sizes.
-			interval := string(opts.Interval)
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, opts.KPeriod+opts.SmoothK+opts.DPeriod, "stoch")
-			if err != nil {
-				return err
-			}
-
-			highs, err := ta.ExtractHigh(candles)
-			if err != nil {
-				return err
-			}
-			lows, err := ta.ExtractLow(candles)
-			if err != nil {
-				return err
-			}
-			closes, err := ta.ExtractClose(candles)
-			if err != nil {
-				return err
-			}
-
-			slowK, slowD, err := ta.Stochastic(highs, lows, closes, opts.KPeriod, opts.SmoothK, opts.DPeriod)
-			if err != nil {
-				return err
-			}
-
-			// Align timestamps to stochastic output length (shorter due to lookback)
-			timestamps = timestamps[len(timestamps)-len(slowK):]
-
-			out := make([]stochPoint, len(slowK))
-			for i := range slowK {
-				out[i] = stochPoint{
-					Datetime: timestamps[i],
-					SlowK:    slowK[i],
-					SlowD:    slowD[i],
-				}
-			}
-
-			if opts.Points > 0 && opts.Points < len(out) {
-				out = out[len(out)-opts.Points:]
-			}
-
-			data := stochOutput{
-				Indicator: "stoch",
-				Symbol:    symbol,
-				Interval:  interval,
-				KPeriod:   opts.KPeriod,
-				SmoothK:   opts.SmoothK,
-				DPeriod:   opts.DPeriod,
-				Values:    out,
-			}
-			return output.WriteSuccess(w, data, output.NewMetadata())
+			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
+				return buildStochOutput(cmd.Context(), c, opts, symbol)
+			})
 		},
 	}
 
@@ -1096,74 +1105,77 @@ Configurable via --k-period, --smooth-k, and --d-period.`,
 	return cmd
 }
 
+func buildStochOutput(ctx context.Context, c *client.Ref, opts *stochOpts, symbol string) (stochOutput, error) {
+	// Stochastic chains three windowed ops (raw %K, smoothed %K, %D);
+	// total depth is the sum of all window sizes.
+	interval := string(opts.Interval)
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.KPeriod+opts.SmoothK+opts.DPeriod, "stoch")
+	if err != nil {
+		return stochOutput{}, err
+	}
+
+	highs, err := ta.ExtractHigh(candles)
+	if err != nil {
+		return stochOutput{}, err
+	}
+	lows, err := ta.ExtractLow(candles)
+	if err != nil {
+		return stochOutput{}, err
+	}
+	closes, err := ta.ExtractClose(candles)
+	if err != nil {
+		return stochOutput{}, err
+	}
+
+	slowK, slowD, err := ta.Stochastic(highs, lows, closes, opts.KPeriod, opts.SmoothK, opts.DPeriod)
+	if err != nil {
+		return stochOutput{}, err
+	}
+
+	timestamps = timestamps[len(timestamps)-len(slowK):]
+	out := make([]stochPoint, len(slowK))
+	for i := range slowK {
+		out[i] = stochPoint{
+			Datetime: timestamps[i],
+			SlowK:    slowK[i],
+			SlowD:    slowD[i],
+		}
+	}
+
+	if opts.Points > 0 && opts.Points < len(out) {
+		out = out[len(out)-opts.Points:]
+	}
+
+	return stochOutput{
+		Indicator: "stoch",
+		Symbol:    symbol,
+		Interval:  interval,
+		KPeriod:   opts.KPeriod,
+		SmoothK:   opts.SmoothK,
+		DPeriod:   opts.DPeriod,
+		Values:    out,
+	}, nil
+}
+
 func cobraTAADXCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &adxOpts{}
 	cmd := &cobra.Command{
-		Use:   "adx SYMBOL",
+		Use:   "adx SYMBOL [SYMBOL...]",
 		Short: "Average Directional Index",
 		Long: `Compute Average Directional Index for a symbol. ADX above 25 indicates a
 trending market, below 20 indicates a ranging market. Output includes adx,
 plus_di, and minus_di for directional bias. Default period is 14.`,
 		Example: `  schwab-agent ta adx AAPL
   schwab-agent ta adx AAPL --period 14 --interval daily --points 10`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 
-			symbol := args[0]
-
-			// ADX double-smooths (DI pass + ADX pass); 4x period ensures both converge.
-			interval := string(opts.Interval)
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, opts.Period*4, "adx")
-			if err != nil {
-				return err
-			}
-
-			highs, err := ta.ExtractHigh(candles)
-			if err != nil {
-				return err
-			}
-			lows, err := ta.ExtractLow(candles)
-			if err != nil {
-				return err
-			}
-			closes, err := ta.ExtractClose(candles)
-			if err != nil {
-				return err
-			}
-
-			adxVals, plusDI, minusDI, err := ta.ADX(highs, lows, closes, opts.Period)
-			if err != nil {
-				return err
-			}
-
-			// Align timestamps to ADX output length (shorter due to lookback)
-			timestamps = timestamps[len(timestamps)-len(adxVals):]
-
-			out := make([]adxPoint, len(adxVals))
-			for i := range adxVals {
-				out[i] = adxPoint{
-					Datetime: timestamps[i],
-					ADX:      adxVals[i],
-					PlusDI:   plusDI[i],
-					MinusDI:  minusDI[i],
-				}
-			}
-
-			if opts.Points > 0 && opts.Points < len(out) {
-				out = out[len(out)-opts.Points:]
-			}
-
-			data := adxOutput{
-				Indicator: "adx",
-				Symbol:    symbol,
-				Interval:  interval,
-				Period:    opts.Period,
-				Values:    out,
-			}
-			return output.WriteSuccess(w, data, output.NewMetadata())
+			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
+				return buildADXOutput(cmd.Context(), c, opts, symbol)
+			})
 		},
 	}
 
@@ -1175,10 +1187,60 @@ plus_di, and minus_di for directional bias. Default period is 14.`,
 	return cmd
 }
 
+func buildADXOutput(ctx context.Context, c *client.Ref, opts *adxOpts, symbol string) (adxOutput, error) {
+	// ADX double-smooths (DI pass + ADX pass); 4x period ensures both converge.
+	interval := string(opts.Interval)
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.Period*4, "adx")
+	if err != nil {
+		return adxOutput{}, err
+	}
+
+	highs, err := ta.ExtractHigh(candles)
+	if err != nil {
+		return adxOutput{}, err
+	}
+	lows, err := ta.ExtractLow(candles)
+	if err != nil {
+		return adxOutput{}, err
+	}
+	closes, err := ta.ExtractClose(candles)
+	if err != nil {
+		return adxOutput{}, err
+	}
+
+	adxVals, plusDI, minusDI, err := ta.ADX(highs, lows, closes, opts.Period)
+	if err != nil {
+		return adxOutput{}, err
+	}
+
+	timestamps = timestamps[len(timestamps)-len(adxVals):]
+	out := make([]adxPoint, len(adxVals))
+	for i := range adxVals {
+		out[i] = adxPoint{
+			Datetime: timestamps[i],
+			ADX:      adxVals[i],
+			PlusDI:   plusDI[i],
+			MinusDI:  minusDI[i],
+		}
+	}
+
+	if opts.Points > 0 && opts.Points < len(out) {
+		out = out[len(out)-opts.Points:]
+	}
+
+	return adxOutput{
+		Indicator: "adx",
+		Symbol:    symbol,
+		Interval:  interval,
+		Period:    opts.Period,
+		Values:    out,
+	}, nil
+}
+
 func cobraTAVWAPCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &vwapOpts{}
 	cmd := &cobra.Command{
-		Use:   "vwap SYMBOL",
+		Use:   "vwap SYMBOL [SYMBOL...]",
 		Short: "Volume Weighted Average Price",
 		Long: `Compute Volume Weighted Average Price for a symbol. VWAP is a cumulative
 indicator with no --period flag. Primarily used for intraday analysis with
@@ -1186,47 +1248,16 @@ minute-level intervals. Price above VWAP suggests bullish bias, below
 suggests bearish.`,
 		Example: `  schwab-agent ta vwap AAPL
   schwab-agent ta vwap AAPL --interval 5min --points 20`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		// VWAP is cumulative - no --period flag. Only --interval and --points.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 
-			symbol := args[0]
-
-			// Use 20 as minimum candle count - VWAP works with any count >= 1
-			// but 20 gives meaningful output for typical use cases.
-			interval := string(opts.Interval)
-			candles, timestamps, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, 20, "vwap")
-			if err != nil {
-				return err
-			}
-
-			highs, err := ta.ExtractHigh(candles)
-			if err != nil {
-				return err
-			}
-			lows, err := ta.ExtractLow(candles)
-			if err != nil {
-				return err
-			}
-			closes, err := ta.ExtractClose(candles)
-			if err != nil {
-				return err
-			}
-			volumes, err := ta.ExtractVolume(candles)
-			if err != nil {
-				return err
-			}
-
-			values, err := ta.VWAP(highs, lows, closes, volumes)
-			if err != nil {
-				return err
-			}
-
-			// period=0 because VWAP is cumulative (no windowed period)
-			return writeTAOutput(w, "vwap", symbol, interval, 0, opts.Points, timestamps, values)
+			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
+				return buildVWAPOutput(cmd.Context(), c, opts, symbol)
+			})
 		},
 	}
 
@@ -1238,10 +1269,45 @@ suggests bearish.`,
 	return cmd
 }
 
+func buildVWAPOutput(ctx context.Context, c *client.Ref, opts *vwapOpts, symbol string) (taOutput, error) {
+	// Use 20 as minimum candle count - VWAP works with any count >= 1
+	// but 20 gives meaningful output for typical use cases.
+	interval := string(opts.Interval)
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, 20, "vwap")
+	if err != nil {
+		return taOutput{}, err
+	}
+
+	highs, err := ta.ExtractHigh(candles)
+	if err != nil {
+		return taOutput{}, err
+	}
+	lows, err := ta.ExtractLow(candles)
+	if err != nil {
+		return taOutput{}, err
+	}
+	closes, err := ta.ExtractClose(candles)
+	if err != nil {
+		return taOutput{}, err
+	}
+	volumes, err := ta.ExtractVolume(candles)
+	if err != nil {
+		return taOutput{}, err
+	}
+
+	values, err := ta.VWAP(highs, lows, closes, volumes)
+	if err != nil {
+		return taOutput{}, err
+	}
+
+	// period=0 because VWAP is cumulative (no windowed period)
+	return buildTAOutput("vwap", symbol, interval, 0, opts.Points, timestamps, values)
+}
+
 func cobraTAHVCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &hvOpts{}
 	cmd := &cobra.Command{
-		Use:   "hv SYMBOL",
+		Use:   "hv SYMBOL [SYMBOL...]",
 		Short: "Historical Volatility with regime classification",
 		Long: `Compute Historical Volatility for a symbol. Returns a scalar summary (not
 time series) with annualized volatility, percentile rank, and regime
@@ -1249,50 +1315,15 @@ classification (low, normal, high, extreme). Includes daily, weekly, and
 monthly volatility breakdowns.`,
 		Example: `  schwab-agent ta hv AAPL
   schwab-agent ta hv AAPL --period 20 --interval daily`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 
-			symbol := args[0]
-
-			// Need period+1 closes for N returns, plus extra for rolling window warmup.
-			// period+21 provides a safety margin for the rolling window.
-			interval := string(opts.Interval)
-			candles, _, err := fetchAndValidateCandles(cmd.Context(), c, symbol, interval, opts.Period+21, "hv")
-			if err != nil {
-				return err
-			}
-
-			closes, err := ta.ExtractClose(candles)
-			if err != nil {
-				return err
-			}
-
-			result, err := ta.HistoricalVolatility(closes, opts.Period)
-			if err != nil {
-				return err
-			}
-
-			// HV returns a scalar summary, not a time series.
-			// Do NOT use writeTAOutput (which is for time series).
-			data := hvOutput{
-				Indicator:      "hv",
-				Symbol:         symbol,
-				Interval:       interval,
-				Period:         opts.Period,
-				DailyVol:       result.DailyVol,
-				WeeklyVol:      result.WeeklyVol,
-				MonthlyVol:     result.MonthlyVol,
-				AnnualizedVol:  result.AnnualizedVol,
-				PercentileRank: result.PercentileRank,
-				Regime:         result.Regime,
-				MinVol:         result.MinVol,
-				MaxVol:         result.MaxVol,
-				MeanVol:        result.MeanVol,
-			}
-			return output.WriteSuccess(w, data, output.NewMetadata())
+			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
+				return buildHVOutput(cmd.Context(), c, opts, symbol)
+			})
 		},
 	}
 
@@ -1304,10 +1335,48 @@ monthly volatility breakdowns.`,
 	return cmd
 }
 
+func buildHVOutput(ctx context.Context, c *client.Ref, opts *hvOpts, symbol string) (hvOutput, error) {
+	// Need period+1 closes for N returns, plus extra for rolling window warmup.
+	// period+21 provides a safety margin for the rolling window.
+	interval := string(opts.Interval)
+	candles, _, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.Period+21, "hv")
+	if err != nil {
+		return hvOutput{}, err
+	}
+
+	closes, err := ta.ExtractClose(candles)
+	if err != nil {
+		return hvOutput{}, err
+	}
+
+	result, err := ta.HistoricalVolatility(closes, opts.Period)
+	if err != nil {
+		return hvOutput{}, err
+	}
+
+	// HV returns a scalar summary, not a time series.
+	// Do NOT use writeTAOutput (which is for time series).
+	return hvOutput{
+		Indicator:      "hv",
+		Symbol:         symbol,
+		Interval:       interval,
+		Period:         opts.Period,
+		DailyVol:       result.DailyVol,
+		WeeklyVol:      result.WeeklyVol,
+		MonthlyVol:     result.MonthlyVol,
+		AnnualizedVol:  result.AnnualizedVol,
+		PercentileRank: result.PercentileRank,
+		Regime:         result.Regime,
+		MinVol:         result.MinVol,
+		MaxVol:         result.MaxVol,
+		MeanVol:        result.MeanVol,
+	}, nil
+}
+
 func cobraTAExpectedMoveCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &expectedMoveOpts{}
 	cmd := &cobra.Command{
-		Use:   "expected-move SYMBOL",
+		Use:   "expected-move SYMBOL [SYMBOL...]",
 		Short: "Expected price move from ATM straddle pricing",
 		Long: `Compute expected price move from ATM straddle pricing. Fetches the option
 chain, finds the nearest expiration to --dte (default 30), and prices the
@@ -1315,134 +1384,15 @@ ATM straddle. Output includes 1x and 2x standard deviation ranges (upper
 and lower bounds).`,
 		Example: `  schwab-agent ta expected-move AAPL
   schwab-agent ta expected-move AAPL --dte 45`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 
-			symbol := args[0]
-
-			// Expected Move needs the underlying quote and near-the-money contracts in one response.
-			// Keep this to a single chain call so the underlying snapshot and option prices stay aligned.
-			chain, err := c.OptionChain(cmd.Context(), symbol, &client.ChainParams{
-				ContractType:           "ALL",
-				IncludeUnderlyingQuote: "true",
-				StrikeRange:            "NTM",
+			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
+				return buildExpectedMoveOutput(cmd.Context(), c, opts, symbol)
 			})
-			if err != nil {
-				return err
-			}
-
-			if chain.Underlying == nil {
-				return fmt.Errorf("no underlying data available for %s", symbol)
-			}
-
-			var underlyingPrice float64
-			switch {
-			case chain.Underlying.Mark != nil:
-				underlyingPrice = *chain.Underlying.Mark
-			case chain.Underlying.Last != nil:
-				underlyingPrice = *chain.Underlying.Last
-			case chain.UnderlyingPrice != nil:
-				underlyingPrice = *chain.UnderlyingPrice
-			default:
-				return fmt.Errorf("unable to determine underlying price for %s", symbol)
-			}
-
-			if len(chain.CallExpDateMap) == 0 {
-				return fmt.Errorf("no options available for %s", symbol)
-			}
-
-			selectedExpKey := ""
-			bestDiff := -1
-			for expKey := range chain.CallExpDateMap {
-				parts := strings.Split(expKey, ":")
-				if len(parts) != 2 {
-					continue
-				}
-
-				dte, err := strconv.Atoi(parts[1])
-				if err != nil {
-					continue
-				}
-
-				diff := int(math.Abs(float64(dte - opts.DTE)))
-				if bestDiff < 0 || diff < bestDiff || (diff == bestDiff && expKey < selectedExpKey) {
-					bestDiff = diff
-					selectedExpKey = expKey
-				}
-			}
-			if selectedExpKey == "" {
-				return fmt.Errorf("no options available for %s", symbol)
-			}
-
-			expParts := strings.Split(selectedExpKey, ":")
-			expDate := expParts[0]
-
-			callStrikes := chain.CallExpDateMap[selectedExpKey]
-			putStrikes := chain.PutExpDateMap[selectedExpKey]
-			if len(callStrikes) == 0 || len(putStrikes) == 0 {
-				return fmt.Errorf("no options available for %s at expiration %s", symbol, expDate)
-			}
-
-			atmStrikeKey := ""
-			bestStrikeDiff := -1.0
-			for strikeKey := range callStrikes {
-				strike, err := strconv.ParseFloat(strikeKey, 64)
-				if err != nil {
-					continue
-				}
-
-				diff := math.Abs(strike - underlyingPrice)
-				if bestStrikeDiff < 0 || diff < bestStrikeDiff || (diff == bestStrikeDiff && strike < mustParseFloat(atmStrikeKey)) {
-					bestStrikeDiff = diff
-					atmStrikeKey = strikeKey
-				}
-			}
-			if atmStrikeKey == "" {
-				return fmt.Errorf("no strikes available for %s at expiration %s", symbol, expDate)
-			}
-
-			callContracts := callStrikes[atmStrikeKey]
-			putContracts := putStrikes[atmStrikeKey]
-			if len(callContracts) == 0 {
-				return fmt.Errorf("no call contracts for %s at strike %s", symbol, atmStrikeKey)
-			}
-			if len(putContracts) == 0 {
-				return fmt.Errorf("no put contracts for %s at strike %s", symbol, atmStrikeKey)
-			}
-
-			callPrice, err := contractPrice(callContracts[0], symbol, atmStrikeKey, "call")
-			if err != nil {
-				return err
-			}
-			putPrice, err := contractPrice(putContracts[0], symbol, atmStrikeKey, "put")
-			if err != nil {
-				return err
-			}
-
-			result, err := ta.ExpectedMove(underlyingPrice, callPrice, putPrice, ta.DefaultMultiplier)
-			if err != nil {
-				return err
-			}
-
-			actualDTE, _ := strconv.Atoi(expParts[1])
-			data := expectedMoveOutput{
-				Indicator:       "expected-move",
-				Symbol:          symbol,
-				UnderlyingPrice: underlyingPrice,
-				Expiration:      expDate,
-				DTE:             actualDTE,
-				StraddlePrice:   result.StraddlePrice,
-				ExpectedMove:    result.ExpectedMove,
-				AdjustedMove:    result.AdjustedMove,
-				Upper1x:         result.Upper1x,
-				Lower1x:         result.Lower1x,
-				Upper2x:         result.Upper2x,
-				Lower2x:         result.Lower2x,
-			}
-			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
 
@@ -1451,6 +1401,128 @@ and lower bounds).`,
 	}
 
 	return cmd
+}
+
+func buildExpectedMoveOutput(ctx context.Context, c *client.Ref, opts *expectedMoveOpts, symbol string) (expectedMoveOutput, error) {
+	// Expected Move needs the underlying quote and near-the-money contracts in one response.
+	// Keep this to a single chain call so the underlying snapshot and option prices stay aligned.
+	chain, err := c.OptionChain(ctx, symbol, &client.ChainParams{
+		ContractType:           "ALL",
+		IncludeUnderlyingQuote: "true",
+		StrikeRange:            "NTM",
+	})
+	if err != nil {
+		return expectedMoveOutput{}, err
+	}
+
+	if chain.Underlying == nil {
+		return expectedMoveOutput{}, fmt.Errorf("no underlying data available for %s", symbol)
+	}
+
+	var underlyingPrice float64
+	switch {
+	case chain.Underlying.Mark != nil:
+		underlyingPrice = *chain.Underlying.Mark
+	case chain.Underlying.Last != nil:
+		underlyingPrice = *chain.Underlying.Last
+	case chain.UnderlyingPrice != nil:
+		underlyingPrice = *chain.UnderlyingPrice
+	default:
+		return expectedMoveOutput{}, fmt.Errorf("unable to determine underlying price for %s", symbol)
+	}
+
+	if len(chain.CallExpDateMap) == 0 {
+		return expectedMoveOutput{}, fmt.Errorf("no options available for %s", symbol)
+	}
+
+	selectedExpKey := ""
+	bestDiff := -1
+	for expKey := range chain.CallExpDateMap {
+		parts := strings.Split(expKey, ":")
+		if len(parts) != 2 {
+			continue
+		}
+
+		dte, err := strconv.Atoi(parts[1])
+		if err != nil {
+			continue
+		}
+
+		diff := int(math.Abs(float64(dte - opts.DTE)))
+		if bestDiff < 0 || diff < bestDiff || (diff == bestDiff && expKey < selectedExpKey) {
+			bestDiff = diff
+			selectedExpKey = expKey
+		}
+	}
+	if selectedExpKey == "" {
+		return expectedMoveOutput{}, fmt.Errorf("no options available for %s", symbol)
+	}
+
+	expParts := strings.Split(selectedExpKey, ":")
+	expDate := expParts[0]
+
+	callStrikes := chain.CallExpDateMap[selectedExpKey]
+	putStrikes := chain.PutExpDateMap[selectedExpKey]
+	if len(callStrikes) == 0 || len(putStrikes) == 0 {
+		return expectedMoveOutput{}, fmt.Errorf("no options available for %s at expiration %s", symbol, expDate)
+	}
+
+	atmStrikeKey := ""
+	bestStrikeDiff := -1.0
+	for strikeKey := range callStrikes {
+		strike, err := strconv.ParseFloat(strikeKey, 64)
+		if err != nil {
+			continue
+		}
+
+		diff := math.Abs(strike - underlyingPrice)
+		if bestStrikeDiff < 0 || diff < bestStrikeDiff || (diff == bestStrikeDiff && strike < mustParseFloat(atmStrikeKey)) {
+			bestStrikeDiff = diff
+			atmStrikeKey = strikeKey
+		}
+	}
+	if atmStrikeKey == "" {
+		return expectedMoveOutput{}, fmt.Errorf("no strikes available for %s at expiration %s", symbol, expDate)
+	}
+
+	callContracts := callStrikes[atmStrikeKey]
+	putContracts := putStrikes[atmStrikeKey]
+	if len(callContracts) == 0 {
+		return expectedMoveOutput{}, fmt.Errorf("no call contracts for %s at strike %s", symbol, atmStrikeKey)
+	}
+	if len(putContracts) == 0 {
+		return expectedMoveOutput{}, fmt.Errorf("no put contracts for %s at strike %s", symbol, atmStrikeKey)
+	}
+
+	callPrice, err := contractPrice(callContracts[0], symbol, atmStrikeKey, "call")
+	if err != nil {
+		return expectedMoveOutput{}, err
+	}
+	putPrice, err := contractPrice(putContracts[0], symbol, atmStrikeKey, "put")
+	if err != nil {
+		return expectedMoveOutput{}, err
+	}
+
+	result, err := ta.ExpectedMove(underlyingPrice, callPrice, putPrice, ta.DefaultMultiplier)
+	if err != nil {
+		return expectedMoveOutput{}, err
+	}
+
+	actualDTE, _ := strconv.Atoi(expParts[1])
+	return expectedMoveOutput{
+		Indicator:       "expected-move",
+		Symbol:          symbol,
+		UnderlyingPrice: underlyingPrice,
+		Expiration:      expDate,
+		DTE:             actualDTE,
+		StraddlePrice:   result.StraddlePrice,
+		ExpectedMove:    result.ExpectedMove,
+		AdjustedMove:    result.AdjustedMove,
+		Upper1x:         result.Upper1x,
+		Lower1x:         result.Lower1x,
+		Upper2x:         result.Upper2x,
+		Lower2x:         result.Lower2x,
+	}, nil
 }
 
 func contractPrice(contract *models.OptionContract, symbol, strike, putCall string) (float64, error) {
@@ -1511,15 +1583,14 @@ func fetchAndValidateCandles(
 	return result.Candles, timestamps, nil
 }
 
-// writeTAOutput builds the output map and writes it as a success envelope.
-// Aligns timestamps to indicator values (shorter due to lookback) and applies --points limit.
-func writeTAOutput(
-	w io.Writer,
+// buildTAOutput builds the output object for a single-value time series.
+// It aligns timestamps to indicator values (shorter due to lookback) and applies --points limit.
+func buildTAOutput(
 	indicator, symbol, interval string,
 	period, points int,
 	timestamps []string,
 	values []float64,
-) error {
+) (taOutput, error) {
 	// Align timestamps: indicator output is shorter than input due to lookback window
 	timestamps = timestamps[len(timestamps)-len(values):]
 
@@ -1536,27 +1607,25 @@ func writeTAOutput(
 		out = out[len(out)-points:]
 	}
 
-	data := taOutput{
+	return taOutput{
 		Indicator: indicator,
 		Symbol:    symbol,
 		Interval:  interval,
 		Period:    period,
 		Values:    out,
-	}
-	return output.WriteSuccess(w, data, output.NewMetadata())
+	}, nil
 }
 
-// writeMultiTAOutput builds a combined time series for multiple requested
+// buildMultiTAOutput builds a combined time series for multiple requested
 // periods. Each row represents a candle timestamp and contains one value per
 // period using stable keys such as sma_21, sma_50, and sma_200.
-func writeMultiTAOutput(
-	w io.Writer,
+func buildMultiTAOutput(
 	indicator, symbol, interval string,
 	periods []int,
 	points int,
 	timestamps []string,
 	valuesByPeriod map[int][]float64,
-) error {
+) multiTAOutput {
 	maxValues := 0
 	for _, period := range periods {
 		if len(valuesByPeriod[period]) > maxValues {
@@ -1585,12 +1654,11 @@ func writeMultiTAOutput(
 		out = out[len(out)-points:]
 	}
 
-	data := multiTAOutput{
+	return multiTAOutput{
 		Indicator: indicator,
 		Symbol:    symbol,
 		Interval:  interval,
 		Periods:   periods,
 		Values:    out,
 	}
-	return output.WriteSuccess(w, data, output.NewMetadata())
 }

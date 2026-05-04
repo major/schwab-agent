@@ -271,8 +271,9 @@ constructed symbol and its components.
 price, and contract type components. No API call or authentication required.
 - [schwab-agent ta](#schwab-agent-ta): Compute technical analysis indicators from Schwab price history. All indicators
 are calculated locally after fetching candles. Use --interval to select data
-frequency (daily, weekly, 1min, 5min, 15min, 30min) and --points to limit
-output to the N most recent values.
+frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
+default --points to 1 for token-efficient latest-value output; use --points 0
+when you need the full computed series.
 - [schwab-agent ta adx](#schwab-agent-ta-adx): Compute Average Directional Index for a symbol. ADX above 25 indicates a
 trending market, below 20 indicates a ranging market. Output includes adx,
 plus_di, and minus_di for directional bias. Default period is 14.
@@ -1318,8 +1319,9 @@ price, and contract type components. No API call or authentication required.
 
 Compute technical analysis indicators from Schwab price history. All indicators
 are calculated locally after fetching candles. Use --interval to select data
-frequency (daily, weekly, 1min, 5min, 15min, 30min) and --points to limit
-output to the N most recent values.
+frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
+default --points to 1 for token-efficient latest-value output; use --points 0
+when you need the full computed series.
 
 ## schwab-agent ta adx
 
@@ -1331,7 +1333,7 @@ plus_di, and minus_di for directional bias. Default period is 14.
 
 - `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
 - `--period` (int, default: 14): Indicator period
-- `--points` (int, default: 1): Number of output points (0 = all)
+- `--points` (int, default: 1): Number of output points (default 1; 0 = all)
 
 ## schwab-agent ta atr
 
@@ -1343,7 +1345,7 @@ data with Wilder smoothing. Default period is 14.
 
 - `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
 - `--period` (int, default: 14): Indicator period
-- `--points` (int, default: 1): Number of output points (0 = all)
+- `--points` (int, default: 1): Number of output points (default 1; 0 = all)
 
 ## schwab-agent ta bbands
 
@@ -1355,7 +1357,7 @@ relatively low. Use --std-dev to widen or narrow the bands (default 2.0).
 
 - `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
 - `--period` (int, default: 20): BBands period
-- `--points` (int, default: 1): Number of output points (0 = all)
+- `--points` (int, default: 1): Number of output points (default 1; 0 = all)
 - `--std-dev` (float64, default: 2.0): Standard deviations
 
 ## schwab-agent ta dashboard
@@ -1368,7 +1370,7 @@ high-low ranges. Signals are neutral factual labels for agents, not trading advi
 ### Flags
 
 - `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
-- `--points` (int, default: 1): Number of output points (0 = all)
+- `--points` (int, default: 1): Number of output points (default 1; 0 = all)
 
 ## schwab-agent ta ema
 
@@ -1381,7 +1383,7 @@ analysis).
 
 - `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
 - `--period` (intSlice, default: 20): Indicator period (repeatable or comma-separated)
-- `--points` (int, default: 1): Number of output points (0 = all)
+- `--points` (int, default: 1): Number of output points (default 1; 0 = all)
 
 ## schwab-agent ta expected-move
 
@@ -1417,7 +1419,7 @@ slow=26, signal=9.
 
 - `--fast` (int, default: 12): Fast EMA period
 - `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
-- `--points` (int, default: 1): Number of output points (0 = all)
+- `--points` (int, default: 1): Number of output points (default 1; 0 = all)
 - `--signal` (int, default: 9): Signal EMA period
 - `--slow` (int, default: 26): Slow EMA period
 
@@ -1431,7 +1433,7 @@ can be repeated or comma-separated for multiple lookbacks. Default period is 14.
 
 - `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
 - `--period` (intSlice, default: 14): Indicator period (repeatable or comma-separated)
-- `--points` (int, default: 1): Number of output points (0 = all)
+- `--points` (int, default: 1): Number of output points (default 1; 0 = all)
 
 ## schwab-agent ta sma
 
@@ -1444,7 +1446,7 @@ with keys like sma_21, sma_50, sma_200.
 
 - `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
 - `--period` (intSlice, default: 20): Indicator period (repeatable or comma-separated)
-- `--points` (int, default: 1): Number of output points (0 = all)
+- `--points` (int, default: 1): Number of output points (default 1; 0 = all)
 
 ## schwab-agent ta stoch
 
@@ -1457,7 +1459,7 @@ Configurable via --k-period, --smooth-k, and --d-period.
 - `--d-period` (int, default: 3): Slow %D period
 - `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
 - `--k-period` (int, default: 14): Fast %K lookback period
-- `--points` (int, default: 1): Number of output points (0 = all)
+- `--points` (int, default: 1): Number of output points (default 1; 0 = all)
 - `--smooth-k` (int, default: 3): Slow %K smoothing period
 
 ## schwab-agent ta vwap
@@ -1470,7 +1472,7 @@ suggests bearish.
 ### Flags
 
 - `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
-- `--points` (int, default: 1): Number of output points (0 = all)
+- `--points` (int, default: 1): Number of output points (default 1; 0 = all)
 
 ## Optional
 
