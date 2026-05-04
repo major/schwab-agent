@@ -183,6 +183,17 @@ type simpleTAConfig struct {
 	compute func(closes []float64, period int) ([]float64, error)
 }
 
+// taCommandConfig describes the Cobra metadata and typed builder shared by TA
+// commands that accept one or more symbols and write one result per symbol.
+type taCommandConfig[O structcli.Options, R any] struct {
+	name    string
+	short   string
+	long    string
+	example string
+	newOpts func() O
+	build   func(context.Context, *client.Ref, O, string) (R, error)
+}
+
 func maxPeriod(periods []int) int {
 	largest := periods[0]
 	for _, period := range periods[1:] {
@@ -194,20 +205,11 @@ func maxPeriod(periods []int) int {
 	return largest
 }
 
-// writeTASymbolResults preserves the historical single-symbol TA response shape
-// while letting batched commands return the same symbol-keyed map pattern used by
-// quote get. Schwab's price-history API is single-symbol, so batching still makes
-// one API call per symbol, but agents only need one CLI invocation and can receive
-// partial data when a single ticker fails.
+// writeTASymbolResults writes a stable symbol-keyed object for every TA command,
+// including single-symbol requests. Schwab's price-history API is single-symbol,
+// so batching still makes one API call per symbol, but agents can always parse
+// data[SYMBOL] without branching on request cardinality.
 func writeTASymbolResults(w io.Writer, symbols []string, compute func(symbol string) (any, error)) error {
-	if len(symbols) == 1 {
-		data, err := compute(symbols[0])
-		if err != nil {
-			return err
-		}
-		return output.WriteSuccess(w, data, output.NewMetadata())
-	}
-
 	data := make(map[string]any, len(symbols))
 	partialErrors := make([]string, 0)
 	joinedErrors := make([]error, 0)
@@ -371,8 +373,10 @@ func NewTACmd(c *client.Ref, w io.Writer) *cobra.Command {
 		Use:   "ta",
 		Short: "Technical analysis indicators",
 		Long: `Compute technical analysis indicators from Schwab price history. All indicators
-are calculated locally after fetching candles. Use --interval to select data
-frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
+are calculated locally after fetching candles. Results are always keyed by
+symbol under data.<SYMBOL>, even when one symbol is requested, so agents can use
+the same parser for single-symbol and batch analysis. Use --interval to select
+data frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
 default --points to 1 for token-efficient latest-value output; use --points 0
 when you need the full computed series.`,
 		GroupID: "market-data",
@@ -480,6 +484,37 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 	return cmd
 }
 
+// makeCobraTACommand builds the repeated Cobra/structcli plumbing for TA
+// commands whose real work lives in a typed per-symbol builder. Keeping the
+// builders typed makes indicator-specific code easy to read while this helper
+// enforces the common normalized symbol-keyed output shape.
+func makeCobraTACommand[O structcli.Options, R any](cfg taCommandConfig[O, R], c *client.Ref, w io.Writer) *cobra.Command {
+	opts := cfg.newOpts()
+	cmd := &cobra.Command{
+		Use:     cfg.name + " SYMBOL [SYMBOL...]",
+		Short:   cfg.short,
+		Long:    cfg.long,
+		Example: cfg.example,
+		Args:    cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := structcli.Unmarshal(cmd, opts); err != nil {
+				return err
+			}
+
+			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
+				return cfg.build(cmd.Context(), c, opts, symbol)
+			})
+		},
+	}
+
+	if err := structcli.Define(cmd, opts); err != nil {
+		panic(err)
+	}
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
+
+	return cmd
+}
+
 func computeSimpleTAOutput(
 	ctx context.Context,
 	c *client.Ref,
@@ -513,7 +548,7 @@ func computeSimpleTAOutput(
 		return buildTAOutput(cfg.name, symbol, interval, periods[0], opts.Points, timestamps, valuesByPeriod[periods[0]])
 	}
 
-	return buildMultiTAOutput(cfg.name, symbol, interval, periods, opts.Points, timestamps, valuesByPeriod), nil
+	return buildMultiTAOutput(cfg.name, symbol, interval, periods, opts.Points, timestamps, valuesByPeriod)
 }
 
 func cobraTADashboardCommand(c *client.Ref, w io.Writer) *cobra.Command {
@@ -741,10 +776,27 @@ func addTailAlignedFloat(rows []map[string]any, key string, values []float64) er
 	return nil
 }
 
-func limitDashboardRows(rows []map[string]any, points int) []map[string]any {
-	if points > 0 && points < len(rows) {
-		rows = rows[len(rows)-points:]
+func tailAlignedTimestamps(timestamps []string, valueCount int, label string) ([]string, error) {
+	if valueCount > len(timestamps) {
+		return nil, apperr.NewValidationError(
+			fmt.Sprintf("%s has %d values for %d timestamps", label, valueCount, len(timestamps)),
+			nil,
+		)
 	}
+
+	return timestamps[len(timestamps)-valueCount:], nil
+}
+
+func tailLimit[T any](items []T, points int) []T {
+	if points > 0 && points < len(items) {
+		return items[len(items)-points:]
+	}
+
+	return items
+}
+
+func limitDashboardRows(rows []map[string]any, points int) []map[string]any {
+	rows = tailLimit(rows, points)
 
 	out := make([]map[string]any, len(rows))
 	for i, row := range rows {
@@ -870,35 +922,19 @@ func volumeSignal(relativeVolume float64) string {
 }
 
 func cobraTAMACDCommand(c *client.Ref, w io.Writer) *cobra.Command {
-	opts := &macdOpts{}
-	cmd := &cobra.Command{
-		Use:   "macd SYMBOL [SYMBOL...]",
-		Short: "Moving Average Convergence/Divergence",
-		Long: `Compute MACD (Moving Average Convergence/Divergence) for a symbol. Uses
+	return makeCobraTACommand(taCommandConfig[*macdOpts, macdOutput]{
+		name:  "macd",
+		short: "Moving Average Convergence/Divergence",
+		long: `Compute MACD (Moving Average Convergence/Divergence) for a symbol. Uses
 --fast, --slow, and --signal periods instead of --period. Output keys include
 macd, signal, and histogram (histogram = macd - signal). Defaults: fast=12,
 slow=26, signal=9.`,
-		Example: `  schwab-agent ta macd AAPL
+		example: `  schwab-agent ta macd AAPL
   schwab-agent ta macd AAPL --fast 12 --slow 26 --signal 9 --points 10
   schwab-agent ta macd NVDA --interval weekly --points 10`,
-		Args: cobra.MinimumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
-				return err
-			}
-
-			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
-				return buildMACDOutput(cmd.Context(), c, opts, symbol)
-			})
-		},
-	}
-
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
-
-	return cmd
+		newOpts: func() *macdOpts { return &macdOpts{} },
+		build:   buildMACDOutput,
+	}, c, w)
 }
 
 func buildMACDOutput(ctx context.Context, c *client.Ref, opts *macdOpts, symbol string) (macdOutput, error) {
@@ -919,7 +955,10 @@ func buildMACDOutput(ctx context.Context, c *client.Ref, opts *macdOpts, symbol 
 		return macdOutput{}, err
 	}
 
-	timestamps = timestamps[len(timestamps)-len(macdVals):]
+	timestamps, err = tailAlignedTimestamps(timestamps, len(macdVals), "macd timestamp alignment")
+	if err != nil {
+		return macdOutput{}, err
+	}
 	out := make([]macdPoint, len(macdVals))
 	for i := range macdVals {
 		out[i] = macdPoint{
@@ -930,9 +969,7 @@ func buildMACDOutput(ctx context.Context, c *client.Ref, opts *macdOpts, symbol 
 		}
 	}
 
-	if opts.Points > 0 && opts.Points < len(out) {
-		out = out[len(out)-opts.Points:]
-	}
+	out = tailLimit(out, opts.Points)
 
 	return macdOutput{
 		Indicator: "macd",
@@ -946,33 +983,17 @@ func buildMACDOutput(ctx context.Context, c *client.Ref, opts *macdOpts, symbol 
 }
 
 func cobraTAATRCommand(c *client.Ref, w io.Writer) *cobra.Command {
-	opts := &atrOpts{}
-	cmd := &cobra.Command{
-		Use:   "atr SYMBOL [SYMBOL...]",
-		Short: "Average True Range",
-		Long: `Compute Average True Range for a symbol. ATR measures volatility in price
+	return makeCobraTACommand(taCommandConfig[*atrOpts, taOutput]{
+		name:  "atr",
+		short: "Average True Range",
+		long: `Compute Average True Range for a symbol. ATR measures volatility in price
 units: higher values indicate wider price swings. Uses high, low, and close
 data with Wilder smoothing. Default period is 14.`,
-		Example: `  schwab-agent ta atr AAPL
+		example: `  schwab-agent ta atr AAPL
   schwab-agent ta atr AAPL --period 14 --interval daily --points 10`,
-		Args: cobra.MinimumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
-				return err
-			}
-
-			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
-				return buildATROutput(cmd.Context(), c, opts, symbol)
-			})
-		},
-	}
-
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
-
-	return cmd
+		newOpts: func() *atrOpts { return &atrOpts{} },
+		build:   buildATROutput,
+	}, c, w)
 }
 
 func buildATROutput(ctx context.Context, c *client.Ref, opts *atrOpts, symbol string) (taOutput, error) {
@@ -1005,34 +1026,18 @@ func buildATROutput(ctx context.Context, c *client.Ref, opts *atrOpts, symbol st
 }
 
 func cobraTABBandsCommand(c *client.Ref, w io.Writer) *cobra.Command {
-	opts := &bbandsOpts{}
-	cmd := &cobra.Command{
-		Use:   "bbands SYMBOL [SYMBOL...]",
-		Short: "Bollinger Bands",
-		Long: `Compute Bollinger Bands for a symbol. Output keys are upper, middle, and lower
+	return makeCobraTACommand(taCommandConfig[*bbandsOpts, bbandsOutput]{
+		name:  "bbands",
+		short: "Bollinger Bands",
+		long: `Compute Bollinger Bands for a symbol. Output keys are upper, middle, and lower
 bands. Price near the upper band is relatively high, near the lower band is
 relatively low. Use --std-dev to widen or narrow the bands (default 2.0).`,
-		Example: `  schwab-agent ta bbands AAPL
+		example: `  schwab-agent ta bbands AAPL
   schwab-agent ta bbands AAPL --period 20 --std-dev 2.0 --points 10
   schwab-agent ta bbands AAPL --std-dev 1.5 --points 10`,
-		Args: cobra.MinimumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
-				return err
-			}
-
-			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
-				return buildBBandsOutput(cmd.Context(), c, opts, symbol)
-			})
-		},
-	}
-
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
-
-	return cmd
+		newOpts: func() *bbandsOpts { return &bbandsOpts{} },
+		build:   buildBBandsOutput,
+	}, c, w)
 }
 
 func buildBBandsOutput(ctx context.Context, c *client.Ref, opts *bbandsOpts, symbol string) (bbandsOutput, error) {
@@ -1052,7 +1057,10 @@ func buildBBandsOutput(ctx context.Context, c *client.Ref, opts *bbandsOpts, sym
 		return bbandsOutput{}, err
 	}
 
-	timestamps = timestamps[len(timestamps)-len(upper):]
+	timestamps, err = tailAlignedTimestamps(timestamps, len(upper), "bbands timestamp alignment")
+	if err != nil {
+		return bbandsOutput{}, err
+	}
 	out := make([]bbandsPoint, len(upper))
 	for i := range upper {
 		out[i] = bbandsPoint{
@@ -1063,9 +1071,7 @@ func buildBBandsOutput(ctx context.Context, c *client.Ref, opts *bbandsOpts, sym
 		}
 	}
 
-	if opts.Points > 0 && opts.Points < len(out) {
-		out = out[len(out)-opts.Points:]
-	}
+	out = tailLimit(out, opts.Points)
 
 	return bbandsOutput{
 		Indicator: "bbands",
@@ -1078,33 +1084,17 @@ func buildBBandsOutput(ctx context.Context, c *client.Ref, opts *bbandsOpts, sym
 }
 
 func cobraTAStochCommand(c *client.Ref, w io.Writer) *cobra.Command {
-	opts := &stochOpts{}
-	cmd := &cobra.Command{
-		Use:   "stoch SYMBOL [SYMBOL...]",
-		Short: "Stochastic Oscillator",
-		Long: `Compute Stochastic Oscillator for a symbol. Output keys are slowk and slowd,
+	return makeCobraTACommand(taCommandConfig[*stochOpts, stochOutput]{
+		name:  "stoch",
+		short: "Stochastic Oscillator",
+		long: `Compute Stochastic Oscillator for a symbol. Output keys are slowk and slowd,
 both ranging 0-100. Above 80 and below 20 are common signal thresholds.
 Configurable via --k-period, --smooth-k, and --d-period.`,
-		Example: `  schwab-agent ta stoch AAPL
+		example: `  schwab-agent ta stoch AAPL
   schwab-agent ta stoch AAPL --k-period 14 --smooth-k 3 --d-period 3 --points 10`,
-		Args: cobra.MinimumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
-				return err
-			}
-
-			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
-				return buildStochOutput(cmd.Context(), c, opts, symbol)
-			})
-		},
-	}
-
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
-
-	return cmd
+		newOpts: func() *stochOpts { return &stochOpts{} },
+		build:   buildStochOutput,
+	}, c, w)
 }
 
 func buildStochOutput(ctx context.Context, c *client.Ref, opts *stochOpts, symbol string) (stochOutput, error) {
@@ -1134,7 +1124,10 @@ func buildStochOutput(ctx context.Context, c *client.Ref, opts *stochOpts, symbo
 		return stochOutput{}, err
 	}
 
-	timestamps = timestamps[len(timestamps)-len(slowK):]
+	timestamps, err = tailAlignedTimestamps(timestamps, len(slowK), "stoch timestamp alignment")
+	if err != nil {
+		return stochOutput{}, err
+	}
 	out := make([]stochPoint, len(slowK))
 	for i := range slowK {
 		out[i] = stochPoint{
@@ -1144,9 +1137,7 @@ func buildStochOutput(ctx context.Context, c *client.Ref, opts *stochOpts, symbo
 		}
 	}
 
-	if opts.Points > 0 && opts.Points < len(out) {
-		out = out[len(out)-opts.Points:]
-	}
+	out = tailLimit(out, opts.Points)
 
 	return stochOutput{
 		Indicator: "stoch",
@@ -1160,33 +1151,17 @@ func buildStochOutput(ctx context.Context, c *client.Ref, opts *stochOpts, symbo
 }
 
 func cobraTAADXCommand(c *client.Ref, w io.Writer) *cobra.Command {
-	opts := &adxOpts{}
-	cmd := &cobra.Command{
-		Use:   "adx SYMBOL [SYMBOL...]",
-		Short: "Average Directional Index",
-		Long: `Compute Average Directional Index for a symbol. ADX above 25 indicates a
+	return makeCobraTACommand(taCommandConfig[*adxOpts, adxOutput]{
+		name:  "adx",
+		short: "Average Directional Index",
+		long: `Compute Average Directional Index for a symbol. ADX above 25 indicates a
 trending market, below 20 indicates a ranging market. Output includes adx,
 plus_di, and minus_di for directional bias. Default period is 14.`,
-		Example: `  schwab-agent ta adx AAPL
+		example: `  schwab-agent ta adx AAPL
   schwab-agent ta adx AAPL --period 14 --interval daily --points 10`,
-		Args: cobra.MinimumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
-				return err
-			}
-
-			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
-				return buildADXOutput(cmd.Context(), c, opts, symbol)
-			})
-		},
-	}
-
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
-
-	return cmd
+		newOpts: func() *adxOpts { return &adxOpts{} },
+		build:   buildADXOutput,
+	}, c, w)
 }
 
 func buildADXOutput(ctx context.Context, c *client.Ref, opts *adxOpts, symbol string) (adxOutput, error) {
@@ -1215,7 +1190,10 @@ func buildADXOutput(ctx context.Context, c *client.Ref, opts *adxOpts, symbol st
 		return adxOutput{}, err
 	}
 
-	timestamps = timestamps[len(timestamps)-len(adxVals):]
+	timestamps, err = tailAlignedTimestamps(timestamps, len(adxVals), "adx timestamp alignment")
+	if err != nil {
+		return adxOutput{}, err
+	}
 	out := make([]adxPoint, len(adxVals))
 	for i := range adxVals {
 		out[i] = adxPoint{
@@ -1226,9 +1204,7 @@ func buildADXOutput(ctx context.Context, c *client.Ref, opts *adxOpts, symbol st
 		}
 	}
 
-	if opts.Points > 0 && opts.Points < len(out) {
-		out = out[len(out)-opts.Points:]
-	}
+	out = tailLimit(out, opts.Points)
 
 	return adxOutput{
 		Indicator: "adx",
@@ -1240,35 +1216,18 @@ func buildADXOutput(ctx context.Context, c *client.Ref, opts *adxOpts, symbol st
 }
 
 func cobraTAVWAPCommand(c *client.Ref, w io.Writer) *cobra.Command {
-	opts := &vwapOpts{}
-	cmd := &cobra.Command{
-		Use:   "vwap SYMBOL [SYMBOL...]",
-		Short: "Volume Weighted Average Price",
-		Long: `Compute Volume Weighted Average Price for a symbol. VWAP is a cumulative
+	return makeCobraTACommand(taCommandConfig[*vwapOpts, taOutput]{
+		name:  "vwap",
+		short: "Volume Weighted Average Price",
+		long: `Compute Volume Weighted Average Price for a symbol. VWAP is a cumulative
 indicator with no --period flag. Primarily used for intraday analysis with
 minute-level intervals. Price above VWAP suggests bullish bias, below
 suggests bearish.`,
-		Example: `  schwab-agent ta vwap AAPL
+		example: `  schwab-agent ta vwap AAPL
   schwab-agent ta vwap AAPL --interval 5min --points 20`,
-		Args: cobra.MinimumNArgs(1),
-		// VWAP is cumulative - no --period flag. Only --interval and --points.
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
-				return err
-			}
-
-			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
-				return buildVWAPOutput(cmd.Context(), c, opts, symbol)
-			})
-		},
-	}
-
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
-
-	return cmd
+		newOpts: func() *vwapOpts { return &vwapOpts{} },
+		build:   buildVWAPOutput,
+	}, c, w)
 }
 
 func buildVWAPOutput(ctx context.Context, c *client.Ref, opts *vwapOpts, symbol string) (taOutput, error) {
@@ -1307,34 +1266,18 @@ func buildVWAPOutput(ctx context.Context, c *client.Ref, opts *vwapOpts, symbol 
 }
 
 func cobraTAHVCommand(c *client.Ref, w io.Writer) *cobra.Command {
-	opts := &hvOpts{}
-	cmd := &cobra.Command{
-		Use:   "hv SYMBOL [SYMBOL...]",
-		Short: "Historical Volatility with regime classification",
-		Long: `Compute Historical Volatility for a symbol. Returns a scalar summary (not
+	return makeCobraTACommand(taCommandConfig[*hvOpts, hvOutput]{
+		name:  "hv",
+		short: "Historical Volatility with regime classification",
+		long: `Compute Historical Volatility for a symbol. Returns a scalar summary (not
 time series) with annualized volatility, percentile rank, and regime
 classification (low, normal, high, extreme). Includes daily, weekly, and
 monthly volatility breakdowns.`,
-		Example: `  schwab-agent ta hv AAPL
+		example: `  schwab-agent ta hv AAPL
   schwab-agent ta hv AAPL --period 20 --interval daily`,
-		Args: cobra.MinimumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
-				return err
-			}
-
-			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
-				return buildHVOutput(cmd.Context(), c, opts, symbol)
-			})
-		},
-	}
-
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
-
-	return cmd
+		newOpts: func() *hvOpts { return &hvOpts{} },
+		build:   buildHVOutput,
+	}, c, w)
 }
 
 func buildHVOutput(ctx context.Context, c *client.Ref, opts *hvOpts, symbol string) (hvOutput, error) {
@@ -1376,35 +1319,18 @@ func buildHVOutput(ctx context.Context, c *client.Ref, opts *hvOpts, symbol stri
 }
 
 func cobraTAExpectedMoveCommand(c *client.Ref, w io.Writer) *cobra.Command {
-	opts := &expectedMoveOpts{}
-	cmd := &cobra.Command{
-		Use:   "expected-move SYMBOL [SYMBOL...]",
-		Short: "Expected price move from ATM straddle pricing",
-		Long: `Compute expected price move from ATM straddle pricing. Fetches the option
+	return makeCobraTACommand(taCommandConfig[*expectedMoveOpts, expectedMoveOutput]{
+		name:  "expected-move",
+		short: "Expected price move from ATM straddle pricing",
+		long: `Compute expected price move from ATM straddle pricing. Fetches the option
 chain, finds the nearest expiration to --dte (default 30), and prices the
 ATM straddle. Output includes 1x and 2x standard deviation ranges (upper
 and lower bounds).`,
-		Example: `  schwab-agent ta expected-move AAPL
+		example: `  schwab-agent ta expected-move AAPL
   schwab-agent ta expected-move AAPL --dte 45`,
-		Args: cobra.MinimumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
-				return err
-			}
-
-			return writeTASymbolResults(w, args, func(symbol string) (any, error) {
-				return buildExpectedMoveOutput(cmd.Context(), c, opts, symbol)
-			})
-		},
-	}
-
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
-
-	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
-
-	return cmd
+		newOpts: func() *expectedMoveOpts { return &expectedMoveOpts{} },
+		build:   buildExpectedMoveOutput,
+	}, c, w)
 }
 
 func buildExpectedMoveOutput(ctx context.Context, c *client.Ref, opts *expectedMoveOpts, symbol string) (expectedMoveOutput, error) {
@@ -1595,8 +1521,11 @@ func buildTAOutput(
 	timestamps []string,
 	values []float64,
 ) (taOutput, error) {
-	// Align timestamps: indicator output is shorter than input due to lookback window
-	timestamps = timestamps[len(timestamps)-len(values):]
+	// Align timestamps: indicator output is shorter than input due to lookback window.
+	timestamps, err := tailAlignedTimestamps(timestamps, len(values), indicator+" timestamp alignment")
+	if err != nil {
+		return taOutput{}, err
+	}
 
 	out := make([]map[string]any, len(values))
 	for i, v := range values {
@@ -1606,10 +1535,8 @@ func buildTAOutput(
 		}
 	}
 
-	// Apply --points limit (tail-slice to get most recent N entries)
-	if points > 0 && points < len(out) {
-		out = out[len(out)-points:]
-	}
+	// Apply --points limit (tail-slice to get most recent N entries).
+	out = tailLimit(out, points)
 
 	return taOutput{
 		Indicator: indicator,
@@ -1629,7 +1556,7 @@ func buildMultiTAOutput(
 	points int,
 	timestamps []string,
 	valuesByPeriod map[int][]float64,
-) multiTAOutput {
+) (multiTAOutput, error) {
 	maxValues := 0
 	for _, period := range periods {
 		if len(valuesByPeriod[period]) > maxValues {
@@ -1637,10 +1564,14 @@ func buildMultiTAOutput(
 		}
 	}
 
-	start := len(timestamps) - maxValues
+	timestamps, err := tailAlignedTimestamps(timestamps, maxValues, indicator+" multi-period timestamp alignment")
+	if err != nil {
+		return multiTAOutput{}, err
+	}
+
 	out := make([]map[string]any, maxValues)
 	for i := range maxValues {
-		out[i] = map[string]any{"datetime": timestamps[start+i]}
+		out[i] = map[string]any{"datetime": timestamps[i]}
 	}
 
 	for _, period := range periods {
@@ -1654,9 +1585,7 @@ func buildMultiTAOutput(
 
 	// Apply --points after merging so the latest timestamp can include every
 	// requested period in one object, which is the common crossover use case.
-	if points > 0 && points < len(out) {
-		out = out[len(out)-points:]
-	}
+	out = tailLimit(out, points)
 
 	return multiTAOutput{
 		Indicator: indicator,
@@ -1664,5 +1593,5 @@ func buildMultiTAOutput(
 		Interval:  interval,
 		Periods:   periods,
 		Values:    out,
-	}
+	}, nil
 }

@@ -1633,8 +1633,10 @@ schwab-agent symbol parse "AAPL  250620C00200000"
 #### `schwab-agent ta`
 
 Compute technical analysis indicators from Schwab price history. All indicators
-are calculated locally after fetching candles. Use --interval to select data
-frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
+are calculated locally after fetching candles. Results are always keyed by
+symbol under data.<SYMBOL>, even when one symbol is requested, so agents can use
+the same parser for single-symbol and batch analysis. Use --interval to select
+data frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
 default --points to 1 for token-efficient latest-value output; use --points 0
 when you need the full computed series.
 

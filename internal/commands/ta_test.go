@@ -51,8 +51,26 @@ func mockFlatCandleListJSON(symbol string, n int) string {
 	return fmt.Sprintf(`{"symbol":%q,"empty":false,"candles":[%s]}`, symbol, strings.Join(candles, ","))
 }
 
-// decodeTAEnvelope unmarshals the output buffer into an Envelope and extracts the data map.
+// decodeTAEnvelope unmarshals the output buffer and returns the single symbol's
+// payload for tests that focus on indicator content rather than envelope shape.
 func decodeTAEnvelope(t *testing.T, buf *bytes.Buffer) (envelope output.Envelope, data map[string]any) {
+	t.Helper()
+	envelope, root := decodeTAEnvelopeRoot(t, buf)
+	if len(root) == 1 {
+		for _, raw := range root {
+			entry, ok := raw.(map[string]any)
+			if ok {
+				return envelope, entry
+			}
+		}
+	}
+
+	return envelope, root
+}
+
+// decodeTAEnvelopeRoot unmarshals the output buffer into an Envelope and
+// extracts the root data map without unwrapping symbol-keyed entries.
+func decodeTAEnvelopeRoot(t *testing.T, buf *bytes.Buffer) (envelope output.Envelope, data map[string]any) {
 	t.Helper()
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 
@@ -257,6 +275,26 @@ func TestTADashboard_ValidEnvelope(t *testing.T) {
 	assert.Equal(t, latest, values[0].(map[string]any), "default values row should match latest")
 }
 
+func TestTADashboard_SingleSymbolReturnsSymbolMap(t *testing.T) {
+	// Arrange: every TA command uses the same symbol-keyed shape, even when only
+	// one symbol is requested, so LLM callers do not need one-symbol branching.
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 252))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "dashboard", "AAPL")
+	require.NoError(t, err)
+
+	// Assert
+	_, data := decodeTAEnvelopeRoot(t, &buf)
+	entry, ok := data["AAPL"].(map[string]any)
+	require.True(t, ok, "single-symbol dashboard should be keyed by symbol")
+	assert.Equal(t, "dashboard", entry["indicator"])
+	assert.Equal(t, "AAPL", entry["symbol"])
+}
+
 func TestTADashboard_PointsFlag(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(priceHistoryHandler(t, "MSFT", 254))
@@ -360,6 +398,26 @@ func TestTASMA_ValidEnvelope(t *testing.T) {
 	first := values[0].(map[string]any)
 	assert.Contains(t, first, "datetime")
 	assert.Contains(t, first, "sma")
+}
+
+func TestTASMA_SingleSymbolReturnsSymbolMap(t *testing.T) {
+	// Arrange: simple indicators use the same normalized root as the dashboard
+	// and batch requests so agents can always read data.<SYMBOL>.
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 80))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "sma", "AAPL")
+	require.NoError(t, err)
+
+	// Assert
+	_, data := decodeTAEnvelopeRoot(t, &buf)
+	entry, ok := data["AAPL"].(map[string]any)
+	require.True(t, ok, "single-symbol sma should be keyed by symbol")
+	assert.Equal(t, "sma", entry["indicator"])
+	assert.Equal(t, "AAPL", entry["symbol"])
 }
 
 func TestTASMA_PeriodFlag(t *testing.T) {
@@ -701,6 +759,26 @@ func TestTAMACD_ValidEnvelope(t *testing.T) {
 	assert.Contains(t, first, "histogram")
 }
 
+func TestTAMACD_SingleSymbolReturnsSymbolMap(t *testing.T) {
+	// Arrange: generic-helper indicators should preserve the same normalized root
+	// shape as simple indicators and dashboard output.
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 80))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "macd", "AAPL")
+	require.NoError(t, err)
+
+	// Assert
+	_, data := decodeTAEnvelopeRoot(t, &buf)
+	entry, ok := data["AAPL"].(map[string]any)
+	require.True(t, ok, "single-symbol macd should be keyed by symbol")
+	assert.Equal(t, "macd", entry["indicator"])
+	assert.Equal(t, "AAPL", entry["symbol"])
+}
+
 func TestTAMACD_CustomFlags(t *testing.T) {
 	// Arrange - fast=8, slow=21, signal=5; required = (21+5)*2 = 52 candles
 	srv := httptest.NewServer(priceHistoryHandler(t, "MSFT", 80))
@@ -832,7 +910,7 @@ func TestTAATR_MultipleSymbolsPartialError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert
-	envelope, data := decodeTAEnvelope(t, &buf)
+	envelope, data := decodeTAEnvelopeRoot(t, &buf)
 	assert.Equal(t, 2, envelope.Metadata.Requested)
 	assert.Equal(t, 1, envelope.Metadata.Returned)
 	require.Len(t, envelope.Errors, 1)
