@@ -286,6 +286,7 @@ func TestNewOrderCmdBuildNewOptionStrategiesOutputRequestJSON(t *testing.T) {
 			require.NoError(t, err)
 
 			order := decodeOrderRequest(t, stdout)
+			assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
 			assert.Equal(t, testCase.orderType, order.OrderType)
 			require.NotNil(t, order.ComplexOrderStrategyType)
 			assert.Equal(t, testCase.complexType, *order.ComplexOrderStrategyType)

@@ -1,7 +1,6 @@
 package orderbuilder
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -327,6 +326,19 @@ func TestValidateBackRatioOrderRejectsInvalidRatio(t *testing.T) {
 	})
 
 	assertValidationError(t, err, "long ratio must be greater than one", "Use `--long-ratio 2` for the standard one-by-two back-ratio")
+}
+
+// TestValidateBackRatioOrderRejectsFractionalRatio prevents fractional option legs.
+func TestValidateBackRatioOrderRejectsFractionalRatio(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateBackRatioOrder(&BackRatioParams{
+		Underlying: "F", Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		ShortStrike: 12, LongStrike: 14, PutCall: models.PutCallCall,
+		Open: true, Quantity: 1, LongRatio: 1.5, Price: 0.20,
+	})
+
+	assertValidationError(t, err, "long ratio must be a whole number", "Use an integer value like `--long-ratio 2`")
 }
 
 // TestValidateBackRatioOrderRejectsWrongCallDirection verifies the conventional
@@ -695,7 +707,7 @@ func TestValidateNewOptionStrategiesCommonFailures(t *testing.T) {
 			err := testCase.check()
 
 			var validationErr *apperr.ValidationError
-			require.True(t, errors.As(err, &validationErr), "expected ValidationError, got %T: %v", err, err)
+			require.ErrorAs(t, err, &validationErr)
 			assert.Equal(t, testCase.message, validationErr.Message)
 		})
 	}
@@ -2125,8 +2137,8 @@ func TestValidateVerticalOrderRemainingBranches(t *testing.T) {
 			err := ValidateVerticalOrder(&tt.params)
 
 			require.Error(t, err)
-			validationErr, ok := errors.AsType[*apperr.ValidationError](err)
-			require.True(t, ok)
+			var validationErr *apperr.ValidationError
+			require.ErrorAs(t, err, &validationErr)
 			assert.Equal(t, tt.wantMsg, validationErr.Message)
 		})
 	}
@@ -2220,8 +2232,8 @@ func TestValidateIronCondorRemainingBranches(t *testing.T) {
 			err := ValidateIronCondorOrder(&tt.params)
 
 			require.Error(t, err)
-			validationErr, ok := errors.AsType[*apperr.ValidationError](err)
-			require.True(t, ok)
+			var validationErr *apperr.ValidationError
+			require.ErrorAs(t, err, &validationErr)
 			assert.Equal(t, tt.wantMsg, validationErr.Message)
 		})
 	}
@@ -2292,8 +2304,8 @@ func TestValidateStrangleRemainingBranches(t *testing.T) {
 			err := ValidateStrangleOrder(&tt.params)
 
 			require.Error(t, err)
-			validationErr, ok := errors.AsType[*apperr.ValidationError](err)
-			require.True(t, ok)
+			var validationErr *apperr.ValidationError
+			require.ErrorAs(t, err, &validationErr)
 			assert.Equal(t, tt.wantMsg, validationErr.Message)
 		})
 	}
@@ -2338,8 +2350,8 @@ func TestValidateStraddleRemainingBranches(t *testing.T) {
 			err := ValidateStraddleOrder(&tt.params)
 
 			require.Error(t, err)
-			validationErr, ok := errors.AsType[*apperr.ValidationError](err)
-			require.True(t, ok)
+			var validationErr *apperr.ValidationError
+			require.ErrorAs(t, err, &validationErr)
 			assert.Equal(t, tt.wantMsg, validationErr.Message)
 		})
 	}
@@ -2384,8 +2396,8 @@ func TestValidateCoveredCallRemainingBranches(t *testing.T) {
 			err := ValidateCoveredCallOrder(&tt.params)
 
 			require.Error(t, err)
-			validationErr, ok := errors.AsType[*apperr.ValidationError](err)
-			require.True(t, ok)
+			var validationErr *apperr.ValidationError
+			require.ErrorAs(t, err, &validationErr)
 			assert.Equal(t, tt.wantMsg, validationErr.Message)
 		})
 	}
@@ -2486,8 +2498,8 @@ func assertValidationError(t *testing.T, err error, expectedMessage, expectedDet
 
 	require.Error(t, err)
 
-	validationErr, ok := errors.AsType[*apperr.ValidationError](err)
-	require.True(t, ok)
+	var validationErr *apperr.ValidationError
+	require.ErrorAs(t, err, &validationErr)
 	assert.Equal(t, expectedMessage, validationErr.Message)
 	assert.Equal(t, expectedDetails, validationErr.Details())
 }

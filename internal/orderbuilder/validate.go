@@ -440,6 +440,10 @@ func ValidateBackRatioOrder(params *BackRatioParams) error {
 		return validationError("long ratio must be greater than one", "Use `--long-ratio 2` for the standard one-by-two back-ratio")
 	}
 
+	if math.Trunc(params.LongRatio) != params.LongRatio {
+		return validationError("long ratio must be a whole number", "Use an integer value like `--long-ratio 2`")
+	}
+
 	if params.PutCall == "" {
 		return validationError("option type (call or put) is required", "Add `--call` or `--put`")
 	}
