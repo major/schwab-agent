@@ -60,6 +60,119 @@ func TestBuildVerticalOrderBullCallOpen(t *testing.T) {
 	assert.Equal(t, 14.0, *shortLeg.Instrument.OptionStrikePrice)
 }
 
+// TestBuildButterflyOrderLongOpen verifies a long butterfly uses long wings and a short body.
+func TestBuildButterflyOrderLongOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildButterflyOrder(&ButterflyParams{
+		Underlying: "F", Expiration: expiration, LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14,
+		PutCall: models.PutCallCall, Buy: true, Open: true, Quantity: 1, Price: 0.50,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeButterfly, *order.ComplexOrderStrategyType)
+	require.Len(t, order.OrderLegCollection, 3)
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
+	assert.Equal(t, 2.0, order.OrderLegCollection[1].Quantity)
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[2].Instruction)
+}
+
+// TestBuildCondorOrderShortClose verifies a short condor close buys the wings back.
+func TestBuildCondorOrderShortClose(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildCondorOrder(&CondorParams{
+		Underlying: "F", Expiration: expiration, LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16,
+		PutCall: models.PutCallPut, Buy: false, Open: false, Quantity: 1, Price: 0.75,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeCondor, *order.ComplexOrderStrategyType)
+	require.Len(t, order.OrderLegCollection, 4)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[1].Instruction)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[2].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[3].Instruction)
+}
+
+// TestBuildBackRatioOrderOpen verifies a one-by-two back-ratio spread.
+func TestBuildBackRatioOrderOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildBackRatioOrder(&BackRatioParams{
+		Underlying: "F", Expiration: expiration, ShortStrike: 12, LongStrike: 14,
+		PutCall: models.PutCallCall, Open: true, Quantity: 1, LongRatio: 2, Credit: false, Price: 0.20,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeBackRatio, *order.ComplexOrderStrategyType)
+	require.Len(t, order.OrderLegCollection, 2)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[1].Instruction)
+	assert.Equal(t, 2.0, order.OrderLegCollection[1].Quantity)
+}
+
+// TestBuildVerticalRollOrder verifies closing and opening vertical legs are ordered clearly.
+func TestBuildVerticalRollOrder(t *testing.T) {
+	t.Parallel()
+
+	closeExpiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+	openExpiration := time.Date(2026, time.July, 17, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildVerticalRollOrder(&VerticalRollParams{
+		Underlying: "F", CloseExpiration: closeExpiration, OpenExpiration: openExpiration,
+		CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15,
+		PutCall: models.PutCallCall, Credit: true, Quantity: 1, Price: 0.25,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeVerticalRoll, *order.ComplexOrderStrategyType)
+	require.Len(t, order.OrderLegCollection, 4)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[1].Instruction)
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[2].Instruction)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[3].Instruction)
+}
+
+// TestBuildDoubleDiagonalOrderOpen verifies long far legs and short near legs.
+func TestBuildDoubleDiagonalOrderOpen(t *testing.T) {
+	t.Parallel()
+
+	nearExpiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+	farExpiration := time.Date(2026, time.July, 17, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildDoubleDiagonalOrder(&DoubleDiagonalParams{
+		Underlying: "F", NearExpiration: nearExpiration, FarExpiration: farExpiration,
+		PutFarStrike: 9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15,
+		Open: true, Quantity: 1, Price: 0.80,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetDebit, order.OrderType)
+	require.NotNil(t, order.ComplexOrderStrategyType)
+	assert.Equal(t, models.ComplexOrderStrategyTypeDoubleDiagonal, *order.ComplexOrderStrategyType)
+	require.Len(t, order.OrderLegCollection, 4)
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[2].Instruction)
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[3].Instruction)
+}
+
 // TestBuildVerticalOrderBearCallOpen verifies a bear call spread (credit to open).
 // BUY higher strike call + SELL lower strike call = NET_CREDIT.
 func TestBuildVerticalOrderBearCallOpen(t *testing.T) {

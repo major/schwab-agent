@@ -166,6 +166,11 @@ run_help_test "order build covered-call" order build covered-call
 run_help_test "order build collar"       order build collar
 run_help_test "order build calendar"     order build calendar
 run_help_test "order build diagonal"     order build diagonal
+run_help_test "order build butterfly"    order build butterfly
+run_help_test "order build condor"       order build condor
+run_help_test "order build vertical-roll" order build vertical-roll
+run_help_test "order build back-ratio"   order build back-ratio
+run_help_test "order build double-diagonal" order build double-diagonal
 run_help_test "order build fts"          order build fts
 run_help_test "chain"             chain
 run_help_test "chain get"         chain get
@@ -489,6 +494,34 @@ run_build_test "diagonal: PUT CLOSE" \
     --near-strike 14 --far-strike 12 \
     --near-expiration 2026-05-15 --far-expiration 2026-07-17 \
     --put --close --quantity 1 --price 0.50
+
+# -------------------------------------------------------------------
+# Order build: Additional option strategies
+# -------------------------------------------------------------------
+
+section "Order Build: Additional Option Strategies"
+
+run_build_test "butterfly: CALL BUY OPEN" \
+    order build butterfly --underlying F --expiration 2026-06-18 \
+    --lower-strike 10 --middle-strike 12 --upper-strike 14 \
+    --call --buy --open --quantity 1 --price 0.50
+run_build_test "condor: PUT SELL OPEN" \
+    order build condor --underlying F --expiration 2026-06-18 \
+    --lower-strike 10 --lower-middle-strike 12 --upper-middle-strike 14 --upper-strike 16 \
+    --put --sell --open --quantity 1 --price 0.75
+run_build_test "vertical-roll: CALL CREDIT" \
+    order build vertical-roll --underlying F \
+    --close-expiration 2026-06-18 --open-expiration 2026-07-17 \
+    --close-long-strike 12 --close-short-strike 14 --open-long-strike 13 --open-short-strike 15 \
+    --call --credit --quantity 1 --price 0.25
+run_build_test "back-ratio: CALL DEBIT" \
+    order build back-ratio --underlying F --expiration 2026-06-18 \
+    --short-strike 12 --long-strike 14 --call --open --quantity 1 --long-ratio 2 --debit --price 0.20
+run_build_test "double-diagonal: OPEN" \
+    order build double-diagonal --underlying F \
+    --near-expiration 2026-06-18 --far-expiration 2026-07-17 \
+    --put-far-strike 9 --put-near-strike 10 --call-near-strike 14 --call-far-strike 15 \
+    --open --quantity 1 --price 0.80
 
 # -------------------------------------------------------------------
 # Order build: FTS (first-triggers-second)

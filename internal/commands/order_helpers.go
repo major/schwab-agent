@@ -241,6 +241,115 @@ type diagonalBuildOpts struct {
 // Attach implements structcli.Options interface.
 func (o *diagonalBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
+// butterflyBuildOpts holds flags for butterfly spread build flows.
+type butterflyBuildOpts struct {
+	Underlying   string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration   string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	LowerStrike  float64         `flag:"lower-strike" flagdescr:"Lower wing strike" flagrequired:"true" flaggroup:"contract"`
+	MiddleStrike float64         `flag:"middle-strike" flagdescr:"Middle body strike" flagrequired:"true" flaggroup:"contract"`
+	UpperStrike  float64         `flag:"upper-strike" flagdescr:"Upper wing strike" flagrequired:"true" flaggroup:"contract"`
+	Call         bool            `flag:"call" flagdescr:"Call butterfly" flaggroup:"contract"`
+	Put          bool            `flag:"put" flagdescr:"Put butterfly" flaggroup:"contract"`
+	Buy          bool            `flag:"buy" flagdescr:"Buy a long butterfly" flaggroup:"execution"`
+	Sell         bool            `flag:"sell" flagdescr:"Sell a short butterfly" flaggroup:"execution"`
+	Open         bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close        bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity     float64         `flag:"quantity" flagdescr:"Wing contract quantity" flagrequired:"true" flaggroup:"execution"`
+	Price        float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration     models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session      models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+}
+
+// Attach implements structcli.Options interface.
+func (o *butterflyBuildOpts) Attach(_ *cobra.Command) error { return nil }
+
+// condorBuildOpts holds flags for condor spread build flows.
+type condorBuildOpts struct {
+	Underlying        string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration        string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	LowerStrike       float64         `flag:"lower-strike" flagdescr:"Lower wing strike" flagrequired:"true" flaggroup:"contract"`
+	LowerMiddleStrike float64         `flag:"lower-middle-strike" flagdescr:"Lower middle strike" flagrequired:"true" flaggroup:"contract"`
+	UpperMiddleStrike float64         `flag:"upper-middle-strike" flagdescr:"Upper middle strike" flagrequired:"true" flaggroup:"contract"`
+	UpperStrike       float64         `flag:"upper-strike" flagdescr:"Upper wing strike" flagrequired:"true" flaggroup:"contract"`
+	Call              bool            `flag:"call" flagdescr:"Call condor" flaggroup:"contract"`
+	Put               bool            `flag:"put" flagdescr:"Put condor" flaggroup:"contract"`
+	Buy               bool            `flag:"buy" flagdescr:"Buy a long condor" flaggroup:"execution"`
+	Sell              bool            `flag:"sell" flagdescr:"Sell a short condor" flaggroup:"execution"`
+	Open              bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close             bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity          float64         `flag:"quantity" flagdescr:"Contract quantity per strike" flagrequired:"true" flaggroup:"execution"`
+	Price             float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration          models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session           models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+}
+
+// Attach implements structcli.Options interface.
+func (o *condorBuildOpts) Attach(_ *cobra.Command) error { return nil }
+
+// backRatioBuildOpts holds flags for back-ratio spread build flows.
+type backRatioBuildOpts struct {
+	Underlying  string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Expiration  string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	ShortStrike float64         `flag:"short-strike" flagdescr:"Short option strike" flagrequired:"true" flaggroup:"contract"`
+	LongStrike  float64         `flag:"long-strike" flagdescr:"Long option strike" flagrequired:"true" flaggroup:"contract"`
+	Call        bool            `flag:"call" flagdescr:"Call back-ratio" flaggroup:"contract"`
+	Put         bool            `flag:"put" flagdescr:"Put back-ratio" flaggroup:"contract"`
+	Open        bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close       bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity    float64         `flag:"quantity" flagdescr:"Short-leg contract quantity" flagrequired:"true" flaggroup:"execution"`
+	LongRatio   float64         `flag:"long-ratio" flagdescr:"Long contracts per short contract" default:"2" flaggroup:"execution"`
+	Debit       bool            `flag:"debit" flagdescr:"Build as NET_DEBIT" flaggroup:"pricing"`
+	Credit      bool            `flag:"credit" flagdescr:"Build as NET_CREDIT" flaggroup:"pricing"`
+	Price       float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration    models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session     models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+}
+
+// Attach implements structcli.Options interface.
+func (o *backRatioBuildOpts) Attach(_ *cobra.Command) error { return nil }
+
+// verticalRollBuildOpts holds flags for vertical roll build flows.
+type verticalRollBuildOpts struct {
+	Underlying       string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	CloseExpiration  string          `flag:"close-expiration" flagdescr:"Expiration of the vertical being closed (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	OpenExpiration   string          `flag:"open-expiration" flagdescr:"Expiration of the vertical being opened (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	CloseLongStrike  float64         `flag:"close-long-strike" flagdescr:"Long strike of the vertical being closed" flagrequired:"true" flaggroup:"contract"`
+	CloseShortStrike float64         `flag:"close-short-strike" flagdescr:"Short strike of the vertical being closed" flagrequired:"true" flaggroup:"contract"`
+	OpenLongStrike   float64         `flag:"open-long-strike" flagdescr:"Long strike of the vertical being opened" flagrequired:"true" flaggroup:"contract"`
+	OpenShortStrike  float64         `flag:"open-short-strike" flagdescr:"Short strike of the vertical being opened" flagrequired:"true" flaggroup:"contract"`
+	Call             bool            `flag:"call" flagdescr:"Call vertical roll" flaggroup:"contract"`
+	Put              bool            `flag:"put" flagdescr:"Put vertical roll" flaggroup:"contract"`
+	Debit            bool            `flag:"debit" flagdescr:"Build as NET_DEBIT" flaggroup:"pricing"`
+	Credit           bool            `flag:"credit" flagdescr:"Build as NET_CREDIT" flaggroup:"pricing"`
+	Quantity         float64         `flag:"quantity" flagdescr:"Contract quantity" flagrequired:"true" flaggroup:"execution"`
+	Price            float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration         models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session          models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+}
+
+// Attach implements structcli.Options interface.
+func (o *verticalRollBuildOpts) Attach(_ *cobra.Command) error { return nil }
+
+// doubleDiagonalBuildOpts holds flags for double diagonal spread build flows.
+type doubleDiagonalBuildOpts struct {
+	Underlying     string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	NearExpiration string          `flag:"near-expiration" flagdescr:"Near expiration for short legs (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	FarExpiration  string          `flag:"far-expiration" flagdescr:"Far expiration for long legs (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	PutFarStrike   float64         `flag:"put-far-strike" flagdescr:"Far put long strike" flagrequired:"true" flaggroup:"contract"`
+	PutNearStrike  float64         `flag:"put-near-strike" flagdescr:"Near put short strike" flagrequired:"true" flaggroup:"contract"`
+	CallNearStrike float64         `flag:"call-near-strike" flagdescr:"Near call short strike" flagrequired:"true" flaggroup:"contract"`
+	CallFarStrike  float64         `flag:"call-far-strike" flagdescr:"Far call long strike" flagrequired:"true" flaggroup:"contract"`
+	Open           bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
+	Close          bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
+	Quantity       float64         `flag:"quantity" flagdescr:"Contract quantity" flagrequired:"true" flaggroup:"execution"`
+	Price          float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
+	Duration       models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
+	Session        models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+}
+
+// Attach implements structcli.Options interface.
+func (o *doubleDiagonalBuildOpts) Attach(_ *cobra.Command) error { return nil }
+
 // Valid enum values for CLI flag parsing. Each slice corresponds to one enum
 // type in the models package and is used by the generic parseEnum/requireEnum
 // helpers in helpers.go.
@@ -922,6 +1031,193 @@ func parseDiagonalParams(opts *diagonalBuildOpts, _ []string) (*orderbuilder.Dia
 	}, nil
 }
 
+// parseButterflyParams converts command flags into butterfly builder params.
+func parseButterflyParams(opts *butterflyBuildOpts, _ []string) (*orderbuilder.ButterflyParams, error) {
+	putCall, err := parsePutCall(opts.Call, opts.Put)
+	if err != nil {
+		return nil, err
+	}
+
+	isBuy, err := parseBuySell(opts.Buy, opts.Sell)
+	if err != nil {
+		return nil, err
+	}
+
+	isOpen, err := parseOpenClose(opts.Open, opts.Close)
+	if err != nil {
+		return nil, err
+	}
+
+	expiration, err := parseExpiration(opts.Expiration)
+	if err != nil {
+		return nil, err
+	}
+
+	return &orderbuilder.ButterflyParams{
+		Underlying:   strings.TrimSpace(opts.Underlying),
+		Expiration:   expiration,
+		LowerStrike:  opts.LowerStrike,
+		MiddleStrike: opts.MiddleStrike,
+		UpperStrike:  opts.UpperStrike,
+		PutCall:      putCall,
+		Buy:          isBuy,
+		Open:         isOpen,
+		Quantity:     opts.Quantity,
+		Price:        opts.Price,
+		Duration:     normalizeDuration(opts.Duration),
+		Session:      opts.Session,
+	}, nil
+}
+
+// parseCondorParams converts command flags into condor builder params.
+func parseCondorParams(opts *condorBuildOpts, _ []string) (*orderbuilder.CondorParams, error) {
+	putCall, err := parsePutCall(opts.Call, opts.Put)
+	if err != nil {
+		return nil, err
+	}
+
+	isBuy, err := parseBuySell(opts.Buy, opts.Sell)
+	if err != nil {
+		return nil, err
+	}
+
+	isOpen, err := parseOpenClose(opts.Open, opts.Close)
+	if err != nil {
+		return nil, err
+	}
+
+	expiration, err := parseExpiration(opts.Expiration)
+	if err != nil {
+		return nil, err
+	}
+
+	return &orderbuilder.CondorParams{
+		Underlying:        strings.TrimSpace(opts.Underlying),
+		Expiration:        expiration,
+		LowerStrike:       opts.LowerStrike,
+		LowerMiddleStrike: opts.LowerMiddleStrike,
+		UpperMiddleStrike: opts.UpperMiddleStrike,
+		UpperStrike:       opts.UpperStrike,
+		PutCall:           putCall,
+		Buy:               isBuy,
+		Open:              isOpen,
+		Quantity:          opts.Quantity,
+		Price:             opts.Price,
+		Duration:          normalizeDuration(opts.Duration),
+		Session:           opts.Session,
+	}, nil
+}
+
+// parseBackRatioParams converts command flags into back-ratio builder params.
+func parseBackRatioParams(opts *backRatioBuildOpts, _ []string) (*orderbuilder.BackRatioParams, error) {
+	putCall, err := parsePutCall(opts.Call, opts.Put)
+	if err != nil {
+		return nil, err
+	}
+
+	isOpen, err := parseOpenClose(opts.Open, opts.Close)
+	if err != nil {
+		return nil, err
+	}
+
+	isCredit, err := parseDebitCredit(opts.Debit, opts.Credit)
+	if err != nil {
+		return nil, err
+	}
+
+	expiration, err := parseExpiration(opts.Expiration)
+	if err != nil {
+		return nil, err
+	}
+
+	return &orderbuilder.BackRatioParams{
+		Underlying:  strings.TrimSpace(opts.Underlying),
+		Expiration:  expiration,
+		ShortStrike: opts.ShortStrike,
+		LongStrike:  opts.LongStrike,
+		PutCall:     putCall,
+		Open:        isOpen,
+		Quantity:    opts.Quantity,
+		LongRatio:   opts.LongRatio,
+		Credit:      isCredit,
+		Price:       opts.Price,
+		Duration:    normalizeDuration(opts.Duration),
+		Session:     opts.Session,
+	}, nil
+}
+
+// parseVerticalRollParams converts command flags into vertical roll builder params.
+func parseVerticalRollParams(opts *verticalRollBuildOpts, _ []string) (*orderbuilder.VerticalRollParams, error) {
+	putCall, err := parsePutCall(opts.Call, opts.Put)
+	if err != nil {
+		return nil, err
+	}
+
+	isCredit, err := parseDebitCredit(opts.Debit, opts.Credit)
+	if err != nil {
+		return nil, err
+	}
+
+	closeExpiration, err := parseDateFlag(opts.CloseExpiration, "close-expiration")
+	if err != nil {
+		return nil, err
+	}
+
+	openExpiration, err := parseDateFlag(opts.OpenExpiration, "open-expiration")
+	if err != nil {
+		return nil, err
+	}
+
+	return &orderbuilder.VerticalRollParams{
+		Underlying:       strings.TrimSpace(opts.Underlying),
+		CloseExpiration:  closeExpiration,
+		OpenExpiration:   openExpiration,
+		CloseLongStrike:  opts.CloseLongStrike,
+		CloseShortStrike: opts.CloseShortStrike,
+		OpenLongStrike:   opts.OpenLongStrike,
+		OpenShortStrike:  opts.OpenShortStrike,
+		PutCall:          putCall,
+		Credit:           isCredit,
+		Quantity:         opts.Quantity,
+		Price:            opts.Price,
+		Duration:         normalizeDuration(opts.Duration),
+		Session:          opts.Session,
+	}, nil
+}
+
+// parseDoubleDiagonalParams converts command flags into double diagonal builder params.
+func parseDoubleDiagonalParams(opts *doubleDiagonalBuildOpts, _ []string) (*orderbuilder.DoubleDiagonalParams, error) {
+	isOpen, err := parseOpenClose(opts.Open, opts.Close)
+	if err != nil {
+		return nil, err
+	}
+
+	nearExpiration, err := parseDateFlag(opts.NearExpiration, "near-expiration")
+	if err != nil {
+		return nil, err
+	}
+
+	farExpiration, err := parseDateFlag(opts.FarExpiration, "far-expiration")
+	if err != nil {
+		return nil, err
+	}
+
+	return &orderbuilder.DoubleDiagonalParams{
+		Underlying:     strings.TrimSpace(opts.Underlying),
+		NearExpiration: nearExpiration,
+		FarExpiration:  farExpiration,
+		PutFarStrike:   opts.PutFarStrike,
+		PutNearStrike:  opts.PutNearStrike,
+		CallNearStrike: opts.CallNearStrike,
+		CallFarStrike:  opts.CallFarStrike,
+		Open:           isOpen,
+		Quantity:       opts.Quantity,
+		Price:          opts.Price,
+		Duration:       normalizeDuration(opts.Duration),
+		Session:        opts.Session,
+	}, nil
+}
+
 // parseDateFlag parses a named YYYY-MM-DD flag value into a time.Time.
 // Used by calendar/diagonal spreads which have two expiration flags instead
 // of the single --expiration flag used by other spread types.
@@ -960,6 +1256,15 @@ func parseOpenClose(open, closeLeg bool) (bool, error) {
 	}
 
 	return open, nil
+}
+
+// parseDebitCredit validates mutually exclusive debit/credit flags.
+func parseDebitCredit(debit, credit bool) (bool, error) {
+	if debit == credit {
+		return false, newValidationError("exactly one of --debit or --credit is required")
+	}
+
+	return credit, nil
 }
 
 // parsePutCall validates mutually exclusive put/call flags.

@@ -262,6 +262,190 @@ func TestValidateVerticalOrderRequiresUnderlying(t *testing.T) {
 	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
 }
 
+// TestValidateButterflyOrderRejectsUnorderedStrikes verifies butterfly strike ordering.
+func TestValidateButterflyOrderRejectsUnorderedStrikes(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateButterflyOrder(&ButterflyParams{
+		Underlying: "F", Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		LowerStrike: 12, MiddleStrike: 10, UpperStrike: 14, PutCall: models.PutCallCall,
+		Buy: true, Open: true, Quantity: 1, Price: 0.50,
+	})
+
+	assertValidationError(t, err, "butterfly strikes must be ordered lower < middle < upper", "Use three increasing strikes with `--lower-strike`, `--middle-strike`, and `--upper-strike`")
+}
+
+// TestValidateButterflyOrderRejectsUnbalancedWings keeps the balanced strategy
+// from accepting shapes that Schwab represents with UNBALANCED_BUTTERFLY.
+func TestValidateButterflyOrderRejectsUnbalancedWings(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateButterflyOrder(&ButterflyParams{
+		Underlying: "F", Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		LowerStrike: 10, MiddleStrike: 12, UpperStrike: 15, PutCall: models.PutCallCall,
+		Buy: true, Open: true, Quantity: 1, Price: 0.50,
+	})
+
+	assertValidationError(t, err, "butterfly wings must be balanced", "Use equal distances from `--middle-strike` to `--lower-strike` and `--upper-strike`; unbalanced butterflies are a separate strategy type")
+}
+
+// TestValidateCondorOrderRejectsUnorderedStrikes verifies condor strike ordering.
+func TestValidateCondorOrderRejectsUnorderedStrikes(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCondorOrder(&CondorParams{
+		Underlying: "F", Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		LowerStrike: 10, LowerMiddleStrike: 14, UpperMiddleStrike: 12, UpperStrike: 16, PutCall: models.PutCallPut,
+		Buy: true, Open: true, Quantity: 1, Price: 0.50,
+	})
+
+	assertValidationError(t, err, "condor strikes must be ordered lower < lower-middle < upper-middle < upper", "Use four increasing strikes for the condor wings and middle strikes")
+}
+
+// TestValidateCondorOrderRejectsUnbalancedWings keeps the balanced strategy
+// distinct from Schwab's UNBALANCED_CONDOR enum value.
+func TestValidateCondorOrderRejectsUnbalancedWings(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateCondorOrder(&CondorParams{
+		Underlying: "F", Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 17, PutCall: models.PutCallPut,
+		Buy: true, Open: true, Quantity: 1, Price: 0.50,
+	})
+
+	assertValidationError(t, err, "condor wings must be balanced", "Use equal wing widths between lower/lower-middle and upper-middle/upper; unbalanced condors are a separate strategy type")
+}
+
+// TestValidateBackRatioOrderRejectsInvalidRatio verifies back-ratio quantity relationship.
+func TestValidateBackRatioOrderRejectsInvalidRatio(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateBackRatioOrder(&BackRatioParams{
+		Underlying: "F", Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		ShortStrike: 12, LongStrike: 14, PutCall: models.PutCallCall,
+		Open: true, Quantity: 1, LongRatio: 1, Price: 0.20,
+	})
+
+	assertValidationError(t, err, "long ratio must be greater than one", "Use `--long-ratio 2` for the standard one-by-two back-ratio")
+}
+
+// TestValidateBackRatioOrderRejectsWrongCallDirection verifies the conventional
+// call back-ratio shape: sell the lower strike and buy more contracts higher.
+func TestValidateBackRatioOrderRejectsWrongCallDirection(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateBackRatioOrder(&BackRatioParams{
+		Underlying: "F", Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		ShortStrike: 14, LongStrike: 12, PutCall: models.PutCallCall,
+		Open: true, Quantity: 1, LongRatio: 2, Price: 0.20,
+	})
+
+	assertValidationError(t, err, "call back-ratio long strike must be above short strike", "For call back-ratios, sell the lower strike and buy more contracts at the higher strike")
+}
+
+// TestValidateBackRatioOrderRejectsWrongPutDirection verifies the conventional
+// put back-ratio shape: sell the higher strike and buy more contracts lower.
+func TestValidateBackRatioOrderRejectsWrongPutDirection(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateBackRatioOrder(&BackRatioParams{
+		Underlying: "F", Expiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		ShortStrike: 12, LongStrike: 14, PutCall: models.PutCallPut,
+		Open: true, Quantity: 1, LongRatio: 2, Price: 0.20,
+	})
+
+	assertValidationError(t, err, "put back-ratio long strike must be below short strike", "For put back-ratios, sell the higher strike and buy more contracts at the lower strike")
+}
+
+// TestValidateVerticalRollOrderRejectsEqualOpenStrikes verifies rolled verticals remain spreads.
+func TestValidateVerticalRollOrderRejectsEqualOpenStrikes(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateVerticalRollOrder(&VerticalRollParams{
+		Underlying: "F", CloseExpiration: time.Now().UTC().Add(30 * 24 * time.Hour), OpenExpiration: time.Now().UTC().Add(60 * 24 * time.Hour),
+		CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 15, OpenShortStrike: 15,
+		PutCall: models.PutCallCall, Quantity: 1, Price: 0.25,
+	})
+
+	assertValidationError(t, err, "open long and short strikes must be different", "Use different values for `--open-long-strike` and `--open-short-strike`")
+}
+
+// TestValidateVerticalRollOrderAcceptsSameExpirationStrikeRoll verifies users can
+// roll a vertical up or down within the same expiration cycle.
+func TestValidateVerticalRollOrderAcceptsSameExpirationStrikeRoll(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Now().UTC().Add(30 * 24 * time.Hour)
+
+	err := ValidateVerticalRollOrder(&VerticalRollParams{
+		Underlying: "F", CloseExpiration: expiration, OpenExpiration: expiration,
+		CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15,
+		PutCall: models.PutCallCall, Quantity: 1, Price: 0.25,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestValidateVerticalRollOrderRejectsEarlierOpenExpiration verifies rolls never
+// open a new spread before the spread being closed.
+func TestValidateVerticalRollOrderRejectsEarlierOpenExpiration(t *testing.T) {
+	t.Parallel()
+
+	closeExpiration := time.Now().UTC().Add(60 * 24 * time.Hour)
+	openExpiration := time.Now().UTC().Add(30 * 24 * time.Hour)
+
+	err := ValidateVerticalRollOrder(&VerticalRollParams{
+		Underlying: "F", CloseExpiration: closeExpiration, OpenExpiration: openExpiration,
+		CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15,
+		PutCall: models.PutCallCall, Quantity: 1, Price: 0.25,
+	})
+
+	assertValidationError(t, err, "open expiration must not be before close expiration", "Use `--open-expiration` on or after `--close-expiration`")
+}
+
+// TestValidateVerticalRollOrderRejectsUnequalWidths preserves the distinction
+// between balanced VERTICAL_ROLL and Schwab's UNBALANCED_VERTICAL_ROLL enum.
+func TestValidateVerticalRollOrderRejectsUnequalWidths(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateVerticalRollOrder(&VerticalRollParams{
+		Underlying: "F", CloseExpiration: time.Now().UTC().Add(30 * 24 * time.Hour), OpenExpiration: time.Now().UTC().Add(60 * 24 * time.Hour),
+		CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 16,
+		PutCall: models.PutCallCall, Quantity: 1, Price: 0.25,
+	})
+
+	assertValidationError(t, err, "vertical roll widths must match", "Use equal close and open spread widths for `VERTICAL_ROLL`; unequal widths are a separate unbalanced strategy type")
+}
+
+// TestValidateVerticalRollOrderRejectsNoopRoll catches close/open legs that would
+// close and reopen the same vertical without changing strikes or expiration.
+func TestValidateVerticalRollOrderRejectsNoopRoll(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Now().UTC().Add(30 * 24 * time.Hour)
+
+	err := ValidateVerticalRollOrder(&VerticalRollParams{
+		Underlying: "F", CloseExpiration: expiration, OpenExpiration: expiration,
+		CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 12, OpenShortStrike: 14,
+		PutCall: models.PutCallCall, Quantity: 1, Price: 0.25,
+	})
+
+	assertValidationError(t, err, "vertical roll must change strikes or expiration", "Use different open strikes or a later `--open-expiration` so the roll changes the position")
+}
+
+// TestValidateDoubleDiagonalOrderRejectsOverlappingStrikes verifies put/call sides do not overlap.
+func TestValidateDoubleDiagonalOrderRejectsOverlappingStrikes(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{
+		Underlying: "F", NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour), FarExpiration: time.Now().UTC().Add(60 * 24 * time.Hour),
+		PutFarStrike: 9, PutNearStrike: 15, CallNearStrike: 14, CallFarStrike: 16,
+		Open: true, Quantity: 1, Price: 0.80,
+	})
+
+	assertValidationError(t, err, "double diagonal strikes must be ordered put-far < put-near < call-near < call-far", "Keep put strikes below call strikes so the near short legs do not overlap")
+}
+
 // TestValidateVerticalOrderRejectsEqualStrikes verifies same-strike rejection.
 func TestValidateVerticalOrderRejectsEqualStrikes(t *testing.T) {
 	t.Parallel()

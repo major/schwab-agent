@@ -126,7 +126,7 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 | order.go | order | list, get |
 | order_place.go | order | place (equity/option/bracket/oco), preview, cancel, replace |
 | order_helpers.go | (shared) | opts structs, enum parsing, flag definitions, validation helpers |
-| order_build.go | order build | equity, option, bracket, oco, vertical, iron-condor, straddle, strangle, covered-call |
+| order_build.go | order build | equity, option, bracket, oco, vertical, iron-condor, straddle, strangle, covered-call, collar, calendar, diagonal, butterfly, condor, vertical-roll, back-ratio, double-diagonal, fts |
 | chain.go | chain | get, expiration |
 | history.go | history | get |
 | instrument.go | instrument | search, get |

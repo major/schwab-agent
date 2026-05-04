@@ -4,14 +4,6 @@ https://github.com/major/schwab-agent
 
 > CLI tool for AI agents to trade via Schwab APIs
 
-## Discovery
-
-Run `schwab-agent --jsonschema=tree` first when you need to discover commands, flags, enum values, defaults, config keys, or environment variable bindings. Treat that JSON Schema tree as the authoritative shell command contract. Use this file for workflow guidance and static context after choosing the command and flags from the schema.
-
-```bash
-schwab-agent --jsonschema=tree
-```
-
 ## Commands
 
 - [schwab-agent](#schwab-agent): CLI tool for AI agents to trade via Schwab APIs
@@ -19,9 +11,6 @@ schwab-agent --jsonschema=tree
 details, look up account numbers and hash values, set a default account, and
 query transaction history. Account list and get enrich results with nicknames
 from the preferences API (best-effort, degrades gracefully).
-- [schwab-agent account summary](#schwab-agent-account-summary): List compact account identifiers for agents. Returns account hashes from the
-account numbers endpoint and best-effort nickname, primary-account marker, and
-account type from user preferences without fetching balances or positions.
 - [schwab-agent account get](#schwab-agent-account-get): Get details for a single account by hash value. The hash can be passed as a
 positional argument, via --account, or resolved from the default_account
 config. Results are enriched with nicknames from the preferences API. Use
@@ -29,13 +18,21 @@ config. Results are enriched with nicknames from the preferences API. Use
 - [schwab-agent account list](#schwab-agent-account-list): List all linked Schwab accounts with nicknames and settings enriched from
 the preferences API. Use --positions to include current positions for each
 account in the response. Nicknames are loaded best-effort and omitted if
-the preferences API is unavailable.
+the preferences API is unavailable. Agents that only need account hashes,
+nicknames, and primary account markers should use account summary for a smaller
+one-command account picker.
 - [schwab-agent account numbers](#schwab-agent-account-numbers): List account numbers and their corresponding hash values. Hash values are
 used as account identifiers in all other commands. Use set-default to store
 a hash as the default account.
 - [schwab-agent account set-default](#schwab-agent-account-set-default): Set the default account hash in the config file. Commands that require an
 account will use this value when --account is not specified. Run account
 numbers to find valid hash values.
+- [schwab-agent account summary](#schwab-agent-account-summary): List linked Schwab accounts in a compact, token-efficient shape for agents.
+Each entry includes the account hash required by other commands, the readable
+account number, and best-effort nickname/primary/type data from user preferences.
+Use --positions to include compact holdings with computed cost basis and P&L
+in the same response. Use account list when you need full balances or account
+list --positions when you need the full Schwab account payload with positions.
 - [schwab-agent account transaction](#schwab-agent-account-transaction): Query transaction history for an account. Transactions are account-scoped and
 inherit the --account flag from the parent command. Filter by type, date range,
 and symbol.
@@ -129,21 +126,30 @@ magnitude (0, 1, 5, 10, 30, 60). Quote shell-special characters in index
 names (e.g. '$SPX').
 - [schwab-agent order](#schwab-agent-order): Manage orders across your Schwab accounts. Supports listing, viewing, placing,
 previewing, building, canceling, and replacing orders. Placing, canceling, and
-replacing orders require both the "i-also-like-to-live-dangerously" config flag
-and --confirm on each command. Duration aliases GTC, FOK, and IOC are accepted.
+replacing orders require the "i-also-like-to-live-dangerously" config flag.
+Duration aliases GTC, FOK, and IOC are accepted.
 - [schwab-agent order build](#schwab-agent-order-build): Build order request JSON locally without calling the API or requiring
 authentication. Output is raw JSON (not envelope-wrapped) that can be piped to
 order preview or order place --spec - for a staged workflow. Supports equity,
 option, bracket, OCO, and multi-leg option strategies.
+- [schwab-agent order build back-ratio](#schwab-agent-order-build-back-ratio): Build an option back-ratio spread order request JSON. Quantity controls the
+short leg, and --long-ratio controls how many long contracts are bought per
+short contract. Use --debit or --credit because back-ratios can price either way.
 - [schwab-agent order build bracket](#schwab-agent-order-build-bracket): Build a bracket order request JSON with entry and automatic exit legs. At
 least one of --take-profit or --stop-loss is required. Exit instructions are
 auto-inverted from the entry action.
+- [schwab-agent order build butterfly](#schwab-agent-order-build-butterfly): Build a butterfly spread order request JSON. Uses three ordered strikes at
+the same expiration: lower wing, middle body, upper wing. Buying opens a long
+butterfly with long wings and two short body contracts.
 - [schwab-agent order build calendar](#schwab-agent-order-build-calendar): Build a calendar spread order request JSON. Same strike price across two
 different expirations: sells the near-term contract and buys the far-term
 contract. Profits from time decay differential between the two legs.
 - [schwab-agent order build collar](#schwab-agent-order-build-collar): Build a collar-with-stock order request JSON. Combines long stock, a
 protective long put, and a covered short call. Limits downside risk while
 capping upside. Quantity 1 means 100 shares plus 1 put and 1 call contract.
+- [schwab-agent order build condor](#schwab-agent-order-build-condor): Build a same-expiration condor spread order request JSON. Uses four ordered
+strikes: lower wing, lower-middle short, upper-middle short, upper wing. Buying
+opens a long condor; selling opens the inverse short condor.
 - [schwab-agent order build covered-call](#schwab-agent-order-build-covered-call): Build a covered call order request JSON that atomically buys shares and sells
 a call. Quantity 1 means 100 shares plus 1 call contract. The --price is the
 net debit per share after call premium. To sell calls against shares you
@@ -151,8 +157,11 @@ already own, use order place option --action SELL_TO_OPEN instead.
 - [schwab-agent order build diagonal](#schwab-agent-order-build-diagonal): Build a diagonal spread order request JSON. Different strikes AND different
 expirations: sells the near-term contract at one strike and buys the far-term
 contract at a different strike. Combines elements of vertical and calendar spreads.
+- [schwab-agent order build double-diagonal](#schwab-agent-order-build-double-diagonal): Build a double diagonal spread order request JSON with far long put/call legs
+and near short put/call legs. The near expiration must come before the far
+expiration, and strikes must keep the put side below the call side.
 - [schwab-agent order build equity](#schwab-agent-order-build-equity): Build an equity order request JSON. Validates flags and outputs the order
-payload without placing it. Pipe to order place --spec - --confirm to execute,
+payload without placing it. Pipe to order place --spec - to execute,
 or to order preview --spec - to check estimated commissions.
 - [schwab-agent order build fts](#schwab-agent-order-build-fts): Build a first-triggers-second order from two JSON order specs. The primary
 order executes first; when it fills, the secondary order is automatically
@@ -176,9 +185,12 @@ or --sell for short strangles (expecting low volatility).
 - [schwab-agent order build vertical](#schwab-agent-order-build-vertical): Build a vertical spread (bull/bear call or put spread) order request JSON.
 Use --long-strike for the strike bought and --short-strike for the strike sold.
 NET_DEBIT or NET_CREDIT is auto-determined from the strike relationship.
-- [schwab-agent order cancel](#schwab-agent-order-cancel): Cancel an existing order by ID. Requires both safety guards: the
-"i-also-like-to-live-dangerously" config flag and --confirm. The order ID can
-be passed as a positional argument or with --order-id (flag takes priority).
+- [schwab-agent order build vertical-roll](#schwab-agent-order-build-vertical-roll): Build a vertical roll order request JSON that closes one vertical spread and
+opens another in a single order. Use --debit or --credit to state the roll's net
+pricing direction.
+- [schwab-agent order cancel](#schwab-agent-order-cancel): Cancel an existing order by ID. Requires the "i-also-like-to-live-dangerously"
+config flag. The order ID can be passed as a positional argument or with
+--order-id (flag takes priority).
 - [schwab-agent order get](#schwab-agent-order-get): Retrieve a single order by its ID. The order ID can be passed as a positional
 argument or with the --order-id flag. When both are provided, the flag takes
 priority. Requires a default account or --account flag.
@@ -188,34 +200,33 @@ are filtered out to show only actionable orders. Use --status all to see
 everything. Multiple --status values fan out into separate API calls with
 merged, deduplicated results.
 - [schwab-agent order place](#schwab-agent-order-place): Place an order via subcommand (equity, option, bracket, oco) or from a JSON spec
-with --spec. Both safety guards are required: set "i-also-like-to-live-dangerously"
-to true in config.json, and pass --confirm on every placement. Recommended workflow:
-check the price with quote get, build the order JSON with order build, preview it
-with order preview, then place with --confirm.
+with --spec. Requires "i-also-like-to-live-dangerously" set to true in config.json.
+Recommended workflow: check the price with quote get, build the order JSON with
+order build, preview it with order preview, then place.
 - [schwab-agent order place bracket](#schwab-agent-order-place-bracket): Place a bracket order that combines an entry trade with automatic exit orders.
 At least one of --take-profit or --stop-loss is required. Exit instructions are
 auto-inverted from the entry action (BUY entry creates SELL exits). Canceling
 the parent cascades to all child orders.
 - [schwab-agent order place equity](#schwab-agent-order-place-equity): Place an equity (stock) order. Supports MARKET, LIMIT, STOP, STOP_LIMIT, and
 TRAILING_STOP order types. Default type is MARKET if --type is omitted. Duration
-aliases GTC, FOK, and IOC are accepted alongside their full names. Both safety
-guards are required for placement.
+aliases GTC, FOK, and IOC are accepted alongside their full names. Requires
+i-also-like-to-live-dangerously in config for placement.
 - [schwab-agent order place oco](#schwab-agent-order-place-oco): Place a one-cancels-other order for an existing position. When one exit fills,
 the other is automatically canceled. At least one of --take-profit or --stop-loss
 is required. For long positions use SELL; for short positions use BUY. Unlike
 bracket orders, OCO has no entry leg.
 - [schwab-agent order place option](#schwab-agent-order-place-option): Place a single-leg option order. Requires --underlying, --expiration, --strike,
 and exactly one of --call or --put. Use BUY_TO_OPEN/SELL_TO_CLOSE for new
-positions and SELL_TO_OPEN/BUY_TO_CLOSE for existing ones. Both safety guards
-are required for placement.
+positions and SELL_TO_OPEN/BUY_TO_CLOSE for existing ones. Requires
+i-also-like-to-live-dangerously in config for placement.
 - [schwab-agent order preview](#schwab-agent-order-preview): Preview an order from a JSON spec without placing it. Returns estimated
 commissions, fees, and order details. Pipe output from order build for a
 build-then-preview workflow. Does not require safety guards since no order
 is actually placed.
 - [schwab-agent order replace](#schwab-agent-order-replace): Replace an existing order with a new equity order. The original order is
 canceled and a new one is created with a new ID. Only equity order flags are
-accepted. Requires both safety guards. The original order status becomes
-REPLACED after the new order is created.
+accepted. Requires the "i-also-like-to-live-dangerously" config flag. The
+original order status becomes REPLACED after the new order is created.
 - [schwab-agent position](#schwab-agent-position): View positions across accounts
 - [schwab-agent position list](#schwab-agent-position-list): List positions as a flat list with account identifiers and computed cost basis
 and P&L fields that Schwab's API does not provide directly. Uses the default
@@ -289,20 +300,6 @@ details, look up account numbers and hash values, set a default account, and
 query transaction history. Account list and get enrich results with nicknames
 from the preferences API (best-effort, degrades gracefully).
 
-## schwab-agent account summary
-
-List compact account identifiers for agents. This is the smallest account picker
-for LLM workflows: it returns accountHash, accountNumber, nickName,
-primaryAccount, and type when preferences are available. It calls accountNumbers
-for hashes, joins optional userPreference fields by account number, and does not
-fetch balances. Use --positions to fetch
-compact holdings in the same response with symbol, assetType, quantity,
-marketValue, averagePrice, totalCostBasis, unrealizedPnL, and unrealizedPnLPct.
-
-### Flags
-
-- `--positions` (bool, default: false): Include compact current positions for each account
-
 ## schwab-agent account get
 
 Get details for a single account by hash value. The hash can be passed as a
@@ -319,7 +316,9 @@ config. Results are enriched with nicknames from the preferences API. Use
 List all linked Schwab accounts with nicknames and settings enriched from
 the preferences API. Use --positions to include current positions for each
 account in the response. Nicknames are loaded best-effort and omitted if
-the preferences API is unavailable.
+the preferences API is unavailable. Agents that only need account hashes,
+nicknames, and primary account markers should use account summary for a smaller
+one-command account picker.
 
 ### Flags
 
@@ -336,6 +335,19 @@ a hash as the default account.
 Set the default account hash in the config file. Commands that require an
 account will use this value when --account is not specified. Run account
 numbers to find valid hash values.
+
+## schwab-agent account summary
+
+List linked Schwab accounts in a compact, token-efficient shape for agents.
+Each entry includes the account hash required by other commands, the readable
+account number, and best-effort nickname/primary/type data from user preferences.
+Use --positions to include compact holdings with computed cost basis and P&L
+in the same response. Use account list when you need full balances or account
+list --positions when you need the full Schwab account payload with positions.
+
+### Flags
+
+- `--positions` (bool, default: false): Include compact current positions for each account
 
 ## schwab-agent account transaction
 
@@ -546,8 +558,8 @@ names (e.g. '$SPX').
 
 Manage orders across your Schwab accounts. Supports listing, viewing, placing,
 previewing, building, canceling, and replacing orders. Placing, canceling, and
-replacing orders require both the "i-also-like-to-live-dangerously" config flag
-and --confirm on each command. Duration aliases GTC, FOK, and IOC are accepted.
+replacing orders require the "i-also-like-to-live-dangerously" config flag.
+Duration aliases GTC, FOK, and IOC are accepted.
 
 ## schwab-agent order build
 
@@ -555,6 +567,30 @@ Build order request JSON locally without calling the API or requiring
 authentication. Output is raw JSON (not envelope-wrapped) that can be piped to
 order preview or order place --spec - for a staged workflow. Supports equity,
 option, bracket, OCO, and multi-leg option strategies.
+
+## schwab-agent order build back-ratio
+
+Build an option back-ratio spread order request JSON. Quantity controls the
+short leg, and --long-ratio controls how many long contracts are bought per
+short contract. Use --debit or --credit because back-ratios can price either way.
+
+### Flags
+
+- `--call` (bool, default: false): Call back-ratio
+- `--close` (bool, default: false): Closing position
+- `--credit` (bool, default: false): Build as NET_CREDIT
+- `--debit` (bool, default: false): Build as NET_DEBIT
+- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--expiration` (string, required): Expiration date (YYYY-MM-DD)
+- `--long-ratio` (float64, default: 2): Long contracts per short contract
+- `--long-strike` (float64, default: 0, required): Long option strike
+- `--open` (bool, default: false): Opening position
+- `--price` (float64, default: 0, required): Net debit or credit amount
+- `--put` (bool, default: false): Put back-ratio
+- `--quantity` (float64, default: 0, required): Short-leg contract quantity
+- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--short-strike` (float64, default: 0, required): Short option strike
+- `--underlying` (string, required): Underlying symbol
 
 ## schwab-agent order build bracket
 
@@ -573,6 +609,30 @@ auto-inverted from the entry action.
 - `--symbol` (string, required): Equity symbol
 - `--take-profit` (float64, default: 0): Take-profit exit price
 - `--type` (string): Entry order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+
+## schwab-agent order build butterfly
+
+Build a butterfly spread order request JSON. Uses three ordered strikes at
+the same expiration: lower wing, middle body, upper wing. Buying opens a long
+butterfly with long wings and two short body contracts.
+
+### Flags
+
+- `--buy` (bool, default: false): Buy a long butterfly
+- `--call` (bool, default: false): Call butterfly
+- `--close` (bool, default: false): Closing position
+- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--expiration` (string, required): Expiration date (YYYY-MM-DD)
+- `--lower-strike` (float64, default: 0, required): Lower wing strike
+- `--middle-strike` (float64, default: 0, required): Middle body strike
+- `--open` (bool, default: false): Opening position
+- `--price` (float64, default: 0, required): Net debit or credit amount
+- `--put` (bool, default: false): Put butterfly
+- `--quantity` (float64, default: 0, required): Wing contract quantity
+- `--sell` (bool, default: false): Sell a short butterfly
+- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--underlying` (string, required): Underlying symbol
+- `--upper-strike` (float64, default: 0, required): Upper wing strike
 
 ## schwab-agent order build calendar
 
@@ -614,6 +674,31 @@ capping upside. Quantity 1 means 100 shares plus 1 put and 1 call contract.
 - `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
 - `--underlying` (string, required): Underlying symbol
 
+## schwab-agent order build condor
+
+Build a same-expiration condor spread order request JSON. Uses four ordered
+strikes: lower wing, lower-middle short, upper-middle short, upper wing. Buying
+opens a long condor; selling opens the inverse short condor.
+
+### Flags
+
+- `--buy` (bool, default: false): Buy a long condor
+- `--call` (bool, default: false): Call condor
+- `--close` (bool, default: false): Closing position
+- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--expiration` (string, required): Expiration date (YYYY-MM-DD)
+- `--lower-middle-strike` (float64, default: 0, required): Lower middle strike
+- `--lower-strike` (float64, default: 0, required): Lower wing strike
+- `--open` (bool, default: false): Opening position
+- `--price` (float64, default: 0, required): Net debit or credit amount
+- `--put` (bool, default: false): Put condor
+- `--quantity` (float64, default: 0, required): Contract quantity per strike
+- `--sell` (bool, default: false): Sell a short condor
+- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--underlying` (string, required): Underlying symbol
+- `--upper-middle-strike` (float64, default: 0, required): Upper middle strike
+- `--upper-strike` (float64, default: 0, required): Upper wing strike
+
 ## schwab-agent order build covered-call
 
 Build a covered call order request JSON that atomically buys shares and sells
@@ -653,10 +738,32 @@ contract at a different strike. Combines elements of vertical and calendar sprea
 - `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
 - `--underlying` (string, required): Underlying symbol
 
+## schwab-agent order build double-diagonal
+
+Build a double diagonal spread order request JSON with far long put/call legs
+and near short put/call legs. The near expiration must come before the far
+expiration, and strikes must keep the put side below the call side.
+
+### Flags
+
+- `--call-far-strike` (float64, default: 0, required): Far call long strike
+- `--call-near-strike` (float64, default: 0, required): Near call short strike
+- `--close` (bool, default: false): Closing position
+- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--far-expiration` (string, required): Far expiration for long legs (YYYY-MM-DD)
+- `--near-expiration` (string, required): Near expiration for short legs (YYYY-MM-DD)
+- `--open` (bool, default: false): Opening position
+- `--price` (float64, default: 0, required): Net debit or credit amount
+- `--put-far-strike` (float64, default: 0, required): Far put long strike
+- `--put-near-strike` (float64, default: 0, required): Near put short strike
+- `--quantity` (float64, default: 0, required): Contract quantity
+- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--underlying` (string, required): Underlying symbol
+
 ## schwab-agent order build equity
 
 Build an equity order request JSON. Validates flags and outputs the order
-payload without placing it. Pipe to order place --spec - --confirm to execute,
+payload without placing it. Pipe to order place --spec - to execute,
 or to order preview --spec - to check estimated commissions.
 
 ### Flags
@@ -814,15 +921,38 @@ NET_DEBIT or NET_CREDIT is auto-determined from the strike relationship.
 - `--short-strike` (float64, default: 0, required): Strike price of the option being sold
 - `--underlying` (string, required): Underlying symbol
 
-## schwab-agent order cancel
+## schwab-agent order build vertical-roll
 
-Cancel an existing order by ID. Requires both safety guards: the
-"i-also-like-to-live-dangerously" config flag and --confirm. The order ID can
-be passed as a positional argument or with --order-id (flag takes priority).
+Build a vertical roll order request JSON that closes one vertical spread and
+opens another in a single order. Use --debit or --credit to state the roll's net
+pricing direction.
 
 ### Flags
 
-- `--confirm` (bool, default: false): Confirm cancellation
+- `--call` (bool, default: false): Call vertical roll
+- `--close-expiration` (string, required): Expiration of the vertical being closed (YYYY-MM-DD)
+- `--close-long-strike` (float64, default: 0, required): Long strike of the vertical being closed
+- `--close-short-strike` (float64, default: 0, required): Short strike of the vertical being closed
+- `--credit` (bool, default: false): Build as NET_CREDIT
+- `--debit` (bool, default: false): Build as NET_DEBIT
+- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--open-expiration` (string, required): Expiration of the vertical being opened (YYYY-MM-DD)
+- `--open-long-strike` (float64, default: 0, required): Long strike of the vertical being opened
+- `--open-short-strike` (float64, default: 0, required): Short strike of the vertical being opened
+- `--price` (float64, default: 0, required): Net debit or credit amount
+- `--put` (bool, default: false): Put vertical roll
+- `--quantity` (float64, default: 0, required): Contract quantity
+- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--underlying` (string, required): Underlying symbol
+
+## schwab-agent order cancel
+
+Cancel an existing order by ID. Requires the "i-also-like-to-live-dangerously"
+config flag. The order ID can be passed as a positional argument or with
+--order-id (flag takes priority).
+
+### Flags
+
 - `--order-id` (string): Order ID
 
 ## schwab-agent order get
@@ -852,14 +982,12 @@ merged, deduplicated results.
 ## schwab-agent order place
 
 Place an order via subcommand (equity, option, bracket, oco) or from a JSON spec
-with --spec. Both safety guards are required: set "i-also-like-to-live-dangerously"
-to true in config.json, and pass --confirm on every placement. Recommended workflow:
-check the price with quote get, build the order JSON with order build, preview it
-with order preview, then place with --confirm.
+with --spec. Requires "i-also-like-to-live-dangerously" set to true in config.json.
+Recommended workflow: check the price with quote get, build the order JSON with
+order build, preview it with order preview, then place.
 
 ### Flags
 
-- `--confirm` (bool, default: false): Confirm order placement
 - `--spec` (string, required): Inline JSON, @file, or - for stdin
 
 ## schwab-agent order place bracket
@@ -872,7 +1000,6 @@ the parent cascades to all child orders.
 ### Flags
 
 - `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
-- `--confirm` (bool, default: false): Confirm order placement
 - `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
 - `--price` (float64, default: 0): Entry price
 - `--quantity` (float64, default: 0, required): Share quantity
@@ -886,14 +1013,13 @@ the parent cascades to all child orders.
 
 Place an equity (stock) order. Supports MARKET, LIMIT, STOP, STOP_LIMIT, and
 TRAILING_STOP order types. Default type is MARKET if --type is omitted. Duration
-aliases GTC, FOK, and IOC are accepted alongside their full names. Both safety
-guards are required for placement.
+aliases GTC, FOK, and IOC are accepted alongside their full names. Requires
+i-also-like-to-live-dangerously in config for placement.
 
 ### Flags
 
 - `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
 - `--activation-price` (float64, default: 0): Price that activates the trailing stop
-- `--confirm` (bool, default: false): Confirm order placement
 - `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX}
 - `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
 - `--price` (float64, default: 0): Limit price
@@ -920,7 +1046,6 @@ bracket orders, OCO has no entry leg.
 ### Flags
 
 - `--action` (string, required): Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
-- `--confirm` (bool, default: false): Confirm order placement
 - `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
 - `--quantity` (float64, default: 0, required): Share quantity
 - `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
@@ -932,14 +1057,13 @@ bracket orders, OCO has no entry leg.
 
 Place a single-leg option order. Requires --underlying, --expiration, --strike,
 and exactly one of --call or --put. Use BUY_TO_OPEN/SELL_TO_CLOSE for new
-positions and SELL_TO_OPEN/BUY_TO_CLOSE for existing ones. Both safety guards
-are required for placement.
+positions and SELL_TO_OPEN/BUY_TO_CLOSE for existing ones. Requires
+i-also-like-to-live-dangerously in config for placement.
 
 ### Flags
 
 - `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
 - `--call` (bool, default: false): Call option
-- `--confirm` (bool, default: false): Confirm order placement
 - `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX}
 - `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
@@ -969,14 +1093,13 @@ is actually placed.
 
 Replace an existing order with a new equity order. The original order is
 canceled and a new one is created with a new ID. Only equity order flags are
-accepted. Requires both safety guards. The original order status becomes
-REPLACED after the new order is created.
+accepted. Requires the "i-also-like-to-live-dangerously" config flag. The
+original order status becomes REPLACED after the new order is created.
 
 ### Flags
 
 - `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
 - `--activation-price` (float64, default: 0): Price that activates the trailing stop
-- `--confirm` (bool, default: false): Confirm replacement
 - `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX}
 - `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
 - `--order-id` (string): Order ID
@@ -1007,7 +1130,6 @@ include totalCostBasis, unrealizedPnL, and unrealizedPnLPct.
 
 ### Flags
 
-- `--account` (string): Account hash (overrides config default)
 - `--all-accounts` (bool, default: false): Show positions across all linked accounts
 
 ## schwab-agent quote

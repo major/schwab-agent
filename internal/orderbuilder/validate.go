@@ -2,6 +2,7 @@
 package orderbuilder
 
 import (
+	"math"
 	"strings"
 	"time"
 
@@ -321,6 +322,229 @@ func ValidateIronCondorOrder(params *IronCondorParams) error {
 	return validateSpreadPrice(params.Price, "iron condors")
 }
 
+// ValidateButterflyOrder validates butterfly spread parameters.
+func ValidateButterflyOrder(params *ButterflyParams) error {
+	if err := validateUnderlying(params.Underlying); err != nil {
+		return err
+	}
+
+	if err := validateQuantity(params.Quantity); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.Expiration); err != nil {
+		return err
+	}
+
+	if err := validatePositiveStrikes([]namedStrike{
+		{params.LowerStrike, "lower-strike"},
+		{params.MiddleStrike, "middle-strike"},
+		{params.UpperStrike, "upper-strike"},
+	}); err != nil {
+		return err
+	}
+
+	if params.LowerStrike >= params.MiddleStrike || params.MiddleStrike >= params.UpperStrike {
+		return validationError("butterfly strikes must be ordered lower < middle < upper", "Use three increasing strikes with `--lower-strike`, `--middle-strike`, and `--upper-strike`")
+	}
+
+	if !sameStrikeWidth(params.MiddleStrike-params.LowerStrike, params.UpperStrike-params.MiddleStrike) {
+		return validationError(
+			"butterfly wings must be balanced",
+			"Use equal distances from `--middle-strike` to `--lower-strike` and `--upper-strike`; unbalanced butterflies are a separate strategy type",
+		)
+	}
+
+	if params.PutCall == "" {
+		return validationError("option type (call or put) is required", "Add `--call` or `--put`")
+	}
+
+	return validateSpreadPrice(params.Price, "butterflies")
+}
+
+// ValidateCondorOrder validates condor spread parameters.
+func ValidateCondorOrder(params *CondorParams) error {
+	if err := validateUnderlying(params.Underlying); err != nil {
+		return err
+	}
+
+	if err := validateQuantity(params.Quantity); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.Expiration); err != nil {
+		return err
+	}
+
+	if err := validatePositiveStrikes([]namedStrike{
+		{params.LowerStrike, "lower-strike"},
+		{params.LowerMiddleStrike, "lower-middle-strike"},
+		{params.UpperMiddleStrike, "upper-middle-strike"},
+		{params.UpperStrike, "upper-strike"},
+	}); err != nil {
+		return err
+	}
+
+	if params.LowerStrike >= params.LowerMiddleStrike || params.LowerMiddleStrike >= params.UpperMiddleStrike || params.UpperMiddleStrike >= params.UpperStrike {
+		return validationError("condor strikes must be ordered lower < lower-middle < upper-middle < upper", "Use four increasing strikes for the condor wings and middle strikes")
+	}
+
+	if !sameStrikeWidth(params.LowerMiddleStrike-params.LowerStrike, params.UpperStrike-params.UpperMiddleStrike) {
+		return validationError(
+			"condor wings must be balanced",
+			"Use equal wing widths between lower/lower-middle and upper-middle/upper; unbalanced condors are a separate strategy type",
+		)
+	}
+
+	if params.PutCall == "" {
+		return validationError("option type (call or put) is required", "Add `--call` or `--put`")
+	}
+
+	return validateSpreadPrice(params.Price, "condors")
+}
+
+// ValidateBackRatioOrder validates back-ratio spread parameters.
+func ValidateBackRatioOrder(params *BackRatioParams) error {
+	if err := validateUnderlying(params.Underlying); err != nil {
+		return err
+	}
+
+	if err := validateQuantity(params.Quantity); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.Expiration); err != nil {
+		return err
+	}
+
+	if err := validatePositiveStrikes([]namedStrike{
+		{params.ShortStrike, "short-strike"},
+		{params.LongStrike, "long-strike"},
+	}); err != nil {
+		return err
+	}
+
+	if params.ShortStrike == params.LongStrike {
+		return validationError("short and long strikes must be different", "Use different values for `--short-strike` and `--long-strike`")
+	}
+
+	if params.PutCall == models.PutCallCall && params.LongStrike <= params.ShortStrike {
+		return validationError("call back-ratio long strike must be above short strike", "For call back-ratios, sell the lower strike and buy more contracts at the higher strike")
+	}
+
+	if params.PutCall == models.PutCallPut && params.LongStrike >= params.ShortStrike {
+		return validationError("put back-ratio long strike must be below short strike", "For put back-ratios, sell the higher strike and buy more contracts at the lower strike")
+	}
+
+	if params.LongRatio <= 1 {
+		return validationError("long ratio must be greater than one", "Use `--long-ratio 2` for the standard one-by-two back-ratio")
+	}
+
+	if params.PutCall == "" {
+		return validationError("option type (call or put) is required", "Add `--call` or `--put`")
+	}
+
+	return validateSpreadPrice(params.Price, "back-ratios")
+}
+
+// ValidateVerticalRollOrder validates vertical roll parameters.
+func ValidateVerticalRollOrder(params *VerticalRollParams) error {
+	if err := validateUnderlying(params.Underlying); err != nil {
+		return err
+	}
+
+	if err := validateQuantity(params.Quantity); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.CloseExpiration); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.OpenExpiration); err != nil {
+		return err
+	}
+
+	if params.OpenExpiration.Before(params.CloseExpiration) {
+		return validationError("open expiration must not be before close expiration", "Use `--open-expiration` on or after `--close-expiration`")
+	}
+
+	if err := validatePositiveStrikes([]namedStrike{
+		{params.CloseLongStrike, "close-long-strike"},
+		{params.CloseShortStrike, "close-short-strike"},
+		{params.OpenLongStrike, "open-long-strike"},
+		{params.OpenShortStrike, "open-short-strike"},
+	}); err != nil {
+		return err
+	}
+
+	if params.CloseLongStrike == params.CloseShortStrike {
+		return validationError("close long and short strikes must be different", "Use different values for `--close-long-strike` and `--close-short-strike`")
+	}
+
+	if params.OpenLongStrike == params.OpenShortStrike {
+		return validationError("open long and short strikes must be different", "Use different values for `--open-long-strike` and `--open-short-strike`")
+	}
+
+	if !sameStrikeWidth(spreadWidth(params.CloseLongStrike, params.CloseShortStrike), spreadWidth(params.OpenLongStrike, params.OpenShortStrike)) {
+		return validationError(
+			"vertical roll widths must match",
+			"Use equal close and open spread widths for `VERTICAL_ROLL`; unequal widths are a separate unbalanced strategy type",
+		)
+	}
+
+	if params.CloseExpiration.Equal(params.OpenExpiration) && params.CloseLongStrike == params.OpenLongStrike && params.CloseShortStrike == params.OpenShortStrike {
+		return validationError(
+			"vertical roll must change strikes or expiration",
+			"Use different open strikes or a later `--open-expiration` so the roll changes the position",
+		)
+	}
+
+	if params.PutCall == "" {
+		return validationError("option type (call or put) is required", "Add `--call` or `--put`")
+	}
+
+	return validateSpreadPrice(params.Price, "vertical rolls")
+}
+
+// ValidateDoubleDiagonalOrder validates double diagonal spread parameters.
+func ValidateDoubleDiagonalOrder(params *DoubleDiagonalParams) error {
+	if err := validateUnderlying(params.Underlying); err != nil {
+		return err
+	}
+
+	if err := validateQuantity(params.Quantity); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.NearExpiration); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.FarExpiration); err != nil {
+		return err
+	}
+
+	if params.NearExpiration.Equal(params.FarExpiration) || params.NearExpiration.After(params.FarExpiration) {
+		return validationError("near expiration must be before far expiration", "Use `--near-expiration` before `--far-expiration`")
+	}
+
+	if err := validatePositiveStrikes([]namedStrike{
+		{params.PutFarStrike, "put-far-strike"},
+		{params.PutNearStrike, "put-near-strike"},
+		{params.CallNearStrike, "call-near-strike"},
+		{params.CallFarStrike, "call-far-strike"},
+	}); err != nil {
+		return err
+	}
+
+	if params.PutFarStrike >= params.PutNearStrike || params.PutNearStrike >= params.CallNearStrike || params.CallNearStrike >= params.CallFarStrike {
+		return validationError("double diagonal strikes must be ordered put-far < put-near < call-near < call-far", "Keep put strikes below call strikes so the near short legs do not overlap")
+	}
+
+	return validateSpreadPrice(params.Price, "double diagonals")
+}
+
 // ValidateStrangleOrder validates strangle parameters.
 func ValidateStrangleOrder(params *StrangleParams) error {
 	if err := validateUnderlying(params.Underlying); err != nil {
@@ -564,6 +788,39 @@ func validateSpreadPrice(price float64, strategy string) error {
 	}
 
 	return nil
+}
+
+// namedStrike pairs a strike value with its CLI flag name for validation errors.
+type namedStrike struct {
+	value float64
+	name  string
+}
+
+// validatePositiveStrikes checks a set of strike flags for positive values.
+func validatePositiveStrikes(strikes []namedStrike) error {
+	for _, strike := range strikes {
+		if strike.value <= 0 {
+			return validationError(strike.name+" must be greater than zero", "Add `--"+strike.name+" <price>` with a positive value")
+		}
+	}
+
+	return nil
+}
+
+// spreadWidth returns the absolute distance between two strikes. Vertical spreads
+// can be entered with the long leg above or below the short leg, so validation
+// compares widths rather than relying on strike ordering.
+func spreadWidth(firstStrike, secondStrike float64) float64 {
+	return math.Abs(firstStrike - secondStrike)
+}
+
+// sameStrikeWidth compares option strike distances with a small tolerance. Strike
+// flags are decimal values, and direct float64 equality can reject valid spreads
+// when equivalent decimal widths have slightly different binary representations.
+func sameStrikeWidth(left, right float64) bool {
+	const strikeWidthTolerance = 1e-9
+
+	return math.Abs(left-right) <= strikeWidthTolerance
 }
 
 // validatePriceLinkPair checks that price-link-basis and price-link-type are

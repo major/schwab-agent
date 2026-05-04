@@ -180,10 +180,51 @@ expirations: sells the near-term contract at one strike and buys the far-term
 contract at a different strike. Combines elements of vertical and calendar spreads.`
 	diagonalBuild.Example = `  schwab-agent order build diagonal --underlying F --near-strike 12 --far-strike 14 --near-expiration 2026-05-16 --far-expiration 2026-07-17 --call --open --quantity 1 --price 0.50`
 
+	butterflyBuild := makeCobraBuildOrderCommand(w, "butterfly", "Build a butterfly spread order request", func() *butterflyBuildOpts { return &butterflyBuildOpts{} }, func(cmd *cobra.Command, opts *butterflyBuildOpts) {
+		defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"buy", "sell"}, []string{"open", "close"})
+	}, parseButterflyParams, orderbuilder.ValidateButterflyOrder, orderbuilder.BuildButterflyOrder)
+	butterflyBuild.Long = `Build a butterfly spread order request JSON. Uses three ordered strikes at
+the same expiration: lower wing, middle body, upper wing. Buying opens a long
+butterfly with long wings and two short body contracts.`
+	butterflyBuild.Example = `  schwab-agent order build butterfly --underlying F --expiration 2026-06-18 --lower-strike 10 --middle-strike 12 --upper-strike 14 --call --buy --open --quantity 1 --price 0.50`
+
+	condorBuild := makeCobraBuildOrderCommand(w, "condor", "Build a condor spread order request", func() *condorBuildOpts { return &condorBuildOpts{} }, func(cmd *cobra.Command, opts *condorBuildOpts) {
+		defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"buy", "sell"}, []string{"open", "close"})
+	}, parseCondorParams, orderbuilder.ValidateCondorOrder, orderbuilder.BuildCondorOrder)
+	condorBuild.Long = `Build a same-expiration condor spread order request JSON. Uses four ordered
+strikes: lower wing, lower-middle short, upper-middle short, upper wing. Buying
+opens a long condor; selling opens the inverse short condor.`
+	condorBuild.Example = `  schwab-agent order build condor --underlying F --expiration 2026-06-18 --lower-strike 10 --lower-middle-strike 12 --upper-middle-strike 14 --upper-strike 16 --call --buy --open --quantity 1 --price 0.75`
+
+	verticalRollBuild := makeCobraBuildOrderCommand(w, "vertical-roll", "Build a vertical roll order request", func() *verticalRollBuildOpts { return &verticalRollBuildOpts{} }, func(cmd *cobra.Command, opts *verticalRollBuildOpts) {
+		defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"debit", "credit"})
+	}, parseVerticalRollParams, orderbuilder.ValidateVerticalRollOrder, orderbuilder.BuildVerticalRollOrder)
+	verticalRollBuild.Long = `Build a vertical roll order request JSON that closes one vertical spread and
+opens another in a single order. Use --debit or --credit to state the roll's net
+pricing direction.`
+	verticalRollBuild.Example = `  schwab-agent order build vertical-roll --underlying F --close-expiration 2026-06-18 --open-expiration 2026-07-17 --close-long-strike 12 --close-short-strike 14 --open-long-strike 13 --open-short-strike 15 --call --debit --quantity 1 --price 0.25`
+
+	backRatioBuild := makeCobraBuildOrderCommand(w, "back-ratio", "Build a back-ratio spread order request", func() *backRatioBuildOpts { return &backRatioBuildOpts{} }, func(cmd *cobra.Command, opts *backRatioBuildOpts) {
+		defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"open", "close"}, []string{"debit", "credit"})
+	}, parseBackRatioParams, orderbuilder.ValidateBackRatioOrder, orderbuilder.BuildBackRatioOrder)
+	backRatioBuild.Long = `Build an option back-ratio spread order request JSON. Quantity controls the
+short leg, and --long-ratio controls how many long contracts are bought per
+short contract. Use --debit or --credit because back-ratios can price either way.`
+	backRatioBuild.Example = `  schwab-agent order build back-ratio --underlying F --expiration 2026-06-18 --short-strike 12 --long-strike 14 --call --open --quantity 1 --long-ratio 2 --debit --price 0.20`
+
+	doubleDiagonalBuild := makeCobraBuildOrderCommand(w, "double-diagonal", "Build a double diagonal spread order request", func() *doubleDiagonalBuildOpts { return &doubleDiagonalBuildOpts{} }, func(cmd *cobra.Command, opts *doubleDiagonalBuildOpts) {
+		defineAndConstrain(cmd, opts, []string{"open", "close"})
+	}, parseDoubleDiagonalParams, orderbuilder.ValidateDoubleDiagonalOrder, orderbuilder.BuildDoubleDiagonalOrder)
+	doubleDiagonalBuild.Long = `Build a double diagonal spread order request JSON with far long put/call legs
+and near short put/call legs. The near expiration must come before the far
+expiration, and strikes must keep the put side below the call side.`
+	doubleDiagonalBuild.Example = `  schwab-agent order build double-diagonal --underlying F --near-expiration 2026-06-18 --far-expiration 2026-07-17 --put-far-strike 9 --put-near-strike 10 --call-near-strike 14 --call-far-strike 15 --open --quantity 1 --price 0.80`
+
 	cmd.AddCommand(
 		equityBuild, optionBuild, bracketBuild, ocoBuild,
 		verticalBuild, ironCondorBuild, straddleBuild, strangleBuild,
 		coveredCallBuild, collarBuild, calendarBuild, diagonalBuild,
+		butterflyBuild, condorBuild, verticalRollBuild, backRatioBuild, doubleDiagonalBuild,
 		newBuildFTSCmd(w),
 	)
 

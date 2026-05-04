@@ -163,6 +163,305 @@ func BuildIronCondorOrder(params *IronCondorParams) (*models.OrderRequest, error
 	return order, nil
 }
 
+// ButterflyParams holds parameters for building a same-expiration butterfly.
+// A long butterfly buys the two wings and sells two contracts at the body strike.
+type ButterflyParams struct {
+	Underlying   string
+	Expiration   time.Time
+	LowerStrike  float64
+	MiddleStrike float64
+	UpperStrike  float64
+	PutCall      models.PutCall
+	Buy          bool // true = long butterfly, false = short butterfly
+	Open         bool // true = opening position, false = closing
+	Quantity     float64
+	Price        float64
+	Duration     models.Duration
+	Session      models.Session
+}
+
+// BuildButterflyOrder constructs an OrderRequest for a three-strike butterfly.
+func BuildButterflyOrder(params *ButterflyParams) (*models.OrderRequest, error) {
+	wingInstruction, bodyInstruction := directionalSpreadInstructions(params.Buy, params.Open)
+	complexType := models.ComplexOrderStrategyTypeButterfly
+
+	order := &models.OrderRequest{
+		Session:                  cmp.Or(params.Session, models.SessionNormal),
+		Duration:                 cmp.Or(params.Duration, models.DurationDay),
+		OrderType:                directionalSpreadOrderType(params.Buy, params.Open),
+		ComplexOrderStrategyType: &complexType,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		Price:                    new(params.Price),
+		OrderLegCollection: []models.OrderLegCollection{
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.LowerStrike, PutCall: params.PutCall,
+				Instruction: wingInstruction, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.MiddleStrike, PutCall: params.PutCall,
+				Instruction: bodyInstruction, Quantity: params.Quantity * 2,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.UpperStrike, PutCall: params.PutCall,
+				Instruction: wingInstruction, Quantity: params.Quantity,
+			}),
+		},
+	}
+
+	return order, nil
+}
+
+// CondorParams holds parameters for building a same-expiration condor.
+// A long condor buys the outside wings and sells the two middle strikes.
+type CondorParams struct {
+	Underlying        string
+	Expiration        time.Time
+	LowerStrike       float64
+	LowerMiddleStrike float64
+	UpperMiddleStrike float64
+	UpperStrike       float64
+	PutCall           models.PutCall
+	Buy               bool // true = long condor, false = short condor
+	Open              bool // true = opening position, false = closing
+	Quantity          float64
+	Price             float64
+	Duration          models.Duration
+	Session           models.Session
+}
+
+// BuildCondorOrder constructs an OrderRequest for a four-strike condor.
+func BuildCondorOrder(params *CondorParams) (*models.OrderRequest, error) {
+	wingInstruction, middleInstruction := directionalSpreadInstructions(params.Buy, params.Open)
+	complexType := models.ComplexOrderStrategyTypeCondor
+
+	order := &models.OrderRequest{
+		Session:                  cmp.Or(params.Session, models.SessionNormal),
+		Duration:                 cmp.Or(params.Duration, models.DurationDay),
+		OrderType:                directionalSpreadOrderType(params.Buy, params.Open),
+		ComplexOrderStrategyType: &complexType,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		Price:                    new(params.Price),
+		OrderLegCollection: []models.OrderLegCollection{
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.LowerStrike, PutCall: params.PutCall,
+				Instruction: wingInstruction, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.LowerMiddleStrike, PutCall: params.PutCall,
+				Instruction: middleInstruction, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.UpperMiddleStrike, PutCall: params.PutCall,
+				Instruction: middleInstruction, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.UpperStrike, PutCall: params.PutCall,
+				Instruction: wingInstruction, Quantity: params.Quantity,
+			}),
+		},
+	}
+
+	return order, nil
+}
+
+// BackRatioParams holds parameters for building an option back-ratio spread.
+// Quantity is the short-leg size; LongRatio controls long contracts per short.
+type BackRatioParams struct {
+	Underlying  string
+	Expiration  time.Time
+	ShortStrike float64
+	LongStrike  float64
+	PutCall     models.PutCall
+	Open        bool
+	Quantity    float64
+	LongRatio   float64
+	Credit      bool
+	Price       float64
+	Duration    models.Duration
+	Session     models.Session
+}
+
+// BuildBackRatioOrder constructs an OrderRequest for a back-ratio spread.
+func BuildBackRatioOrder(params *BackRatioParams) (*models.OrderRequest, error) {
+	longInstruction, shortInstruction := spreadInstructions(params.Open)
+	complexType := models.ComplexOrderStrategyTypeBackRatio
+
+	orderType := models.OrderTypeNetDebit
+	if params.Credit {
+		orderType = models.OrderTypeNetCredit
+	}
+
+	order := &models.OrderRequest{
+		Session:                  cmp.Or(params.Session, models.SessionNormal),
+		Duration:                 cmp.Or(params.Duration, models.DurationDay),
+		OrderType:                orderType,
+		ComplexOrderStrategyType: &complexType,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		Price:                    new(params.Price),
+		OrderLegCollection: []models.OrderLegCollection{
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.ShortStrike, PutCall: params.PutCall,
+				Instruction: shortInstruction, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.Expiration,
+				Strike: params.LongStrike, PutCall: params.PutCall,
+				Instruction: longInstruction, Quantity: params.Quantity * params.LongRatio,
+			}),
+		},
+	}
+
+	return order, nil
+}
+
+// VerticalRollParams holds parameters for closing one vertical and opening another.
+type VerticalRollParams struct {
+	Underlying       string
+	CloseExpiration  time.Time
+	OpenExpiration   time.Time
+	CloseLongStrike  float64
+	CloseShortStrike float64
+	OpenLongStrike   float64
+	OpenShortStrike  float64
+	PutCall          models.PutCall
+	Credit           bool
+	Quantity         float64
+	Price            float64
+	Duration         models.Duration
+	Session          models.Session
+}
+
+// BuildVerticalRollOrder constructs an OrderRequest that closes and opens vertical spreads.
+func BuildVerticalRollOrder(params *VerticalRollParams) (*models.OrderRequest, error) {
+	complexType := models.ComplexOrderStrategyTypeVerticalRoll
+
+	orderType := models.OrderTypeNetDebit
+	if params.Credit {
+		orderType = models.OrderTypeNetCredit
+	}
+
+	order := &models.OrderRequest{
+		Session:                  cmp.Or(params.Session, models.SessionNormal),
+		Duration:                 cmp.Or(params.Duration, models.DurationDay),
+		OrderType:                orderType,
+		ComplexOrderStrategyType: &complexType,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		Price:                    new(params.Price),
+		OrderLegCollection: []models.OrderLegCollection{
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.CloseExpiration,
+				Strike: params.CloseLongStrike, PutCall: params.PutCall,
+				Instruction: models.InstructionSellToClose, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.CloseExpiration,
+				Strike: params.CloseShortStrike, PutCall: params.PutCall,
+				Instruction: models.InstructionBuyToClose, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.OpenExpiration,
+				Strike: params.OpenLongStrike, PutCall: params.PutCall,
+				Instruction: models.InstructionBuyToOpen, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.OpenExpiration,
+				Strike: params.OpenShortStrike, PutCall: params.PutCall,
+				Instruction: models.InstructionSellToOpen, Quantity: params.Quantity,
+			}),
+		},
+	}
+
+	return order, nil
+}
+
+// DoubleDiagonalParams holds parameters for building a double diagonal spread.
+type DoubleDiagonalParams struct {
+	Underlying     string
+	NearExpiration time.Time
+	FarExpiration  time.Time
+	PutFarStrike   float64
+	PutNearStrike  float64
+	CallNearStrike float64
+	CallFarStrike  float64
+	Open           bool
+	Quantity       float64
+	Price          float64
+	Duration       models.Duration
+	Session        models.Session
+}
+
+// BuildDoubleDiagonalOrder constructs an OrderRequest for a put and call diagonal pair.
+func BuildDoubleDiagonalOrder(params *DoubleDiagonalParams) (*models.OrderRequest, error) {
+	longInstruction, shortInstruction := spreadInstructions(params.Open)
+	complexType := models.ComplexOrderStrategyTypeDoubleDiagonal
+
+	orderType := models.OrderTypeNetDebit
+	if !params.Open {
+		orderType = models.OrderTypeNetCredit
+	}
+
+	order := &models.OrderRequest{
+		Session:                  cmp.Or(params.Session, models.SessionNormal),
+		Duration:                 cmp.Or(params.Duration, models.DurationDay),
+		OrderType:                orderType,
+		ComplexOrderStrategyType: &complexType,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		Price:                    new(params.Price),
+		OrderLegCollection: []models.OrderLegCollection{
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.FarExpiration,
+				Strike: params.PutFarStrike, PutCall: models.PutCallPut,
+				Instruction: longInstruction, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.NearExpiration,
+				Strike: params.PutNearStrike, PutCall: models.PutCallPut,
+				Instruction: shortInstruction, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.NearExpiration,
+				Strike: params.CallNearStrike, PutCall: models.PutCallCall,
+				Instruction: shortInstruction, Quantity: params.Quantity,
+			}),
+			buildOptionLeg(&optionLegParams{
+				Underlying: params.Underlying, Expiration: params.FarExpiration,
+				Strike: params.CallFarStrike, PutCall: models.PutCallCall,
+				Instruction: longInstruction, Quantity: params.Quantity,
+			}),
+		},
+	}
+
+	return order, nil
+}
+
+// directionalSpreadInstructions returns outside and inside leg instructions for
+// strategies whose structure can be bought or sold, then opened or closed.
+func directionalSpreadInstructions(isBuy, isOpen bool) (outerInstruction, innerInstruction models.Instruction) {
+	if isBuy {
+		return spreadInstructions(isOpen)
+	}
+
+	innerInstruction, outerInstruction = spreadInstructions(isOpen)
+	return outerInstruction, innerInstruction
+}
+
+// directionalSpreadOrderType maps buy/sell plus open/close into net debit/credit.
+func directionalSpreadOrderType(isBuy, isOpen bool) models.OrderType {
+	if isBuy == isOpen {
+		return models.OrderTypeNetDebit
+	}
+
+	return models.OrderTypeNetCredit
+}
+
 // StraddleParams holds parameters for building a straddle order.
 // A straddle buys (or sells) both a call and a put at the same strike.
 type StraddleParams struct {
