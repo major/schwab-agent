@@ -32,17 +32,19 @@ func (o *historyGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewHistoryCmd returns the Cobra command for price history lookups.
 func NewHistoryCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	getCmd := newHistoryGetCmd(c, w)
 	cmd := &cobra.Command{
 		Use:        "history",
 		Short:      "Retrieve price history for a symbol",
 		Aliases:    []string{"price-history"},
 		SuggestFor: []string{"price-history"},
 		GroupID:    "market-data",
-		RunE:       requireSubcommand,
+		Args:       cobra.ArbitraryArgs,
+		RunE:       defaultSubcommand(getCmd),
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
-	cmd.AddCommand(newHistoryGetCmd(c, w))
+	cmd.AddCommand(getCmd)
 	return cmd
 }
 

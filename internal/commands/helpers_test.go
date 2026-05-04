@@ -114,6 +114,86 @@ func TestCobraRequireSubcommand(t *testing.T) {
 	})
 }
 
+func TestDefaultSubcommand(t *testing.T) {
+	newParent := func(t *testing.T, called *bool, gotArgs *[]string) *cobra.Command {
+		t.Helper()
+
+		defaultCmd := &cobra.Command{
+			Use:   "get SYMBOL",
+			Short: "default subcommand",
+			RunE: func(_ *cobra.Command, args []string) error {
+				*called = true
+				*gotArgs = append((*gotArgs)[:0], args...)
+
+				return nil
+			},
+		}
+		parent := &cobra.Command{
+			Use:  "parent",
+			Args: cobra.ArbitraryArgs,
+			RunE: defaultSubcommand(defaultCmd),
+		}
+		parent.AddCommand(defaultCmd)
+		parent.AddCommand(&cobra.Command{
+			Use:   "sma SYMBOL",
+			Short: "named subcommand",
+			RunE:  func(_ *cobra.Command, _ []string) error { return nil },
+		})
+
+		return parent
+	}
+
+	t.Run("args dispatch to default subcommand RunE", func(t *testing.T) {
+		// Arrange
+		called := false
+		gotArgs := []string{}
+		parent := newParent(t, &called, &gotArgs)
+
+		// Act
+		_, err := runTestCommand(t, parent, "AAPL")
+
+		// Assert
+		require.NoError(t, err)
+		assert.True(t, called)
+		assert.Equal(t, []string{"AAPL"}, gotArgs)
+	})
+
+	t.Run("no args returns requireSubcommand validation error", func(t *testing.T) {
+		// Arrange
+		called := false
+		gotArgs := []string{}
+		parent := newParent(t, &called, &gotArgs)
+
+		// Act
+		_, err := runTestCommand(t, parent)
+
+		// Assert
+		var valErr *apperr.ValidationError
+		require.ErrorAs(t, err, &valErr)
+		assert.Contains(t, valErr.Error(), `"parent" requires a subcommand`)
+		assert.False(t, called)
+		assert.Empty(t, gotArgs)
+	})
+
+	t.Run("subcommand name falls through to requireSubcommand", func(t *testing.T) {
+		// Arrange
+		called := false
+		gotArgs := []string{}
+		parent := newParent(t, &called, &gotArgs)
+
+		// Act - Cobra normally routes this before parent RunE. Calling the RunE
+		// directly verifies the defensive guard for future command wiring changes.
+		err := parent.RunE(parent, []string{"sma"})
+
+		// Assert
+		var valErr *apperr.ValidationError
+		require.ErrorAs(t, err, &valErr)
+		assert.Contains(t, valErr.Error(), `unknown command "sma" for "parent"`)
+		assert.False(t, called)
+		assert.Empty(t, gotArgs)
+	})
+}
+
 func TestCobraVisibleSubcommandNames(t *testing.T) {
 	// Arrange
 	parent := &cobra.Command{

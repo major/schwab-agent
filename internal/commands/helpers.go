@@ -125,6 +125,23 @@ func requireSubcommand(cmd *cobra.Command, args []string) error {
 	)
 }
 
+// defaultSubcommand returns a RunE for parent commands that have a preferred
+// positional-only shorthand. Cobra has already failed to resolve args[0] as a
+// subcommand when this parent RunE is called, so a non-subcommand first arg can
+// be handed directly to the default child command's RunE.
+func defaultSubcommand(sub *cobra.Command) func(cmd *cobra.Command, args []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 || slices.Contains(visibleSubcommandNames(cmd), args[0]) {
+			return requireSubcommand(cmd, args)
+		}
+
+		// Do not call Execute here: that would re-run the root PersistentPreRunE,
+		// causing duplicate auth/client setup. The shorthand intentionally forwards
+		// positional args only; flags still require the explicit subcommand form.
+		return sub.RunE(sub, args)
+	}
+}
+
 // suggestSubcommands handles usage errors that happen before RunE runs. This
 // is most useful for parent commands whose subcommands own distinct flags: an
 // unknown flag on the parent usually means the user skipped the subcommand.

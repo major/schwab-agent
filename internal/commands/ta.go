@@ -366,6 +366,7 @@ func (o *dashboardOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewTACmd returns the Cobra command for technical analysis indicators.
 func NewTACmd(c *client.Ref, w io.Writer) *cobra.Command {
+	dashboardCmd := cobraTADashboardCommand(c, w)
 	cmd := &cobra.Command{
 		Use:   "ta",
 		Short: "Technical analysis indicators",
@@ -375,12 +376,13 @@ frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
 default --points to 1 for token-efficient latest-value output; use --points 0
 when you need the full computed series.`,
 		GroupID: "market-data",
-		RunE:    requireSubcommand,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    defaultSubcommand(dashboardCmd),
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
 	cmd.AddCommand(
-		cobraTADashboardCommand(c, w),
+		dashboardCmd,
 		makeCobraSimpleTACommand(&simpleTAConfig{
 			name:  "sma",
 			usage: "Simple Moving Average",
