@@ -102,6 +102,37 @@ run_help_test() {
     fi
 }
 
+# run_error_test validates that a command exits non-zero (expected error).
+run_error_test() {
+    local name="$1"
+    shift
+    if ! "$BINARY" "$@" > /dev/null 2>&1; then
+        printf "${GREEN}PASS${NC} %s (expected error)\n" "$name"
+        PASS=$((PASS + 1))
+    else
+        printf "${RED}FAIL${NC} %s (expected non-zero exit, got 0)\n" "$name"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+# run_dispatch_test validates that a shorthand command dispatches correctly.
+# Dispatch succeeds if exit code is NOT 1 (validation error). Exit 0 (success with
+# token) or exit 3 (auth error without token) both prove dispatch happened.
+# Usage: run_dispatch_test "test name" command args...
+run_dispatch_test() {
+    local name="$1"
+    shift
+    "$BINARY" "$@" > /dev/null 2>&1
+    local actual_code=$?
+    if [ "$actual_code" -ne 1 ]; then
+        printf "${GREEN}PASS${NC} %s (exit %d, dispatch verified)\n" "$name" "$actual_code"
+        PASS=$((PASS + 1))
+    else
+        printf "${RED}FAIL${NC} %s (exit 1 = validation error, dispatch failed)\n" "$name"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 section() {
     printf "\n${BOLD}--- %s ---${NC}\n" "$1"
 }
@@ -198,6 +229,27 @@ run_help_test "ta adx"            ta adx
 run_help_test "ta vwap"           ta vwap
 run_help_test "ta hv"             ta hv
 run_help_test "ta expected-move"  ta expected-move
+run_help_test "indicators"        indicators
+run_help_test "analyze"           analyze
+run_help_test "price-history"     price-history
+run_help_test "price-history get" price-history get
+
+# -------------------------------------------------------------------
+# Shorthand and alias error cases (no args)
+# -------------------------------------------------------------------
+
+section "Shorthand/Alias Error Cases"
+
+run_error_test "quote (no args)" quote
+run_error_test "history (no args)" history
+run_error_test "ta (no args)" ta
+run_error_test "indicators (no args)" indicators
+run_error_test "analyze (no args)" analyze
+
+# Shorthand dispatch tests: verify dispatch happens (not exit 1 = validation error)
+run_dispatch_test "quote shorthand dispatches" quote AAPL
+run_dispatch_test "history shorthand dispatches" history AAPL
+run_dispatch_test "ta shorthand dispatches" ta AAPL
 
 # -------------------------------------------------------------------
 # Symbol build / parse

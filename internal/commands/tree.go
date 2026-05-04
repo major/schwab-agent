@@ -31,6 +31,8 @@ func BuildCommandTree(
 	root.AddCommand(NewOptionCmd(ref, w))
 	root.AddCommand(NewMarketCmd(ref, w))
 	root.AddCommand(NewTACmd(ref, w))
+	root.AddCommand(NewIndicatorsCmd(ref, w))
+	root.AddCommand(NewAnalyzeCmd(ref, w))
 	root.AddCommand(NewAccountCmd(ref, configPath, w))
 	root.AddCommand(NewPositionCmd(ref, configPath, w))
 	root.AddCommand(NewAuthCmd(configPath, tokenPath, w, authDeps))

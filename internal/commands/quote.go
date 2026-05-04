@@ -27,18 +27,19 @@ var validQuoteFields = map[string]bool{
 }
 
 // NewQuoteCmd returns the Cobra command for stock quote operations.
-// The parent command requires a subcommand (no DefaultCommand behavior).
 func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
+	getCmd := newQuoteGetCmd(c, w)
 	cmd := &cobra.Command{
 		Use:     "quote",
 		Short:   "Stock quote operations",
 		Long:    "Get quotes for one or more symbols",
-		RunE:    requireSubcommand,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    defaultSubcommand(getCmd),
 		GroupID: "market-data",
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
-	cmd.AddCommand(newQuoteGetCmd(c, w))
+	cmd.AddCommand(getCmd)
 
 	return cmd
 }

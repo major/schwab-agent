@@ -161,8 +161,10 @@ schwab-agent order place --spec @order.json
 | `order` | List, get, place, preview, build, cancel, replace |
 | `chain` | Option chain data (`get`, `expiration`) |
 | `option` | Option planning tickets that combine quote, chain, and OCC symbol context |
-| `history` | Price history for a symbol |
+| `history` | Price history for a symbol (alias: `price-history`) |
 | `ta` | Technical analysis (dashboard, sma, ema, rsi, macd, atr, bbands, stoch, adx, vwap, hv, expected-move) |
+| `indicators` | Technical analysis dashboard shortcut |
+| `analyze` | Combined quote and technical analysis dashboard |
 | `market` | Market hours and top movers |
 | `symbol` | Build and parse OCC option symbols (no auth required) |
 | `instrument` | Search instruments |

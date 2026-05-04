@@ -113,3 +113,13 @@ func TestNewHistoryCmd_Get_APIError(t *testing.T) {
 	_, err := runTestCommand(t, cmd, "get", "AAPL")
 	require.Error(t, err)
 }
+
+func TestNewHistoryCmd_PriceHistoryAlias(t *testing.T) {
+	// Verify that the "price-history" alias is registered on the history command.
+	srv := jsonServer(`{"symbol":"AAPL","empty":false,"candles":[]}`)
+	defer srv.Close()
+
+	cmd := NewHistoryCmd(testClient(t, srv), &bytes.Buffer{})
+
+	assert.Contains(t, cmd.Aliases, "price-history")
+}
