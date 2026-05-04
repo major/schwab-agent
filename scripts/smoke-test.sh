@@ -263,6 +263,9 @@ run_help_contains_test "order replace shows equity symbol flag" "--symbol" order
 run_help_contains_test "order replace option shows underlying flag" "--underlying" order replace option
 run_help_contains_test "order replace option shows call flag" "--call" order replace option
 run_help_contains_test "order replace option shows put flag" "--put" order replace option
+run_help_contains_test "order preview shows save-preview flag" "--save-preview" order preview
+run_help_contains_test "order preview equity shows save-preview flag" "--save-preview" order preview equity
+run_help_contains_test "order place shows from-preview flag" "--from-preview" order place
 
 run_help_contains_test "quote get shows underlying flag" "--underlying" quote get
 run_help_contains_test "quote get shows call flag" "--call" quote get

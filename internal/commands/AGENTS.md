@@ -72,6 +72,7 @@ if err := requireMutableEnabled(configPath); err != nil { return err }
 ```
 
 - `requireMutableEnabled`: Checks `i-also-like-to-live-dangerously` in config
+- `preview_ledger.go`: Saves `order preview --save-preview` payloads in the local state dir with 15-minute TTLs. `order place --from-preview <digest>` must submit the saved `models.OrderRequest` unchanged after digest, TTL, and optional `--account` checks pass.
 
 ## Account Resolution
 
@@ -97,6 +98,7 @@ Four order types share a common pattern: parse flags -> validate -> build -> pla
 - **OCO**: `parseOCOParams` -> `orderbuilder.ValidateOCOOrder` -> `orderbuilder.BuildOCOOrder`
 
 Spec mode (`--spec`): Accepts inline JSON, `@file` path, or `-` for stdin via `readSpecSource()`.
+Preview digest mode (`order preview --save-preview` then `order place --from-preview <digest>`): Binds the canonical order JSON to the account, operation, and endpoint so agents can separate review from mutation without rebuilding the payload.
 
 ## Enum Parsing
 

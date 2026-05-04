@@ -130,12 +130,16 @@ schwab-agent order place equity \
   --price 150.00 \
   --duration DAY
 
-# Preview an order without placing it
+# Preview an order without placing it, then save the exact reviewed payload
 schwab-agent order preview equity \
   --symbol AAPL \
   --action BUY \
   --quantity 10 \
-  --type MARKET
+  --type MARKET \
+  --save-preview
+
+# Place the exact payload returned by previewDigest.digest
+schwab-agent order place --from-preview <digest>
 
 # Show recent order activity, including filled/canceled/replaced orders
 schwab-agent order list --recent
@@ -208,9 +212,10 @@ schwab-agent order place --spec @order.json
 
 ## Safety
 
-schwab-agent has a single layer of protection for operations that modify your account:
+schwab-agent has two layers of protection for operations that modify your account:
 
 1. **Config flag**: Set `"i-also-like-to-live-dangerously": true` in your config file to enable mutable operations (order placement, cancellation, replacement).
+2. **Preview digest flow**: Add `--save-preview` to `order preview` to store the exact payload locally for 15 minutes, then submit that same payload with `order place --from-preview <digest>`. The digest is bound to the account, operation, endpoint, and canonical order JSON. It is a local safety reference, not a Schwab reservation or idempotency key.
 
 This prevents accidental trades from misconfigured agents.
 

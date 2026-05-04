@@ -25,6 +25,7 @@ type orderActionData struct {
 	Action               string               `json:"action"`
 	OrderID              int64                `json:"orderId"`
 	OriginalOrderID      *int64               `json:"originalOrderId,omitempty"`
+	PreviewDigest        string               `json:"previewDigest,omitempty"`
 	SubmittedOrder       *models.OrderRequest `json:"submittedOrder,omitempty"`
 	Canceled             bool                 `json:"canceled,omitempty"`
 	Replaced             bool                 `json:"replaced,omitempty"`
@@ -38,14 +39,16 @@ type orderActionData struct {
 
 // orderPreviewData wraps an order preview response.
 type orderPreviewData struct {
-	BuiltOrder *models.OrderRequest `json:"builtOrder,omitempty"`
-	Preview    *models.PreviewOrder `json:"preview"`
-	OrderID    *int64               `json:"orderId,omitempty"`
+	BuiltOrder    *models.OrderRequest `json:"builtOrder,omitempty"`
+	Preview       *models.PreviewOrder `json:"preview"`
+	OrderID       *int64               `json:"orderId,omitempty"`
+	PreviewDigest *previewDigestData   `json:"previewDigest,omitempty"`
 }
 
 // orderPlaceOpts holds local flags for top-level spec-based order placement.
 type orderPlaceOpts struct {
-	Spec string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin" flagrequired:"true"`
+	Spec        string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin"`
+	FromPreview string `flag:"from-preview" flagdescr:"Place the exact order payload saved by order preview --save-preview"`
 }
 
 // Attach implements structcli.Options interface.
@@ -53,7 +56,8 @@ func (o *orderPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // orderPreviewOpts holds local flags for order preview.
 type orderPreviewOpts struct {
-	Spec string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin" flagrequired:"true"`
+	Spec        string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin" flagrequired:"true"`
+	SavePreview bool   `flag:"save-preview" flagdescr:"Save this preview locally and return a digest for order place --from-preview"`
 }
 
 // Attach implements structcli.Options interface.
@@ -162,29 +166,101 @@ func writeOrderActionResult(w io.Writer, data *orderActionData, errs []string) e
 	return output.WriteSuccess(w, data, metadata)
 }
 
+type orderPlacePayload struct {
+	Account       string
+	Order         *models.OrderRequest
+	PreviewDigest string
+}
+
+// resolveOrderPlacePayload returns the account and order payload for top-level
+// placement. `--from-preview` deliberately bypasses spec parsing so the mutable
+// submit path reuses the exact payload saved during preview instead of rebuilding
+// an order from fresh flags or JSON.
+func resolveOrderPlacePayload(cmd *cobra.Command, c *client.Ref, configPath string, opts *orderPlaceOpts) (*orderPlacePayload, error) {
+	if strings.TrimSpace(opts.FromPreview) != "" {
+		entry, err := loadOrderPreview(opts.FromPreview)
+		if err != nil {
+			return nil, err
+		}
+
+		accountFlag, err := cmd.Flags().GetString("account")
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(accountFlag) != "" {
+			account, err := resolveAccount(c, accountFlag, configPath, nil)
+			if err != nil {
+				return nil, err
+			}
+			if account != entry.Account {
+				return nil, newValidationError("--account does not match the account bound to the preview digest")
+			}
+		}
+
+		return &orderPlacePayload{Account: entry.Account, Order: entry.Order, PreviewDigest: entry.Digest}, nil
+	}
+
+	accountFlag, err := cmd.Flags().GetString("account")
+	if err != nil {
+		return nil, err
+	}
+	account, err := resolveAccount(c, accountFlag, configPath, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	order, err := parseSpecOrder(cmd, opts.Spec)
+	if err != nil {
+		return nil, err
+	}
+	return &orderPlacePayload{Account: account, Order: order}, nil
+}
+
+// writeOrderPreviewResult optionally saves the previewed order to the local
+// digest ledger before emitting the standard preview envelope.
+func writeOrderPreviewResult(w io.Writer, account string, order *models.OrderRequest, preview *models.PreviewOrder, savePreview bool) error {
+	data := orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}
+	if savePreview {
+		digestData, err := saveOrderPreview(account, order, preview)
+		if err != nil {
+			return err
+		}
+		data.PreviewDigest = digestData
+	}
+
+	return output.WriteSuccess(w, data, output.NewMetadata())
+}
+
 // newOrderPlaceCmd places new orders from either flags or a JSON spec.
 func newOrderPlaceCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 	opts := &orderPlaceOpts{}
 	cmd := &cobra.Command{
 		Use:   "place",
 		Short: "Place an order",
-		Long: `Place an order via subcommand (equity, option, bracket, oco) or from a JSON spec
-with --spec. Requires "i-also-like-to-live-dangerously" set to true in config.json.
-Recommended workflow: check the price with quote get, build the order JSON with
-order build, preview it with order preview, then place.`,
+		Long: `Place an order via subcommand (equity, option, bracket, oco), from a JSON spec
+with --spec, or from an exact saved preview with --from-preview. Requires
+"i-also-like-to-live-dangerously" set to true in config.json. The safest workflow
+is to run order preview --save-preview, inspect the response, then place with the
+returned previewDigest.digest value.`,
 		Example: `  # Place from a JSON file
-   schwab-agent order place --spec @order.json
-   # Place from stdin (piped from order build)
-   schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -
-   # Place from inline JSON
-   schwab-agent order place --spec '{"orderType":"LIMIT",...}'`,
+  schwab-agent order place --spec @order.json
+  # Place the exact payload saved by a previous preview
+  schwab-agent order preview equity --account abc123 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --save-preview
+  schwab-agent order place --from-preview <digest>
+  # Place from stdin (piped from order build)
+  schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order place --spec -
+  # Place from inline JSON
+  schwab-agent order place --spec '{"orderType":"LIMIT",...}'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := structcli.Unmarshal(cmd, opts); err != nil {
 				return err
 			}
 
-			if strings.TrimSpace(opts.Spec) == "" {
-				return newValidationError("spec is required for `order place` without a subcommand")
+			specProvided := strings.TrimSpace(opts.Spec) != ""
+			previewDigest := strings.TrimSpace(opts.FromPreview)
+			fromPreviewProvided := previewDigest != ""
+			if specProvided == fromPreviewProvided {
+				return newValidationError("provide exactly one of --spec or --from-preview for `order place` without a subcommand")
 			}
 
 			configFlag, err := cmd.Flags().GetString("config")
@@ -199,30 +275,21 @@ order build, preview it with order preview, then place.`,
 				return err
 			}
 
-			accountFlag, err := cmd.Flags().GetString("account")
+			payload, err := resolveOrderPlacePayload(cmd, c, configFlag, opts)
+			if err != nil {
+				return err
+			}
+			if err := orderbuilder.ValidateOrderRequest(payload.Order); err != nil {
+				return err
+			}
+
+			response, err := c.PlaceOrder(cmd.Context(), payload.Account, payload.Order)
 			if err != nil {
 				return err
 			}
 
-			account, err := resolveAccount(c, accountFlag, configFlag, nil)
-			if err != nil {
-				return err
-			}
-
-			order, err := parseSpecOrder(cmd, opts.Spec)
-			if err != nil {
-				return err
-			}
-			if err := orderbuilder.ValidateOrderRequest(order); err != nil {
-				return err
-			}
-
-			response, err := c.PlaceOrder(cmd.Context(), account, order)
-			if err != nil {
-				return err
-			}
-
-			data, errs := fetchOrderActionData(cmd, c, account, "place", response.OrderID, order)
+			data, errs := fetchOrderActionData(cmd, c, payload.Account, "place", response.OrderID, payload.Order)
+			data.PreviewDigest = payload.PreviewDigest
 			return writeOrderActionResult(w, &data, errs)
 		},
 	}
@@ -231,6 +298,7 @@ order build, preview it with order preview, then place.`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.MarkFlagsMutuallyExclusive("spec", "from-preview")
 
 	equityCmd := makeCobraPlaceOrderCommand(c, configPath, w, "equity", "Place an equity order", func() *equityPlaceOpts { return &equityPlaceOpts{} }, func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) }, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
 	equityCmd.Long = `Place an equity (stock) order. Supports MARKET, LIMIT, STOP, STOP_LIMIT, and
@@ -381,9 +449,11 @@ func newOrderPreviewCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Co
 Typed preview subcommands reuse the same local builders as order place, then
 return both the built order request and Schwab preview response in one envelope.
 This removes the build-then-preview round trip while keeping placement explicit.
-Does not require safety guards since no order is actually placed.`,
+Use --save-preview to store the exact reviewed payload locally and return a
+previewDigest.digest value for order place --from-preview. Does not require
+safety guards since no order is actually placed.`,
 		Example: `  schwab-agent order preview --spec @order.json
-  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200
+  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 --save-preview
   schwab-agent order preview option --underlying AAPL --expiration 2026-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
   schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -395,12 +465,20 @@ Does not require safety guards since no order is actually placed.`,
 				return newValidationError("spec is required")
 			}
 
+			configFlag, err := cmd.Flags().GetString("config")
+			if err != nil {
+				return err
+			}
+			if configFlag == "" {
+				configFlag = configPath
+			}
+
 			accountFlag, err := cmd.Flags().GetString("account")
 			if err != nil {
 				return err
 			}
 
-			account, err := resolveAccount(c, accountFlag, configPath, nil)
+			account, err := resolveAccount(c, accountFlag, configFlag, nil)
 			if err != nil {
 				return err
 			}
@@ -418,7 +496,7 @@ Does not require safety guards since no order is actually placed.`,
 				return err
 			}
 
-			return output.WriteSuccess(w, orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}, output.NewMetadata())
+			return writeOrderPreviewResult(w, account, order, preview, opts.SavePreview)
 		},
 	}
 
@@ -430,7 +508,8 @@ Does not require safety guards since no order is actually placed.`,
 	equityCmd.Long = `Preview an equity (stock) order without placing it. Supports the same flags
 as order place equity, but skips the mutable-operation safety gate because no
 order is submitted. The response includes the built order request plus Schwab's
-preview details so agents can inspect both in one call.`
+preview details so agents can inspect both in one call. Add --save-preview to
+return a digest for exact-payload placement.`
 	equityCmd.Example = `  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10
 	  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC`
 
@@ -439,7 +518,8 @@ preview details so agents can inspect both in one call.`
 	}, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder)
 	optionCmd.Long = `Preview a single-leg option order without placing it. Requires --underlying,
 --expiration, --strike, and exactly one of --call or --put. The response includes
-the locally built OCC order request and Schwab's preview response.`
+the locally built OCC order request and Schwab's preview response. Add
+--save-preview to return a digest for exact-payload placement.`
 	optionCmd.Example = `  schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1
 	  schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50`
 
@@ -492,12 +572,20 @@ func makeCobraPreviewOrderCommand[O any, P any](
 				return err
 			}
 
+			configFlag, err := cmd.Flags().GetString("config")
+			if err != nil {
+				return err
+			}
+			if configFlag == "" {
+				configFlag = configPath
+			}
+
 			accountFlag, err := cmd.Flags().GetString("account")
 			if err != nil {
 				return err
 			}
 
-			account, err := resolveAccount(c, accountFlag, configPath, nil)
+			account, err := resolveAccount(c, accountFlag, configFlag, nil)
 			if err != nil {
 				return err
 			}
@@ -521,7 +609,11 @@ func makeCobraPreviewOrderCommand[O any, P any](
 				return err
 			}
 
-			return output.WriteSuccess(w, orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}, output.NewMetadata())
+			savePreview, err := cmd.Flags().GetBool("save-preview")
+			if err != nil {
+				return err
+			}
+			return writeOrderPreviewResult(w, account, order, preview, savePreview)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
@@ -529,6 +621,7 @@ func makeCobraPreviewOrderCommand[O any, P any](
 	if flagSetup != nil {
 		flagSetup(cmd, opts)
 	}
+	cmd.Flags().Bool("save-preview", false, "Save this preview locally and return a digest for order place --from-preview")
 
 	return cmd
 }

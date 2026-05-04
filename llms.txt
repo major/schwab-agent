@@ -218,10 +218,11 @@ everything. Use --recent for an agent-friendly recent activity view that keeps
 terminal statuses and narrows the default lookback to 24 hours. Multiple
 --status values fan out into separate API calls with merged, deduplicated
 results.
-- [schwab-agent order place](#schwab-agent-order-place): Place an order via subcommand (equity, option, bracket, oco) or from a JSON spec
-with --spec. Requires "i-also-like-to-live-dangerously" set to true in config.json.
-Recommended workflow: check the price with quote get, build the order JSON with
-order build, preview it with order preview, then place.
+- [schwab-agent order place](#schwab-agent-order-place): Place an order via subcommand (equity, option, bracket, oco), from a JSON spec
+with --spec, or from an exact saved preview with --from-preview. Requires
+"i-also-like-to-live-dangerously" set to true in config.json. The safest workflow
+is to run order preview --save-preview, inspect the response, then place with the
+returned previewDigest.digest value.
 - [schwab-agent order place bracket](#schwab-agent-order-place-bracket): Place a bracket order that combines an entry trade with automatic exit orders.
 At least one of --take-profit or --stop-loss is required. Exit instructions are
 auto-inverted from the entry action (BUY entry creates SELL exits). Canceling
@@ -242,20 +243,24 @@ i-also-like-to-live-dangerously in config for placement.
 Typed preview subcommands reuse the same local builders as order place, then
 return both the built order request and Schwab preview response in one envelope.
 This removes the build-then-preview round trip while keeping placement explicit.
-Does not require safety guards since no order is actually placed.
+Use --save-preview to store the exact reviewed payload locally and return a
+previewDigest.digest value for order place --from-preview. Does not require
+safety guards since no order is actually placed.
 - [schwab-agent order preview bracket](#schwab-agent-order-preview-bracket): Preview a bracket order without placing it. At least one of --take-profit or
 --stop-loss is required. The preview response includes the locally built trigger
 order and Schwab's validation, fee, and commission details.
 - [schwab-agent order preview equity](#schwab-agent-order-preview-equity): Preview an equity (stock) order without placing it. Supports the same flags
 as order place equity, but skips the mutable-operation safety gate because no
 order is submitted. The response includes the built order request plus Schwab's
-preview details so agents can inspect both in one call.
+preview details so agents can inspect both in one call. Add --save-preview to
+return a digest for exact-payload placement.
 - [schwab-agent order preview oco](#schwab-agent-order-preview-oco): Preview a one-cancels-other order for an existing position without placing it.
 When both exits are present, the built order shows the OCO relationship Schwab
 will validate during preview.
 - [schwab-agent order preview option](#schwab-agent-order-preview-option): Preview a single-leg option order without placing it. Requires --underlying,
 --expiration, --strike, and exactly one of --call or --put. The response includes
-the locally built OCC order request and Schwab's preview response.
+the locally built OCC order request and Schwab's preview response. Add
+--save-preview to return a digest for exact-payload placement.
 - [schwab-agent order replace](#schwab-agent-order-replace): Replace an existing order with a new equity order. The original order is
 canceled and a new one is created with a new ID. Only equity order flags are
 accepted. Requires the "i-also-like-to-live-dangerously" config flag. The
@@ -1079,14 +1084,16 @@ results.
 
 ## schwab-agent order place
 
-Place an order via subcommand (equity, option, bracket, oco) or from a JSON spec
-with --spec. Requires "i-also-like-to-live-dangerously" set to true in config.json.
-Recommended workflow: check the price with quote get, build the order JSON with
-order build, preview it with order preview, then place.
+Place an order via subcommand (equity, option, bracket, oco), from a JSON spec
+with --spec, or from an exact saved preview with --from-preview. Requires
+"i-also-like-to-live-dangerously" set to true in config.json. The safest workflow
+is to run order preview --save-preview, inspect the response, then place with the
+returned previewDigest.digest value.
 
 ### Flags
 
-- `--spec` (string, required): Inline JSON, @file, or - for stdin
+- `--from-preview` (string): Place the exact order payload saved by order preview --save-preview
+- `--spec` (string): Inline JSON, @file, or - for stdin
 
 ## schwab-agent order place bracket
 
@@ -1182,10 +1189,13 @@ Preview an order from a JSON spec or typed subcommand flags without placing it.
 Typed preview subcommands reuse the same local builders as order place, then
 return both the built order request and Schwab preview response in one envelope.
 This removes the build-then-preview round trip while keeping placement explicit.
-Does not require safety guards since no order is actually placed.
+Use --save-preview to store the exact reviewed payload locally and return a
+previewDigest.digest value for order place --from-preview. Does not require
+safety guards since no order is actually placed.
 
 ### Flags
 
+- `--save-preview` (bool, default: false): Save this preview locally and return a digest for order place --from-preview
 - `--spec` (string, required): Inline JSON, @file, or - for stdin
 
 ## schwab-agent order preview bracket
@@ -1200,6 +1210,7 @@ order and Schwab's validation, fee, and commission details.
 - `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
 - `--price` (float64, default: 0): Entry price
 - `--quantity` (float64, default: 0, required): Share quantity
+- `--save-preview` (bool, default: false): Save this preview locally and return a digest for order place --from-preview
 - `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
 - `--stop-loss` (float64, default: 0): Stop-loss exit price
 - `--symbol` (string, required): Equity symbol
@@ -1211,7 +1222,8 @@ order and Schwab's validation, fee, and commission details.
 Preview an equity (stock) order without placing it. Supports the same flags
 as order place equity, but skips the mutable-operation safety gate because no
 order is submitted. The response includes the built order request plus Schwab's
-preview details so agents can inspect both in one call.
+preview details so agents can inspect both in one call. Add --save-preview to
+return a digest for exact-payload placement.
 
 ### Flags
 
@@ -1223,6 +1235,7 @@ preview details so agents can inspect both in one call.
 - `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
 - `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
 - `--quantity` (float64, default: 0, required): Share quantity
+- `--save-preview` (bool, default: false): Save this preview locally and return a digest for order place --from-preview
 - `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
 - `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE}
 - `--stop-link-basis` (string): Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
@@ -1244,6 +1257,7 @@ will validate during preview.
 - `--action` (string, required): Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
 - `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
 - `--quantity` (float64, default: 0, required): Share quantity
+- `--save-preview` (bool, default: false): Save this preview locally and return a digest for order place --from-preview
 - `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
 - `--stop-loss` (float64, default: 0): Stop-loss exit price (stop order)
 - `--symbol` (string, required): Equity symbol
@@ -1253,7 +1267,8 @@ will validate during preview.
 
 Preview a single-leg option order without placing it. Requires --underlying,
 --expiration, --strike, and exactly one of --call or --put. The response includes
-the locally built OCC order request and Schwab's preview response.
+the locally built OCC order request and Schwab's preview response. Add
+--save-preview to return a digest for exact-payload placement.
 
 ### Flags
 
@@ -1267,6 +1282,7 @@ the locally built OCC order request and Schwab's preview response.
 - `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
 - `--put` (bool, default: false): Put option
 - `--quantity` (float64, default: 0, required): Contract quantity
+- `--save-preview` (bool, default: false): Save this preview locally and return a digest for order place --from-preview
 - `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
 - `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE}
 - `--strike` (float64, default: 0, required): Strike price

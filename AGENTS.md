@@ -101,6 +101,7 @@ JSON at `~/.config/schwab-agent/config.json`. Fields: `client_id`, `client_secre
 ## Safety Guards
 
 - **Mutable operations** require `"i-also-like-to-live-dangerously": true` in config
+- **Preview digest ledger**: `order preview --save-preview` stores the exact canonical order payload under the local state dir (`$SCHWAB_AGENT_STATE_DIR/previews`, `$XDG_STATE_HOME/schwab-agent/previews`, or `~/.local/state/schwab-agent/previews`) with `0700` directories and `0600` files. `order place --from-preview <digest>` reloads the account-bound payload, verifies the SHA-256 digest and 15-minute TTL, rejects account mismatches, and submits the stored payload unchanged.
 - Market orders intentionally exclude price fields in the builder
 
 ## Testing Conventions
