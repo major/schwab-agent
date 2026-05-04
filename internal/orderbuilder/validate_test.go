@@ -446,6 +446,261 @@ func TestValidateDoubleDiagonalOrderRejectsOverlappingStrikes(t *testing.T) {
 	assertValidationError(t, err, "double diagonal strikes must be ordered put-far < put-near < call-near < call-far", "Keep put strikes below call strikes so the near short legs do not overlap")
 }
 
+// TestValidateNewOptionStrategiesCommonFailures covers validation branches that
+// are shared by the new strategy builders. These are user-facing errors, not
+// coverage-only paths, because every builder can receive malformed direct API
+// input even when CLI flag constraints catch many cases earlier.
+func TestValidateNewOptionStrategiesCommonFailures(t *testing.T) {
+	t.Parallel()
+
+	future := time.Now().UTC().Add(30 * 24 * time.Hour)
+	later := future.Add(30 * 24 * time.Hour)
+	past := time.Now().UTC().Add(-24 * time.Hour)
+
+	testCases := []struct {
+		name    string
+		check   func() error
+		message string
+	}{
+		{
+			name: "butterfly missing underlying",
+			check: func() error {
+				return ValidateButterflyOrder(&ButterflyParams{Expiration: future, LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14, PutCall: models.PutCallCall, Quantity: 1, Price: 0.50})
+			},
+			message: "underlying symbol is required",
+		},
+		{
+			name: "butterfly zero quantity",
+			check: func() error {
+				return ValidateButterflyOrder(&ButterflyParams{Underlying: "F", Expiration: future, LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14, PutCall: models.PutCallCall, Price: 0.50})
+			},
+			message: "quantity must be greater than zero",
+		},
+		{
+			name: "butterfly past expiration",
+			check: func() error {
+				return ValidateButterflyOrder(&ButterflyParams{Underlying: "F", Expiration: past, LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14, PutCall: models.PutCallCall, Quantity: 1, Price: 0.50})
+			},
+			message: "option expiration date is in the past",
+		},
+		{
+			name: "butterfly negative strike",
+			check: func() error {
+				return ValidateButterflyOrder(&ButterflyParams{Underlying: "F", Expiration: future, LowerStrike: -10, MiddleStrike: 12, UpperStrike: 14, PutCall: models.PutCallCall, Quantity: 1, Price: 0.50})
+			},
+			message: "lower-strike must be greater than zero",
+		},
+		{
+			name: "butterfly missing option type",
+			check: func() error {
+				return ValidateButterflyOrder(&ButterflyParams{Underlying: "F", Expiration: future, LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14, Quantity: 1, Price: 0.50})
+			},
+			message: "option type (call or put) is required",
+		},
+		{
+			name: "butterfly missing price",
+			check: func() error {
+				return ValidateButterflyOrder(&ButterflyParams{Underlying: "F", Expiration: future, LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14, PutCall: models.PutCallCall, Quantity: 1})
+			},
+			message: "price is required for butterflies",
+		},
+		{
+			name: "condor missing option type",
+			check: func() error {
+				return ValidateCondorOrder(&CondorParams{Underlying: "F", Expiration: future, LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16, Quantity: 1, Price: 0.50})
+			},
+			message: "option type (call or put) is required",
+		},
+		{
+			name: "condor missing underlying",
+			check: func() error {
+				return ValidateCondorOrder(&CondorParams{Expiration: future, LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16, PutCall: models.PutCallPut, Quantity: 1, Price: 0.50})
+			},
+			message: "underlying symbol is required",
+		},
+		{
+			name: "condor zero quantity",
+			check: func() error {
+				return ValidateCondorOrder(&CondorParams{Underlying: "F", Expiration: future, LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16, PutCall: models.PutCallPut, Price: 0.50})
+			},
+			message: "quantity must be greater than zero",
+		},
+		{
+			name: "condor past expiration",
+			check: func() error {
+				return ValidateCondorOrder(&CondorParams{Underlying: "F", Expiration: past, LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16, PutCall: models.PutCallPut, Quantity: 1, Price: 0.50})
+			},
+			message: "option expiration date is in the past",
+		},
+		{
+			name: "condor negative strike",
+			check: func() error {
+				return ValidateCondorOrder(&CondorParams{Underlying: "F", Expiration: future, LowerStrike: 10, LowerMiddleStrike: -12, UpperMiddleStrike: 14, UpperStrike: 16, PutCall: models.PutCallPut, Quantity: 1, Price: 0.50})
+			},
+			message: "lower-middle-strike must be greater than zero",
+		},
+		{
+			name: "condor missing price",
+			check: func() error {
+				return ValidateCondorOrder(&CondorParams{Underlying: "F", Expiration: future, LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16, PutCall: models.PutCallPut, Quantity: 1})
+			},
+			message: "price is required for condors",
+		},
+		{
+			name: "back-ratio equal strikes",
+			check: func() error {
+				return ValidateBackRatioOrder(&BackRatioParams{Underlying: "F", Expiration: future, ShortStrike: 12, LongStrike: 12, PutCall: models.PutCallCall, Quantity: 1, LongRatio: 2, Price: 0.20})
+			},
+			message: "short and long strikes must be different",
+		},
+		{
+			name: "back-ratio missing underlying",
+			check: func() error {
+				return ValidateBackRatioOrder(&BackRatioParams{Expiration: future, ShortStrike: 12, LongStrike: 14, PutCall: models.PutCallCall, Quantity: 1, LongRatio: 2, Price: 0.20})
+			},
+			message: "underlying symbol is required",
+		},
+		{
+			name: "back-ratio zero quantity",
+			check: func() error {
+				return ValidateBackRatioOrder(&BackRatioParams{Underlying: "F", Expiration: future, ShortStrike: 12, LongStrike: 14, PutCall: models.PutCallCall, LongRatio: 2, Price: 0.20})
+			},
+			message: "quantity must be greater than zero",
+		},
+		{
+			name: "back-ratio past expiration",
+			check: func() error {
+				return ValidateBackRatioOrder(&BackRatioParams{Underlying: "F", Expiration: past, ShortStrike: 12, LongStrike: 14, PutCall: models.PutCallCall, Quantity: 1, LongRatio: 2, Price: 0.20})
+			},
+			message: "option expiration date is in the past",
+		},
+		{
+			name: "back-ratio negative strike",
+			check: func() error {
+				return ValidateBackRatioOrder(&BackRatioParams{Underlying: "F", Expiration: future, ShortStrike: -12, LongStrike: 14, PutCall: models.PutCallCall, Quantity: 1, LongRatio: 2, Price: 0.20})
+			},
+			message: "short-strike must be greater than zero",
+		},
+		{
+			name: "back-ratio missing option type",
+			check: func() error {
+				return ValidateBackRatioOrder(&BackRatioParams{Underlying: "F", Expiration: future, ShortStrike: 12, LongStrike: 14, Quantity: 1, LongRatio: 2, Price: 0.20})
+			},
+			message: "option type (call or put) is required",
+		},
+		{
+			name: "back-ratio missing price",
+			check: func() error {
+				return ValidateBackRatioOrder(&BackRatioParams{Underlying: "F", Expiration: future, ShortStrike: 12, LongStrike: 14, PutCall: models.PutCallCall, Quantity: 1, LongRatio: 2})
+			},
+			message: "price is required for back-ratios",
+		},
+		{
+			name: "vertical-roll equal close strikes",
+			check: func() error {
+				return ValidateVerticalRollOrder(&VerticalRollParams{Underlying: "F", CloseExpiration: future, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 12, OpenLongStrike: 13, OpenShortStrike: 15, PutCall: models.PutCallCall, Quantity: 1, Price: 0.25})
+			},
+			message: "close long and short strikes must be different",
+		},
+		{
+			name: "vertical-roll missing underlying",
+			check: func() error {
+				return ValidateVerticalRollOrder(&VerticalRollParams{CloseExpiration: future, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15, PutCall: models.PutCallCall, Quantity: 1, Price: 0.25})
+			},
+			message: "underlying symbol is required",
+		},
+		{
+			name: "vertical-roll zero quantity",
+			check: func() error {
+				return ValidateVerticalRollOrder(&VerticalRollParams{Underlying: "F", CloseExpiration: future, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15, PutCall: models.PutCallCall, Price: 0.25})
+			},
+			message: "quantity must be greater than zero",
+		},
+		{
+			name: "vertical-roll past close expiration",
+			check: func() error {
+				return ValidateVerticalRollOrder(&VerticalRollParams{Underlying: "F", CloseExpiration: past, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15, PutCall: models.PutCallCall, Quantity: 1, Price: 0.25})
+			},
+			message: "option expiration date is in the past",
+		},
+		{
+			name: "vertical-roll negative strike",
+			check: func() error {
+				return ValidateVerticalRollOrder(&VerticalRollParams{Underlying: "F", CloseExpiration: future, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: -13, OpenShortStrike: 15, PutCall: models.PutCallCall, Quantity: 1, Price: 0.25})
+			},
+			message: "open-long-strike must be greater than zero",
+		},
+		{
+			name: "vertical-roll missing option type",
+			check: func() error {
+				return ValidateVerticalRollOrder(&VerticalRollParams{Underlying: "F", CloseExpiration: future, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15, Quantity: 1, Price: 0.25})
+			},
+			message: "option type (call or put) is required",
+		},
+		{
+			name: "vertical-roll missing price",
+			check: func() error {
+				return ValidateVerticalRollOrder(&VerticalRollParams{Underlying: "F", CloseExpiration: future, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15, PutCall: models.PutCallCall, Quantity: 1})
+			},
+			message: "price is required for vertical rolls",
+		},
+		{
+			name: "double-diagonal missing underlying",
+			check: func() error {
+				return ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{NearExpiration: future, FarExpiration: later, PutFarStrike: 9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15, Quantity: 1, Price: 0.80})
+			},
+			message: "underlying symbol is required",
+		},
+		{
+			name: "double-diagonal zero quantity",
+			check: func() error {
+				return ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{Underlying: "F", NearExpiration: future, FarExpiration: later, PutFarStrike: 9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15, Price: 0.80})
+			},
+			message: "quantity must be greater than zero",
+		},
+		{
+			name: "double-diagonal past near expiration",
+			check: func() error {
+				return ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{Underlying: "F", NearExpiration: past, FarExpiration: later, PutFarStrike: 9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15, Quantity: 1, Price: 0.80})
+			},
+			message: "option expiration date is in the past",
+		},
+		{
+			name: "double-diagonal near not before far",
+			check: func() error {
+				return ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{Underlying: "F", NearExpiration: later, FarExpiration: future, PutFarStrike: 9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15, Quantity: 1, Price: 0.80})
+			},
+			message: "near expiration must be before far expiration",
+		},
+		{
+			name: "double-diagonal negative strike",
+			check: func() error {
+				return ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{Underlying: "F", NearExpiration: future, FarExpiration: later, PutFarStrike: -9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15, Quantity: 1, Price: 0.80})
+			},
+			message: "put-far-strike must be greater than zero",
+		},
+		{
+			name: "double-diagonal missing price",
+			check: func() error {
+				return ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{Underlying: "F", NearExpiration: future, FarExpiration: later, PutFarStrike: 9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15, Quantity: 1})
+			},
+			message: "price is required for double diagonals",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := testCase.check()
+
+			var validationErr *apperr.ValidationError
+			require.True(t, errors.As(err, &validationErr), "expected ValidationError, got %T: %v", err, err)
+			assert.Equal(t, testCase.message, validationErr.Message)
+		})
+	}
+}
+
 // TestValidateVerticalOrderRejectsEqualStrikes verifies same-strike rejection.
 func TestValidateVerticalOrderRejectsEqualStrikes(t *testing.T) {
 	t.Parallel()

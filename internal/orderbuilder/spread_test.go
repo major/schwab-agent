@@ -173,6 +173,49 @@ func TestBuildDoubleDiagonalOrderOpen(t *testing.T) {
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[3].Instruction)
 }
 
+// TestBuildButterflyOrderShortOpen verifies short butterflies use credit order
+// semantics and the inverse leg directions from long butterflies.
+func TestBuildButterflyOrderShortOpen(t *testing.T) {
+	t.Parallel()
+
+	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildButterflyOrder(&ButterflyParams{
+		Underlying: "F", Expiration: expiration, LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14,
+		PutCall: models.PutCallPut, Buy: false, Open: true, Quantity: 1, Price: 0.45,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+	require.Len(t, order.OrderLegCollection, 3)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[1].Instruction)
+	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[2].Instruction)
+}
+
+// TestBuildDoubleDiagonalOrderClose verifies close-side order semantics for the
+// strategy that defaults to debit on open and credit on close.
+func TestBuildDoubleDiagonalOrderClose(t *testing.T) {
+	t.Parallel()
+
+	nearExpiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
+	farExpiration := time.Date(2026, time.July, 17, 0, 0, 0, 0, time.UTC)
+
+	order, err := BuildDoubleDiagonalOrder(&DoubleDiagonalParams{
+		Underlying: "F", NearExpiration: nearExpiration, FarExpiration: farExpiration,
+		PutFarStrike: 9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15,
+		Open: false, Quantity: 1, Price: 0.70,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeNetCredit, order.OrderType)
+	require.Len(t, order.OrderLegCollection, 4)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[0].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[1].Instruction)
+	assert.Equal(t, models.InstructionBuyToClose, order.OrderLegCollection[2].Instruction)
+	assert.Equal(t, models.InstructionSellToClose, order.OrderLegCollection[3].Instruction)
+}
+
 // TestBuildVerticalOrderBearCallOpen verifies a bear call spread (credit to open).
 // BUY higher strike call + SELL lower strike call = NET_CREDIT.
 func TestBuildVerticalOrderBearCallOpen(t *testing.T) {
