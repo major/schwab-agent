@@ -241,6 +241,60 @@ func TestNewOrderCmdBuildEquityOutputsRequestJSON(t *testing.T) {
 	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
 }
 
+func TestNewOrderCmdBuildNewOptionStrategiesOutputRequestJSON(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name        string
+		args        []string
+		complexType models.ComplexOrderStrategyType
+		orderType   models.OrderType
+		legs        int
+	}{
+		{
+			name:        "butterfly",
+			args:        []string{"order", "build", "butterfly", "--underlying", "F", "--expiration", testFutureExpDate, "--lower-strike", "10", "--middle-strike", "12", "--upper-strike", "14", "--call", "--buy", "--open", "--quantity", "1", "--price", "0.50"},
+			complexType: models.ComplexOrderStrategyTypeButterfly, orderType: models.OrderTypeNetDebit, legs: 3,
+		},
+		{
+			name:        "condor",
+			args:        []string{"order", "build", "condor", "--underlying", "F", "--expiration", testFutureExpDate, "--lower-strike", "10", "--lower-middle-strike", "12", "--upper-middle-strike", "14", "--upper-strike", "16", "--put", "--sell", "--open", "--quantity", "1", "--price", "0.75"},
+			complexType: models.ComplexOrderStrategyTypeCondor, orderType: models.OrderTypeNetCredit, legs: 4,
+		},
+		{
+			name:        "vertical-roll",
+			args:        []string{"order", "build", "vertical-roll", "--underlying", "F", "--close-expiration", testFutureExpDate, "--open-expiration", testFutureExpTime.AddDate(0, 1, 0).Format("2006-01-02"), "--close-long-strike", "12", "--close-short-strike", "14", "--open-long-strike", "13", "--open-short-strike", "15", "--call", "--credit", "--quantity", "1", "--price", "0.25"},
+			complexType: models.ComplexOrderStrategyTypeVerticalRoll, orderType: models.OrderTypeNetCredit, legs: 4,
+		},
+		{
+			name:        "back-ratio",
+			args:        []string{"order", "build", "back-ratio", "--underlying", "F", "--expiration", testFutureExpDate, "--short-strike", "12", "--long-strike", "14", "--call", "--open", "--quantity", "1", "--debit", "--price", "0.20"},
+			complexType: models.ComplexOrderStrategyTypeBackRatio, orderType: models.OrderTypeNetDebit, legs: 2,
+		},
+		{
+			name:        "double-diagonal",
+			args:        []string{"order", "build", "double-diagonal", "--underlying", "F", "--near-expiration", testFutureExpDate, "--far-expiration", testFutureExpTime.AddDate(0, 1, 0).Format("2006-01-02"), "--put-far-strike", "9", "--put-near-strike", "10", "--call-near-strike", "14", "--call-far-strike", "15", "--open", "--quantity", "1", "--price", "0.80"},
+			complexType: models.ComplexOrderStrategyTypeDoubleDiagonal, orderType: models.OrderTypeNetDebit, legs: 4,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			stdout, err := runOrderCommand(t, nil, writeTestConfig(t, "hash123"), "", testCase.args...)
+			require.NoError(t, err)
+
+			order := decodeOrderRequest(t, stdout)
+			assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
+			assert.Equal(t, testCase.orderType, order.OrderType)
+			require.NotNil(t, order.ComplexOrderStrategyType)
+			assert.Equal(t, testCase.complexType, *order.ComplexOrderStrategyType)
+			require.Len(t, order.OrderLegCollection, testCase.legs)
+		})
+	}
+}
+
 func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 	t.Parallel()
 
