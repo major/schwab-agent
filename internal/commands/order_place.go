@@ -22,10 +22,15 @@ import (
 // fallback for rare Schwab/proxy responses that accept the mutation without an
 // order Location header.
 type orderActionData struct {
-	OrderID  int64         `json:"orderId"`
-	Canceled bool          `json:"canceled,omitempty"`
-	Replaced bool          `json:"replaced,omitempty"`
-	Order    *models.Order `json:"order,omitempty"`
+	Action               string               `json:"action"`
+	OrderID              int64                `json:"orderId"`
+	SubmittedOrder       *models.OrderRequest `json:"submittedOrder,omitempty"`
+	Canceled             bool                 `json:"canceled,omitempty"`
+	Replaced             bool                 `json:"replaced,omitempty"`
+	OrderStatus          *models.OrderStatus  `json:"orderStatus,omitempty"`
+	VerificationState    string               `json:"verificationState"`
+	VerificationFailures []string             `json:"verificationFailures,omitempty"`
+	Order                *models.Order        `json:"order,omitempty"`
 }
 
 // orderPreviewData wraps an order preview response.
@@ -71,18 +76,27 @@ func (o *orderReplaceOpts) Attach(_ *cobra.Command) error { return nil }
 // action. The follow-up GET is deliberately best-effort: once Schwab accepts a
 // mutation, the CLI must not turn that successful trade action into a command
 // failure just because the read-after-write lookup is delayed or unavailable.
-func fetchOrderActionData(cmd *cobra.Command, c *client.Ref, account string, orderID int64) (data orderActionData, errs []string) {
-	data = orderActionData{OrderID: orderID}
+func fetchOrderActionData(cmd *cobra.Command, c *client.Ref, account string, action string, orderID int64, submittedOrder *models.OrderRequest) (data orderActionData, errs []string) {
+	data = orderActionData{
+		Action:            action,
+		OrderID:           orderID,
+		SubmittedOrder:    submittedOrder,
+		VerificationState: "unverified",
+	}
 	if orderID == 0 {
-		return data, []string{"order details unavailable: Schwab accepted the order action but did not return an order ID"}
+		data.VerificationFailures = []string{"order details unavailable: Schwab accepted the order action but did not return an order ID"}
+		return data, data.VerificationFailures
 	}
 
 	order, err := c.GetOrder(cmd.Context(), account, orderID)
 	if err != nil {
-		return data, []string{fmt.Sprintf("order details unavailable after successful order action: %v", err)}
+		data.VerificationFailures = []string{fmt.Sprintf("order details unavailable after successful order action: %v", err)}
+		return data, data.VerificationFailures
 	}
 
 	data.Order = order
+	data.OrderStatus = order.Status
+	data.VerificationState = "verified"
 	return data, nil
 }
 
@@ -159,7 +173,7 @@ order build, preview it with order preview, then place.`,
 				return err
 			}
 
-			data, errs := fetchOrderActionData(cmd, c, account, response.OrderID)
+			data, errs := fetchOrderActionData(cmd, c, account, "place", response.OrderID, order)
 			return writeOrderActionResult(w, data, errs)
 		},
 	}
@@ -289,7 +303,7 @@ func makeCobraPlaceOrderCommand[O any, P any](
 				return err
 			}
 
-			data, errs := fetchOrderActionData(cmd, c, account, response.OrderID)
+			data, errs := fetchOrderActionData(cmd, c, account, "place", response.OrderID, order)
 			return writeOrderActionResult(w, data, errs)
 		},
 	}
@@ -505,7 +519,7 @@ config flag. The order ID can be passed as a positional argument or with
 				return err
 			}
 
-			data, errs := fetchOrderActionData(cmd, c, account, orderID)
+			data, errs := fetchOrderActionData(cmd, c, account, "cancel", orderID, nil)
 			data.Canceled = true
 			return writeOrderActionResult(w, data, errs)
 		},
@@ -585,7 +599,7 @@ original order status becomes REPLACED after the new order is created.`,
 				return err
 			}
 
-			data, errs := fetchOrderActionData(cmd, c, account, response.OrderID)
+			data, errs := fetchOrderActionData(cmd, c, account, "replace", response.OrderID, order)
 			data.Replaced = true
 			return writeOrderActionResult(w, data, errs)
 		},
