@@ -11,6 +11,7 @@ import (
 	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -48,6 +49,11 @@ func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
 type quoteGetOpts struct {
 	Fields     []string `flag:"fields" flagdescr:"Quote fields to return (repeatable): quote, fundamental, extended, reference, regular"`
 	Indicative bool     `flag:"indicative" flagdescr:"Request indicative (non-tradeable) quotes"`
+	Underlying string   `flag:"underlying" flagdescr:"Underlying symbol for option quote"`
+	Expiration string   `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD) for option quote"`
+	Strike     float64  `flag:"strike" flagdescr:"Strike price for option quote"`
+	Call       bool     `flag:"call" flagdescr:"Call option"`
+	Put        bool     `flag:"put" flagdescr:"Put option"`
 }
 
 // Attach implements structcli.Options interface.
@@ -99,12 +105,17 @@ func newQuoteGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 when some are missing. Use --fields to select specific data groups (quote,
 fundamental, extended, reference, regular). Key output fields include last
 price, bid/ask, volume, 52-week high/low, PE ratio, dividend yield, and
-market cap.`,
+market cap.
+
+Use --underlying, --expiration, --strike, and --call/--put to quote an option
+by its components instead of providing a raw OCC symbol. These flags are
+mutually exclusive with positional symbol arguments.`,
 		Example: `  schwab-agent quote get AAPL
   schwab-agent quote get AAPL NVDA TSLA
   schwab-agent quote get AAPL --fields quote,fundamental
-  schwab-agent quote get AAPL --fields fundamental --indicative`,
-		Args: cobra.MinimumNArgs(1),
+  schwab-agent quote get AAPL --fields fundamental --indicative
+  schwab-agent quote get --underlying AMZN --expiration 2026-05-15 --strike 270 --call`,
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Unmarshal decodes flags and runs quoteGetOpts.Validate(),
 			// which rejects unrecognized --fields values.
@@ -113,6 +124,40 @@ market cap.`,
 			}
 
 			params := buildCobraQuoteParams(opts)
+
+			// Check if any option flag was explicitly set.
+			optionMode := cmd.Flags().Changed("underlying") ||
+				cmd.Flags().Changed("expiration") ||
+				cmd.Flags().Changed("strike") ||
+				cmd.Flags().Changed("call") ||
+				cmd.Flags().Changed("put")
+
+			if optionMode {
+				// Option flags and positional symbols are mutually exclusive.
+				if len(args) > 0 {
+					return apperr.NewValidationError(
+						"cannot combine positional symbols with option flags (--underlying, --expiration, --strike, --call/--put)", nil)
+				}
+
+				// Validate all required option flags are present.
+				if err := validateOptionQuoteFlags(cmd); err != nil {
+					return err
+				}
+
+				// Build OCC symbol from option components.
+				occ, err := buildOCCSymbol(opts.Underlying, opts.Expiration, opts.Strike, opts.Call, opts.Put)
+				if err != nil {
+					return err
+				}
+
+				return quoteSingle(cmd.Context(), c, w, occ, params)
+			}
+
+			// Positional symbol mode: require at least one symbol.
+			if len(args) == 0 {
+				return apperr.NewValidationError(
+					"at least one symbol is required (or use option flags: --underlying, --expiration, --strike, --call/--put)", nil)
+			}
 
 			if len(args) == 1 {
 				return quoteSingle(cmd.Context(), c, w, args[0], params)
@@ -124,8 +169,33 @@ market cap.`,
 	if err := structcli.Define(cmd, opts); err != nil {
 		panic(err)
 	}
+	cmd.MarkFlagsMutuallyExclusive("call", "put")
 
 	return cmd
+}
+
+// validateOptionQuoteFlags checks that all required option quote flags are
+// present when at least one option flag was set. Returns a ValidationError
+// listing any missing flags.
+func validateOptionQuoteFlags(cmd *cobra.Command) error {
+	var missing []string
+	if !cmd.Flags().Changed("underlying") {
+		missing = append(missing, "--underlying")
+	}
+	if !cmd.Flags().Changed("expiration") {
+		missing = append(missing, "--expiration")
+	}
+	if !cmd.Flags().Changed("strike") {
+		missing = append(missing, "--strike")
+	}
+	if !cmd.Flags().Changed("call") && !cmd.Flags().Changed("put") {
+		missing = append(missing, "--call or --put")
+	}
+	if len(missing) > 0 {
+		return apperr.NewValidationError(
+			"option quote requires: "+strings.Join(missing, ", "), nil)
+	}
+	return nil
 }
 
 // buildCobraQuoteParams constructs a QuoteParams from the validated option struct.

@@ -133,9 +133,11 @@ func TestNewQuoteGetNoArgs(t *testing.T) {
 	_, err := runTestCommand(t, cmd, "get")
 	require.Error(t, err)
 
-	// Cobra's MinimumNArgs(1) produces a usage error, not a ValidationError
-	// The error message should indicate at least 1 argument is required
-	assert.Contains(t, err.Error(), "requires at least 1 arg")
+	// With ArbitraryArgs, RunE validates that at least one symbol is provided
+	// when no option flags are set.
+	var valErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), "at least one symbol is required")
 	assert.Empty(t, buf.String())
 }
 
@@ -347,6 +349,120 @@ func TestNewQuoteGetCommaSeparatedFields(t *testing.T) {
 	aapl, ok := data["AAPL"].(map[string]any)
 	require.True(t, ok, "single-symbol response should be nested under symbol key")
 	assert.Equal(t, "AAPL", aapl["symbol"])
+}
+
+func TestNewQuoteGetOptionFlagsCall(t *testing.T) {
+	// Option flags should build an OCC symbol and route through quoteSingle.
+	occSymbol := "AMZN  260515C00270000"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"AMZN  260515C00270000":{"symbol":"AMZN  260515C00270000","lastPrice":5.50}}`))
+	}))
+	defer server.Close()
+
+	var buf bytes.Buffer
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "get",
+		"--underlying", "AMZN",
+		"--expiration", "2026-05-15",
+		"--strike", "270",
+		"--call",
+	)
+	require.NoError(t, err)
+
+	var envelope output.Envelope
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Contains(t, data, occSymbol)
+}
+
+func TestNewQuoteGetOptionFlagsPut(t *testing.T) {
+	// Put flag should produce the correct OCC symbol with P instead of C.
+	occSymbol := "AMZN  260515P00270000"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"AMZN  260515P00270000":{"symbol":"AMZN  260515P00270000","lastPrice":3.25}}`))
+	}))
+	defer server.Close()
+
+	var buf bytes.Buffer
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "get",
+		"--underlying", "AMZN",
+		"--expiration", "2026-05-15",
+		"--strike", "270",
+		"--put",
+	)
+	require.NoError(t, err)
+
+	var envelope output.Envelope
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Contains(t, data, occSymbol)
+}
+
+func TestNewQuoteGetOptionFlagsWithPositionalArgs(t *testing.T) {
+	// Positional symbols and option flags are mutually exclusive.
+	server := jsonServer(`{}`)
+	defer server.Close()
+
+	var buf bytes.Buffer
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "get",
+		"AAPL",
+		"--underlying", "AMZN",
+		"--expiration", "2026-05-15",
+		"--strike", "270",
+		"--call",
+	)
+	require.Error(t, err)
+
+	var valErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), "cannot combine positional symbols with option flags")
+	assert.Empty(t, buf.String())
+}
+
+func TestNewQuoteGetOptionFlagsMissingRequired(t *testing.T) {
+	// Setting some option flags without all required ones should list the
+	// missing flags in the error message.
+	server := jsonServer(`{}`)
+	defer server.Close()
+
+	var buf bytes.Buffer
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "get",
+		"--underlying", "AMZN",
+		"--strike", "270",
+	)
+	require.Error(t, err)
+
+	var valErr *apperr.ValidationError
+	assert.ErrorAs(t, err, &valErr)
+	assert.Contains(t, err.Error(), "--expiration")
+	assert.Contains(t, err.Error(), "--call or --put")
+	assert.Empty(t, buf.String())
+}
+
+func TestNewQuoteGetCallAndPutMutuallyExclusive(t *testing.T) {
+	// --call and --put are mutually exclusive via MarkFlagsMutuallyExclusive.
+	server := jsonServer(`{}`)
+	defer server.Close()
+
+	var buf bytes.Buffer
+	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "get",
+		"--underlying", "AMZN",
+		"--expiration", "2026-05-15",
+		"--strike", "270",
+		"--call",
+		"--put",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "if any flags in the group [call put] are set none of the others can be")
+	assert.Empty(t, buf.String())
 }
 
 func TestNewQuoteGetFieldsCaseInsensitive(t *testing.T) {
