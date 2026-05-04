@@ -1402,6 +1402,8 @@ and lower bounds).`,
 		panic(err)
 	}
 
+	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
+
 	return cmd
 }
 

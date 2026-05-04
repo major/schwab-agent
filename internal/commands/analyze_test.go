@@ -182,7 +182,7 @@ func TestNewAnalyzeCmd_MultiSymbol(t *testing.T) {
 	}
 }
 
-func TestNewAnalyzeCmd_PartialFailure_QuoteFails(t *testing.T) {
+func TestNewAnalyzeCmd_PartialFailure_TAFails(t *testing.T) {
 	// Arrange - test partial failure: AAPL succeeds completely, INVALID has quote
 	// succeed but TA fail (empty candles). This verifies that partial data (quote
 	// present, analysis nil) is included in the output even when there's an error.

@@ -116,10 +116,10 @@ func TestNewHistoryCmd_Get_APIError(t *testing.T) {
 
 func TestNewHistoryCmd_PriceHistoryAlias(t *testing.T) {
 	// Verify that the "price-history" alias is registered on the history command.
-	cmd := NewHistoryCmd(testClient(t, httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"symbol":"AAPL","empty":false,"candles":[]}`))
-	}))), &bytes.Buffer{})
+	srv := jsonServer(`{"symbol":"AAPL","empty":false,"candles":[]}`)
+	defer srv.Close()
+
+	cmd := NewHistoryCmd(testClient(t, srv), &bytes.Buffer{})
 
 	assert.Contains(t, cmd.Aliases, "price-history")
 }
