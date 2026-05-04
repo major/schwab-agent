@@ -215,7 +215,7 @@ func writeTASymbolResults(w io.Writer, symbols []string, compute func(symbol str
 		result, err := compute(symbol)
 		if err != nil {
 			partialErrors = append(partialErrors, fmt.Sprintf("%s: %v", symbol, err))
-			joinedErrors = append(joinedErrors, err)
+			joinedErrors = append(joinedErrors, fmt.Errorf("%s: %w", symbol, err))
 			continue
 		}
 		data[symbol] = result
