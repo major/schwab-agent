@@ -69,30 +69,18 @@ constructed symbol and its components.`,
 				return err
 			}
 
-			if opts.Underlying == "" {
-				return apperr.NewValidationError("underlying is required", nil)
-			}
-
-			if opts.Expiration == "" {
-				return apperr.NewValidationError("expiration is required", nil)
-			}
-
-			putCall, err := parsePutCall(opts.Call, opts.Put)
+			symbol, err := buildOCCSymbol(opts.Underlying, opts.Expiration, opts.Strike, opts.Call, opts.Put)
 			if err != nil {
 				return err
 			}
 
-			expirationTime, err := time.Parse("2006-01-02", strings.TrimSpace(opts.Expiration))
-			if err != nil {
-				return apperr.NewValidationError("expiration must use YYYY-MM-DD format", err)
-			}
-
-			underlying := strings.TrimSpace(opts.Underlying)
-			symbol := orderbuilder.BuildOCCSymbol(underlying, expirationTime, opts.Strike, string(putCall))
+			// Parse the expiration date for the result output
+			expirationTime, _ := time.Parse("2006-01-02", strings.TrimSpace(opts.Expiration))
+			putCall, _ := parsePutCall(opts.Call, opts.Put)
 
 			result := symbolResult{
 				Symbol:     symbol,
-				Underlying: underlying,
+				Underlying: strings.TrimSpace(opts.Underlying),
 				Expiration: expirationTime.Format("2006-01-02"),
 				PutCall:    string(putCall),
 				Strike:     opts.Strike,
