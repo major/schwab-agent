@@ -439,7 +439,7 @@ func TestMetadataAccountContextFields(t *testing.T) {
 				Account:             "abc123",
 				AccountNickName:     "My Roth IRA",
 				AccountType:         "ROTH_IRA",
-				AccountSource:       "SCHWAB",
+				AccountSource:       "explicit",
 				AccountDisplayLabel: "Roth IRA - My Roth IRA",
 			},
 			wantKeys: []string{"timestamp", "account", "accountNickName", "accountType", "accountSource", "accountDisplayLabel"},
@@ -460,7 +460,7 @@ func TestMetadataAccountContextFields(t *testing.T) {
 				Timestamp:           "2026-04-21T10:00:00Z",
 				AccountNickName:     "Trading Account",
 				AccountType:         "INDIVIDUAL",
-				AccountSource:       "SCHWAB",
+				AccountSource:       "default",
 				AccountDisplayLabel: "Individual - Trading Account",
 			},
 			wantKeys: []string{"timestamp", "accountNickName", "accountType", "accountSource", "accountDisplayLabel"},
@@ -550,7 +550,7 @@ func TestMetadataAccountContextFieldsJSON(t *testing.T) {
 		Account:             "abc123",
 		AccountNickName:     "My Roth IRA",
 		AccountType:         "ROTH_IRA",
-		AccountSource:       "SCHWAB",
+		AccountSource:       "preview",
 		AccountDisplayLabel: "Roth IRA - My Roth IRA",
 	}
 
@@ -566,7 +566,7 @@ func TestMetadataAccountContextFieldsJSON(t *testing.T) {
 	assert.Equal(t, "abc123", envelope.Metadata.Account)
 	assert.Equal(t, "My Roth IRA", envelope.Metadata.AccountNickName)
 	assert.Equal(t, "ROTH_IRA", envelope.Metadata.AccountType)
-	assert.Equal(t, "SCHWAB", envelope.Metadata.AccountSource)
+	assert.Equal(t, "preview", envelope.Metadata.AccountSource)
 	assert.Equal(t, "Roth IRA - My Roth IRA", envelope.Metadata.AccountDisplayLabel)
 }
 

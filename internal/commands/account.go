@@ -373,28 +373,32 @@ func firstAccountIdentifierWithSource(accountFlag string, positionalArgs []strin
 // short or non-hex values fall through to API lookup so account numbers and
 // nicknames keep working.
 func isLikelyAccountHash(value string) bool {
-	lower := strings.ToLower(value)
-	if strings.Contains(lower, "hash") {
-		return true
-	}
-
 	if len(value) >= 16 {
+		allHex := true
 		for _, r := range value {
 			if !unicode.Is(unicode.ASCII_Hex_Digit, r) {
-				return false
+				allHex = false
+				break
 			}
 		}
-		return true
+		if allHex {
+			return true
+		}
 	}
 
 	// Existing command tests and local Schwab-compatible fixtures use compact
-	// alphanumeric placeholders such as abc123. Purely numeric values still fall
-	// through because they are more likely to be plain account numbers.
+	// placeholders such as abc123 and default-hash-123. Values with whitespace
+	// still fall through so nicknames like "Hash IRA" resolve through the APIs.
+	// Purely numeric values also fall through because they are more likely to be
+	// plain account numbers. The separator check keeps legacy HASH_ABC-style test
+	// fixtures working without treating every single-token nickname containing
+	// "hash" as an opaque Schwab identifier.
 	if len(value) < 6 {
 		return false
 	}
 	hasLetter := false
 	hasDigit := false
+	hasSeparator := false
 	for _, r := range value {
 		if unicode.IsLetter(r) {
 			hasLetter = true
@@ -404,13 +408,17 @@ func isLikelyAccountHash(value string) bool {
 			hasDigit = true
 			continue
 		}
+		if r == '-' || r == '_' {
+			hasSeparator = true
+			continue
+		}
 		if unicode.IsSpace(r) {
 			return false
 		}
 		return false
 	}
 
-	return hasLetter && hasDigit
+	return hasLetter && (hasDigit || hasSeparator && strings.Contains(strings.ToLower(value), "hash"))
 }
 
 // shouldAttemptAccountHashEnrichment avoids extra network calls for compact test
@@ -1049,8 +1057,7 @@ full details including the Schwab hash, account number, nickname, account type,
 resolution source, and display label.
 
 The identifier can come from the --account flag, a positional argument, or the
-default_account in config.json. Note that -a shorthand may not work on the
-account parent command due to flag shadowing; use --account instead.`,
+default_account in config.json.`,
 		Example: `  # Resolve by nickname
   schwab-agent account resolve "My IRA"
 

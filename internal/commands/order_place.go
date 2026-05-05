@@ -194,11 +194,11 @@ func resolveOrderPlacePayload(cmd *cobra.Command, c *client.Ref, configPath stri
 			return nil, err
 		}
 		if strings.TrimSpace(accountFlag) != "" {
-			account, err := resolveAccount(c, accountFlag, configPath, nil)
+			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configPath, nil)
 			if err != nil {
 				return nil, err
 			}
-			if account != entry.Account {
+			if acct.Hash != entry.Account {
 				return nil, newValidationError("--account does not match the account bound to the preview digest")
 			}
 		}

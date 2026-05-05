@@ -1480,6 +1480,26 @@ func TestResolveAccountDetailed(t *testing.T) {
 			},
 		},
 		{
+			name:        "nickname containing hash resolves through API lookup",
+			accountFlag: "Hash IRA",
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": []map[string]string{
+					{"accountNumber": "12345", "hashValue": "ABCDEF1234567890"},
+				},
+				"/trader/v1/userPreference": map[string]any{"accounts": []map[string]string{
+					{"accountNumber": "12345", "nickName": "Hash IRA", "type": "MARGIN"},
+				}},
+			},
+			expected: resolvedAccountInfo{
+				Hash:          "ABCDEF1234567890",
+				AccountNumber: "12345",
+				NickName:      "Hash IRA",
+				AccountType:   "MARGIN",
+				Source:        "explicit",
+				DisplayLabel:  "Hash IRA",
+			},
+		},
+		{
 			name:        "nickname collision",
 			accountFlag: "Trading",
 			routes: map[string]any{

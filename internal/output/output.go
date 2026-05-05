@@ -18,15 +18,15 @@ import (
 
 // Metadata holds the standard metadata fields for response envelopes.
 type Metadata struct {
-	Timestamp            string `json:"timestamp"`
-	Account              string `json:"account,omitempty"`
-	Requested            int    `json:"requested,omitempty"`
-	Returned             int    `json:"returned,omitempty"`
-	PositionsIncluded    bool   `json:"positionsIncluded,omitempty"`
-	AccountNickName      string `json:"accountNickName,omitempty"`
-	AccountType          string `json:"accountType,omitempty"`
-	AccountSource        string `json:"accountSource,omitempty"`
-	AccountDisplayLabel  string `json:"accountDisplayLabel,omitempty"`
+	Timestamp           string `json:"timestamp"`
+	Account             string `json:"account,omitempty"`
+	Requested           int    `json:"requested,omitempty"`
+	Returned            int    `json:"returned,omitempty"`
+	PositionsIncluded   bool   `json:"positionsIncluded,omitempty"`
+	AccountNickName     string `json:"accountNickName,omitempty"`
+	AccountType         string `json:"accountType,omitempty"`
+	AccountSource       string `json:"accountSource,omitempty"`
+	AccountDisplayLabel string `json:"accountDisplayLabel,omitempty"`
 }
 
 // NewMetadata returns metadata pre-populated with the current UTC timestamp.
