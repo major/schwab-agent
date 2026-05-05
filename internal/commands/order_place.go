@@ -808,8 +808,9 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 			}
 
 			// If --type was not explicitly provided but --price was, infer LIMIT.
-			// resolveOrderFlagAliases has already copied --order-type into optionOpts.Type,
-			// so check both the canonical and alias flag Changed states.
+			// resolveOrderFlagAliases (used here) writes directly into optionOpts.Type
+			// without calling cmd.Flags().Set, so Changed("type") stays false when
+			// only --order-type was set. Check both flags to cover both aliases.
 			typeExplicit := cmd.Flags().Changed("type") || cmd.Flags().Changed("order-type")
 			if !typeExplicit && optionOpts.Price > 0 {
 				optionOpts.Type = models.OrderTypeLimit
