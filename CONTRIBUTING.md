@@ -44,6 +44,12 @@ make lint       # Run golangci-lint
 
 CI runs the same checks with `go test -v -race -coverprofile=coverage.out ./...` and golangci-lint. Your PR won't merge if either fails.
 
+### Automated review tools
+
+CodeRabbit automatic PR reviews are disabled to preserve quota. Maintainers can still request a manual CodeRabbit review in GitHub when needed.
+
+GitHub Copilot code review uses the repository instructions in `.github/copilot-instructions.md` and the path-specific files in `.github/instructions/`. Automatic Copilot review requests are managed by a GitHub branch ruleset rather than a workflow file.
+
 ### Code style
 
 The project uses golangci-lint v2 with these active linters: bodyclose, errorlint, gocritic, gosec, misspell, nolintlint, revive, unconvert, unparam.

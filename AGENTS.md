@@ -2,6 +2,7 @@
 
 > Keep this file and all subdirectory AGENTS.md files updated when the project changes.
 > Keep README.md updated whenever the project changes.
+> Keep `.coderabbit.yaml` and `.github/copilot-instructions.md` plus `.github/instructions/*.instructions.md` aligned with current repo conventions when review-relevant behavior changes.
 > Check /usr/local for newer Go versions before assuming the system Go is current.
 > Leave generous comments when fixing bugs or working around API quirks. Anything that might save a future developer from re-discovering the same issue is worth writing down.
 

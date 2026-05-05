@@ -30,7 +30,8 @@ reviews:
       mode: warning
 
   auto_review:
-    enabled: true
+    # Keep automatic reviews off so maintainers can request CodeRabbit manually when quota is available.
+    enabled: false
     drafts: false
     auto_pause_after_reviewed_commits: 0
     base_branches:
