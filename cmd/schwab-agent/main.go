@@ -10,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/leodido/structcli"
-	"github.com/leodido/structcli/debug"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/commands"
@@ -24,7 +22,7 @@ var version = "dev"
 func main() {
 	root := buildApp(os.Stdout)
 
-	cmd, err := structcli.ExecuteC(root)
+	cmd, err := root.ExecuteC()
 	if err != nil {
 		exitCode, writeErr := output.WriteCommandError(os.Stdout, cmd, err)
 		if writeErr != nil {
@@ -47,15 +45,11 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 
 	root := commands.BuildCommandTree(w, configPath, tokenPath, version, deps, authDeps)
 
-	if err := structcli.Setup(root,
-		structcli.WithDebug(debug.Options{Exit: true}),
-	); err != nil {
-		panic(err)
-	}
+	commands.InstallDebugOptions(root)
 
 	// Register --instruction/--order-type flag aliases on qualifying commands.
-	// This runs after structcli.Setup() so aliases are layered on top of the
-	// generated command tree without affecting structcli's remaining setup hooks.
+	// This runs after all first-party persistent flags are installed so aliases
+	// are layered on top of the final Cobra command tree.
 	commands.RegisterOrderFlagAliasesOnTree(root)
 
 	return root

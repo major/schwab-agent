@@ -54,7 +54,7 @@ reviews:
         - Error wrapping must use fmt.Errorf("context: %w", err) with %w verb
         - Use errors.As() for typed error matching, constructor functions to create errors
         - No init() functions; all setup belongs in main() and the Before hook
-        - Command factories must follow FooCommand(ref *client.Ref, w io.Writer) *cli.Command pattern
+        - Command factories must follow NewFooCmd(ref *client.Ref, w io.Writer) *cobra.Command pattern
         - All output must go through output.WriteSuccess/WriteError/WritePartial JSON envelopes
         - Always SetEscapeHTML(false) on JSON encoders
         - Don't nitpick style (golangci-lint handles formatting and lint)
@@ -73,10 +73,10 @@ reviews:
         HTTP client review:
         - client.Ref embeds *Client; pre-allocated and shared by all commands
         - The Before hook populates ref.Client after auth completes
-        - HTTP errors must be wrapped in typed errors from internal/errors
+        - HTTP errors must be wrapped in typed errors from internal/apperr
         - Verify proper context propagation for cancellation
 
-    - path: "internal/errors/**/*.go"
+    - path: "internal/apperr/**/*.go"
       instructions: |
         Error hierarchy review:
         - All errors must embed SchwabError base type

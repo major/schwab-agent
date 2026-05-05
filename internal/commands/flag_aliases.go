@@ -21,8 +21,8 @@ func registerOrderFlagAliases(cmd *cobra.Command) {
 		var instructionAlias string
 		cmd.Flags().StringVar(&instructionAlias, "instruction", "", "alias for --action (order instruction)")
 
-		// Replace structcli's single-flag required constraint on --action with
-		// a Cobra group constraint: exactly one of --action or --instruction
+		// Replace the single-flag required constraint on --action with a Cobra
+		// group constraint: exactly one of --action or --instruction
 		// must be set. Without this, Cobra rejects --instruction usage because
 		// --action is still marked individually required.
 		if wasRequired := clearRequiredAnnotation(actionFlag); wasRequired {
@@ -159,8 +159,8 @@ func resolveOrderFlagAliasesViaFlags(cmd *cobra.Command) error {
 
 // RegisterOrderFlagAliasesOnTree walks the command tree and registers
 // --instruction and --order-type aliases on all commands that have --action
-// and/or --type flags. Call this after structcli.Setup() so aliases are added
-// after structcli finishes wiring help topics, flag errors, and debug hooks.
+// and/or --type flags. Call this after the command tree has all local flags so
+// alias constraints can adjust any required markers on canonical flags.
 func RegisterOrderFlagAliasesOnTree(root *cobra.Command) {
 	walkCommandTree(root, func(cmd *cobra.Command) {
 		registerOrderFlagAliases(cmd)

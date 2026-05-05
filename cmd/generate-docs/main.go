@@ -1,5 +1,5 @@
-// generate-docs produces LLM-readable documentation from the CLI's command
-// tree. It outputs SKILL.md (Anthropic skill format) and llms.txt (web
+// generate-docs produces LLM-readable documentation from the CLI's Cobra
+// command tree. It outputs SKILL.md (Anthropic skill format) and llms.txt (web
 // standard) to the project root. The existing hand-crafted AGENTS.md is
 // intentionally preserved since it contains architecture context that the
 // generator cannot produce.
@@ -15,12 +15,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
-	"github.com/leodido/structcli"
-	"github.com/leodido/structcli/generate"
-
 	"github.com/major/schwab-agent/internal/commands"
+	"github.com/spf13/cobra"
 )
 
 // version is set via ldflags at build time (same as the main binary).
@@ -46,133 +45,95 @@ func run() error {
 		commands.DefaultRootDeps(),
 		commands.DefaultAuthDeps(),
 	)
+	commands.InstallDebugOptions(root)
+	commands.RegisterOrderFlagAliasesOnTree(root)
 
-	// Setup is required so the generators can read structcli-managed flag
-	// metadata and enum values, even though runtime-only setup hooks are absent.
-	if err := structcli.Setup(root); err != nil {
-		return fmt.Errorf("structcli setup: %w", err)
-	}
+	commandList := visibleCommands(root)
 
-	// Generate SKILL.md (Anthropic skill file format with YAML frontmatter,
-	// per-command flag tables, and trigger phrases).
-	skill, err := generate.Skill(root, generate.SkillOptions{
-		Name:    "schwab-agent",
-		Author:  "major",
-		Version: version,
-	})
-	if err != nil {
-		return fmt.Errorf("generating SKILL.md: %w", err)
-	}
-
-	skill = labelSkillCodeFences(skill)
-
+	skill := generateSkill(root, commandList)
 	//nolint:gosec // G306: public documentation files should be world-readable
-	if err := os.WriteFile(filepath.Join(outDir, "SKILL.md"), skill, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "SKILL.md"), []byte(skill), 0o644); err != nil {
 		return fmt.Errorf("writing SKILL.md: %w", err)
 	}
-
 	fmt.Fprintf(os.Stderr, "wrote %s\n", filepath.Join(outDir, "SKILL.md"))
 
-	// Generate llms.txt (llmstxt.org standard with commands index and flag
-	// definitions).
-	llmstxt, err := generate.LLMsTxt(root, generate.LLMsTxtOptions{
-		ModulePath: "github.com/major/schwab-agent",
-	})
-	if err != nil {
-		return fmt.Errorf("generating llms.txt: %w", err)
-	}
-
-	llmstxt = removeLLMsJSONSchemaReference(llmstxt)
-
+	llmstxt := generateLLMsTxt(root, commandList)
 	//nolint:gosec // G306: public documentation files should be world-readable
-	if err := os.WriteFile(filepath.Join(outDir, "llms.txt"), llmstxt, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "llms.txt"), []byte(llmstxt), 0o644); err != nil {
 		return fmt.Errorf("writing llms.txt: %w", err)
 	}
-
 	fmt.Fprintf(os.Stderr, "wrote %s\n", filepath.Join(outDir, "llms.txt"))
 
 	return nil
 }
 
-func labelSkillCodeFences(content []byte) []byte {
-	lines := strings.Split(string(content), "\n")
-	inFence := false
-	for i, line := range lines {
-		if line != "```" {
-			continue
-		}
-
-		if inFence {
-			inFence = false
-			continue
-		}
-
-		// structcli generates shell examples in SKILL.md with bare opening
-		// fences. Add a language tag here so generated docs satisfy markdownlint
-		// without forking or post-editing the generated file by hand.
-		lines[i] = "```bash"
-		inFence = true
+func generateSkill(root *cobra.Command, commandList []*cobra.Command) string {
+	var b strings.Builder
+	b.WriteString("---\n")
+	b.WriteString("name: schwab-agent\n")
+	b.WriteString("description: Trade and inspect Charles Schwab accounts through the schwab-agent CLI. Use when an agent needs account lookup, market data, technical indicators, option chains, or order preview/build/place/cancel/replace workflows.\n")
+	b.WriteString("---\n\n")
+	b.WriteString("# schwab-agent\n\n")
+	b.WriteString(root.Short + "\n\n")
+	b.WriteString("## Usage\n\n")
+	b.WriteString("```bash\n")
+	b.WriteString(strings.TrimSpace(root.UsageString()) + "\n")
+	b.WriteString("```\n\n")
+	b.WriteString("## Commands\n\n")
+	for _, cmd := range commandList {
+		writeCommandMarkdown(&b, cmd)
 	}
 
-	return []byte(strings.Join(lines, "\n"))
+	return b.String()
 }
 
-func removeLLMsJSONSchemaReference(content []byte) []byte {
-	lines := strings.Split(string(content), "\n")
-	out := make([]string, 0, len(lines))
-
-	for i := 0; i < len(lines); i++ {
-		if lines[i] != "## Optional" {
-			out = append(out, lines[i])
-			continue
-		}
-
-		optionalLines, next := collectFilteredOptionalLines(lines, i+1)
-		if len(optionalLines) > 0 {
-			// structcli's llms.txt generator always advertises --jsonschema, even
-			// when the command tree does not install that runtime flag. Keep any
-			// other optional entries, but drop the now-stale JSON Schema reference.
-			out = append(out, "## Optional", "")
-			out = append(out, optionalLines...)
-		}
-
-		i = next - 1
+func generateLLMsTxt(root *cobra.Command, commandList []*cobra.Command) string {
+	var b strings.Builder
+	b.WriteString("# schwab-agent\n\n")
+	b.WriteString("> " + root.Short + "\n\n")
+	b.WriteString("Module: github.com/major/schwab-agent\n\n")
+	b.WriteString("## Commands\n\n")
+	for _, cmd := range commandList {
+		b.WriteString("- `" + cmd.CommandPath() + "`: " + oneLine(cmd.Short) + "\n")
+	}
+	b.WriteString("\n## Command Reference\n\n")
+	for _, cmd := range commandList {
+		writeCommandMarkdown(&b, cmd)
 	}
 
-	return []byte(strings.Join(out, "\n"))
+	return b.String()
 }
 
-func collectFilteredOptionalLines(lines []string, start int) (optionalLines []string, next int) {
-	optionalLines = make([]string, 0)
-	next = start
+func writeCommandMarkdown(b *strings.Builder, cmd *cobra.Command) {
+	b.WriteString("### `" + cmd.CommandPath() + "`\n\n")
+	// Cobra's rendered usage is the canonical runtime contract. Reusing it here
+	// keeps generated agent docs aligned with the live binary's help output,
+	// including positional arguments, aliases, examples, and flag groups.
+	b.WriteString("```bash\n")
+	b.WriteString(strings.TrimSpace(cmd.UsageString()) + "\n")
+	b.WriteString("```\n\n")
+}
 
-	for next < len(lines) && !strings.HasPrefix(lines[next], "## ") {
-		line := lines[next]
-		if !isGeneratedJSONSchemaOptionalLine(line) {
-			optionalLines = append(optionalLines, line)
+func visibleCommands(root *cobra.Command) []*cobra.Command {
+	commandList := make([]*cobra.Command, 0)
+	var walk func(*cobra.Command)
+	walk = func(cmd *cobra.Command) {
+		if cmd.Hidden {
+			return
 		}
-		next++
+		commandList = append(commandList, cmd)
+		children := cmd.Commands()
+		sort.Slice(children, func(i, j int) bool { return children[i].Name() < children[j].Name() })
+		for _, child := range children {
+			walk(child)
+		}
 	}
-
-	return trimBlankLines(optionalLines), next
+	walk(root)
+	return commandList
 }
 
-func isGeneratedJSONSchemaOptionalLine(line string) bool {
-	return strings.Contains(line, "[JSON Schema]") && strings.Contains(line, "--jsonschema")
-}
-
-func trimBlankLines(lines []string) []string {
-	start := 0
-	for start < len(lines) && lines[start] == "" {
-		start++
-	}
-
-	end := len(lines)
-	for end > start && lines[end-1] == "" {
-		end--
-	}
-
-	return lines[start:end]
+func oneLine(value string) string {
+	return strings.Join(strings.Fields(value), " ")
 }
 
 // projectRoot returns the repository root by walking up from this source

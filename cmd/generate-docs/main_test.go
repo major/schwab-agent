@@ -4,42 +4,55 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/major/schwab-agent/internal/commands"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRemoveLLMsJSONSchemaReferenceDropsEmptyOptionalSection(t *testing.T) {
-	input := []byte(strings.Join([]string{
-		"# schwab-agent",
-		"",
-		"## Optional",
-		"",
-		"- [JSON Schema](#json-schema): Machine-readable schema available via `schwab-agent --jsonschema`",
-		"",
-	}, "\n"))
+func buildTestCommandTree(t *testing.T) *cobra.Command {
+	t.Helper()
 
-	content := string(removeLLMsJSONSchemaReference(input))
+	root := commands.BuildCommandTree(
+		&strings.Builder{}, "", "", version,
+		commands.DefaultRootDeps(),
+		commands.DefaultAuthDeps(),
+	)
+	commands.InstallDebugOptions(root)
+	commands.RegisterOrderFlagAliasesOnTree(root)
+	root.AddCommand(&cobra.Command{Use: "__hidden", Hidden: true})
 
-	require.NotContains(t, content, "## Optional")
-	require.NotContains(t, content, "--jsonschema")
+	return root
 }
 
-func TestRemoveLLMsJSONSchemaReferencePreservesOtherOptionalItems(t *testing.T) {
-	input := []byte(strings.Join([]string{
-		"# schwab-agent",
-		"",
-		"## Optional",
-		"",
-		"- [JSON Schema](#json-schema): Machine-readable schema available via `schwab-agent --jsonschema`",
-		"- [MCP Server](#mcp): Available as MCP server via `schwab-agent --mcp`",
-		"",
-		"## Next",
-		"content",
-	}, "\n"))
+func TestGenerateDocsExcludeRuntimeOnlyJSONSchemaReferences(t *testing.T) {
+	root := buildTestCommandTree(t)
+	commandList := visibleCommands(root)
 
-	content := string(removeLLMsJSONSchemaReference(input))
+	content := generateLLMsTxt(root, commandList)
 
-	require.Contains(t, content, "## Optional")
-	require.Contains(t, content, "--mcp")
-	require.Contains(t, content, "## Next")
 	require.NotContains(t, content, "--jsonschema")
+	require.NotContains(t, content, "JSON Schema")
+}
+
+func TestGenerateSkillUsesTaggedCodeFences(t *testing.T) {
+	root := buildTestCommandTree(t)
+	commandList := visibleCommands(root)
+
+	content := generateSkill(root, commandList)
+
+	require.Contains(t, content, "```bash\n")
+	require.NotContains(t, content, "Examples:\n\n```\n")
+}
+
+func TestVisibleCommandsSkipsHiddenCommands(t *testing.T) {
+	root := buildTestCommandTree(t)
+	commandList := visibleCommands(root)
+
+	paths := make([]string, 0, len(commandList))
+	for _, cmd := range commandList {
+		paths = append(paths, cmd.CommandPath())
+	}
+
+	require.Contains(t, strings.Join(paths, "\n"), "schwab-agent quote")
+	require.NotContains(t, strings.Join(paths, "\n"), "__hidden")
 }

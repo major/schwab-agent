@@ -2,7 +2,6 @@
 package output
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,16 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
 )
 
 // StructuredError is the top-level machine-readable error shape used by the
-// CLI. It intentionally mirrors structcli.StructuredError while flag parsing is
-// migrated to Cobra-native handlers, so callers keep the same JSON contract as
-// structcli is phased out one behavior at a time.
+// CLI. It preserves the JSON contract originally exposed to agents while all
+// classification is now handled by schwab-agent's Cobra-native error pipeline.
 type StructuredError struct {
 	Error      string      `json:"error"`
 	ExitCode   int         `json:"exit_code"`
@@ -36,9 +33,13 @@ type StructuredError struct {
 	EnvVar     string      `json:"env_var,omitempty"`
 }
 
-// Violation mirrors structcli's per-field validation details for callers that
-// decode validation failures through ErrorEnvelope.
-type Violation = structcli.Violation
+// Violation describes one field-level validation failure. schwab-agent's current
+// validators return compact messages, but the field is kept for callers that
+// decode the stable ErrorEnvelope schema.
+type Violation struct {
+	Field   string `json:"field,omitempty"`
+	Message string `json:"message,omitempty"`
+}
 
 // Metadata holds the standard metadata fields for response envelopes.
 type Metadata struct {
@@ -96,9 +97,7 @@ func WriteError(w io.Writer, err error) error {
 // WriteCommandError writes an error response and returns the process exit code
 // that should accompany it. Schwab-domain errors are mapped locally so their
 // existing 1-5 exit-code contract stays intact. Cobra flag errors are mapped
-// locally because structcli.WithFlagErrors() is no longer installed; remaining
-// non-domain errors still fall back to structcli.HandleError while the broader
-// structcli migration continues.
+// locally because Cobra surfaces raw pflag errors before RunE handlers execute.
 func WriteCommandError(w io.Writer, cmd *cobra.Command, err error) (int, error) {
 	if err == nil {
 		return 0, nil
@@ -114,22 +113,17 @@ func WriteCommandError(w io.Writer, cmd *cobra.Command, err error) (int, error) 
 		return se.ExitCode, writeStructuredError(w, &se)
 	}
 
-	if cmd != nil {
-		return writeStructCLIError(w, cmd, err)
-	}
-
 	se := StructuredError{
 		Error:    "error",
 		ExitCode: 1,
 		Message:  err.Error(),
+		Command:  commandPath(cmd),
 	}
 	return se.ExitCode, writeStructuredError(w, &se)
 }
 
 // isSchwabDomainError reports whether err belongs to schwab-agent's typed
-// domain hierarchy. structcli has its own ValidationError type, so checking the
-// shared SchwabError base avoids accidentally stealing structcli validation
-// errors away from the non-domain fallback.
+// domain hierarchy.
 func isSchwabDomainError(err error) bool {
 	if _, ok := errors.AsType[*apperr.AuthRequiredError](err); ok {
 		return true
@@ -263,29 +257,6 @@ func schwabErrorDetails(err error) string {
 	}
 
 	return ""
-}
-
-// writeStructCLIError asks structcli to classify non-flag errors, then re-encodes
-// the result with this package's JSON encoder settings. Flag parsing is handled
-// locally before this point; this fallback exists for the remaining structcli
-// migration surface, such as help/config classifications.
-func writeStructCLIError(w io.Writer, cmd *cobra.Command, err error) (int, error) {
-	var buf bytes.Buffer
-	exitCode := structcli.HandleError(cmd, err, &buf)
-
-	var structcliErr structcli.StructuredError
-	if unmarshalErr := json.Unmarshal(buf.Bytes(), &structcliErr); unmarshalErr != nil {
-		se := StructuredError{
-			Error:    "error",
-			ExitCode: exitCode,
-			Message:  err.Error(),
-			Command:  commandPath(cmd),
-		}
-		return exitCode, writeStructuredError(w, &se)
-	}
-
-	se := StructuredError(structcliErr)
-	return exitCode, writeStructuredError(w, &se)
 }
 
 // writeStructuredError writes a top-level StructuredError.

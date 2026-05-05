@@ -2,10 +2,8 @@ package apperr
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
-	structclierrors "github.com/leodido/structcli/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -154,29 +152,6 @@ func TestErrorCodeForOrderBuildError(t *testing.T) {
 	err := NewOrderBuildError("order build failed", nil)
 	code := ErrorCode(err)
 	assert.Equal(t, "ORDER_BUILD_ERROR", code)
-}
-
-// TestErrorCodeForStructcliValidationError verifies structcli's ValidationError
-// (produced by the Validatable interface) maps to VALIDATION_ERROR, same as
-// our internal ValidationError.
-func TestErrorCodeForStructcliValidationError(t *testing.T) {
-	err := &structclierrors.ValidationError{
-		ContextName: "test-cmd",
-		Errors:      []error{fmt.Errorf("field is invalid")},
-	}
-	code := ErrorCode(err)
-	assert.Equal(t, "VALIDATION_ERROR", code)
-}
-
-// TestExitCodeForStructcliValidationError verifies structcli's ValidationError
-// maps to exit code 1 (default for non-exitCoder errors).
-func TestExitCodeForStructcliValidationError(t *testing.T) {
-	err := &structclierrors.ValidationError{
-		ContextName: "test-cmd",
-		Errors:      []error{fmt.Errorf("field is invalid")},
-	}
-	code := ExitCodeFor(err)
-	assert.Equal(t, 1, code)
 }
 
 // TestErrorCodeForSchwabError verifies ErrorCode returns correct string.
