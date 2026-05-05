@@ -24,10 +24,6 @@ metadata:
 
 ### Available Commands
 
-#### `schwab-agent`
-
-CLI tool for AI agents to trade via Schwab APIs
-
 #### `schwab-agent account`
 
 Manage Schwab trading accounts. List accounts with nicknames, view account
@@ -294,12 +290,12 @@ specific moneyness with --strike-range (ITM, NTM, OTM, ALL).
 | `--include-underlying-quote` | bool | false | no | Include underlying quote data in response |
 | `--interest-rate` | string | - | no | Interest rate for theoretical pricing calculations |
 | `--interval` | string | - | no | Strike interval for spread strategy chains |
-| `--strategy` | string | - | no | Option pricing strategy {,ANALYTICAL,BUTTERFLY,CALENDAR,COLLAR,CONDOR,COVERED,DIAGONAL,ROLL,SINGLE,STRADDLE,STRANGLE,VERTICAL} |
+| `--strategy` | string | - | no | Option pricing strategy |
 | `--strike` | string | - | no | Filter to a specific strike price |
 | `--strike-count` | string | - | no | Number of strikes to return |
-| `--strike-range` | string | - | no | Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL {,ALL,ITM,NTM,OTM,SAK,SBK,SNK} |
+| `--strike-range` | string | - | no | Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL |
 | `--to-date` | string | - | no | End date (YYYY-MM-DD) |
-| `--type` | string | - | no | Contract type: CALL, PUT, or ALL {,ALL,CALL,PUT} |
+| `--type` | string | - | no | Contract type: CALL, PUT, or ALL |
 | `--underlying-price` | string | - | no | Override underlying price for theoretical calculations |
 | `--volatility` | string | - | no | Volatility for theoretical pricing calculations |
 
@@ -394,11 +390,11 @@ date ranges via epoch milliseconds. Returns OHLCV candle data.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--frequency` | string | - | no | Frequency value {,1,10,15,30,5} |
-| `--frequency-type` | string | - | no | Frequency type (minute, daily, weekly, monthly) {,daily,minute,monthly,weekly} |
+| `--frequency` | string | - | no | Frequency value |
+| `--frequency-type` | string | - | no | Frequency type (minute, daily, weekly, monthly) |
 | `--from` | string | - | no | Start date (milliseconds since epoch) |
 | `--period` | string | - | no | Number of periods |
-| `--period-type` | string | - | no | Period type (day, month, year, ytd) {,day,month,year,ytd} |
+| `--period-type` | string | - | no | Period type (day, month, year, ytd) |
 | `--to` | string | - | no | End date (milliseconds since epoch) |
 
 **Example:**
@@ -497,8 +493,8 @@ names (e.g. '$SPX').
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--frequency` | string | - | no | Minimum percent change magnitude (0, 1, 5, 10, 30, 60) {,0,1,10,30,5,60} |
-| `--sort` | string | - | no | Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN) {,PERCENT_CHANGE_DOWN,PERCENT_CHANGE_UP,TRADES,VOLUME} |
+| `--frequency` | string | - | no | Minimum percent change magnitude (0, 1, 5, 10, 30, 60) |
+| `--sort` | string | - | no | Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN) |
 
 **Example:**
 
@@ -569,7 +565,7 @@ short contract. Use --debit or --credit because back-ratios can price either way
 | `--close` | bool | false | no | Closing position |
 | `--credit` | bool | false | no | Build as NET_CREDIT |
 | `--debit` | bool | false | no | Build as NET_DEBIT |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
 | `--long-ratio` | float64 | 2 | no | Long contracts per short contract |
 | `--long-strike` | float64 | 0 | yes | Long option strike |
@@ -577,7 +573,7 @@ short contract. Use --debit or --credit because back-ratios can price either way
 | `--price` | float64 | 0 | yes | Net debit or credit amount |
 | `--put` | bool | false | no | Put back-ratio |
 | `--quantity` | float64 | 0 | yes | Short-leg contract quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--short-strike` | float64 | 0 | yes | Short option strike |
 | `--underlying` | string | - | yes | Underlying symbol |
 
@@ -597,15 +593,15 @@ auto-inverted from the entry action.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--action` | string | - | yes | Order action |
+| `--duration` | string | - | no | Order duration |
 | `--price` | float64 | 0 | no | Entry price |
 | `--quantity` | float64 | 0 | yes | Share quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--stop-loss` | float64 | 0 | no | Stop-loss exit price |
 | `--symbol` | string | - | yes | Equity symbol |
 | `--take-profit` | float64 | 0 | no | Take-profit exit price |
-| `--type` | string | - | no | Entry order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Entry order type |
 
 **Example:**
 
@@ -627,7 +623,7 @@ butterfly with long wings and two short body contracts.
 | `--buy` | bool | false | no | Buy a long butterfly |
 | `--call` | bool | false | no | Call butterfly |
 | `--close` | bool | false | no | Closing position |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
 | `--lower-strike` | float64 | 0 | yes | Lower wing strike |
 | `--middle-strike` | float64 | 0 | yes | Middle body strike |
@@ -636,7 +632,7 @@ butterfly with long wings and two short body contracts.
 | `--put` | bool | false | no | Put butterfly |
 | `--quantity` | float64 | 0 | yes | Wing contract quantity |
 | `--sell` | bool | false | no | Sell a short butterfly |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--underlying` | string | - | yes | Underlying symbol |
 | `--upper-strike` | float64 | 0 | yes | Upper wing strike |
 
@@ -659,14 +655,14 @@ MARKET entry (--type MARKET) skips price validation for stop-loss placement beca
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--duration` | string | - | no | Entry duration (exit legs are always GTC) {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Entry duration (exit legs are always GTC) |
 | `--price` | float64 | 0 | no | Entry limit price (required for LIMIT orders, omit for MARKET) |
 | `--quantity` | float64 | 0 | yes | Share quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--stop-loss` | float64 | 0 | yes | Stop trigger price - becomes market sell when hit |
 | `--symbol` | string | - | yes | Stock symbol (e.g., AAPL) |
 | `--take-profit` | float64 | 0 | no | Optional take-profit limit price |
-| `--type` | string | - | no | Entry order type (LIMIT or MARKET, default LIMIT) {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Entry order type (LIMIT or MARKET, default LIMIT) |
 
 **Example:**
 
@@ -693,14 +689,14 @@ contract. Profits from time decay differential between the two legs.
 |------|------|---------|----------|-------------|
 | `--call` | bool | false | no | Call calendar spread |
 | `--close` | bool | false | no | Closing position |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--far-expiration` | string | - | yes | Far-term expiration date (YYYY-MM-DD) |
 | `--near-expiration` | string | - | yes | Near-term expiration date (YYYY-MM-DD) |
 | `--open` | bool | false | no | Opening position |
 | `--price` | float64 | 0 | yes | Net debit amount |
 | `--put` | bool | false | no | Put calendar spread |
 | `--quantity` | float64 | 0 | yes | Number of contracts |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--strike` | float64 | 0 | yes | Strike price (shared by both legs) |
 | `--underlying` | string | - | yes | Underlying symbol |
 
@@ -722,13 +718,13 @@ capping upside. Quantity 1 means 100 shares plus 1 put and 1 call contract.
 |------|------|---------|----------|-------------|
 | `--call-strike` | float64 | 0 | yes | Covered call strike price |
 | `--close` | bool | false | no | Closing position |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date for both options (YYYY-MM-DD) |
 | `--open` | bool | false | no | Opening position |
 | `--price` | float64 | 0 | yes | Net debit amount |
 | `--put-strike` | float64 | 0 | yes | Protective put strike price |
 | `--quantity` | float64 | 0 | yes | Number of contracts (1 contract = 100 shares) |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--underlying` | string | - | yes | Underlying symbol |
 
 **Example:**
@@ -750,7 +746,7 @@ opens a long condor; selling opens the inverse short condor.
 | `--buy` | bool | false | no | Buy a long condor |
 | `--call` | bool | false | no | Call condor |
 | `--close` | bool | false | no | Closing position |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
 | `--lower-middle-strike` | float64 | 0 | yes | Lower middle strike |
 | `--lower-strike` | float64 | 0 | yes | Lower wing strike |
@@ -759,7 +755,7 @@ opens a long condor; selling opens the inverse short condor.
 | `--put` | bool | false | no | Put condor |
 | `--quantity` | float64 | 0 | yes | Contract quantity per strike |
 | `--sell` | bool | false | no | Sell a short condor |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--underlying` | string | - | yes | Underlying symbol |
 | `--upper-middle-strike` | float64 | 0 | yes | Upper middle strike |
 | `--upper-strike` | float64 | 0 | yes | Upper wing strike |
@@ -781,11 +777,11 @@ already own, use order place option --action SELL_TO_OPEN instead.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
 | `--price` | float64 | 0 | yes | Net debit amount |
 | `--quantity` | float64 | 0 | yes | Number of contracts (1 contract = 100 shares) |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--strike` | float64 | 0 | yes | Call strike price |
 | `--underlying` | string | - | yes | Underlying symbol |
 
@@ -807,7 +803,7 @@ contract at a different strike. Combines elements of vertical and calendar sprea
 |------|------|---------|----------|-------------|
 | `--call` | bool | false | no | Call diagonal spread |
 | `--close` | bool | false | no | Closing position |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--far-expiration` | string | - | yes | Far-term expiration date (YYYY-MM-DD) |
 | `--far-strike` | float64 | 0 | yes | Strike price for the far-term (bought) leg |
 | `--near-expiration` | string | - | yes | Near-term expiration date (YYYY-MM-DD) |
@@ -816,7 +812,7 @@ contract at a different strike. Combines elements of vertical and calendar sprea
 | `--price` | float64 | 0 | yes | Net debit amount |
 | `--put` | bool | false | no | Put diagonal spread |
 | `--quantity` | float64 | 0 | yes | Number of contracts |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--underlying` | string | - | yes | Underlying symbol |
 
 **Example:**
@@ -838,7 +834,7 @@ expiration, and strikes must keep the put side below the call side.
 | `--call-far-strike` | float64 | 0 | yes | Far call long strike |
 | `--call-near-strike` | float64 | 0 | yes | Near call short strike |
 | `--close` | bool | false | no | Closing position |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--far-expiration` | string | - | yes | Far expiration for long legs (YYYY-MM-DD) |
 | `--near-expiration` | string | - | yes | Near expiration for short legs (YYYY-MM-DD) |
 | `--open` | bool | false | no | Opening position |
@@ -846,7 +842,7 @@ expiration, and strikes must keep the put side below the call side.
 | `--put-far-strike` | float64 | 0 | yes | Far put long strike |
 | `--put-near-strike` | float64 | 0 | yes | Near put short strike |
 | `--quantity` | float64 | 0 | yes | Contract quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--underlying` | string | - | yes | Underlying symbol |
 
 **Example:**
@@ -865,23 +861,23 @@ or to order preview --spec - to check estimated commissions.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--action` | string | - | yes | Order action |
 | `--activation-price` | float64 | 0 | no | Price that activates the trailing stop |
-| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) |
+| `--duration` | string | - | no | Order duration |
 | `--price` | float64 | 0 | no | Limit price |
-| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
-| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) |
 | `--quantity` | float64 | 0 | yes | Share quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
-| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
-| `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
-| `--stop-link-type` | string | - | no | Trailing stop offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--session` | string | - | no | Trading session |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) |
+| `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) |
+| `--stop-link-type` | string | - | no | Trailing stop offset type (VALUE, PERCENT, TICK) |
 | `--stop-offset` | float64 | 0 | no | Trailing stop offset amount |
 | `--stop-price` | float64 | 0 | no | Stop price |
-| `--stop-type` | string | - | no | Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) {,ASK,BID,LAST,MARK,STANDARD} |
+| `--stop-type` | string | - | no | Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) |
 | `--symbol` | string | - | yes | Equity symbol |
-| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Order type |
 
 **Example:**
 
@@ -925,14 +921,14 @@ generates a NET_CREDIT.
 | `--call-long-strike` | float64 | 0 | yes | Highest strike: call being bought (protection) |
 | `--call-short-strike` | float64 | 0 | yes | Call being sold (premium) |
 | `--close` | bool | false | no | Closing position |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
 | `--open` | bool | false | no | Opening position |
 | `--price` | float64 | 0 | yes | Net credit or debit amount |
 | `--put-long-strike` | float64 | 0 | yes | Lowest strike: put being bought (protection) |
 | `--put-short-strike` | float64 | 0 | yes | Put being sold (premium) |
 | `--quantity` | float64 | 0 | yes | Number of contracts |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--underlying` | string | - | yes | Underlying symbol |
 
 **Example:**
@@ -951,10 +947,10 @@ one exit fills, the other is canceled. At least one of --take-profit or
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--action` | string | - | yes | Exit action (SELL to close long, BUY to close short) |
+| `--duration` | string | - | no | Order duration |
 | `--quantity` | float64 | 0 | yes | Share quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--stop-loss` | float64 | 0 | no | Stop-loss exit price (stop order) |
 | `--symbol` | string | - | yes | Equity symbol |
 | `--take-profit` | float64 | 0 | no | Take-profit exit price (limit order) |
@@ -976,20 +972,20 @@ suitable for piping to order place or order preview.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--action` | string | - | yes | Order action |
 | `--call` | bool | false | no | Call option |
-| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
 | `--price` | float64 | 0 | no | Limit price |
-| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
-| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) |
 | `--put` | bool | false | no | Put option |
 | `--quantity` | float64 | 0 | yes | Contract quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
-| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
+| `--session` | string | - | no | Trading session |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) |
 | `--strike` | float64 | 0 | yes | Strike price |
-| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Order type |
 | `--underlying` | string | - | yes | Underlying symbol |
 
 **Example:**
@@ -1011,13 +1007,13 @@ put at the same strike price and expiration. Use --buy for long straddles
 |------|------|---------|----------|-------------|
 | `--buy` | bool | false | no | Buy the straddle (long, net debit) |
 | `--close` | bool | false | no | Closing position |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
 | `--open` | bool | false | no | Opening position |
 | `--price` | float64 | 0 | yes | Net debit or credit amount |
 | `--quantity` | float64 | 0 | yes | Number of contracts |
 | `--sell` | bool | false | no | Sell the straddle (short, net credit) |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--strike` | float64 | 0 | yes | Strike price (shared by call and put legs) |
 | `--underlying` | string | - | yes | Underlying symbol |
 
@@ -1041,14 +1037,14 @@ or --sell for short strangles (expecting low volatility).
 | `--buy` | bool | false | no | Buy the strangle (long, net debit) |
 | `--call-strike` | float64 | 0 | yes | Strike price for the call leg |
 | `--close` | bool | false | no | Closing position |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
 | `--open` | bool | false | no | Opening position |
 | `--price` | float64 | 0 | yes | Net debit or credit amount |
 | `--put-strike` | float64 | 0 | yes | Strike price for the put leg |
 | `--quantity` | float64 | 0 | yes | Number of contracts |
 | `--sell` | bool | false | no | Sell the strangle (short, net credit) |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--underlying` | string | - | yes | Underlying symbol |
 
 **Example:**
@@ -1070,14 +1066,14 @@ NET_DEBIT or NET_CREDIT is auto-determined from the strike relationship.
 |------|------|---------|----------|-------------|
 | `--call` | bool | false | no | Call spread |
 | `--close` | bool | false | no | Closing position |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
 | `--long-strike` | float64 | 0 | yes | Strike price of the option being bought |
 | `--open` | bool | false | no | Opening position |
 | `--price` | float64 | 0 | yes | Net debit or credit amount |
 | `--put` | bool | false | no | Put spread |
 | `--quantity` | float64 | 0 | yes | Number of contracts |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--short-strike` | float64 | 0 | yes | Strike price of the option being sold |
 | `--underlying` | string | - | yes | Underlying symbol |
 
@@ -1106,14 +1102,14 @@ pricing direction.
 | `--close-short-strike` | float64 | 0 | yes | Short strike of the vertical being closed |
 | `--credit` | bool | false | no | Build as NET_CREDIT |
 | `--debit` | bool | false | no | Build as NET_DEBIT |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Order duration |
 | `--open-expiration` | string | - | yes | Expiration of the vertical being opened (YYYY-MM-DD) |
 | `--open-long-strike` | float64 | 0 | yes | Long strike of the vertical being opened |
 | `--open-short-strike` | float64 | 0 | yes | Short strike of the vertical being opened |
 | `--price` | float64 | 0 | yes | Net debit or credit amount |
 | `--put` | bool | false | no | Put vertical roll |
 | `--quantity` | float64 | 0 | yes | Contract quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--underlying` | string | - | yes | Underlying symbol |
 
 **Example:**
@@ -1176,7 +1172,7 @@ results.
 |------|------|---------|----------|-------------|
 | `--from` | string | - | no | Filter by entered time lower bound |
 | `--recent` | bool | false | no | Show recent order activity, including terminal statuses, from the last 24 hours unless --from is set |
-| `--status` | stringSlice | [] | no | Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc. |
+| `--status` | stringArray | [] | no | Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc. |
 | `--to` | string | - | no | Filter by entered time upper bound |
 
 **Example:**
@@ -1230,15 +1226,15 @@ the parent cascades to all child orders.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--action` | string | - | yes | Order action |
+| `--duration` | string | - | no | Order duration |
 | `--price` | float64 | 0 | no | Entry price |
 | `--quantity` | float64 | 0 | yes | Share quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--stop-loss` | float64 | 0 | no | Stop-loss exit price |
 | `--symbol` | string | - | yes | Equity symbol |
 | `--take-profit` | float64 | 0 | no | Take-profit exit price |
-| `--type` | string | - | no | Entry order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Entry order type |
 
 **Example:**
 
@@ -1264,14 +1260,14 @@ MARKET entry (--type MARKET) skips price validation for stop-loss placement beca
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--duration` | string | - | no | Entry duration (exit legs are always GTC) {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Entry duration (exit legs are always GTC) |
 | `--price` | float64 | 0 | no | Entry limit price (required for LIMIT orders, omit for MARKET) |
 | `--quantity` | float64 | 0 | yes | Share quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--stop-loss` | float64 | 0 | yes | Stop trigger price - becomes market sell when hit |
 | `--symbol` | string | - | yes | Stock symbol (e.g., AAPL) |
 | `--take-profit` | float64 | 0 | no | Optional take-profit limit price |
-| `--type` | string | - | no | Entry order type (LIMIT or MARKET, default LIMIT) {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Entry order type (LIMIT or MARKET, default LIMIT) |
 
 **Example:**
 
@@ -1297,23 +1293,23 @@ i-also-like-to-live-dangerously in config for placement.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--action` | string | - | yes | Order action |
 | `--activation-price` | float64 | 0 | no | Price that activates the trailing stop |
-| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) |
+| `--duration` | string | - | no | Order duration |
 | `--price` | float64 | 0 | no | Limit price |
-| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
-| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) |
 | `--quantity` | float64 | 0 | yes | Share quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
-| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
-| `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
-| `--stop-link-type` | string | - | no | Trailing stop offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--session` | string | - | no | Trading session |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) |
+| `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) |
+| `--stop-link-type` | string | - | no | Trailing stop offset type (VALUE, PERCENT, TICK) |
 | `--stop-offset` | float64 | 0 | no | Trailing stop offset amount |
 | `--stop-price` | float64 | 0 | no | Stop price |
-| `--stop-type` | string | - | no | Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) {,ASK,BID,LAST,MARK,STANDARD} |
+| `--stop-type` | string | - | no | Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) |
 | `--symbol` | string | - | yes | Equity symbol |
-| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Order type |
 
 **Example:**
 
@@ -1339,10 +1335,10 @@ bracket orders, OCO has no entry leg.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--action` | string | - | yes | Exit action (SELL to close long, BUY to close short) |
+| `--duration` | string | - | no | Order duration |
 | `--quantity` | float64 | 0 | yes | Share quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--stop-loss` | float64 | 0 | no | Stop-loss exit price (stop order) |
 | `--symbol` | string | - | yes | Equity symbol |
 | `--take-profit` | float64 | 0 | no | Take-profit exit price (limit order) |
@@ -1369,20 +1365,20 @@ i-also-like-to-live-dangerously in config for placement.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--action` | string | - | yes | Order action |
 | `--call` | bool | false | no | Call option |
-| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
 | `--price` | float64 | 0 | no | Limit price |
-| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
-| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) |
 | `--put` | bool | false | no | Put option |
 | `--quantity` | float64 | 0 | yes | Contract quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
-| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
+| `--session` | string | - | no | Trading session |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) |
 | `--strike` | float64 | 0 | yes | Strike price |
-| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Order type |
 | `--underlying` | string | - | yes | Underlying symbol |
 
 **Example:**
@@ -1432,16 +1428,16 @@ order and Schwab's validation, fee, and commission details.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--action` | string | - | yes | Order action |
+| `--duration` | string | - | no | Order duration |
 | `--price` | float64 | 0 | no | Entry price |
 | `--quantity` | float64 | 0 | yes | Share quantity |
 | `--save-preview` | bool | false | no | Save this preview locally and return a digest for order place --from-preview |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--stop-loss` | float64 | 0 | no | Stop-loss exit price |
 | `--symbol` | string | - | yes | Equity symbol |
 | `--take-profit` | float64 | 0 | no | Take-profit exit price |
-| `--type` | string | - | no | Entry order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Entry order type |
 
 **Example:**
 
@@ -1463,15 +1459,15 @@ MARKET entry (--type MARKET) skips price validation for stop-loss placement beca
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--duration` | string | - | no | Entry duration (exit legs are always GTC) {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--duration` | string | - | no | Entry duration (exit legs are always GTC) |
 | `--price` | float64 | 0 | no | Entry limit price (required for LIMIT orders, omit for MARKET) |
 | `--quantity` | float64 | 0 | yes | Share quantity |
 | `--save-preview` | bool | false | no | Save this preview locally and return a digest for order place --from-preview |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--stop-loss` | float64 | 0 | yes | Stop trigger price - becomes market sell when hit |
 | `--symbol` | string | - | yes | Stock symbol (e.g., AAPL) |
 | `--take-profit` | float64 | 0 | no | Optional take-profit limit price |
-| `--type` | string | - | no | Entry order type (LIMIT or MARKET, default LIMIT) {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Entry order type (LIMIT or MARKET, default LIMIT) |
 
 **Example:**
 
@@ -1498,24 +1494,24 @@ return a digest for exact-payload placement.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--action` | string | - | yes | Order action |
 | `--activation-price` | float64 | 0 | no | Price that activates the trailing stop |
-| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) |
+| `--duration` | string | - | no | Order duration |
 | `--price` | float64 | 0 | no | Limit price |
-| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
-| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) |
 | `--quantity` | float64 | 0 | yes | Share quantity |
 | `--save-preview` | bool | false | no | Save this preview locally and return a digest for order place --from-preview |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
-| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
-| `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
-| `--stop-link-type` | string | - | no | Trailing stop offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--session` | string | - | no | Trading session |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) |
+| `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) |
+| `--stop-link-type` | string | - | no | Trailing stop offset type (VALUE, PERCENT, TICK) |
 | `--stop-offset` | float64 | 0 | no | Trailing stop offset amount |
 | `--stop-price` | float64 | 0 | no | Stop price |
-| `--stop-type` | string | - | no | Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) {,ASK,BID,LAST,MARK,STANDARD} |
+| `--stop-type` | string | - | no | Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) |
 | `--symbol` | string | - | yes | Equity symbol |
-| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Order type |
 
 **Example:**
 
@@ -1534,11 +1530,11 @@ will validate during preview.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--action` | string | - | yes | Exit action (SELL to close long, BUY to close short) |
+| `--duration` | string | - | no | Order duration |
 | `--quantity` | float64 | 0 | yes | Share quantity |
 | `--save-preview` | bool | false | no | Save this preview locally and return a digest for order place --from-preview |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--session` | string | - | no | Trading session |
 | `--stop-loss` | float64 | 0 | no | Stop-loss exit price (stop order) |
 | `--symbol` | string | - | yes | Equity symbol |
 | `--take-profit` | float64 | 0 | no | Take-profit exit price (limit order) |
@@ -1561,21 +1557,21 @@ the locally built OCC order request and Schwab's preview response. Add
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--action` | string | - | yes | Order action |
 | `--call` | bool | false | no | Call option |
-| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
 | `--price` | float64 | 0 | no | Limit price |
-| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
-| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) |
 | `--put` | bool | false | no | Put option |
 | `--quantity` | float64 | 0 | yes | Contract quantity |
 | `--save-preview` | bool | false | no | Save this preview locally and return a digest for order place --from-preview |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
-| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
+| `--session` | string | - | no | Trading session |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) |
 | `--strike` | float64 | 0 | yes | Strike price |
-| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Order type |
 | `--underlying` | string | - | yes | Underlying symbol |
 
 **Example:**
@@ -1596,24 +1592,24 @@ original order status becomes REPLACED after the new order is created.
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--action` | string | - | yes | Order action |
 | `--activation-price` | float64 | 0 | no | Price that activates the trailing stop |
-| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) |
+| `--duration` | string | - | no | Order duration |
 | `--order-id` | string | - | no | Order ID |
 | `--price` | float64 | 0 | no | Limit price |
-| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
-| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) |
 | `--quantity` | float64 | 0 | yes | Share quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
-| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
-| `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
-| `--stop-link-type` | string | - | no | Trailing stop offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--session` | string | - | no | Trading session |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) |
+| `--stop-link-basis` | string | - | no | Trailing stop reference price (LAST, BID, ASK, MARK) |
+| `--stop-link-type` | string | - | no | Trailing stop offset type (VALUE, PERCENT, TICK) |
 | `--stop-offset` | float64 | 0 | no | Trailing stop offset amount |
 | `--stop-price` | float64 | 0 | no | Stop price |
-| `--stop-type` | string | - | no | Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) {,ASK,BID,LAST,MARK,STANDARD} |
+| `--stop-type` | string | - | no | Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) |
 | `--symbol` | string | - | yes | Equity symbol |
-| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Order type |
 
 **Example:**
 
@@ -1633,21 +1629,21 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 
 | Flag | Type | Default | Required | Description |
 |------|------|---------|----------|-------------|
-| `--action` | string | - | yes | Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN} |
+| `--action` | string | - | yes | Order action |
 | `--call` | bool | false | no | Call option |
-| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX} |
-| `--duration` | string | - | no | Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--destination` | string | - | no | Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) |
+| `--duration` | string | - | no | Order duration |
 | `--expiration` | string | - | yes | Expiration date (YYYY-MM-DD) |
 | `--order-id` | string | - | no | Order ID |
 | `--price` | float64 | 0 | no | Limit price |
-| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER} |
-| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE} |
+| `--price-link-basis` | string | - | no | Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) |
+| `--price-link-type` | string | - | no | Price link offset type (VALUE, PERCENT, TICK) |
 | `--put` | bool | false | no | Put option |
 | `--quantity` | float64 | 0 | yes | Contract quantity |
-| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
-| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE} |
+| `--session` | string | - | no | Trading session |
+| `--special-instruction` | string | - | no | Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) |
 | `--strike` | float64 | 0 | yes | Strike price |
-| `--type` | string | - | no | Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+| `--type` | string | - | no | Order type |
 | `--underlying` | string | - | yes | Underlying symbol |
 
 **Example:**
@@ -1677,8 +1673,8 @@ P&L, and sort filters to shrink output for portfolio triage workflows.
 | `--losers-only` | bool | false | no | Show only positions with negative unrealized P&L |
 | `--max-pnl` | float64 | 0 | no | Maximum unrealized P&L to include when set |
 | `--min-pnl` | float64 | 0 | no | Minimum unrealized P&L to include when set |
-| `--sort` | string | - | no | Sort positions by pnl-desc, pnl-asc, or value-desc {,pnl-asc,pnl-desc,value-desc} |
-| `--symbol` | stringSlice | [] | no | Filter by symbol (repeatable, comma-separated values allowed) |
+| `--sort` | string | - | no | Sort positions by pnl-desc, pnl-asc, or value-desc |
+| `--symbol` | stringArray | [] | no | Filter by symbol (repeatable, comma-separated values allowed) |
 
 **Example:**
 
@@ -1713,7 +1709,7 @@ mutually exclusive with positional symbol arguments.
 |------|------|---------|----------|-------------|
 | `--call` | bool | false | no | Call option |
 | `--expiration` | string | - | no | Expiration date (YYYY-MM-DD) for option quote |
-| `--fields` | stringSlice | [] | no | Quote fields to return (repeatable): quote, fundamental, extended, reference, regular |
+| `--fields` | stringArray | [] | no | Quote fields to return (repeatable): quote, fundamental, extended, reference, regular |
 | `--indicative` | bool | false | no | Request indicative (non-tradeable) quotes |
 | `--put` | bool | false | no | Put option |
 | `--strike` | float64 | 0 | no | Strike price for option quote |
@@ -1833,7 +1829,7 @@ relatively low. Use --std-dev to widen or narrow the bands (default 2.0).
 | `--interval` | string | daily | no | Data interval (daily, weekly, 1min, 5min, 15min, 30min) |
 | `--period` | int | 20 | no | BBands period |
 | `--points` | int | 1 | no | Number of output points (default 1; 0 = all) |
-| `--std-dev` | float64 | 2.0 | no | Standard deviations |
+| `--std-dev` | float64 | 2 | no | Standard deviations |
 
 **Example:**
 
@@ -2042,10 +2038,6 @@ suggests bearish.
 schwab-agent ta vwap AAPL
   schwab-agent ta vwap AAPL --interval 5min --points 20
 ```
-
-### Environment Variable Prefix
-
-All environment variables use the `SCHWAB_AGENT_` prefix.
 
 ### Examples
 

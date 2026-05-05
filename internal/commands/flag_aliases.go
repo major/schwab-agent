@@ -14,8 +14,8 @@ import (
 func registerOrderFlagAliases(cmd *cobra.Command) {
 	// Register --instruction alias only if --action exists and --instruction
 	// is not already registered (idempotent for tree-walker safety).
-	// Usage must start with "alias for --" (lowercase) so structcli's JSON
-	// Schema generator skips these flags, matching its preset alias convention.
+	// Keep the usage text explicit so generated docs and help output make the
+	// relationship to the primary flag obvious.
 	actionFlag := cmd.Flags().Lookup("action")
 	if actionFlag != nil && cmd.Flags().Lookup("instruction") == nil {
 		var instructionAlias string
@@ -159,9 +159,8 @@ func resolveOrderFlagAliasesViaFlags(cmd *cobra.Command) error {
 
 // RegisterOrderFlagAliasesOnTree walks the command tree and registers
 // --instruction and --order-type aliases on all commands that have --action
-// and/or --type flags. Must be called AFTER structcli.Setup() to avoid
-// interfering with structcli's JSON Schema generation, which breaks when
-// non-structcli flags are present at schema-build time.
+// and/or --type flags. Call this after structcli.Setup() so aliases are added
+// after structcli finishes wiring help topics, flag errors, and debug hooks.
 func RegisterOrderFlagAliasesOnTree(root *cobra.Command) {
 	walkCommandTree(root, func(cmd *cobra.Command) {
 		registerOrderFlagAliases(cmd)

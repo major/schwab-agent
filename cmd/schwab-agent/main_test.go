@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	stderrors "errors"
 	"net/http"
 	"net/http/httptest"
@@ -96,61 +95,6 @@ func cobraArgs(args []string) []string {
 	return args
 }
 
-// schemaByTitle indexes the --jsonschema=tree output by command title.
-func schemaByTitle(t *testing.T, stdout string) map[string]map[string]any {
-	t.Helper()
-
-	var schemas []map[string]any
-	require.NoError(t, json.Unmarshal([]byte(stdout), &schemas))
-	require.NotEmpty(t, schemas)
-
-	byTitle := make(map[string]map[string]any, len(schemas))
-	for _, schema := range schemas {
-		title, ok := schema["title"].(string)
-		require.True(t, ok, "schema entry is missing a string title: %#v", schema)
-		byTitle[title] = schema
-	}
-
-	return byTitle
-}
-
-// schemaStrings returns a string slice from a schema array field.
-func schemaStrings(t *testing.T, schema map[string]any, key string) []string {
-	t.Helper()
-
-	values, ok := schema[key].([]any)
-	require.True(t, ok, "schema %q field is not an array", key)
-
-	result := make([]string, 0, len(values))
-	for _, value := range values {
-		stringValue, ok := value.(string)
-		require.True(t, ok, "schema %q field contains a non-string value: %#v", key, value)
-		result = append(result, stringValue)
-	}
-
-	return result
-}
-
-// schemaProperties returns the JSON Schema properties map for a command schema.
-func schemaProperties(t *testing.T, schema map[string]any) map[string]any {
-	t.Helper()
-
-	properties, ok := schema["properties"].(map[string]any)
-	require.True(t, ok, "schema entry is missing properties: %#v", schema)
-
-	return properties
-}
-
-// schemaProperty returns a single named flag property from a command schema.
-func schemaProperty(t *testing.T, schema map[string]any, name string) map[string]any {
-	t.Helper()
-
-	property, ok := schemaProperties(t, schema)[name].(map[string]any)
-	require.True(t, ok, "schema entry is missing property %q", name)
-
-	return property
-}
-
 // writeTestConfig persists a valid auth config for Before hook tests.
 func writeTestConfig(t *testing.T, path string) {
 	t.Helper()
@@ -179,51 +123,14 @@ func TestBuildApp_AllCommandsPresent(t *testing.T) {
 	}
 }
 
-func TestJSONSchemaTreeIsCanonicalDiscoveryContract(t *testing.T) {
+func TestBuildApp_JSONSchemaFlagIsNotRegistered(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	stdout, err := runApp(t, "schwab-agent", "--jsonschema=tree")
-	require.NoError(t, err)
+	stdout, err := runApp(t, "schwab-agent", "--jsonschema")
+	require.Error(t, err)
 
-	schemas := schemaByTitle(t, stdout)
-	rootSchema := schemas["schwab-agent"]
-	require.NotNil(t, rootSchema)
-
-	assert.Subset(t, schemaStrings(t, rootSchema, "x-structcli-subcommands"), []string{
-		"account",
-		"auth",
-		"chain",
-		"history",
-		"instrument",
-		"market",
-		"order",
-		"position",
-		"quote",
-		"symbol",
-		"ta",
-	})
-	assert.Equal(t, "a", schemaProperty(t, rootSchema, "account")["x-structcli-shorthand"])
-	assert.Equal(t, "v", schemaProperty(t, rootSchema, "verbose")["x-structcli-shorthand"])
-	assert.Contains(t, schemaProperties(t, rootSchema), "config")
-	assert.Contains(t, schemaProperties(t, rootSchema), "token")
-
-	symbolBuildSchema := schemas["schwab-agent symbol build"]
-	require.NotNil(t, symbolBuildSchema)
-	assert.Subset(t, schemaStrings(t, symbolBuildSchema, "required"), []string{"expiration", "strike", "underlying"})
-
-	equitySchema := schemas["schwab-agent order build equity"]
-	require.NotNil(t, equitySchema)
-	// --action's required annotation is replaced by a OneRequired group with
-	// --instruction after alias registration, so only symbol and quantity
-	// remain individually required.
-	assert.Subset(t, schemaStrings(t, equitySchema, "required"), []string{"quantity", "symbol"})
-	assert.Subset(t, schemaStrings(t, schemaProperty(t, equitySchema, "action"), "enum"), []string{"BUY", "SELL"})
-	assert.Subset(t, schemaStrings(t, schemaProperty(t, equitySchema, "type"), "enum"), []string{"LIMIT", "MARKET"})
-
-	taSchema := schemas["schwab-agent ta sma"]
-	require.NotNil(t, taSchema)
-	assert.Equal(t, "daily", schemaProperty(t, taSchema, "interval")["default"])
-	assert.Subset(t, schemaStrings(t, schemaProperty(t, taSchema, "interval"), "enum"), []string{"1min", "daily", "weekly"})
+	assert.Contains(t, err.Error(), "unknown flag: --jsonschema")
+	assert.NotContains(t, stdout, `"$schema"`)
 }
 
 func TestBeforeHook_SkipsAuthForAuthCommand(t *testing.T) {

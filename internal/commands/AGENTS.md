@@ -48,7 +48,7 @@ type quoteGetOpts struct {
 
 ### Flag Aliases
 
-Order subcommands that use `--action` and `--type` also accept `--instruction` and `--order-type` as aliases. `registerOrderFlagAliases()` adds the alias flags with mutual exclusivity constraints. `resolveOrderFlagAliasesViaFlags()` runs before handlers read their bound option structs, copying alias values to canonical flags via `cmd.Flags().Set()`. `RegisterOrderFlagAliasesOnTree(root)` walks the full command tree post-setup to register aliases on all 14 qualifying subcommands. Alias flags use a lowercase "alias for --" Usage prefix so structcli's JSON Schema generator skips them.
+Order subcommands that use `--action` and `--type` also accept `--instruction` and `--order-type` as aliases. `registerOrderFlagAliases()` adds the alias flags with mutual exclusivity constraints. `resolveOrderFlagAliasesViaFlags()` runs before handlers read their bound option structs, copying alias values to canonical flags via `cmd.Flags().Set()`. `RegisterOrderFlagAliasesOnTree(root)` walks the full command tree post-setup to register aliases on all 14 qualifying subcommands. Alias flags use explicit "alias for --" usage text so generated docs and help output make the relationship clear.
 
 ## Adding a New Command
 

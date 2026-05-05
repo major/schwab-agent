@@ -141,8 +141,8 @@ type orderStatusFilter string
 const orderStatusFilterAll orderStatusFilter = "all"
 
 // init registers CLI-facing enums with structcli without adding a structcli
-// dependency to the pure models package. Registered enums populate JSON Schema,
-// shell completions, and pflag validation for typed option fields.
+// dependency to the pure models package. Registered enums populate shell
+// completions and pflag validation for typed option fields.
 func init() {
 	structcli.RegisterEnum(enumMapWithEmpty(validInstructions))
 	structcli.RegisterEnum(enumMapWithEmptyAndAliases(validOrderTypes, map[models.OrderType][]string{
