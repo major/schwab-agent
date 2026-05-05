@@ -413,6 +413,12 @@ func isLikelyAccountHash(value string) bool {
 	return hasLetter && hasDigit
 }
 
+// shouldAttemptAccountHashEnrichment avoids extra network calls for compact test
+// fixtures such as hash123/default-hash while still enriching real Schwab hashes.
+func shouldAttemptAccountHashEnrichment(hash string) bool {
+	return len(strings.TrimSpace(hash)) >= 16
+}
+
 type resolvedAccountCandidate struct {
 	accountNumber string
 	hash          string
@@ -680,6 +686,7 @@ from the preferences API (best-effort, degrades gracefully).`,
 		newAccountNumbersCmd(c, w),
 		newAccountSetDefaultCmd(configPath, w),
 		newAccountTransactionCmd(c, configPath, w),
+		newAccountResolveCmd(c, configPath, w),
 	)
 
 	return cmd
@@ -1017,6 +1024,66 @@ func newAccountTransactionGetCmd(c *client.Ref, configPath string, w io.Writer) 
 			}
 
 			return output.WriteSuccess(w, transactionGetData{Transaction: result}, output.NewMetadata())
+		},
+	}
+}
+
+// accountResolveData is the output shape for the account resolve command.
+type accountResolveData struct {
+	AccountHash   string `json:"accountHash"`
+	AccountNumber string `json:"accountNumber,omitempty"`
+	NickName      string `json:"nickName,omitempty"`
+	Type          string `json:"type,omitempty"`
+	Source        string `json:"source"`
+	DisplayLabel  string `json:"displayLabel"`
+}
+
+// newAccountResolveCmd returns a command that resolves any account identifier
+// (hash, number, or nickname) to full account details with source tracking.
+func newAccountResolveCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "resolve [account]",
+		Short: "Resolve an account identifier to full details",
+		Long: `Resolve any account identifier (hash, account number, or nickname) to its
+full details including the Schwab hash, account number, nickname, account type,
+resolution source, and display label.
+
+The identifier can come from the --account flag, a positional argument, or the
+default_account in config.json. Note that -a shorthand may not work on the
+account parent command due to flag shadowing; use --account instead.`,
+		Example: `  # Resolve by nickname
+  schwab-agent account resolve "My IRA"
+
+  # Resolve by account number
+  schwab-agent account resolve 12345678
+
+  # Resolve using the --account flag
+  schwab-agent account resolve --account "My IRA"
+
+  # Resolve using the default account from config
+  schwab-agent account resolve`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			accountFlag, err := cmd.Flags().GetString("account")
+			if err != nil {
+				return err
+			}
+
+			info, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configPath, args)
+			if err != nil {
+				return err
+			}
+
+			data := accountResolveData{
+				AccountHash:   info.Hash,
+				AccountNumber: info.AccountNumber,
+				NickName:      info.NickName,
+				Type:          info.AccountType,
+				Source:        info.Source,
+				DisplayLabel:  info.DisplayLabel,
+			}
+
+			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
 }

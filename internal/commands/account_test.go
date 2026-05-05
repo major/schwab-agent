@@ -1727,3 +1727,166 @@ func TestFirstAccountIdentifierWithSource(t *testing.T) {
 		})
 	}
 }
+
+func TestAccountResolveCmd(t *testing.T) {
+	t.Parallel()
+
+	// Shared mock data used across subtests.
+	accountNumbers := []map[string]string{
+		{"accountNumber": "12345678", "hashValue": "ABCDEF1234567890ABCDEF1234567890"},
+	}
+	userPrefs := map[string]any{
+		"accounts": []map[string]any{
+			{
+				"accountNumber":  "12345678",
+				"nickName":       "My IRA",
+				"type":           "MARGIN",
+				"primaryAccount": true,
+			},
+		},
+	}
+
+	tests := []struct {
+		name          string
+		args          []string
+		routes        map[string]any
+		configDefault string
+		wantErr       bool
+		wantHash      string
+		wantNumber    string
+		wantNickName  string
+		wantType      string
+		wantSource    string
+		wantLabel     string
+	}{
+		{
+			name: "resolve by nickname via positional arg",
+			args: []string{"resolve", "My IRA"},
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": accountNumbers,
+				"/trader/v1/userPreference":          userPrefs,
+			},
+			wantHash:     "ABCDEF1234567890ABCDEF1234567890",
+			wantNumber:   "12345678",
+			wantNickName: "My IRA",
+			wantType:     "MARGIN",
+			wantSource:   "explicit",
+			wantLabel:    "My IRA",
+		},
+		{
+			name: "resolve by account number via positional arg",
+			args: []string{"resolve", "12345678"},
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": accountNumbers,
+				"/trader/v1/userPreference":          userPrefs,
+			},
+			wantHash:     "ABCDEF1234567890ABCDEF1234567890",
+			wantNumber:   "12345678",
+			wantNickName: "My IRA",
+			wantType:     "MARGIN",
+			wantSource:   "explicit",
+			wantLabel:    "My IRA",
+		},
+		{
+			name: "resolve by hash via positional arg",
+			args: []string{"resolve", "ABCDEF1234567890ABCDEF1234567890"},
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": accountNumbers,
+				"/trader/v1/userPreference":          userPrefs,
+			},
+			wantHash:     "ABCDEF1234567890ABCDEF1234567890",
+			wantNumber:   "12345678",
+			wantNickName: "My IRA",
+			wantType:     "MARGIN",
+			wantSource:   "explicit",
+			wantLabel:    "My IRA",
+		},
+		{
+			name: "resolve from default config",
+			args: []string{"resolve"},
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": accountNumbers,
+				"/trader/v1/userPreference":          userPrefs,
+			},
+			configDefault: "My IRA",
+			wantHash:      "ABCDEF1234567890ABCDEF1234567890",
+			wantNumber:    "12345678",
+			wantNickName:  "My IRA",
+			wantType:      "MARGIN",
+			wantSource:    "default",
+			wantLabel:     "My IRA",
+		},
+		{
+			name:    "no account and no default returns error",
+			args:    []string{"resolve"},
+			routes:  map[string]any{},
+			wantErr: true,
+		},
+		{
+			name: "resolve via --account flag",
+			args: []string{"resolve", "--account", "My IRA"},
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": accountNumbers,
+				"/trader/v1/userPreference":          userPrefs,
+			},
+			wantHash:     "ABCDEF1234567890ABCDEF1234567890",
+			wantNumber:   "12345678",
+			wantNickName: "My IRA",
+			wantType:     "MARGIN",
+			wantSource:   "explicit",
+			wantLabel:    "My IRA",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			srv := accountMockServer(t, tt.routes)
+			defer srv.Close()
+
+			configPath := ""
+			if tt.configDefault != "" {
+				configPath = writeAccountTestConfig(t, t.TempDir(), tt.configDefault)
+			}
+
+			c := testClient(t, srv)
+
+			var buf bytes.Buffer
+			cmd := NewAccountCmd(c, configPath, &buf)
+
+			// Act
+			_, err := runTestCommand(t, cmd, tt.args...)
+
+			// Assert
+			if tt.wantErr {
+				require.Error(t, err)
+				var notFound *apperr.AccountNotFoundError
+				assert.True(t, errors.As(err, &notFound), "expected AccountNotFoundError, got %T", err)
+
+				return
+			}
+
+			require.NoError(t, err)
+
+			env := decodeAccountEnvelope(t, buf.Bytes())
+			assert.NotEmpty(t, env.Metadata.Timestamp)
+
+			dataMap, ok := env.Data.(map[string]any)
+			require.True(t, ok, "data should be a JSON object")
+
+			assert.Equal(t, tt.wantHash, dataMap["accountHash"])
+			assert.Equal(t, tt.wantNumber, dataMap["accountNumber"])
+			assert.Equal(t, tt.wantNickName, dataMap["nickName"])
+			assert.Equal(t, tt.wantType, dataMap["type"])
+			assert.Equal(t, tt.wantSource, dataMap["source"])
+			assert.Equal(t, tt.wantLabel, dataMap["displayLabel"])
+
+			// Metadata should NOT include account context fields for this command.
+			assert.Empty(t, env.Metadata.Account, "resolve should not set metadata.account")
+			assert.Empty(t, env.Metadata.AccountNickName, "resolve should not set metadata.accountNickName")
+			assert.Empty(t, env.Metadata.AccountSource, "resolve should not set metadata.accountSource")
+		})
+	}
+}

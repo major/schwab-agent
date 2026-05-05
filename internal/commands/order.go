@@ -216,17 +216,23 @@ priority. Requires a default account or --account flag.`,
 				return err
 			}
 
-			account, err := resolveAccount(c, accountFlag, configPath, nil)
+			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configPath, nil)
 			if err != nil {
 				return err
 			}
 
-			order, err := c.GetOrder(cmd.Context(), account, orderID)
+			order, err := c.GetOrder(cmd.Context(), acct.Hash, orderID)
 			if err != nil {
 				return err
 			}
 
-			return output.WriteSuccess(w, orderGetData{Order: order}, output.NewMetadata())
+			meta := output.NewMetadata()
+			meta.Account = acct.Hash
+			meta.AccountNickName = acct.NickName
+			meta.AccountType = acct.AccountType
+			meta.AccountSource = acct.Source
+			meta.AccountDisplayLabel = acct.DisplayLabel
+			return output.WriteSuccess(w, orderGetData{Order: order}, meta)
 		},
 	}
 
