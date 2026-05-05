@@ -16,6 +16,30 @@ import (
 	"github.com/major/schwab-agent/internal/apperr"
 )
 
+// StructuredError is the top-level machine-readable error shape used by the
+// CLI. It intentionally mirrors structcli.StructuredError while flag parsing is
+// migrated to Cobra-native handlers, so callers keep the same JSON contract as
+// structcli is phased out one behavior at a time.
+type StructuredError struct {
+	Error      string      `json:"error"`
+	ExitCode   int         `json:"exit_code"`
+	Message    string      `json:"message"`
+	Flag       string      `json:"flag,omitempty"`
+	Got        string      `json:"got,omitempty"`
+	Expected   string      `json:"expected,omitempty"`
+	Command    string      `json:"command,omitempty"`
+	Hint       string      `json:"hint,omitempty"`
+	Available  []string    `json:"available,omitempty"`
+	Violations []Violation `json:"violations,omitempty"`
+	ConfigFile string      `json:"config_file,omitempty"`
+	Key        string      `json:"key,omitempty"`
+	EnvVar     string      `json:"env_var,omitempty"`
+}
+
+// Violation mirrors structcli's per-field validation details for callers that
+// decode validation failures through ErrorEnvelope.
+type Violation = structcli.Violation
+
 // Metadata holds the standard metadata fields for response envelopes.
 type Metadata struct {
 	Timestamp           string `json:"timestamp"`
@@ -44,9 +68,8 @@ type Envelope struct {
 }
 
 // ErrorEnvelope is kept as a compatibility alias for tests and callers that
-// decode errors through this package type. Error responses now use structcli's
-// top-level StructuredError contract instead of the legacy nested envelope.
-type ErrorEnvelope = structcli.StructuredError
+// decode errors through this package type.
+type ErrorEnvelope = StructuredError
 
 // WriteSuccess writes a successful response with data and metadata to the writer.
 // The response is formatted as a JSON envelope with data and metadata fields.
@@ -63,8 +86,8 @@ func WriteSuccess(w io.Writer, data any, metadata Metadata) error {
 }
 
 // WriteError writes an error response to the writer.
-// The response uses structcli's top-level StructuredError contract so agents
-// can parse one stable schema for both Schwab-domain and flag/config errors.
+// The response uses the top-level StructuredError contract so agents can parse
+// one stable schema for both Schwab-domain and flag/config errors.
 func WriteError(w io.Writer, err error) error {
 	_, writeErr := WriteCommandError(w, nil, err)
 	return writeErr
@@ -72,10 +95,10 @@ func WriteError(w io.Writer, err error) error {
 
 // WriteCommandError writes an error response and returns the process exit code
 // that should accompany it. Schwab-domain errors are mapped locally so their
-// existing 1-5 exit-code contract stays intact; Cobra and structcli errors are
-// delegated to structcli.HandleError so flag metadata, command paths, enum
-// values, env var hints, and available commands stay as rich as structcli can
-// make them.
+// existing 1-5 exit-code contract stays intact. Cobra flag errors are mapped
+// locally because structcli.WithFlagErrors() is no longer installed; remaining
+// non-domain errors still fall back to structcli.HandleError while the broader
+// structcli migration continues.
 func WriteCommandError(w io.Writer, cmd *cobra.Command, err error) (int, error) {
 	if err == nil {
 		return 0, nil
@@ -86,11 +109,16 @@ func WriteCommandError(w io.Writer, cmd *cobra.Command, err error) (int, error) 
 		return se.ExitCode, writeStructuredError(w, &se)
 	}
 
+	if flagErr := flagErrorFrom(err); flagErr != nil {
+		se := flagStructuredError(cmd, flagErr)
+		return se.ExitCode, writeStructuredError(w, &se)
+	}
+
 	if cmd != nil {
 		return writeStructCLIError(w, cmd, err)
 	}
 
-	se := structcli.StructuredError{
+	se := StructuredError{
 		Error:    "error",
 		ExitCode: 1,
 		Message:  err.Error(),
@@ -101,7 +129,7 @@ func WriteCommandError(w io.Writer, cmd *cobra.Command, err error) (int, error) 
 // isSchwabDomainError reports whether err belongs to schwab-agent's typed
 // domain hierarchy. structcli has its own ValidationError type, so checking the
 // shared SchwabError base avoids accidentally stealing structcli validation
-// errors away from structcli.HandleError.
+// errors away from the non-domain fallback.
 func isSchwabDomainError(err error) bool {
 	if _, ok := errors.AsType[*apperr.AuthRequiredError](err); ok {
 		return true
@@ -137,11 +165,11 @@ func isSchwabDomainError(err error) bool {
 	return false
 }
 
-// schwabStructuredError maps project domain errors onto structcli's stable JSON
-// shape. The old Details field becomes Hint because it is remediation text for
-// agents and humans, not another machine-readable error code.
-func schwabStructuredError(cmd *cobra.Command, err error) structcli.StructuredError {
-	se := structcli.StructuredError{
+// schwabStructuredError maps project domain errors onto the stable JSON shape.
+// The old Details field becomes Hint because it is remediation text for agents
+// and humans, not another machine-readable error code.
+func schwabStructuredError(cmd *cobra.Command, err error) StructuredError {
+	se := StructuredError{
 		Error:    strings.ToLower(apperr.ErrorCode(err)),
 		ExitCode: apperr.ExitCodeFor(err),
 		Message:  err.Error(),
@@ -160,6 +188,40 @@ func schwabStructuredError(cmd *cobra.Command, err error) structcli.StructuredEr
 			se.Got = fmt.Sprintf("status: %d", httpErr.StatusCode)
 		}
 		se.Expected = "2xx response"
+	}
+
+	return se
+}
+
+func flagErrorFrom(err error) *apperr.FlagError {
+	if flagErr, ok := errors.AsType[*apperr.FlagError](err); ok {
+		return flagErr
+	}
+
+	// Some tests and command paths can still hand us Cobra's raw pflag error if a
+	// command-specific SetFlagErrorFunc was not installed. Parse only recognized
+	// pflag messages here; unlike NormalizeFlagError, this must not wrap arbitrary
+	// command or config errors.
+	if classified, ok := apperr.ClassifyFlagError(err); ok {
+		return classified
+	}
+
+	return nil
+}
+
+func flagStructuredError(cmd *cobra.Command, err *apperr.FlagError) StructuredError {
+	se := StructuredError{
+		Error:    "invalid_flag_value",
+		ExitCode: err.ExitCode(),
+		Message:  err.Error(),
+		Flag:     err.FlagName,
+		Command:  commandPath(cmd),
+	}
+	if err.Kind == apperr.FlagErrorUnknown {
+		se.Error = "unknown_flag"
+	}
+	if err.Value != "" {
+		se.Got = err.Value
 	}
 
 	return se
@@ -203,29 +265,31 @@ func schwabErrorDetails(err error) string {
 	return ""
 }
 
-// writeStructCLIError asks structcli to classify the error, then re-encodes the
-// result with this package's JSON encoder settings. This avoids copying
-// structcli's private classifier while still keeping SetEscapeHTML(false)
-// consistent across every JSON writer in schwab-agent.
+// writeStructCLIError asks structcli to classify non-flag errors, then re-encodes
+// the result with this package's JSON encoder settings. Flag parsing is handled
+// locally before this point; this fallback exists for the remaining structcli
+// migration surface, such as help/config classifications.
 func writeStructCLIError(w io.Writer, cmd *cobra.Command, err error) (int, error) {
 	var buf bytes.Buffer
 	exitCode := structcli.HandleError(cmd, err, &buf)
 
-	var se structcli.StructuredError
-	if unmarshalErr := json.Unmarshal(buf.Bytes(), &se); unmarshalErr != nil {
-		se = structcli.StructuredError{
+	var structcliErr structcli.StructuredError
+	if unmarshalErr := json.Unmarshal(buf.Bytes(), &structcliErr); unmarshalErr != nil {
+		se := StructuredError{
 			Error:    "error",
 			ExitCode: exitCode,
 			Message:  err.Error(),
 			Command:  commandPath(cmd),
 		}
+		return exitCode, writeStructuredError(w, &se)
 	}
 
+	se := StructuredError(structcliErr)
 	return exitCode, writeStructuredError(w, &se)
 }
 
-// writeStructuredError writes a top-level structcli StructuredError.
-func writeStructuredError(w io.Writer, se *structcli.StructuredError) error {
+// writeStructuredError writes a top-level StructuredError.
+func writeStructuredError(w io.Writer, se *StructuredError) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetEscapeHTML(false)
 	return encoder.Encode(se)

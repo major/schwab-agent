@@ -262,6 +262,68 @@ func TestWriteCommandErrorUnknownFlag(t *testing.T) {
 	assert.Equal(t, "test", errorEnvelope.Command)
 }
 
+func TestWriteCommandErrorTypedUnknownFlag(t *testing.T) {
+	buf := &bytes.Buffer{}
+	cmd := &cobra.Command{
+		Use:           "test",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return nil
+		},
+	}
+	cmd.SetFlagErrorFunc(apperr.NormalizeFlagError)
+	cmd.SetArgs([]string{"--bogus"})
+
+	executed, err := cmd.ExecuteC()
+	require.Error(t, err)
+
+	exitCode, writeErr := WriteCommandError(buf, executed, err)
+	require.NoError(t, writeErr)
+
+	var errorEnvelope ErrorEnvelope
+	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
+	require.NoError(t, unmarshalErr)
+
+	assert.Equal(t, "unknown_flag", errorEnvelope.Error)
+	assert.Equal(t, 12, exitCode)
+	assert.Equal(t, 12, errorEnvelope.ExitCode)
+	assert.Equal(t, "bogus", errorEnvelope.Flag)
+	assert.Equal(t, "test", errorEnvelope.Command)
+}
+
+func TestWriteCommandErrorTypedInvalidFlagValue(t *testing.T) {
+	buf := &bytes.Buffer{}
+	cmd := &cobra.Command{
+		Use:           "test",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return nil
+		},
+	}
+	cmd.Flags().Int("count", 0, "Number of items")
+	cmd.SetFlagErrorFunc(apperr.NormalizeFlagError)
+	cmd.SetArgs([]string{"--count", "many"})
+
+	executed, err := cmd.ExecuteC()
+	require.Error(t, err)
+
+	exitCode, writeErr := WriteCommandError(buf, executed, err)
+	require.NoError(t, writeErr)
+
+	var errorEnvelope ErrorEnvelope
+	unmarshalErr := json.Unmarshal(buf.Bytes(), &errorEnvelope)
+	require.NoError(t, unmarshalErr)
+
+	assert.Equal(t, "invalid_flag_value", errorEnvelope.Error)
+	assert.Equal(t, 11, exitCode)
+	assert.Equal(t, 11, errorEnvelope.ExitCode)
+	assert.Equal(t, "count", errorEnvelope.Flag)
+	assert.Equal(t, "many", errorEnvelope.Got)
+	assert.Equal(t, "test", errorEnvelope.Command)
+}
+
 func TestWriteErrorWithDetails(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := apperr.NewSchwabError("custom error", errors.New("cause"), apperr.WithDetails("additional context"))

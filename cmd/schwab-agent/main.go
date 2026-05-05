@@ -48,7 +48,6 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 	root := commands.BuildCommandTree(w, configPath, tokenPath, version, deps, authDeps)
 
 	if err := structcli.Setup(root,
-		structcli.WithFlagErrors(),
 		structcli.WithDebug(debug.Options{Exit: true}),
 	); err != nil {
 		panic(err)

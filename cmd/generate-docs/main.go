@@ -47,11 +47,9 @@ func run() error {
 		commands.DefaultAuthDeps(),
 	)
 
-	// Setup is required so the generators can read structcli-managed help
-	// topics, flag validation hooks, and enum metadata.
-	if err := structcli.Setup(root,
-		structcli.WithFlagErrors(),
-	); err != nil {
+	// Setup is required so the generators can read structcli-managed flag
+	// metadata and enum values, even though runtime-only setup hooks are absent.
+	if err := structcli.Setup(root); err != nil {
 		return fmt.Errorf("structcli setup: %w", err)
 	}
 
