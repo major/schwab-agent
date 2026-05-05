@@ -440,6 +440,37 @@ run_build_test "oco: BUY + TP + SL" \
     order build oco --symbol AAPL --action BUY --quantity 10 --take-profit 180 --stop-loss 220
 
 # -------------------------------------------------------------------
+# Order build: Buy-With-Stop - entry + protective stop (+ optional TP)
+# -------------------------------------------------------------------
+
+section "Order Build: Buy-With-Stop"
+
+# Help tests
+run_help_test "order place buy-with-stop"    order place buy-with-stop
+run_help_test "order build buy-with-stop"    order build buy-with-stop
+run_help_test "order preview buy-with-stop"  order preview buy-with-stop
+
+# Build tests
+run_build_test "buy-with-stop: LIMIT + SL" \
+    order build buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140
+run_build_test "buy-with-stop: MARKET + SL" \
+    order build buy-with-stop --symbol AAPL --quantity 10 --type MARKET --stop-loss 140
+run_build_test "buy-with-stop: LIMIT + SL + TP" \
+    order build buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140 --take-profit 170
+run_build_test "buy-with-stop: MARKET + SL + TP" \
+    order build buy-with-stop --symbol AAPL --quantity 10 --type MARKET --stop-loss 140 --take-profit 170
+run_build_test "buy-with-stop: LIMIT + SL + GTC" \
+    order build buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140 --duration GOOD_TILL_CANCEL
+run_build_test "buy-with-stop: alias --order-type MARKET" \
+    order build buy-with-stop --symbol AAPL --quantity 10 --order-type MARKET --stop-loss 140
+
+# Error tests (expect non-zero exit code)
+run_error_test "buy-with-stop: missing --stop-loss" \
+    order build buy-with-stop --symbol AAPL --quantity 10 --price 150
+run_error_test "buy-with-stop: invalid --type STOP" \
+    order build buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140 --type STOP
+
+# -------------------------------------------------------------------
 # Order build: Vertical - call/put x open/close
 # -------------------------------------------------------------------
 

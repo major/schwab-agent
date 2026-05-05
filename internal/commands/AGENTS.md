@@ -133,7 +133,8 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 | position.go | position | list (--all-accounts, --account) |
 | quote.go | quote | get (positional symbols or structured option flags: --underlying, --expiration, --strike, --call/--put) |
 | order.go | order | list (--recent, --status), get |
-| order_place.go | order | place (equity/option/bracket/oco), preview, cancel, replace (equity parent + option sub) |
+| order_place.go | order | place (equity/option/bracket/oco/buy-with-stop), preview, cancel, replace (equity parent + option sub) |
+| order_buy_with_stop.go | order | place/build/preview buy-with-stop (BUY-only bracket with stop-loss, optional take-profit) |
 | order_helpers.go | (shared) | opts structs, enum parsing, flag definitions, validation helpers |
 | flag_aliases.go | (shared) | registerOrderFlagAliases, resolveOrderFlagAliasesViaFlags, RegisterOrderFlagAliasesOnTree |
 | symbol_builder.go | (shared) | buildOCCSymbol for option commands needing OCC symbol construction |
