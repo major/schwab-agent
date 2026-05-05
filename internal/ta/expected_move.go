@@ -6,7 +6,7 @@ import (
 	"github.com/major/schwab-agent/internal/apperr"
 )
 
-// DefaultMultiplier is the straddle price adjustment factor used by schwab-mcp.
+// DefaultMultiplier is the default straddle price adjustment factor.
 const DefaultMultiplier = 0.85
 
 // ExpectedMoveResult contains the calculated expected move values.
