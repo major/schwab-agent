@@ -90,6 +90,31 @@ a hash as the default account.
 schwab-agent account numbers
 ```
 
+#### `schwab-agent account resolve`
+
+Resolve any account identifier (hash, account number, or nickname) to its
+full details including the Schwab hash, account number, nickname, account type,
+resolution source, and display label.
+
+The identifier can come from the --account flag, a positional argument, or the
+default_account in config.json.
+
+**Example:**
+
+```bash
+# Resolve by nickname
+  schwab-agent account resolve "My IRA"
+
+  # Resolve by account number
+  schwab-agent account resolve 12345678
+
+  # Resolve using the --account flag
+  schwab-agent account resolve --account "My IRA"
+
+  # Resolve using the default account from config
+  schwab-agent account resolve
+```
+
 #### `schwab-agent account set-default`
 
 Set the default account hash in the config file. Commands that require an
@@ -346,6 +371,14 @@ To load completions for every new session, execute once:
 
 	schwab-agent completion zsh > "${fpath[1]}/_schwab-agent"
 
+
+#### `schwab-agent config-keys`
+
+Show config keys derived from the current Cobra command tree and their corresponding flags.
+
+#### `schwab-agent env-vars`
+
+Show environment variables that schwab-agent reads for authentication, API configuration, state, and debug behavior.
 
 #### `schwab-agent history`
 
@@ -611,6 +644,41 @@ butterfly with long wings and two short body contracts.
 
 ```bash
 schwab-agent order build butterfly --underlying F --expiration 2026-06-18 --lower-strike 10 --middle-strike 12 --upper-strike 14 --call --buy --open --quantity 1 --price 0.50
+```
+
+#### `schwab-agent order build buy-with-stop`
+
+Creates a bracket order for buying shares with automatic stop-loss protection.
+The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
+Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
+Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.
+IMPORTANT: Bracket orders cannot be modified via order replace. To adjust, cancel the entire order and re-place with new parameters.
+MARKET entry (--type MARKET) skips price validation for stop-loss placement because there is no fixed entry price.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--duration` | string | - | no | Entry duration (exit legs are always GTC) {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--price` | float64 | 0 | no | Entry limit price (required for LIMIT orders, omit for MARKET) |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--stop-loss` | float64 | 0 | yes | Stop trigger price - becomes market sell when hit |
+| `--symbol` | string | - | yes | Stock symbol (e.g., AAPL) |
+| `--take-profit` | float64 | 0 | no | Optional take-profit limit price |
+| `--type` | string | - | no | Entry order type (LIMIT or MARKET, default LIMIT) {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+
+**Example:**
+
+```bash
+# Buy 10 shares of AAPL at $150 with stop-loss at $140
+  schwab-agent order build buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140
+
+  # Market entry with stop-loss (no price validation)
+  schwab-agent order build buy-with-stop --symbol AAPL --quantity 10 --type MARKET --stop-loss 140
+
+  # With take-profit (creates OCO exit structure)
+  schwab-agent order build buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140 --take-profit 170
 ```
 
 #### `schwab-agent order build calendar`
@@ -1183,6 +1251,41 @@ the parent cascades to all child orders.
   schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300
 ```
 
+#### `schwab-agent order place buy-with-stop`
+
+Creates a bracket order for buying shares with automatic stop-loss protection.
+The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
+Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
+Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.
+IMPORTANT: Bracket orders cannot be modified via order replace. To adjust, cancel the entire order and re-place with new parameters.
+MARKET entry (--type MARKET) skips price validation for stop-loss placement because there is no fixed entry price.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--duration` | string | - | no | Entry duration (exit legs are always GTC) {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--price` | float64 | 0 | no | Entry limit price (required for LIMIT orders, omit for MARKET) |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--stop-loss` | float64 | 0 | yes | Stop trigger price - becomes market sell when hit |
+| `--symbol` | string | - | yes | Stock symbol (e.g., AAPL) |
+| `--take-profit` | float64 | 0 | no | Optional take-profit limit price |
+| `--type` | string | - | no | Entry order type (LIMIT or MARKET, default LIMIT) {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+
+**Example:**
+
+```bash
+# Buy 10 shares of AAPL at $150 with stop-loss at $140
+  schwab-agent order place buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140
+
+  # Market entry with stop-loss (no price validation)
+  schwab-agent order place buy-with-stop --symbol AAPL --quantity 10 --type MARKET --stop-loss 140
+
+  # With take-profit (creates OCO exit structure)
+  schwab-agent order place buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140 --take-profit 170
+```
+
 #### `schwab-agent order place equity`
 
 Place an equity (stock) order. Supports MARKET, LIMIT, STOP, STOP_LIMIT, and
@@ -1345,6 +1448,42 @@ order and Schwab's validation, fee, and commission details.
 ```bash
 schwab-agent order preview bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
 	  schwab-agent order preview bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170
+```
+
+#### `schwab-agent order preview buy-with-stop`
+
+Creates a bracket order for buying shares with automatic stop-loss protection.
+The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
+Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
+Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.
+IMPORTANT: Bracket orders cannot be modified via order replace. To adjust, cancel the entire order and re-place with new parameters.
+MARKET entry (--type MARKET) skips price validation for stop-loss placement because there is no fixed entry price.
+
+**Flags:**
+
+| Flag | Type | Default | Required | Description |
+|------|------|---------|----------|-------------|
+| `--duration` | string | - | no | Entry duration (exit legs are always GTC) {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH} |
+| `--price` | float64 | 0 | no | Entry limit price (required for LIMIT orders, omit for MARKET) |
+| `--quantity` | float64 | 0 | yes | Share quantity |
+| `--save-preview` | bool | false | no | Save this preview locally and return a digest for order place --from-preview |
+| `--session` | string | - | no | Trading session {,AM,NORMAL,PM,SEAMLESS} |
+| `--stop-loss` | float64 | 0 | yes | Stop trigger price - becomes market sell when hit |
+| `--symbol` | string | - | yes | Stock symbol (e.g., AAPL) |
+| `--take-profit` | float64 | 0 | no | Optional take-profit limit price |
+| `--type` | string | - | no | Entry order type (LIMIT or MARKET, default LIMIT) {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT} |
+
+**Example:**
+
+```bash
+# Buy 10 shares of AAPL at $150 with stop-loss at $140
+  schwab-agent order preview buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140
+
+  # Market entry with stop-loss (no price validation)
+  schwab-agent order preview buy-with-stop --symbol AAPL --quantity 10 --type MARKET --stop-loss 140
+
+  # With take-profit (creates OCO exit structure)
+  schwab-agent order preview buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140 --take-profit 170
 ```
 
 #### `schwab-agent order preview equity`
@@ -1931,6 +2070,22 @@ schwab-agent account list
 schwab-agent account numbers
 ```
 
+#### schwab-agent account resolve
+
+```bash
+# Resolve by nickname
+  schwab-agent account resolve "My IRA"
+
+  # Resolve by account number
+  schwab-agent account resolve 12345678
+
+  # Resolve using the --account flag
+  schwab-agent account resolve --account "My IRA"
+
+  # Resolve using the default account from config
+  schwab-agent account resolve
+```
+
 #### schwab-agent account set-default
 
 ```bash
@@ -2073,6 +2228,19 @@ schwab-agent order build bracket --symbol NVDA --action BUY --quantity 10 --type
 
 ```bash
 schwab-agent order build butterfly --underlying F --expiration 2026-06-18 --lower-strike 10 --middle-strike 12 --upper-strike 14 --call --buy --open --quantity 1 --price 0.50
+```
+
+#### schwab-agent order build buy-with-stop
+
+```bash
+# Buy 10 shares of AAPL at $150 with stop-loss at $140
+  schwab-agent order build buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140
+
+  # Market entry with stop-loss (no price validation)
+  schwab-agent order build buy-with-stop --symbol AAPL --quantity 10 --type MARKET --stop-loss 140
+
+  # With take-profit (creates OCO exit structure)
+  schwab-agent order build buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140 --take-profit 170
 ```
 
 #### schwab-agent order build calendar
@@ -2225,6 +2393,19 @@ schwab-agent order list
   schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300
 ```
 
+#### schwab-agent order place buy-with-stop
+
+```bash
+# Buy 10 shares of AAPL at $150 with stop-loss at $140
+  schwab-agent order place buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140
+
+  # Market entry with stop-loss (no price validation)
+  schwab-agent order place buy-with-stop --symbol AAPL --quantity 10 --type MARKET --stop-loss 140
+
+  # With take-profit (creates OCO exit structure)
+  schwab-agent order place buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140 --take-profit 170
+```
+
 #### schwab-agent order place equity
 
 ```bash
@@ -2274,6 +2455,19 @@ schwab-agent order preview --spec @order.json
 ```bash
 schwab-agent order preview bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
 	  schwab-agent order preview bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170
+```
+
+#### schwab-agent order preview buy-with-stop
+
+```bash
+# Buy 10 shares of AAPL at $150 with stop-loss at $140
+  schwab-agent order preview buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140
+
+  # Market entry with stop-loss (no price validation)
+  schwab-agent order preview buy-with-stop --symbol AAPL --quantity 10 --type MARKET --stop-loss 140
+
+  # With take-profit (creates OCO exit structure)
+  schwab-agent order preview buy-with-stop --symbol AAPL --quantity 10 --price 150 --stop-loss 140 --take-profit 170
 ```
 
 #### schwab-agent order preview equity
