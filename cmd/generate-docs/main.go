@@ -53,7 +53,6 @@ func run() error {
 		structcli.WithJSONSchema(),
 		structcli.WithHelpTopics(),
 		structcli.WithFlagErrors(),
-		structcli.WithAppName("schwab-agent"),
 	); err != nil {
 		return fmt.Errorf("structcli setup: %w", err)
 	}

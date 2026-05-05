@@ -51,7 +51,6 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 		structcli.WithJSONSchema(),
 		structcli.WithHelpTopics(),
 		structcli.WithFlagErrors(),
-		structcli.WithAppName("schwab-agent"),
 		structcli.WithDebug(debug.Options{Exit: true}),
 	); err != nil {
 		panic(err)
