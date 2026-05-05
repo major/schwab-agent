@@ -3,8 +3,6 @@ package apperr
 
 import (
 	"errors"
-
-	structclierrors "github.com/leodido/structcli/errors"
 )
 
 // ErrorOption configures optional fields on SchwabError during construction.
@@ -331,13 +329,6 @@ func ErrorCode(err error) string {
 
 	if _, ok := errors.AsType[*OrderBuildError](err); ok {
 		return "ORDER_BUILD_ERROR"
-	}
-
-	// structcli's Validatable interface produces its own ValidationError type
-	// when Validate() returns errors during Unmarshal(). Classify it the same
-	// as our internal ValidationError so JSON output stays consistent.
-	if _, ok := errors.AsType[*structclierrors.ValidationError](err); ok {
-		return "VALIDATION_ERROR"
 	}
 
 	return "UNKNOWN"

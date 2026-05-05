@@ -14,7 +14,7 @@ applyTo: "**/*.go"
 
 ## CLI patterns
 
-- Command factories should follow the existing `FooCommand(ref *client.Ref, w io.Writer) *cli.Command` style when applicable.
-- Struct-tag flags should use structcli `Define()` during setup and `Unmarshal()` at the top of `RunE`.
+- Command factories should follow the existing `NewFooCmd(ref *client.Ref, w io.Writer) *cobra.Command` style when applicable.
+- Struct-tag flags should use `defineCobraFlags()` during setup, then RunE handlers should read the bound opts struct directly after calling `validateCobraOptions()` when available.
 - Root persistent flags and Cobra relationship checks may remain raw Cobra calls.
 - Noun-only shorthand commands must dispatch to their documented default subcommands without bypassing auth behavior.

@@ -94,7 +94,7 @@ func invalidQuoteFieldMessage(field, lower string) string {
 func newQuoteGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	opts := &quoteGetOpts{}
 	cmd := &cobra.Command{
-		Use:   "get",
+		Use:   "get [SYMBOL...]",
 		Short: "Get quotes for one or more symbols",
 		Long: `Get quotes for one or more symbols. Multiple symbols return a partial response
 when some are missing. Use --fields to select specific data groups (quote,

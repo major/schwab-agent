@@ -8,8 +8,9 @@ import (
 	"github.com/major/schwab-agent/internal/client"
 )
 
-// BuildCommandTree constructs the full command tree without calling
-// structcli.Setup. It is shared by the main CLI and the doc generator.
+// BuildCommandTree constructs the full command tree shared by the main CLI and
+// the doc generator. Runtime-only wiring such as debug flags and aliases is
+// layered on by callers after the tree is complete.
 func BuildCommandTree(
 	w io.Writer,
 	configPath, tokenPath, version string,

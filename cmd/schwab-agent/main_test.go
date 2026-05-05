@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodido/structcli"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -66,7 +65,7 @@ func runApp(t *testing.T, args ...string) (string, error) {
 	app.SetErr(&stdout)
 	app.SetArgs(cobraArgs(args))
 
-	_, err := structcli.ExecuteC(app)
+	_, err := app.ExecuteC()
 
 	return stdout.String(), err
 }
@@ -81,7 +80,7 @@ func runAppWithDeps(t *testing.T, deps commands.RootDeps, args ...string) (strin
 	app.SetErr(&stdout)
 	app.SetArgs(cobraArgs(args))
 
-	_, err := structcli.ExecuteC(app)
+	_, err := app.ExecuteC()
 
 	return stdout.String(), err
 }
@@ -160,7 +159,7 @@ func TestSkipAuth_EnvVarsCommand(t *testing.T) {
 	var buf bytes.Buffer
 	app := buildAppWithDeps(&buf, commands.RootDeps{})
 	app.SetArgs([]string{"env-vars"})
-	_, err := structcli.ExecuteC(app)
+	_, err := app.ExecuteC()
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -174,7 +173,7 @@ func TestSkipAuth_ConfigKeysCommand(t *testing.T) {
 	var buf bytes.Buffer
 	app := buildAppWithDeps(&buf, commands.RootDeps{})
 	app.SetArgs([]string{"config-keys"})
-	_, err := structcli.ExecuteC(app)
+	_, err := app.ExecuteC()
 	require.NoError(t, err)
 
 	output := buf.String()

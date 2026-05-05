@@ -438,8 +438,8 @@ var (
 	}
 )
 
-// normalizeOrderType preserves legacy CLI aliases after structcli has already
-// validated the typed enum flag value.
+// normalizeOrderType preserves legacy CLI aliases after pflag has validated the
+// typed enum flag value.
 func normalizeOrderType(orderType, fallback models.OrderType) models.OrderType {
 	switch orderType {
 	case "":
@@ -453,7 +453,7 @@ func normalizeOrderType(orderType, fallback models.OrderType) models.OrderType {
 	}
 }
 
-// normalizeDuration preserves common trading abbreviations after structcli
+// normalizeDuration preserves common trading abbreviations after pflag
 // validation so order builders still receive canonical API enum values.
 func normalizeDuration(duration models.Duration) models.Duration {
 	switch duration {
@@ -521,7 +521,7 @@ func parseOrderType(raw string, fallback models.OrderType) (models.OrderType, er
 }
 
 // parseDuration converts CLI input to a duration enum for focused unit tests and
-// legacy helper coverage. Runtime flag decoding is handled by structcli enums.
+// legacy helper coverage. Runtime flag decoding is handled by Cobra enum values.
 func parseDuration(raw string) (models.Duration, error) {
 	upper := strings.ToUpper(strings.TrimSpace(raw))
 

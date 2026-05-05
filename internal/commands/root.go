@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -58,8 +57,7 @@ func NewRootCmd(
 			// Debug mode prints flag source attribution and exits without
 			// executing the command. Skip auth since introspection doesn't
 			// need API access.
-			if structcli.IsDebugActive(cmd) {
-				structcli.UseDebug(cmd, cmd.OutOrStdout())
+			if IsDebugOptionsActive(cmd) {
 				return nil
 			}
 

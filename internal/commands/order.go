@@ -24,9 +24,9 @@ type orderGetData struct {
 
 // orderListOpts holds local flags for the order list subcommand.
 type orderListOpts struct {
-	// Keep status as []string because structcli v0.17 does not support slices of
-	// registered custom enum types. RunE still validates values against the same
-	// registered enum set after expanding comma-separated repeatable input.
+	// Keep status as []string because this flag accepts repeatable and
+	// comma-separated input before RunE validates each value against the order
+	// status enum set.
 	Status []string `flag:"status" flagdescr:"Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc."`
 	From   string   `flag:"from" flagdescr:"Filter by entered time lower bound"`
 	To     string   `flag:"to" flagdescr:"Filter by entered time upper bound"`

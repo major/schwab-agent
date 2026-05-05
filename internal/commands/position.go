@@ -34,9 +34,9 @@ type positionListData struct {
 	Positions []positionEntry `json:"positions"`
 }
 
-// positionFilters captures normalized position-list filters after structcli
-// has unmarshaled flags. Optional numeric filters stay as pointers so callers
-// can distinguish an omitted bound from an explicit zero-dollar threshold.
+// positionFilters captures normalized position-list filters after Cobra has
+// parsed flags. Optional numeric filters stay as pointers so callers can
+// distinguish an omitted bound from an explicit zero-dollar threshold.
 type positionFilters struct {
 	Symbols    map[string]struct{}
 	LosersOnly bool

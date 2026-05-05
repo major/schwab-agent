@@ -45,7 +45,7 @@ but TA fails, that symbol appears with its quote and a null analysis field.`,
   schwab-agent analyze AAPL NVDA
   schwab-agent analyze AAPL --interval weekly --points 5`,
 		GroupID: "market-data",
-		Args:   cobra.MinimumNArgs(1),
+		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err

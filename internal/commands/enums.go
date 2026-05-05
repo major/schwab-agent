@@ -1,11 +1,5 @@
 package commands
 
-import (
-	"github.com/leodido/structcli"
-
-	"github.com/major/schwab-agent/internal/models"
-)
-
 // chainContractType is a CLI-only enum because Schwab's chain endpoint accepts
 // ALL in addition to the CALL/PUT values represented by models.ContractType.
 type chainContractType string
@@ -139,62 +133,3 @@ const (
 type orderStatusFilter string
 
 const orderStatusFilterAll orderStatusFilter = "all"
-
-// init registers CLI-facing enums with structcli without adding a structcli
-// dependency to the pure models package. Registered enums populate shell
-// completions and pflag validation for typed option fields.
-func init() {
-	structcli.RegisterEnum(enumMapWithEmpty(validInstructions))
-	structcli.RegisterEnum(enumMapWithEmptyAndAliases(validOrderTypes, map[models.OrderType][]string{
-		models.OrderTypeMarketOnClose: []string{"MOC"},
-		models.OrderTypeLimitOnClose:  []string{"LOC"},
-	}))
-	structcli.RegisterEnum(enumMapWithEmptyAndAliases(validDurations, map[models.Duration][]string{
-		models.DurationGoodTillCancel:    []string{"GTC"},
-		models.DurationFillOrKill:        []string{"FOK"},
-		models.DurationImmediateOrCancel: []string{"IOC"},
-	}))
-	structcli.RegisterEnum(enumMapWithEmpty(validSessions))
-	structcli.RegisterEnum(enumMapWithEmpty(validStopPriceLinkBases))
-	structcli.RegisterEnum(enumMapWithEmpty(validStopPriceLinkTypes))
-	structcli.RegisterEnum(enumMapWithEmpty(validStopTypes))
-	structcli.RegisterEnum(enumMapWithEmpty(validSpecialInstructions))
-	structcli.RegisterEnum(enumMapWithEmpty(validDestinations))
-	structcli.RegisterEnum(enumMapWithEmpty(validPriceLinkBases))
-	structcli.RegisterEnum(enumMapWithEmpty(validPriceLinkTypes))
-
-	structcli.RegisterEnum(enumMap(validOrderStatusFilters))
-	structcli.RegisterEnum(enumMapWithEmpty([]chainContractType{chainContractTypeCall, chainContractTypePut, chainContractTypeAll}))
-	structcli.RegisterEnum(enumMapWithEmpty([]chainStrategy{chainStrategySingle, chainStrategyAnalytical, chainStrategyCovered, chainStrategyVertical, chainStrategyCalendar, chainStrategyStrangle, chainStrategyStraddle, chainStrategyButterfly, chainStrategyCondor, chainStrategyDiagonal, chainStrategyCollar, chainStrategyRoll}))
-	structcli.RegisterEnum(enumMapWithEmpty([]strikeRange{strikeRangeITM, strikeRangeNTM, strikeRangeOTM, strikeRangeSAK, strikeRangeSBK, strikeRangeSNK, strikeRangeAll}))
-	structcli.RegisterEnum(enumMapWithEmpty([]historyPeriodType{historyPeriodTypeDay, historyPeriodTypeMonth, historyPeriodTypeYear, historyPeriodTypeYTD}))
-	structcli.RegisterEnum(enumMapWithEmpty([]historyFrequencyType{historyFrequencyTypeMinute, historyFrequencyTypeDaily, historyFrequencyTypeWeekly, historyFrequencyTypeMonthly}))
-	structcli.RegisterEnum(enumMapWithEmpty([]historyFrequency{historyFrequency1, historyFrequency5, historyFrequency10, historyFrequency15, historyFrequency30}))
-	structcli.RegisterEnum(enumMap([]instrumentProjection{instrumentProjectionSymbolSearch, instrumentProjectionSymbolRegex, instrumentProjectionDescSearch, instrumentProjectionDescRegex, instrumentProjectionSearch, instrumentProjectionFundamental}))
-	structcli.RegisterEnum(enumMapWithEmpty([]moversSort{moversSortVolume, moversSortTrades, moversSortPercentChangeUp, moversSortPercentChangeDown}))
-	structcli.RegisterEnum(enumMapWithEmpty([]moversFrequency{moversFrequency0, moversFrequency1, moversFrequency5, moversFrequency10, moversFrequency30, moversFrequency60}))
-	structcli.RegisterEnum(enumMapWithEmpty([]positionSort{positionSortPnLDesc, positionSortPnLAsc, positionSortValueDesc}))
-	structcli.RegisterEnum(enumMap([]taInterval{taIntervalDaily, taIntervalWeekly, taInterval1Min, taInterval5Min, taInterval15Min, taInterval30Min}))
-}
-
-func enumMap[E ~string](values []E) map[E][]string {
-	registered := make(map[E][]string, len(values))
-	for _, value := range values {
-		registered[value] = []string{string(value)}
-	}
-	return registered
-}
-
-func enumMapWithEmpty[E ~string](values []E) map[E][]string {
-	registered := enumMap(values)
-	registered[""] = []string{""}
-	return registered
-}
-
-func enumMapWithEmptyAndAliases[E ~string](values []E, aliases map[E][]string) map[E][]string {
-	registered := enumMapWithEmpty(values)
-	for value, valueAliases := range aliases {
-		registered[value] = append(registered[value], valueAliases...)
-	}
-	return registered
-}

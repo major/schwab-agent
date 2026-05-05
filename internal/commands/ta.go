@@ -237,7 +237,7 @@ func writeTASymbolResults(w io.Writer, symbols []string, compute func(symbol str
 
 // simpleTAOpts holds CLI flags for factory-generated indicator commands (SMA, EMA, RSI).
 // Period is excluded from struct tags because its default varies per indicator
-// (cfg.defaultPeriod) and structcli tags require static defaults.
+// (cfg.defaultPeriod), while struct-tag defaults are static by design.
 type simpleTAOpts struct {
 	Period   []int
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`

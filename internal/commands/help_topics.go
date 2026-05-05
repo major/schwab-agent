@@ -9,9 +9,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// NewHelpTopicCmds returns Cobra-native replacements for the lightweight
-// informational topics that structcli previously generated. They are real
-// commands so the normal Cobra auth-skip annotation path can handle them.
+// NewHelpTopicCmds returns lightweight informational topics as real Cobra
+// commands so the normal auth-skip annotation path can handle them.
 func NewHelpTopicCmds(w io.Writer) []*cobra.Command {
 	return []*cobra.Command{
 		newEnvVarsCmd(w),
@@ -21,8 +20,7 @@ func NewHelpTopicCmds(w io.Writer) []*cobra.Command {
 
 // newEnvVarsCmd returns a static reference for environment variables consumed
 // outside Cobra flag binding. Keeping this hand-written makes auth/config
-// environment support visible instead of limiting the topic to structcli-only
-// flag environment bindings.
+// environment support visible beside Cobra's command/flag help output.
 func newEnvVarsCmd(w io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:         "env-vars",
@@ -43,15 +41,14 @@ func newEnvVarsCmd(w io.Writer) *cobra.Command {
 
   Local state and diagnostics:
     SCHWAB_AGENT_STATE_DIR      Directory for preview digest ledger files.
-    SCHWAB_AGENT_DEBUG_OPTIONS  Enables structcli debug option tracing for --debug-options.
+    SCHWAB_AGENT_DEBUG_OPTIONS  Enables debug option tracing for --debug-options.
 `)
 			return err
 		},
 	}
 }
 
-// newConfigKeysCmd prints config keys from the live Cobra command tree. This
-// keeps the topic useful without depending on structcli's help-topic generator.
+// newConfigKeysCmd prints config keys from the live Cobra command tree.
 func newConfigKeysCmd(w io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:         "config-keys",
