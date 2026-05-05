@@ -56,3 +56,19 @@ func TestVisibleCommandsSkipsHiddenCommands(t *testing.T) {
 	require.Contains(t, strings.Join(paths, "\n"), "schwab-agent quote")
 	require.NotContains(t, strings.Join(paths, "\n"), "__hidden")
 }
+
+func TestVisibleCommandsDoesNotMutateCommandTreeOrder(t *testing.T) {
+	oldCommandSorting := cobra.EnableCommandSorting
+	cobra.EnableCommandSorting = false
+	t.Cleanup(func() { cobra.EnableCommandSorting = oldCommandSorting })
+
+	root := &cobra.Command{Use: "root"}
+	beta := &cobra.Command{Use: "beta"}
+	alpha := &cobra.Command{Use: "alpha"}
+	root.AddCommand(beta, alpha)
+
+	_ = visibleCommands(root)
+
+	children := root.Commands()
+	require.Equal(t, []*cobra.Command{beta, alpha}, children)
+}

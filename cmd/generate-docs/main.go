@@ -115,6 +115,10 @@ func writeCommandMarkdown(b *strings.Builder, cmd *cobra.Command) {
 }
 
 func visibleCommands(root *cobra.Command) []*cobra.Command {
+	oldCommandSorting := cobra.EnableCommandSorting
+	cobra.EnableCommandSorting = false
+	defer func() { cobra.EnableCommandSorting = oldCommandSorting }()
+
 	commandList := make([]*cobra.Command, 0)
 	var walk func(*cobra.Command)
 	walk = func(cmd *cobra.Command) {
@@ -122,7 +126,7 @@ func visibleCommands(root *cobra.Command) []*cobra.Command {
 			return
 		}
 		commandList = append(commandList, cmd)
-		children := cmd.Commands()
+		children := append([]*cobra.Command(nil), cmd.Commands()...)
 		sort.Slice(children, func(i, j int) bool { return children[i].Name() < children[j].Name() })
 		for _, child := range children {
 			walk(child)
