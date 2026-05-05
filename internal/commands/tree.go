@@ -37,6 +37,7 @@ func BuildCommandTree(
 	root.AddCommand(NewAuthCmd(configPath, tokenPath, w, authDeps))
 	root.AddCommand(NewOrderCmd(ref, configPath, w))
 	root.AddCommand(NewCompletionCmd(w))
+	root.AddCommand(NewHelpTopicCmds(w)...)
 
 	return root
 }
