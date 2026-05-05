@@ -18,11 +18,15 @@ import (
 
 // Metadata holds the standard metadata fields for response envelopes.
 type Metadata struct {
-	Timestamp         string `json:"timestamp"`
-	Account           string `json:"account,omitempty"`
-	Requested         int    `json:"requested,omitempty"`
-	Returned          int    `json:"returned,omitempty"`
-	PositionsIncluded bool   `json:"positionsIncluded,omitempty"`
+	Timestamp           string `json:"timestamp"`
+	Account             string `json:"account,omitempty"`
+	Requested           int    `json:"requested,omitempty"`
+	Returned            int    `json:"returned,omitempty"`
+	PositionsIncluded   bool   `json:"positionsIncluded,omitempty"`
+	AccountNickName     string `json:"accountNickName,omitempty"`
+	AccountType         string `json:"accountType,omitempty"`
+	AccountSource       string `json:"accountSource,omitempty"`
+	AccountDisplayLabel string `json:"accountDisplayLabel,omitempty"`
 }
 
 // NewMetadata returns metadata pre-populated with the current UTC timestamp.
@@ -46,6 +50,8 @@ type ErrorEnvelope = structcli.StructuredError
 
 // WriteSuccess writes a successful response with data and metadata to the writer.
 // The response is formatted as a JSON envelope with data and metadata fields.
+//
+//nolint:gocritic // hugeParam: Metadata is passed by value intentionally to match the existing API contract; callers construct it inline and pointer indirection would complicate all call sites.
 func WriteSuccess(w io.Writer, data any, metadata Metadata) error {
 	envelope := Envelope{
 		Data:     data,
@@ -236,6 +242,8 @@ func commandPath(cmd *cobra.Command) string {
 
 // WritePartial writes a response with both data and errors (partial success).
 // The response is formatted as a JSON envelope with data, errors, and metadata fields.
+//
+//nolint:gocritic // hugeParam: Metadata is passed by value intentionally to match the existing API contract; callers construct it inline and pointer indirection would complicate all call sites.
 func WritePartial(w io.Writer, data any, errs []string, metadata Metadata) error {
 	envelope := Envelope{
 		Data:     data,

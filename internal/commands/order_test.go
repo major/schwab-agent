@@ -137,6 +137,223 @@ func writeTestOrderResponse(t *testing.T, w http.ResponseWriter, orderID int64, 
 	require.NoError(t, json.NewEncoder(w).Encode(response))
 }
 
+// writeTestAccountMetadataResponses serves account lookup endpoints used by detailed account resolution.
+func writeTestAccountMetadataResponses(t *testing.T, w http.ResponseWriter, path string) bool {
+	t.Helper()
+
+	w.Header().Set("Content-Type", "application/json")
+	switch path {
+	case "/trader/v1/accounts/accountNumbers":
+		_, err := w.Write([]byte(`[{"accountNumber":"12345678","hashValue":"ABCDEF1234567890ABCDEF1234567890"}]`))
+		require.NoError(t, err)
+		return true
+	case "/trader/v1/userPreference":
+		_, err := w.Write([]byte(`{"accounts":[{"accountNumber":"12345678","nickName":"My IRA","type":"MARGIN","primaryAccount":true}]}`))
+		require.NoError(t, err)
+		return true
+	default:
+		return false
+	}
+}
+
+// assertTestAccountMetadata verifies every order action/preview account metadata field.
+func assertTestAccountMetadata(t *testing.T, metadata output.Metadata, source string) { //nolint:gocritic // hugeParam: output.Metadata is passed by value intentionally to match the existing API contract.
+	t.Helper()
+
+	assert.Equal(t, "ABCDEF1234567890ABCDEF1234567890", metadata.Account)
+	assert.Equal(t, "My IRA", metadata.AccountNickName)
+	assert.Equal(t, "MARGIN", metadata.AccountType)
+	assert.Equal(t, source, metadata.AccountSource)
+	assert.Equal(t, "My IRA", metadata.AccountDisplayLabel)
+}
+
+func TestOrderPlaceIncludesAccountMetadata(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if writeTestAccountMetadataResponses(t, w, r.URL.Path) {
+			return
+		}
+
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders":
+			w.Header().Set("Location", "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders/1001")
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders/1001":
+			writeTestOrderResponse(t, w, 1001, models.OrderStatusQueued, "AAPL")
+		default:
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	stdout, err := runOrderCommand(
+		t,
+		testClient(t, server),
+		writeTestConfigMutable(t, "ABCDEF1234567890ABCDEF1234567890"),
+		"",
+		"order", "place", "equity",
+		"--account", "12345678",
+		"--symbol", "AAPL",
+		"--action", "BUY",
+		"--quantity", "10",
+		"--type", "LIMIT",
+		"--price", "185.25",
+	)
+	require.NoError(t, err)
+
+	assertTestAccountMetadata(t, decodeEnvelope(t, stdout).Metadata, "explicit")
+}
+
+func TestOrderPreviewIncludesAccountMetadata(t *testing.T) {
+	t.Parallel()
+
+	orderID := int64(1002)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if writeTestAccountMetadataResponses(t, w, r.URL.Path) {
+			return
+		}
+
+		if r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/previewOrder" {
+			w.Header().Set("Content-Type", "application/json")
+			require.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{OrderID: &orderID}))
+			return
+		}
+
+		assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	stdout, err := runOrderCommand(
+		t,
+		testClient(t, server),
+		writeTestConfig(t, "ABCDEF1234567890ABCDEF1234567890"),
+		"",
+		"order", "preview", "equity",
+		"--account", "12345678",
+		"--symbol", "AAPL",
+		"--action", "BUY",
+		"--quantity", "10",
+		"--type", "LIMIT",
+		"--price", "185.25",
+	)
+	require.NoError(t, err)
+
+	assertTestAccountMetadata(t, decodeEnvelope(t, stdout).Metadata, "explicit")
+}
+
+func TestOrderCancelIncludesAccountMetadata(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if writeTestAccountMetadataResponses(t, w, r.URL.Path) {
+			return
+		}
+
+		switch {
+		case r.Method == http.MethodDelete && r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders/1003":
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders/1003":
+			writeTestOrderResponse(t, w, 1003, models.OrderStatusCanceled, "AAPL")
+		default:
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	stdout, err := runOrderCommand(
+		t,
+		testClient(t, server),
+		writeTestConfigMutable(t, "ABCDEF1234567890ABCDEF1234567890"),
+		"",
+		"order", "cancel", "1003",
+		"--account", "12345678",
+	)
+	require.NoError(t, err)
+
+	assertTestAccountMetadata(t, decodeEnvelope(t, stdout).Metadata, "explicit")
+}
+
+func TestOrderReplaceIncludesAccountMetadata(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if writeTestAccountMetadataResponses(t, w, r.URL.Path) {
+			return
+		}
+
+		switch {
+		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders/1004":
+			w.Header().Set("Location", "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders/2004")
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders/1004":
+			writeTestOrderResponse(t, w, 1004, models.OrderStatusReplaced, "AAPL")
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders/2004":
+			writeTestOrderResponse(t, w, 2004, models.OrderStatusQueued, "AAPL")
+		default:
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	stdout, err := runOrderCommand(
+		t,
+		testClient(t, server),
+		writeTestConfigMutable(t, "ABCDEF1234567890ABCDEF1234567890"),
+		"",
+		"order", "replace", "1004",
+		"--account", "12345678",
+		"--symbol", "AAPL",
+		"--action", "BUY",
+		"--quantity", "10",
+		"--type", "LIMIT",
+		"--price", "185.25",
+	)
+	require.NoError(t, err)
+
+	assertTestAccountMetadata(t, decodeEnvelope(t, stdout).Metadata, "explicit")
+}
+
+func TestFromPreviewIncludesAccountMetadata(t *testing.T) {
+	t.Setenv("SCHWAB_AGENT_STATE_DIR", t.TempDir())
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if writeTestAccountMetadataResponses(t, w, r.URL.Path) {
+			return
+		}
+
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders":
+			w.Header().Set("Location", "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders/1005")
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders/1005":
+			writeTestOrderResponse(t, w, 1005, models.OrderStatusQueued, "AAPL")
+		default:
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	digestData, err := saveOrderPreview("ABCDEF1234567890ABCDEF1234567890", testPreviewLedgerOrder(t), nil)
+	require.NoError(t, err)
+
+	stdout, err := runOrderCommand(
+		t,
+		testClient(t, server),
+		writeTestConfigMutable(t, "ABCDEF1234567890ABCDEF1234567890"),
+		"",
+		"order", "place", "--from-preview", digestData.Digest,
+	)
+	require.NoError(t, err)
+
+	assertTestAccountMetadata(t, decodeEnvelope(t, stdout).Metadata, "preview")
+}
+
 func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 	t.Parallel()
 
@@ -2247,14 +2464,25 @@ func TestNewOrderCmdListNilStatusIncludedByDefault(t *testing.T) {
 func TestNewOrderCmdGetSuccess(t *testing.T) {
 	t.Parallel()
 
-	// Arrange
+	// Arrange - Mock server handles account enrichment and order get
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/trader/v1/accounts/hash123/orders/12345", r.URL.Path)
-
 		w.Header().Set("Content-Type", "application/json")
-		_, err := w.Write([]byte(`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":12345,"status":"FILLED","orderLegCollection":[{"instruction":"BUY","quantity":10,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}`))
-		require.NoError(t, err)
+
+		switch r.URL.Path {
+		case "/trader/v1/accounts/accountNumbers":
+			// Account enrichment: return empty list (hash123 won't be found, enrichment fails gracefully)
+			_, _ = w.Write([]byte(`[]`))
+		case "/trader/v1/userPreference":
+			// Account enrichment: return empty preferences (enrichment fails gracefully)
+			_, _ = w.Write([]byte(`{"accounts":[]}`))
+		case "/trader/v1/accounts/hash123/orders/12345":
+			assert.Equal(t, http.MethodGet, r.Method)
+			_, err := w.Write([]byte(`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":12345,"status":"FILLED","orderLegCollection":[{"instruction":"BUY","quantity":10,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}`))
+			require.NoError(t, err)
+		default:
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -2278,14 +2506,25 @@ func TestNewOrderCmdGetSuccess(t *testing.T) {
 func TestNewOrderCmdGetOrderIDFlagSuccess(t *testing.T) {
 	t.Parallel()
 
-	// Arrange
+	// Arrange - Mock server handles account enrichment and order get
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/trader/v1/accounts/hash123/orders/1234567890", r.URL.Path)
-
 		w.Header().Set("Content-Type", "application/json")
-		_, err := w.Write([]byte(`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":1234567890,"status":"FILLED"}`))
-		require.NoError(t, err)
+
+		switch r.URL.Path {
+		case "/trader/v1/accounts/accountNumbers":
+			// Account enrichment: return empty list (hash123 won't be found, enrichment fails gracefully)
+			_, _ = w.Write([]byte(`[]`))
+		case "/trader/v1/userPreference":
+			// Account enrichment: return empty preferences (enrichment fails gracefully)
+			_, _ = w.Write([]byte(`{"accounts":[]}`))
+		case "/trader/v1/accounts/hash123/orders/1234567890":
+			assert.Equal(t, http.MethodGet, r.Method)
+			_, err := w.Write([]byte(`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":1234567890,"status":"FILLED"}`))
+			require.NoError(t, err)
+		default:
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -2308,14 +2547,25 @@ func TestNewOrderCmdGetOrderIDFlagSuccess(t *testing.T) {
 func TestNewOrderCmdGetOrderIDFlagWinsOverPositional(t *testing.T) {
 	t.Parallel()
 
-	// Arrange
+	// Arrange - Mock server handles account enrichment and order get
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/trader/v1/accounts/hash123/orders/1234567890", r.URL.Path)
-
 		w.Header().Set("Content-Type", "application/json")
-		_, err := w.Write([]byte(`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":1234567890,"status":"FILLED"}`))
-		require.NoError(t, err)
+
+		switch r.URL.Path {
+		case "/trader/v1/accounts/accountNumbers":
+			// Account enrichment: return empty list (hash123 won't be found, enrichment fails gracefully)
+			_, _ = w.Write([]byte(`[]`))
+		case "/trader/v1/userPreference":
+			// Account enrichment: return empty preferences (enrichment fails gracefully)
+			_, _ = w.Write([]byte(`{"accounts":[]}`))
+		case "/trader/v1/accounts/hash123/orders/1234567890":
+			assert.Equal(t, http.MethodGet, r.Method)
+			_, err := w.Write([]byte(`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":1234567890,"status":"FILLED"}`))
+			require.NoError(t, err)
+		default:
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -3966,4 +4216,85 @@ func TestNewOrderCmdBuildDiagonalInvalidDate(t *testing.T) {
 	var validationErr *apperr.ValidationError
 	require.ErrorAs(t, err, &validationErr)
 	assert.Contains(t, validationErr.Error(), "far-expiration must use YYYY-MM-DD format")
+}
+
+func TestOrderGetIncludesAccountMetadata(t *testing.T) {
+	t.Parallel()
+
+	// Arrange - Create a mock server that handles account resolution and order get.
+	// The server must respond to:
+	// 1. GET /trader/v1/accounts/accountNumbers - returns account hash mapping
+	// 2. GET /trader/v1/userPreference - returns account nicknames and types
+	// 3. GET /trader/v1/accounts/{hash}/orders/{id} - returns the order details
+	routes := map[string]any{
+		"/trader/v1/accounts/accountNumbers": []map[string]string{
+			{"accountNumber": "12345678", "hashValue": "ABCDEF1234567890ABCDEF1234567890"},
+		},
+		"/trader/v1/userPreference": map[string]any{
+			"accounts": []map[string]string{
+				{"accountNumber": "12345678", "nickName": "My Trading Account", "type": "MARGIN"},
+			},
+		},
+		"/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/orders/9876543210": map[string]any{
+			"orderId":           9876543210,
+			"clientOrderId":     "test-order-123",
+			"orderType":         "LIMIT",
+			"session":           "NORMAL",
+			"duration":          "DAY",
+			"orderStrategyType": "SINGLE",
+			"orderStatus":       "FILLED",
+			"createdDate":       "2025-01-15T10:30:00Z",
+			"filledQuantity":    10.0,
+			"remainingQuantity": 0.0,
+			"orderLegCollection": []map[string]any{
+				{
+					"orderLegType": "EQUITY",
+					"legId":        1,
+					"symbol":       "AAPL",
+					"instruction":  "BUY",
+					"quantity":     10.0,
+					"price":        150.00,
+				},
+			},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp, ok := routes[r.URL.Path]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]string{"error": "not found"}))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(resp))
+	}))
+	defer server.Close()
+
+	// Create test client and config
+	c := testClient(t, server)
+	configPath := writeTestConfig(t, "12345678") // Use account number as default
+
+	// Act - Run order get command with explicit --account flag (using account number)
+	// This will trigger account resolution via AccountNumbers and UserPreference APIs
+	cmdOutput, err := runOrderCommand(
+		t, c, configPath, "",
+		"order", "get", "9876543210",
+		"--account", "12345678",
+	)
+
+	// Assert - Verify command succeeded and output contains expected metadata
+	require.NoError(t, err)
+
+	envelope := decodeEnvelope(t, cmdOutput)
+
+	// Verify all 5 account metadata fields are present and correct
+	assert.Equal(t, "ABCDEF1234567890ABCDEF1234567890", envelope.Metadata.Account)
+	assert.Equal(t, "My Trading Account", envelope.Metadata.AccountNickName)
+	assert.Equal(t, "MARGIN", envelope.Metadata.AccountType)
+	assert.Equal(t, "explicit", envelope.Metadata.AccountSource)
+	assert.Equal(t, "My Trading Account", envelope.Metadata.AccountDisplayLabel)
+
+	// Verify order data is present
+	assert.NotNil(t, envelope.Data)
 }

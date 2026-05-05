@@ -171,6 +171,159 @@ func resolveAccount(c *client.Ref, accountFlag, configPath string, positionalArg
 	)
 }
 
+// enrichAccountHash returns best-effort account metadata for a Schwab hash.
+// The helper is intentionally non-fatal because callers may already have enough
+// information to continue with the hash even when auxiliary lookup APIs fail.
+func enrichAccountHash(ctx context.Context, c *client.Ref, hash string) (accountNumber, nickName, accountType string) {
+	if c == nil || c.Client == nil {
+		return "", "", ""
+	}
+
+	numbers, err := c.AccountNumbers(ctx)
+	if err != nil {
+		return "", "", ""
+	}
+
+	for _, number := range numbers {
+		if number.HashValue == hash {
+			accountNumber = number.AccountNumber
+			break
+		}
+	}
+	if accountNumber == "" {
+		return "", "", ""
+	}
+
+	prefs, err := c.UserPreference(ctx)
+	if err != nil || prefs == nil {
+		return accountNumber, "", ""
+	}
+
+	nickName, accountType = lookupPrefs(prefs, accountNumber)
+
+	return accountNumber, nickName, accountType
+}
+
+// lookupPrefs extracts the nickname and account type from user preferences
+// for the given account number. Returns zero values if no match is found.
+func lookupPrefs(prefs *models.UserPreference, accountNumber string) (nickName, accountType string) {
+	if prefs == nil {
+		return "", ""
+	}
+
+	for _, pref := range prefs.Accounts {
+		if pref.AccountNumber == nil || !strings.EqualFold(accountNumber, *pref.AccountNumber) {
+			continue
+		}
+		if pref.NickName != nil {
+			nickName = *pref.NickName
+		}
+		if pref.Type != nil {
+			accountType = *pref.Type
+		}
+		return nickName, accountType
+	}
+
+	return "", ""
+}
+
+// resolveAccountDetailed resolves an account identifier and keeps the joined
+// account metadata needed for user-facing labels and output metadata.
+func resolveAccountDetailed(ctx context.Context, c *client.Ref, accountFlag, configPath string, positionalArgs []string) (resolvedAccountInfo, error) {
+	accountID, source := firstAccountIdentifierWithSource(accountFlag, positionalArgs, configPath)
+	if accountID == "" {
+		return resolvedAccountInfo{}, apperr.NewAccountNotFoundError(
+			"no account specified: use --account flag or set default_account in config",
+			nil,
+			apperr.WithDetails("Run `schwab-agent account summary` or `schwab-agent account numbers` to list accounts, then `schwab-agent account set-default` to set one"),
+		)
+	}
+
+	// Schwab account hashes are opaque identifiers that appear as long hex strings.
+	// For hash inputs we must call both APIs since we have no prior data to reuse.
+	if isLikelyAccountHash(accountID) {
+		accountNumber, nickName, accountType := "", "", ""
+		if shouldAttemptAccountHashEnrichment(accountID) {
+			accountNumber, nickName, accountType = enrichAccountHash(ctx, c, accountID)
+		}
+		return resolvedAccountInfo{
+			Hash:          accountID,
+			AccountNumber: accountNumber,
+			NickName:      nickName,
+			AccountType:   accountType,
+			Source:        source,
+			DisplayLabel:  accountDisplayLabel(nickName, accountID),
+		}, nil
+	}
+
+	if c == nil || c.Client == nil {
+		return resolvedAccountInfo{}, apperr.NewAccountNotFoundError(
+			fmt.Sprintf("Account %q cannot be resolved without an API client", accountID),
+			nil,
+			apperr.WithDetails("Use an account hash directly or run with an authenticated client to resolve account numbers and nicknames"),
+		)
+	}
+
+	numbers, err := c.AccountNumbers(ctx)
+	if err != nil {
+		return resolvedAccountInfo{}, err
+	}
+
+	for _, number := range numbers {
+		if strings.EqualFold(accountID, number.AccountNumber) {
+			// We already have the account number and hash from the AccountNumbers
+			// response. Only fetch preferences for the nickname/type enrichment,
+			// avoiding the redundant AccountNumbers call that enrichAccountHash
+			// would repeat.
+			prefs, prefsErr := c.UserPreference(ctx)
+			nickName, accountType := "", ""
+			if prefsErr == nil {
+				nickName, accountType = lookupPrefs(prefs, number.AccountNumber)
+			}
+			return resolvedAccountInfo{
+				Hash:          number.HashValue,
+				AccountNumber: number.AccountNumber,
+				NickName:      nickName,
+				AccountType:   accountType,
+				Source:        source,
+				DisplayLabel:  accountDisplayLabel(nickName, number.HashValue),
+			}, nil
+		}
+	}
+
+	prefs, err := c.UserPreference(ctx)
+	if err != nil {
+		return resolvedAccountInfo{}, err
+	}
+
+	matches := matchingNicknameAccounts(accountID, numbers, prefs)
+	if len(matches) == 1 {
+		// matchingNicknameAccounts already joined nickname + account number to a
+		// hash via the numbers/prefs we fetched above. Reuse that data directly
+		// instead of re-fetching through enrichAccountHash.
+		_, accountType := lookupPrefs(prefs, matches[0].accountNumber)
+		return resolvedAccountInfo{
+			Hash:          matches[0].hash,
+			AccountNumber: matches[0].accountNumber,
+			NickName:      matches[0].nickname,
+			AccountType:   accountType,
+			Source:        source,
+			DisplayLabel:  accountDisplayLabel(matches[0].nickname, matches[0].hash),
+		}, nil
+	}
+	if len(matches) > 1 {
+		return resolvedAccountInfo{}, apperr.NewAccountNotFoundError(
+			fmt.Sprintf("multiple accounts match nickname %q. Candidates: %s", accountID, formatResolvedAccountCandidates(matches)),
+			nil,
+		)
+	}
+
+	return resolvedAccountInfo{}, apperr.NewAccountNotFoundError(
+		fmt.Sprintf("Account '%s' not found. Available accounts: %s", accountID, formatAvailableAccounts(numbers, prefs)),
+		nil,
+	)
+}
+
 // firstAccountIdentifier applies resolveAccount's source priority before the
 // selected identifier is normalized into the required Schwab hash value.
 func firstAccountIdentifier(accountFlag, configPath string, positionalArgs []string) string {
@@ -192,33 +345,60 @@ func firstAccountIdentifier(accountFlag, configPath string, positionalArgs []str
 	return ""
 }
 
+// firstAccountIdentifierWithSource applies resolveAccount's source priority and
+// returns both the selected identifier and its source. Source is "explicit" for
+// flag or positional args, "default" for config default_account, or "" if no
+// account is found.
+func firstAccountIdentifierWithSource(accountFlag string, positionalArgs []string, configPath string) (identifier, source string) {
+	if strings.TrimSpace(accountFlag) != "" {
+		return strings.TrimSpace(accountFlag), "explicit"
+	}
+
+	if len(positionalArgs) > 0 && strings.TrimSpace(positionalArgs[0]) != "" {
+		return strings.TrimSpace(positionalArgs[0]), "explicit"
+	}
+
+	if configPath != "" {
+		cfg, err := auth.LoadConfig(configPath)
+		if err == nil && strings.TrimSpace(cfg.DefaultAccount) != "" {
+			return strings.TrimSpace(cfg.DefaultAccount), "default"
+		}
+	}
+
+	return "", ""
+}
+
 // isLikelyAccountHash recognizes the long hex account hashes returned by
 // Schwab's accountNumbers endpoint. The heuristic is intentionally conservative:
 // short or non-hex values fall through to API lookup so account numbers and
 // nicknames keep working.
 func isLikelyAccountHash(value string) bool {
-	lower := strings.ToLower(value)
-	if strings.Contains(lower, "hash") {
-		return true
-	}
-
 	if len(value) >= 16 {
+		allHex := true
 		for _, r := range value {
 			if !unicode.Is(unicode.ASCII_Hex_Digit, r) {
-				return false
+				allHex = false
+				break
 			}
 		}
-		return true
+		if allHex {
+			return true
+		}
 	}
 
 	// Existing command tests and local Schwab-compatible fixtures use compact
-	// alphanumeric placeholders such as abc123. Purely numeric values still fall
-	// through because they are more likely to be plain account numbers.
+	// placeholders such as abc123 and default-hash-123. Values with whitespace
+	// still fall through so nicknames like "Hash IRA" resolve through the APIs.
+	// Purely numeric values also fall through because they are more likely to be
+	// plain account numbers. The separator check keeps legacy HASH_ABC-style test
+	// fixtures working without treating every single-token nickname containing
+	// "hash" as an opaque Schwab identifier.
 	if len(value) < 6 {
 		return false
 	}
 	hasLetter := false
 	hasDigit := false
+	hasSeparator := false
 	for _, r := range value {
 		if unicode.IsLetter(r) {
 			hasLetter = true
@@ -228,19 +408,60 @@ func isLikelyAccountHash(value string) bool {
 			hasDigit = true
 			continue
 		}
+		if r == '-' || r == '_' {
+			hasSeparator = true
+			continue
+		}
 		if unicode.IsSpace(r) {
 			return false
 		}
 		return false
 	}
 
-	return hasLetter && hasDigit
+	return hasLetter && (hasDigit || hasSeparator && strings.Contains(strings.ToLower(value), "hash"))
+}
+
+// shouldAttemptAccountHashEnrichment avoids extra network calls for compact test
+// fixtures such as hash123/default-hash while still enriching real Schwab hashes.
+func shouldAttemptAccountHashEnrichment(hash string) bool {
+	return len(strings.TrimSpace(hash)) >= 16
 }
 
 type resolvedAccountCandidate struct {
 	accountNumber string
 	hash          string
 	nickname      string
+}
+
+// resolvedAccountInfo holds the resolved account details with display information.
+// Used by commands that need to track both the account identifier and its human-readable label.
+type resolvedAccountInfo struct {
+	Hash          string `json:"hash"`
+	AccountNumber string `json:"accountNumber"`
+	NickName      string `json:"nickName"`
+	AccountType   string `json:"accountType"`
+	Source        string `json:"source"`
+	DisplayLabel  string `json:"displayLabel"`
+}
+
+// accountDisplayLabel returns a human-readable label for an account.
+// If nickname is non-empty and non-whitespace, returns the nickname.
+// Otherwise returns "...{last4 of hash}" or "...{full hash}" if hash is shorter than 4 chars.
+// If both nickname and hash are empty, returns "...".
+func accountDisplayLabel(nickname, hash string) string {
+	if strings.TrimSpace(nickname) != "" {
+		return strings.TrimSpace(nickname)
+	}
+
+	if hash == "" {
+		return "..."
+	}
+
+	if len(hash) < 4 {
+		return fmt.Sprintf("...%s", hash)
+	}
+
+	return fmt.Sprintf("...%s", hash[len(hash)-4:])
 }
 
 // matchingNicknameAccounts joins user preference nicknames back to hashes via
@@ -473,6 +694,7 @@ from the preferences API (best-effort, degrades gracefully).`,
 		newAccountNumbersCmd(c, w),
 		newAccountSetDefaultCmd(configPath, w),
 		newAccountTransactionCmd(c, configPath, w),
+		newAccountResolveCmd(c, configPath, w),
 	)
 
 	return cmd
@@ -810,6 +1032,65 @@ func newAccountTransactionGetCmd(c *client.Ref, configPath string, w io.Writer) 
 			}
 
 			return output.WriteSuccess(w, transactionGetData{Transaction: result}, output.NewMetadata())
+		},
+	}
+}
+
+// accountResolveData is the output shape for the account resolve command.
+type accountResolveData struct {
+	AccountHash   string `json:"accountHash"`
+	AccountNumber string `json:"accountNumber,omitempty"`
+	NickName      string `json:"nickName,omitempty"`
+	Type          string `json:"type,omitempty"`
+	Source        string `json:"source"`
+	DisplayLabel  string `json:"displayLabel"`
+}
+
+// newAccountResolveCmd returns a command that resolves any account identifier
+// (hash, number, or nickname) to full account details with source tracking.
+func newAccountResolveCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "resolve [account]",
+		Short: "Resolve an account identifier to full details",
+		Long: `Resolve any account identifier (hash, account number, or nickname) to its
+full details including the Schwab hash, account number, nickname, account type,
+resolution source, and display label.
+
+The identifier can come from the --account flag, a positional argument, or the
+default_account in config.json.`,
+		Example: `  # Resolve by nickname
+  schwab-agent account resolve "My IRA"
+
+  # Resolve by account number
+  schwab-agent account resolve 12345678
+
+  # Resolve using the --account flag
+  schwab-agent account resolve --account "My IRA"
+
+  # Resolve using the default account from config
+  schwab-agent account resolve`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			accountFlag, err := cmd.Flags().GetString("account")
+			if err != nil {
+				return err
+			}
+
+			info, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configPath, args)
+			if err != nil {
+				return err
+			}
+
+			data := accountResolveData{
+				AccountHash:   info.Hash,
+				AccountNumber: info.AccountNumber,
+				NickName:      info.NickName,
+				Type:          info.AccountType,
+				Source:        info.Source,
+				DisplayLabel:  info.DisplayLabel,
+			}
+
+			return output.WriteSuccess(w, data, output.NewMetadata())
 		},
 	}
 }

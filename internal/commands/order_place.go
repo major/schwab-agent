@@ -157,8 +157,13 @@ func fetchReplaceActionData(cmd *cobra.Command, c *client.Ref, account string, o
 // order lookup succeeds, or a partial envelope when Schwab accepted the mutation
 // but the follow-up details could not be fetched. That distinction lets agents
 // trust the order action occurred while still seeing why `data.order` is absent.
-func writeOrderActionResult(w io.Writer, data *orderActionData, errs []string) error {
+func writeOrderActionResult(w io.Writer, data *orderActionData, errs []string, acct resolvedAccountInfo) error { //nolint:gocritic // hugeParam: resolvedAccountInfo is passed by value intentionally; callers construct it inline and pointer indirection would complicate all call sites.
 	metadata := output.NewMetadata()
+	metadata.Account = acct.Hash
+	metadata.AccountNickName = acct.NickName
+	metadata.AccountType = acct.AccountType
+	metadata.AccountSource = acct.Source
+	metadata.AccountDisplayLabel = acct.DisplayLabel
 	if len(errs) > 0 {
 		return output.WritePartial(w, data, errs, metadata)
 	}
@@ -168,6 +173,7 @@ func writeOrderActionResult(w io.Writer, data *orderActionData, errs []string) e
 
 type orderPlacePayload struct {
 	Account       string
+	AccountInfo   resolvedAccountInfo
 	Order         *models.OrderRequest
 	PreviewDigest string
 }
@@ -188,23 +194,36 @@ func resolveOrderPlacePayload(cmd *cobra.Command, c *client.Ref, configPath stri
 			return nil, err
 		}
 		if strings.TrimSpace(accountFlag) != "" {
-			account, err := resolveAccount(c, accountFlag, configPath, nil)
+			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configPath, nil)
 			if err != nil {
 				return nil, err
 			}
-			if account != entry.Account {
+			if acct.Hash != entry.Account {
 				return nil, newValidationError("--account does not match the account bound to the preview digest")
 			}
 		}
 
-		return &orderPlacePayload{Account: entry.Account, Order: entry.Order, PreviewDigest: entry.Digest}, nil
+		accountNumber, nickName, accountType := "", "", ""
+		if shouldAttemptAccountHashEnrichment(entry.Account) {
+			accountNumber, nickName, accountType = enrichAccountHash(cmd.Context(), c, entry.Account)
+		}
+		acct := resolvedAccountInfo{
+			Hash:          entry.Account,
+			AccountNumber: accountNumber,
+			NickName:      nickName,
+			AccountType:   accountType,
+			Source:        "preview",
+			DisplayLabel:  accountDisplayLabel(nickName, entry.Account),
+		}
+
+		return &orderPlacePayload{Account: entry.Account, AccountInfo: acct, Order: entry.Order, PreviewDigest: entry.Digest}, nil
 	}
 
 	accountFlag, err := cmd.Flags().GetString("account")
 	if err != nil {
 		return nil, err
 	}
-	account, err := resolveAccount(c, accountFlag, configPath, nil)
+	acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configPath, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -213,22 +232,29 @@ func resolveOrderPlacePayload(cmd *cobra.Command, c *client.Ref, configPath stri
 	if err != nil {
 		return nil, err
 	}
-	return &orderPlacePayload{Account: account, Order: order}, nil
+	return &orderPlacePayload{Account: acct.Hash, AccountInfo: acct, Order: order}, nil
 }
 
 // writeOrderPreviewResult optionally saves the previewed order to the local
 // digest ledger before emitting the standard preview envelope.
-func writeOrderPreviewResult(w io.Writer, account string, order *models.OrderRequest, preview *models.PreviewOrder, savePreview bool) error {
+func writeOrderPreviewResult(w io.Writer, acct resolvedAccountInfo, order *models.OrderRequest, preview *models.PreviewOrder, savePreview bool) error { //nolint:gocritic // hugeParam: resolvedAccountInfo is passed by value intentionally; callers construct it inline and pointer indirection would complicate all call sites.
 	data := orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}
 	if savePreview {
-		digestData, err := saveOrderPreview(account, order, preview)
+		digestData, err := saveOrderPreview(acct.Hash, order, preview)
 		if err != nil {
 			return err
 		}
 		data.PreviewDigest = digestData
 	}
 
-	return output.WriteSuccess(w, data, output.NewMetadata())
+	metadata := output.NewMetadata()
+	metadata.Account = acct.Hash
+	metadata.AccountNickName = acct.NickName
+	metadata.AccountType = acct.AccountType
+	metadata.AccountSource = acct.Source
+	metadata.AccountDisplayLabel = acct.DisplayLabel
+
+	return output.WriteSuccess(w, data, metadata)
 }
 
 // newOrderPlaceCmd places new orders from either flags or a JSON spec.
@@ -290,7 +316,7 @@ returned previewDigest.digest value.`,
 
 			data, errs := fetchOrderActionData(cmd, c, payload.Account, "place", response.OrderID, payload.Order)
 			data.PreviewDigest = payload.PreviewDigest
-			return writeOrderActionResult(w, &data, errs)
+			return writeOrderActionResult(w, &data, errs, payload.AccountInfo)
 		},
 	}
 
@@ -402,7 +428,7 @@ func makeCobraPlaceOrderCommand[O any, P any](
 				return err
 			}
 
-			account, err := resolveAccount(c, accountFlag, configFlag, nil)
+			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configFlag, nil)
 			if err != nil {
 				return err
 			}
@@ -421,13 +447,13 @@ func makeCobraPlaceOrderCommand[O any, P any](
 				return err
 			}
 
-			response, err := c.PlaceOrder(cmd.Context(), account, order)
+			response, err := c.PlaceOrder(cmd.Context(), acct.Hash, order)
 			if err != nil {
 				return err
 			}
 
-			data, errs := fetchOrderActionData(cmd, c, account, "place", response.OrderID, order)
-			return writeOrderActionResult(w, &data, errs)
+			data, errs := fetchOrderActionData(cmd, c, acct.Hash, "place", response.OrderID, order)
+			return writeOrderActionResult(w, &data, errs, acct)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
@@ -478,7 +504,7 @@ safety guards since no order is actually placed.`,
 				return err
 			}
 
-			account, err := resolveAccount(c, accountFlag, configFlag, nil)
+			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configFlag, nil)
 			if err != nil {
 				return err
 			}
@@ -491,12 +517,12 @@ safety guards since no order is actually placed.`,
 				return err
 			}
 
-			preview, err := c.PreviewOrder(cmd.Context(), account, order)
+			preview, err := c.PreviewOrder(cmd.Context(), acct.Hash, order)
 			if err != nil {
 				return err
 			}
 
-			return writeOrderPreviewResult(w, account, order, preview, opts.SavePreview)
+			return writeOrderPreviewResult(w, acct, order, preview, opts.SavePreview)
 		},
 	}
 
@@ -585,7 +611,7 @@ func makeCobraPreviewOrderCommand[O any, P any](
 				return err
 			}
 
-			account, err := resolveAccount(c, accountFlag, configFlag, nil)
+			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configFlag, nil)
 			if err != nil {
 				return err
 			}
@@ -604,7 +630,7 @@ func makeCobraPreviewOrderCommand[O any, P any](
 				return err
 			}
 
-			preview, err := c.PreviewOrder(cmd.Context(), account, order)
+			preview, err := c.PreviewOrder(cmd.Context(), acct.Hash, order)
 			if err != nil {
 				return err
 			}
@@ -613,7 +639,7 @@ func makeCobraPreviewOrderCommand[O any, P any](
 			if err != nil {
 				return err
 			}
-			return writeOrderPreviewResult(w, account, order, preview, savePreview)
+			return writeOrderPreviewResult(w, acct, order, preview, savePreview)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
@@ -664,18 +690,18 @@ config flag. The order ID can be passed as a positional argument or with
 				return err
 			}
 
-			account, err := resolveAccount(c, accountFlag, configFlag, nil)
+			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configFlag, nil)
 			if err != nil {
 				return err
 			}
 
-			if err := c.CancelOrder(cmd.Context(), account, orderID); err != nil {
+			if err := c.CancelOrder(cmd.Context(), acct.Hash, orderID); err != nil {
 				return err
 			}
 
-			data, errs := fetchOrderActionData(cmd, c, account, "cancel", orderID, nil)
+			data, errs := fetchOrderActionData(cmd, c, acct.Hash, "cancel", orderID, nil)
 			data.Canceled = true
-			return writeOrderActionResult(w, &data, errs)
+			return writeOrderActionResult(w, &data, errs, acct)
 		},
 	}
 
@@ -742,7 +768,7 @@ original order status becomes REPLACED after the new order is created.`,
 				return err
 			}
 
-			account, err := resolveAccount(c, accountFlag, configFlag, nil)
+			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configFlag, nil)
 			if err != nil {
 				return err
 			}
@@ -761,13 +787,13 @@ original order status becomes REPLACED after the new order is created.`,
 				return err
 			}
 
-			response, err := c.ReplaceOrder(cmd.Context(), account, orderID, order)
+			response, err := c.ReplaceOrder(cmd.Context(), acct.Hash, orderID, order)
 			if err != nil {
 				return err
 			}
 
-			data, errs := fetchReplaceActionData(cmd, c, account, orderID, response.OrderID, order)
-			return writeOrderActionResult(w, &data, errs)
+			data, errs := fetchReplaceActionData(cmd, c, acct.Hash, orderID, response.OrderID, order)
+			return writeOrderActionResult(w, &data, errs, acct)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
@@ -838,7 +864,7 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 				return err
 			}
 
-			account, err := resolveAccount(c, accountFlag, configFlag, nil)
+			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configFlag, nil)
 			if err != nil {
 				return err
 			}
@@ -865,13 +891,13 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 			// future option-build changes cannot accidentally drift from symbol build/parse.
 			order.OrderLegCollection[0].Instrument.Symbol = occSymbol
 
-			response, err := c.ReplaceOrder(cmd.Context(), account, orderID, order)
+			response, err := c.ReplaceOrder(cmd.Context(), acct.Hash, orderID, order)
 			if err != nil {
 				return err
 			}
 
-			data, errs := fetchReplaceActionData(cmd, c, account, orderID, response.OrderID, order)
-			return writeOrderActionResult(w, &data, errs)
+			data, errs := fetchReplaceActionData(cmd, c, acct.Hash, orderID, response.OrderID, order)
+			return writeOrderActionResult(w, &data, errs, acct)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)

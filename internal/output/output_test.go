@@ -422,3 +422,183 @@ func TestWritePartialMultipleErrors(t *testing.T) {
 	assert.Equal(t, 3, len(envelope.Errors))
 	assert.Equal(t, errs, envelope.Errors)
 }
+
+// TestMetadataAccountContextFields verifies the 4 new account context fields
+// are properly serialized when populated and omitted when empty.
+func TestMetadataAccountContextFields(t *testing.T) {
+	tests := []struct {
+		name     string
+		meta     Metadata
+		wantKeys []string
+		notKeys  []string
+	}{
+		{
+			name: "all account context fields populated",
+			meta: Metadata{
+				Timestamp:           "2026-04-21T10:00:00Z",
+				Account:             "abc123",
+				AccountNickName:     "My Roth IRA",
+				AccountType:         "ROTH_IRA",
+				AccountSource:       "explicit",
+				AccountDisplayLabel: "Roth IRA - My Roth IRA",
+			},
+			wantKeys: []string{"timestamp", "account", "accountNickName", "accountType", "accountSource", "accountDisplayLabel"},
+			notKeys:  []string{},
+		},
+		{
+			name: "only timestamp and account, new fields empty",
+			meta: Metadata{
+				Timestamp: "2026-04-21T10:00:00Z",
+				Account:   "abc123",
+			},
+			wantKeys: []string{"timestamp", "account"},
+			notKeys:  []string{"accountNickName", "accountType", "accountSource", "accountDisplayLabel"},
+		},
+		{
+			name: "only new account context fields populated",
+			meta: Metadata{
+				Timestamp:           "2026-04-21T10:00:00Z",
+				AccountNickName:     "Trading Account",
+				AccountType:         "INDIVIDUAL",
+				AccountSource:       "default",
+				AccountDisplayLabel: "Individual - Trading Account",
+			},
+			wantKeys: []string{"timestamp", "accountNickName", "accountType", "accountSource", "accountDisplayLabel"},
+			notKeys:  []string{"account"},
+		},
+		{
+			name: "partial account context fields",
+			meta: Metadata{
+				Timestamp:       "2026-04-21T10:00:00Z",
+				AccountNickName: "Brokerage",
+				AccountType:     "INDIVIDUAL",
+			},
+			wantKeys: []string{"timestamp", "accountNickName", "accountType"},
+			notKeys:  []string{"account", "accountSource", "accountDisplayLabel"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := WriteSuccess(buf, map[string]any{"test": "data"}, tt.meta)
+			require.NoError(t, err)
+
+			var envelope Envelope
+			err = json.Unmarshal(buf.Bytes(), &envelope)
+			require.NoError(t, err)
+
+			// Verify wanted keys are present
+			for _, key := range tt.wantKeys {
+				switch key {
+				case "timestamp":
+					assert.Equal(t, tt.meta.Timestamp, envelope.Metadata.Timestamp)
+				case "account":
+					assert.Equal(t, tt.meta.Account, envelope.Metadata.Account)
+				case "accountNickName":
+					assert.Equal(t, tt.meta.AccountNickName, envelope.Metadata.AccountNickName)
+				case "accountType":
+					assert.Equal(t, tt.meta.AccountType, envelope.Metadata.AccountType)
+				case "accountSource":
+					assert.Equal(t, tt.meta.AccountSource, envelope.Metadata.AccountSource)
+				case "accountDisplayLabel":
+					assert.Equal(t, tt.meta.AccountDisplayLabel, envelope.Metadata.AccountDisplayLabel)
+				}
+			}
+
+			// Verify unwanted keys are omitted from JSON (omitempty behavior)
+			rawJSON := buf.String()
+			for _, key := range tt.notKeys {
+				assert.NotContains(t, rawJSON, `"`+key+`"`, "field %s should be omitted from JSON when empty", key)
+			}
+		})
+	}
+}
+
+// TestMetadataAccountContextFieldsOmitempty verifies that empty account context
+// fields are properly omitted from JSON output due to omitempty tag.
+func TestMetadataAccountContextFieldsOmitempty(t *testing.T) {
+	buf := &bytes.Buffer{}
+	meta := Metadata{
+		Timestamp: "2026-04-21T10:00:00Z",
+		Account:   "abc123",
+		// All new fields left empty
+	}
+
+	err := WriteSuccess(buf, map[string]any{"test": "data"}, meta)
+	require.NoError(t, err)
+
+	rawJSON := buf.String()
+
+	// Verify empty fields are not in JSON output
+	assert.NotContains(t, rawJSON, "accountNickName")
+	assert.NotContains(t, rawJSON, "accountType")
+	assert.NotContains(t, rawJSON, "accountSource")
+	assert.NotContains(t, rawJSON, "accountDisplayLabel")
+
+	// Verify populated fields are present
+	assert.Contains(t, rawJSON, "timestamp")
+	assert.Contains(t, rawJSON, "account")
+}
+
+// TestMetadataAccountContextFieldsJSON verifies the exact JSON structure
+// with all new fields populated.
+func TestMetadataAccountContextFieldsJSON(t *testing.T) {
+	buf := &bytes.Buffer{}
+	meta := Metadata{
+		Timestamp:           "2026-04-21T10:00:00Z",
+		Account:             "abc123",
+		AccountNickName:     "My Roth IRA",
+		AccountType:         "ROTH_IRA",
+		AccountSource:       "preview",
+		AccountDisplayLabel: "Roth IRA - My Roth IRA",
+	}
+
+	err := WriteSuccess(buf, map[string]any{"test": "data"}, meta)
+	require.NoError(t, err)
+
+	var envelope Envelope
+	err = json.Unmarshal(buf.Bytes(), &envelope)
+	require.NoError(t, err)
+
+	// Verify all fields are correctly populated
+	assert.Equal(t, "2026-04-21T10:00:00Z", envelope.Metadata.Timestamp)
+	assert.Equal(t, "abc123", envelope.Metadata.Account)
+	assert.Equal(t, "My Roth IRA", envelope.Metadata.AccountNickName)
+	assert.Equal(t, "ROTH_IRA", envelope.Metadata.AccountType)
+	assert.Equal(t, "preview", envelope.Metadata.AccountSource)
+	assert.Equal(t, "Roth IRA - My Roth IRA", envelope.Metadata.AccountDisplayLabel)
+}
+
+// TestMetadataBackwardCompatibility verifies that existing tests still pass
+// and that the new fields don't break existing functionality.
+func TestMetadataBackwardCompatibility(t *testing.T) {
+	buf := &bytes.Buffer{}
+	data := map[string]any{"symbol": "AAPL", "price": "150.00"}
+	meta := Metadata{
+		Timestamp: "2026-04-21T10:00:00Z",
+		Account:   "xyz789",
+		Requested: 1,
+		Returned:  1,
+	}
+
+	err := WriteSuccess(buf, data, meta)
+	require.NoError(t, err)
+
+	var envelope Envelope
+	err = json.Unmarshal(buf.Bytes(), &envelope)
+	require.NoError(t, err)
+
+	// Verify existing fields still work
+	assert.Equal(t, data, envelope.Data)
+	assert.Equal(t, "2026-04-21T10:00:00Z", envelope.Metadata.Timestamp)
+	assert.Equal(t, "xyz789", envelope.Metadata.Account)
+	assert.Equal(t, 1, envelope.Metadata.Requested)
+	assert.Equal(t, 1, envelope.Metadata.Returned)
+
+	// Verify new fields are empty and omitted
+	assert.Empty(t, envelope.Metadata.AccountNickName)
+	assert.Empty(t, envelope.Metadata.AccountType)
+	assert.Empty(t, envelope.Metadata.AccountSource)
+	assert.Empty(t, envelope.Metadata.AccountDisplayLabel)
+}

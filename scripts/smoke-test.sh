@@ -193,6 +193,7 @@ run_help_test "account list"      account list
 run_help_test "account get"       account get
 run_help_test "account numbers"   account numbers
 run_help_test "account set-default" account set-default
+run_help_test "account resolve" account resolve
 run_help_test "account transaction" account transaction
 run_help_test "account transaction list" account transaction list
 run_help_test "account transaction get"  account transaction get
@@ -740,19 +741,20 @@ run_test "account summary" account summary
 run_test "account summary --positions" account summary --positions
 run_test "account list" account list
 run_test "account numbers" account numbers
-run_test "account list --positions" account list --positions
 
 # Extract the first account hash for account-specific commands.
 ACCOUNT_HASH=$("$BINARY" account numbers 2>/dev/null | jq -r '.data.accounts[0].hashValue // empty' 2>/dev/null)
 
 if [ -n "$ACCOUNT_HASH" ]; then
+    run_test "account resolve" account resolve --account "$ACCOUNT_HASH"
     run_test "account get" account get --account "$ACCOUNT_HASH"
     run_test "account get --positions" account get --account "$ACCOUNT_HASH" --positions
     run_test "account transaction list" account transaction list --account "$ACCOUNT_HASH"
 else
-    printf "${YELLOW}SKIP${NC} account get/transaction (no account hash found)\n"
+    printf "${YELLOW}SKIP${NC} account resolve/get/transaction (no account hash found)\n"
     SKIP=$((SKIP + 1))
 fi
+run_test "account list --positions" account list --positions
 
 # -------------------------------------------------------------------
 # Position
