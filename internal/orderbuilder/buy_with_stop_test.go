@@ -124,7 +124,7 @@ func TestValidateBuyWithStopOrder(t *testing.T) {
 				TakeProfit: 140,
 			},
 			wantErr:     true,
-			wantMessage: "take-profit and stop-loss cannot be the same price",
+			wantMessage: "take-profit must be above stop-loss",
 		},
 		{
 			name: "market skips stop-loss to price relationship",
@@ -137,14 +137,37 @@ func TestValidateBuyWithStopOrder(t *testing.T) {
 			},
 		},
 		{
-			name: "market skips take-profit to price relationship",
+			name: "market rejects take-profit below stop-loss",
 			params: BuyWithStopParams{
 				Symbol:     "AAPL",
 				Quantity:   10,
 				OrderType:  models.OrderTypeMarket,
-				Price:      0,
 				StopLoss:   200,
 				TakeProfit: 100,
+			},
+			wantErr:     true,
+			wantMessage: "take-profit must be above stop-loss",
+		},
+		{
+			name: "market rejects price flag",
+			params: BuyWithStopParams{
+				Symbol:    "AAPL",
+				Quantity:  10,
+				OrderType: models.OrderTypeMarket,
+				Price:     150,
+				StopLoss:  140,
+			},
+			wantErr:     true,
+			wantMessage: "MARKET entry does not accept a price",
+		},
+		{
+			name: "valid market with take-profit above stop-loss",
+			params: BuyWithStopParams{
+				Symbol:     "AAPL",
+				Quantity:   10,
+				OrderType:  models.OrderTypeMarket,
+				StopLoss:   140,
+				TakeProfit: 160,
 			},
 		},
 	}

@@ -54,10 +54,18 @@ func ValidateBuyWithStopOrder(params *BuyWithStopParams) error {
 		return validationError("LIMIT buy-with-stop order requires a price", "Add `--price <amount>` to specify the entry limit price")
 	}
 
-	if params.TakeProfit > 0 && params.TakeProfit == params.StopLoss {
+	// MARKET orders should never carry a price field; reject early so the
+	// builder doesn't accidentally attach one.
+	if entryOrderType == models.OrderTypeMarket && params.Price > 0 {
+		return validationError("MARKET entry does not accept a price", "Remove `--price` or use `--type LIMIT` for a priced entry")
+	}
+
+	// For a BUY entry, take-profit must sit above stop-loss regardless of
+	// order type. Equality and inversion are both contradictory.
+	if params.TakeProfit > 0 && params.TakeProfit <= params.StopLoss {
 		return validationError(
-			"take-profit and stop-loss cannot be the same price",
-			"Use distinct `--take-profit` and `--stop-loss` levels so Schwab can place separate exits",
+			"take-profit must be above stop-loss",
+			"Set `--take-profit` higher than `--stop-loss` so the exits form valid upside/downside brackets",
 		)
 	}
 
@@ -106,7 +114,10 @@ func BuildBuyWithStopOrder(params *BuyWithStopParams) (*models.OrderRequest, err
 		ChildOrderStrategies: buildExitStrategies(exitParams, bracketExitInstruction(models.InstructionBuy)),
 	}
 
-	if params.Price > 0 {
+	// Defense-in-depth: only set Price on LIMIT entries. The validator
+	// already rejects MARKET+price, but guarding here prevents a future
+	// code path from accidentally attaching a price to a market order.
+	if entryOrderType == models.OrderTypeLimit && params.Price > 0 {
 		order.Price = new(params.Price)
 	}
 
