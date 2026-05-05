@@ -6,7 +6,6 @@ https://github.com/major/schwab-agent
 
 ## Commands
 
-- [schwab-agent](#schwab-agent): CLI tool for AI agents to trade via Schwab APIs
 - [schwab-agent account](#schwab-agent-account): Manage Schwab trading accounts. List accounts with nicknames, view account
 details, look up account numbers and hash values, set a default account, and
 query transaction history. Account list and get enrich results with nicknames
@@ -369,10 +368,6 @@ indicator with no --period flag. Primarily used for intraday analysis with
 minute-level intervals. Price above VWAP suggests bullish bias, below
 suggests bearish.
 
-## schwab-agent
-
-CLI tool for AI agents to trade via Schwab APIs
-
 ## schwab-agent account
 
 Manage Schwab trading accounts. List accounts with nicknames, view account
@@ -528,12 +523,12 @@ specific moneyness with --strike-range (ITM, NTM, OTM, ALL).
 - `--include-underlying-quote` (bool, default: false): Include underlying quote data in response
 - `--interest-rate` (string): Interest rate for theoretical pricing calculations
 - `--interval` (string): Strike interval for spread strategy chains
-- `--strategy` (string): Option pricing strategy {,ANALYTICAL,BUTTERFLY,CALENDAR,COLLAR,CONDOR,COVERED,DIAGONAL,ROLL,SINGLE,STRADDLE,STRANGLE,VERTICAL}
+- `--strategy` (string): Option pricing strategy
 - `--strike` (string): Filter to a specific strike price
 - `--strike-count` (string): Number of strikes to return
-- `--strike-range` (string): Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL {,ALL,ITM,NTM,OTM,SAK,SBK,SNK}
+- `--strike-range` (string): Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL
 - `--to-date` (string): End date (YYYY-MM-DD)
-- `--type` (string): Contract type: CALL, PUT, or ALL {,ALL,CALL,PUT}
+- `--type` (string): Contract type: CALL, PUT, or ALL
 - `--underlying-price` (string): Override underlying price for theoretical calculations
 - `--volatility` (string): Volatility for theoretical pricing calculations
 
@@ -616,11 +611,11 @@ date ranges via epoch milliseconds. Returns OHLCV candle data.
 
 ### Flags
 
-- `--frequency` (string): Frequency value {,1,10,15,30,5}
-- `--frequency-type` (string): Frequency type (minute, daily, weekly, monthly) {,daily,minute,monthly,weekly}
+- `--frequency` (string): Frequency value
+- `--frequency-type` (string): Frequency type (minute, daily, weekly, monthly)
 - `--from` (string): Start date (milliseconds since epoch)
 - `--period` (string): Number of periods
-- `--period-type` (string): Period type (day, month, year, ytd) {,day,month,year,ytd}
+- `--period-type` (string): Period type (day, month, year, ytd)
 - `--to` (string): End date (milliseconds since epoch)
 
 ## schwab-agent indicators
@@ -673,8 +668,8 @@ names (e.g. '$SPX').
 
 ### Flags
 
-- `--frequency` (string): Minimum percent change magnitude (0, 1, 5, 10, 30, 60) {,0,1,10,30,5,60}
-- `--sort` (string): Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN) {,PERCENT_CHANGE_DOWN,PERCENT_CHANGE_UP,TRADES,VOLUME}
+- `--frequency` (string): Minimum percent change magnitude (0, 1, 5, 10, 30, 60)
+- `--sort` (string): Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)
 
 ## schwab-agent option
 
@@ -726,7 +721,7 @@ short contract. Use --debit or --credit because back-ratios can price either way
 - `--close` (bool, default: false): Closing position
 - `--credit` (bool, default: false): Build as NET_CREDIT
 - `--debit` (bool, default: false): Build as NET_DEBIT
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
 - `--long-ratio` (float64, default: 2): Long contracts per short contract
 - `--long-strike` (float64, default: 0, required): Long option strike
@@ -734,7 +729,7 @@ short contract. Use --debit or --credit because back-ratios can price either way
 - `--price` (float64, default: 0, required): Net debit or credit amount
 - `--put` (bool, default: false): Put back-ratio
 - `--quantity` (float64, default: 0, required): Short-leg contract quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--short-strike` (float64, default: 0, required): Short option strike
 - `--underlying` (string, required): Underlying symbol
 
@@ -746,15 +741,15 @@ auto-inverted from the entry action.
 
 ### Flags
 
-- `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--action` (string, required): Order action
+- `--duration` (string): Order duration
 - `--price` (float64, default: 0): Entry price
 - `--quantity` (float64, default: 0, required): Share quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--stop-loss` (float64, default: 0): Stop-loss exit price
 - `--symbol` (string, required): Equity symbol
 - `--take-profit` (float64, default: 0): Take-profit exit price
-- `--type` (string): Entry order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Entry order type
 
 ## schwab-agent order build butterfly
 
@@ -767,7 +762,7 @@ butterfly with long wings and two short body contracts.
 - `--buy` (bool, default: false): Buy a long butterfly
 - `--call` (bool, default: false): Call butterfly
 - `--close` (bool, default: false): Closing position
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
 - `--lower-strike` (float64, default: 0, required): Lower wing strike
 - `--middle-strike` (float64, default: 0, required): Middle body strike
@@ -776,7 +771,7 @@ butterfly with long wings and two short body contracts.
 - `--put` (bool, default: false): Put butterfly
 - `--quantity` (float64, default: 0, required): Wing contract quantity
 - `--sell` (bool, default: false): Sell a short butterfly
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--underlying` (string, required): Underlying symbol
 - `--upper-strike` (float64, default: 0, required): Upper wing strike
 
@@ -791,14 +786,14 @@ MARKET entry (--type MARKET) skips price validation for stop-loss placement beca
 
 ### Flags
 
-- `--duration` (string): Entry duration (exit legs are always GTC) {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Entry duration (exit legs are always GTC)
 - `--price` (float64, default: 0): Entry limit price (required for LIMIT orders, omit for MARKET)
 - `--quantity` (float64, default: 0, required): Share quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--stop-loss` (float64, default: 0, required): Stop trigger price - becomes market sell when hit
 - `--symbol` (string, required): Stock symbol (e.g., AAPL)
 - `--take-profit` (float64, default: 0): Optional take-profit limit price
-- `--type` (string): Entry order type (LIMIT or MARKET, default LIMIT) {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Entry order type (LIMIT or MARKET, default LIMIT)
 
 ## schwab-agent order build calendar
 
@@ -810,14 +805,14 @@ contract. Profits from time decay differential between the two legs.
 
 - `--call` (bool, default: false): Call calendar spread
 - `--close` (bool, default: false): Closing position
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--far-expiration` (string, required): Far-term expiration date (YYYY-MM-DD)
 - `--near-expiration` (string, required): Near-term expiration date (YYYY-MM-DD)
 - `--open` (bool, default: false): Opening position
 - `--price` (float64, default: 0, required): Net debit amount
 - `--put` (bool, default: false): Put calendar spread
 - `--quantity` (float64, default: 0, required): Number of contracts
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--strike` (float64, default: 0, required): Strike price (shared by both legs)
 - `--underlying` (string, required): Underlying symbol
 
@@ -831,13 +826,13 @@ capping upside. Quantity 1 means 100 shares plus 1 put and 1 call contract.
 
 - `--call-strike` (float64, default: 0, required): Covered call strike price
 - `--close` (bool, default: false): Closing position
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date for both options (YYYY-MM-DD)
 - `--open` (bool, default: false): Opening position
 - `--price` (float64, default: 0, required): Net debit amount
 - `--put-strike` (float64, default: 0, required): Protective put strike price
 - `--quantity` (float64, default: 0, required): Number of contracts (1 contract = 100 shares)
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--underlying` (string, required): Underlying symbol
 
 ## schwab-agent order build condor
@@ -851,7 +846,7 @@ opens a long condor; selling opens the inverse short condor.
 - `--buy` (bool, default: false): Buy a long condor
 - `--call` (bool, default: false): Call condor
 - `--close` (bool, default: false): Closing position
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
 - `--lower-middle-strike` (float64, default: 0, required): Lower middle strike
 - `--lower-strike` (float64, default: 0, required): Lower wing strike
@@ -860,7 +855,7 @@ opens a long condor; selling opens the inverse short condor.
 - `--put` (bool, default: false): Put condor
 - `--quantity` (float64, default: 0, required): Contract quantity per strike
 - `--sell` (bool, default: false): Sell a short condor
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--underlying` (string, required): Underlying symbol
 - `--upper-middle-strike` (float64, default: 0, required): Upper middle strike
 - `--upper-strike` (float64, default: 0, required): Upper wing strike
@@ -874,11 +869,11 @@ already own, use order place option --action SELL_TO_OPEN instead.
 
 ### Flags
 
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
 - `--price` (float64, default: 0, required): Net debit amount
 - `--quantity` (float64, default: 0, required): Number of contracts (1 contract = 100 shares)
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--strike` (float64, default: 0, required): Call strike price
 - `--underlying` (string, required): Underlying symbol
 
@@ -892,7 +887,7 @@ contract at a different strike. Combines elements of vertical and calendar sprea
 
 - `--call` (bool, default: false): Call diagonal spread
 - `--close` (bool, default: false): Closing position
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--far-expiration` (string, required): Far-term expiration date (YYYY-MM-DD)
 - `--far-strike` (float64, default: 0, required): Strike price for the far-term (bought) leg
 - `--near-expiration` (string, required): Near-term expiration date (YYYY-MM-DD)
@@ -901,7 +896,7 @@ contract at a different strike. Combines elements of vertical and calendar sprea
 - `--price` (float64, default: 0, required): Net debit amount
 - `--put` (bool, default: false): Put diagonal spread
 - `--quantity` (float64, default: 0, required): Number of contracts
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--underlying` (string, required): Underlying symbol
 
 ## schwab-agent order build double-diagonal
@@ -915,7 +910,7 @@ expiration, and strikes must keep the put side below the call side.
 - `--call-far-strike` (float64, default: 0, required): Far call long strike
 - `--call-near-strike` (float64, default: 0, required): Near call short strike
 - `--close` (bool, default: false): Closing position
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--far-expiration` (string, required): Far expiration for long legs (YYYY-MM-DD)
 - `--near-expiration` (string, required): Near expiration for short legs (YYYY-MM-DD)
 - `--open` (bool, default: false): Opening position
@@ -923,7 +918,7 @@ expiration, and strikes must keep the put side below the call side.
 - `--put-far-strike` (float64, default: 0, required): Far put long strike
 - `--put-near-strike` (float64, default: 0, required): Near put short strike
 - `--quantity` (float64, default: 0, required): Contract quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--underlying` (string, required): Underlying symbol
 
 ## schwab-agent order build equity
@@ -934,23 +929,23 @@ or to order preview --spec - to check estimated commissions.
 
 ### Flags
 
-- `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
+- `--action` (string, required): Order action
 - `--activation-price` (float64, default: 0): Price that activates the trailing stop
-- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)
+- `--duration` (string): Order duration
 - `--price` (float64, default: 0): Limit price
-- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
-- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)
+- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK)
 - `--quantity` (float64, default: 0, required): Share quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
-- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE}
-- `--stop-link-basis` (string): Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
-- `--stop-link-type` (string): Trailing stop offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--session` (string): Trading session
+- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)
+- `--stop-link-basis` (string): Trailing stop reference price (LAST, BID, ASK, MARK)
+- `--stop-link-type` (string): Trailing stop offset type (VALUE, PERCENT, TICK)
 - `--stop-offset` (float64, default: 0): Trailing stop offset amount
 - `--stop-price` (float64, default: 0): Stop price
-- `--stop-type` (string): Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) {,ASK,BID,LAST,MARK,STANDARD}
+- `--stop-type` (string): Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)
 - `--symbol` (string, required): Equity symbol
-- `--type` (string): Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Order type
 
 ## schwab-agent order build fts
 
@@ -975,14 +970,14 @@ generates a NET_CREDIT.
 - `--call-long-strike` (float64, default: 0, required): Highest strike: call being bought (protection)
 - `--call-short-strike` (float64, default: 0, required): Call being sold (premium)
 - `--close` (bool, default: false): Closing position
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
 - `--open` (bool, default: false): Opening position
 - `--price` (float64, default: 0, required): Net credit or debit amount
 - `--put-long-strike` (float64, default: 0, required): Lowest strike: put being bought (protection)
 - `--put-short-strike` (float64, default: 0, required): Put being sold (premium)
 - `--quantity` (float64, default: 0, required): Number of contracts
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--underlying` (string, required): Underlying symbol
 
 ## schwab-agent order build oco
@@ -993,10 +988,10 @@ one exit fills, the other is canceled. At least one of --take-profit or
 
 ### Flags
 
-- `--action` (string, required): Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--action` (string, required): Exit action (SELL to close long, BUY to close short)
+- `--duration` (string): Order duration
 - `--quantity` (float64, default: 0, required): Share quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--stop-loss` (float64, default: 0): Stop-loss exit price (stop order)
 - `--symbol` (string, required): Equity symbol
 - `--take-profit` (float64, default: 0): Take-profit exit price (limit order)
@@ -1009,20 +1004,20 @@ suitable for piping to order place or order preview.
 
 ### Flags
 
-- `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
+- `--action` (string, required): Order action
 - `--call` (bool, default: false): Call option
-- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
 - `--price` (float64, default: 0): Limit price
-- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
-- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)
+- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK)
 - `--put` (bool, default: false): Put option
 - `--quantity` (float64, default: 0, required): Contract quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
-- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE}
+- `--session` (string): Trading session
+- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)
 - `--strike` (float64, default: 0, required): Strike price
-- `--type` (string): Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Order type
 - `--underlying` (string, required): Underlying symbol
 
 ## schwab-agent order build straddle
@@ -1035,13 +1030,13 @@ put at the same strike price and expiration. Use --buy for long straddles
 
 - `--buy` (bool, default: false): Buy the straddle (long, net debit)
 - `--close` (bool, default: false): Closing position
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
 - `--open` (bool, default: false): Opening position
 - `--price` (float64, default: 0, required): Net debit or credit amount
 - `--quantity` (float64, default: 0, required): Number of contracts
 - `--sell` (bool, default: false): Sell the straddle (short, net credit)
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--strike` (float64, default: 0, required): Strike price (shared by call and put legs)
 - `--underlying` (string, required): Underlying symbol
 
@@ -1056,14 +1051,14 @@ or --sell for short strangles (expecting low volatility).
 - `--buy` (bool, default: false): Buy the strangle (long, net debit)
 - `--call-strike` (float64, default: 0, required): Strike price for the call leg
 - `--close` (bool, default: false): Closing position
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
 - `--open` (bool, default: false): Opening position
 - `--price` (float64, default: 0, required): Net debit or credit amount
 - `--put-strike` (float64, default: 0, required): Strike price for the put leg
 - `--quantity` (float64, default: 0, required): Number of contracts
 - `--sell` (bool, default: false): Sell the strangle (short, net credit)
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--underlying` (string, required): Underlying symbol
 
 ## schwab-agent order build vertical
@@ -1076,14 +1071,14 @@ NET_DEBIT or NET_CREDIT is auto-determined from the strike relationship.
 
 - `--call` (bool, default: false): Call spread
 - `--close` (bool, default: false): Closing position
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
 - `--long-strike` (float64, default: 0, required): Strike price of the option being bought
 - `--open` (bool, default: false): Opening position
 - `--price` (float64, default: 0, required): Net debit or credit amount
 - `--put` (bool, default: false): Put spread
 - `--quantity` (float64, default: 0, required): Number of contracts
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--short-strike` (float64, default: 0, required): Strike price of the option being sold
 - `--underlying` (string, required): Underlying symbol
 
@@ -1101,14 +1096,14 @@ pricing direction.
 - `--close-short-strike` (float64, default: 0, required): Short strike of the vertical being closed
 - `--credit` (bool, default: false): Build as NET_CREDIT
 - `--debit` (bool, default: false): Build as NET_DEBIT
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Order duration
 - `--open-expiration` (string, required): Expiration of the vertical being opened (YYYY-MM-DD)
 - `--open-long-strike` (float64, default: 0, required): Long strike of the vertical being opened
 - `--open-short-strike` (float64, default: 0, required): Short strike of the vertical being opened
 - `--price` (float64, default: 0, required): Net debit or credit amount
 - `--put` (bool, default: false): Put vertical roll
 - `--quantity` (float64, default: 0, required): Contract quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--underlying` (string, required): Underlying symbol
 
 ## schwab-agent order cancel
@@ -1145,7 +1140,7 @@ results.
 
 - `--from` (string): Filter by entered time lower bound
 - `--recent` (bool, default: false): Show recent order activity, including terminal statuses, from the last 24 hours unless --from is set
-- `--status` (stringSlice, default: []): Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc.
+- `--status` (stringArray, default: []): Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc.
 - `--to` (string): Filter by entered time upper bound
 
 ## schwab-agent order place
@@ -1170,15 +1165,15 @@ the parent cascades to all child orders.
 
 ### Flags
 
-- `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--action` (string, required): Order action
+- `--duration` (string): Order duration
 - `--price` (float64, default: 0): Entry price
 - `--quantity` (float64, default: 0, required): Share quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--stop-loss` (float64, default: 0): Stop-loss exit price
 - `--symbol` (string, required): Equity symbol
 - `--take-profit` (float64, default: 0): Take-profit exit price
-- `--type` (string): Entry order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Entry order type
 
 ## schwab-agent order place buy-with-stop
 
@@ -1191,14 +1186,14 @@ MARKET entry (--type MARKET) skips price validation for stop-loss placement beca
 
 ### Flags
 
-- `--duration` (string): Entry duration (exit legs are always GTC) {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Entry duration (exit legs are always GTC)
 - `--price` (float64, default: 0): Entry limit price (required for LIMIT orders, omit for MARKET)
 - `--quantity` (float64, default: 0, required): Share quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--stop-loss` (float64, default: 0, required): Stop trigger price - becomes market sell when hit
 - `--symbol` (string, required): Stock symbol (e.g., AAPL)
 - `--take-profit` (float64, default: 0): Optional take-profit limit price
-- `--type` (string): Entry order type (LIMIT or MARKET, default LIMIT) {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Entry order type (LIMIT or MARKET, default LIMIT)
 
 ## schwab-agent order place equity
 
@@ -1209,23 +1204,23 @@ i-also-like-to-live-dangerously in config for placement.
 
 ### Flags
 
-- `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
+- `--action` (string, required): Order action
 - `--activation-price` (float64, default: 0): Price that activates the trailing stop
-- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)
+- `--duration` (string): Order duration
 - `--price` (float64, default: 0): Limit price
-- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
-- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)
+- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK)
 - `--quantity` (float64, default: 0, required): Share quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
-- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE}
-- `--stop-link-basis` (string): Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
-- `--stop-link-type` (string): Trailing stop offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--session` (string): Trading session
+- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)
+- `--stop-link-basis` (string): Trailing stop reference price (LAST, BID, ASK, MARK)
+- `--stop-link-type` (string): Trailing stop offset type (VALUE, PERCENT, TICK)
 - `--stop-offset` (float64, default: 0): Trailing stop offset amount
 - `--stop-price` (float64, default: 0): Stop price
-- `--stop-type` (string): Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) {,ASK,BID,LAST,MARK,STANDARD}
+- `--stop-type` (string): Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)
 - `--symbol` (string, required): Equity symbol
-- `--type` (string): Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Order type
 
 ## schwab-agent order place oco
 
@@ -1236,10 +1231,10 @@ bracket orders, OCO has no entry leg.
 
 ### Flags
 
-- `--action` (string, required): Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--action` (string, required): Exit action (SELL to close long, BUY to close short)
+- `--duration` (string): Order duration
 - `--quantity` (float64, default: 0, required): Share quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--stop-loss` (float64, default: 0): Stop-loss exit price (stop order)
 - `--symbol` (string, required): Equity symbol
 - `--take-profit` (float64, default: 0): Take-profit exit price (limit order)
@@ -1253,20 +1248,20 @@ i-also-like-to-live-dangerously in config for placement.
 
 ### Flags
 
-- `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
+- `--action` (string, required): Order action
 - `--call` (bool, default: false): Call option
-- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
 - `--price` (float64, default: 0): Limit price
-- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
-- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)
+- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK)
 - `--put` (bool, default: false): Put option
 - `--quantity` (float64, default: 0, required): Contract quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
-- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE}
+- `--session` (string): Trading session
+- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)
 - `--strike` (float64, default: 0, required): Strike price
-- `--type` (string): Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Order type
 - `--underlying` (string, required): Underlying symbol
 
 ## schwab-agent order preview
@@ -1292,16 +1287,16 @@ order and Schwab's validation, fee, and commission details.
 
 ### Flags
 
-- `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--action` (string, required): Order action
+- `--duration` (string): Order duration
 - `--price` (float64, default: 0): Entry price
 - `--quantity` (float64, default: 0, required): Share quantity
 - `--save-preview` (bool, default: false): Save this preview locally and return a digest for order place --from-preview
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--stop-loss` (float64, default: 0): Stop-loss exit price
 - `--symbol` (string, required): Equity symbol
 - `--take-profit` (float64, default: 0): Take-profit exit price
-- `--type` (string): Entry order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Entry order type
 
 ## schwab-agent order preview buy-with-stop
 
@@ -1314,15 +1309,15 @@ MARKET entry (--type MARKET) skips price validation for stop-loss placement beca
 
 ### Flags
 
-- `--duration` (string): Entry duration (exit legs are always GTC) {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--duration` (string): Entry duration (exit legs are always GTC)
 - `--price` (float64, default: 0): Entry limit price (required for LIMIT orders, omit for MARKET)
 - `--quantity` (float64, default: 0, required): Share quantity
 - `--save-preview` (bool, default: false): Save this preview locally and return a digest for order place --from-preview
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--stop-loss` (float64, default: 0, required): Stop trigger price - becomes market sell when hit
 - `--symbol` (string, required): Stock symbol (e.g., AAPL)
 - `--take-profit` (float64, default: 0): Optional take-profit limit price
-- `--type` (string): Entry order type (LIMIT or MARKET, default LIMIT) {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Entry order type (LIMIT or MARKET, default LIMIT)
 
 ## schwab-agent order preview equity
 
@@ -1334,24 +1329,24 @@ return a digest for exact-payload placement.
 
 ### Flags
 
-- `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
+- `--action` (string, required): Order action
 - `--activation-price` (float64, default: 0): Price that activates the trailing stop
-- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)
+- `--duration` (string): Order duration
 - `--price` (float64, default: 0): Limit price
-- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
-- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)
+- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK)
 - `--quantity` (float64, default: 0, required): Share quantity
 - `--save-preview` (bool, default: false): Save this preview locally and return a digest for order place --from-preview
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
-- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE}
-- `--stop-link-basis` (string): Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
-- `--stop-link-type` (string): Trailing stop offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--session` (string): Trading session
+- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)
+- `--stop-link-basis` (string): Trailing stop reference price (LAST, BID, ASK, MARK)
+- `--stop-link-type` (string): Trailing stop offset type (VALUE, PERCENT, TICK)
 - `--stop-offset` (float64, default: 0): Trailing stop offset amount
 - `--stop-price` (float64, default: 0): Stop price
-- `--stop-type` (string): Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) {,ASK,BID,LAST,MARK,STANDARD}
+- `--stop-type` (string): Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)
 - `--symbol` (string, required): Equity symbol
-- `--type` (string): Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Order type
 
 ## schwab-agent order preview oco
 
@@ -1361,11 +1356,11 @@ will validate during preview.
 
 ### Flags
 
-- `--action` (string, required): Exit action (SELL to close long, BUY to close short) {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--action` (string, required): Exit action (SELL to close long, BUY to close short)
+- `--duration` (string): Order duration
 - `--quantity` (float64, default: 0, required): Share quantity
 - `--save-preview` (bool, default: false): Save this preview locally and return a digest for order place --from-preview
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
+- `--session` (string): Trading session
 - `--stop-loss` (float64, default: 0): Stop-loss exit price (stop order)
 - `--symbol` (string, required): Equity symbol
 - `--take-profit` (float64, default: 0): Take-profit exit price (limit order)
@@ -1379,21 +1374,21 @@ the locally built OCC order request and Schwab's preview response. Add
 
 ### Flags
 
-- `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
+- `--action` (string, required): Order action
 - `--call` (bool, default: false): Call option
-- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
 - `--price` (float64, default: 0): Limit price
-- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
-- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)
+- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK)
 - `--put` (bool, default: false): Put option
 - `--quantity` (float64, default: 0, required): Contract quantity
 - `--save-preview` (bool, default: false): Save this preview locally and return a digest for order place --from-preview
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
-- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE}
+- `--session` (string): Trading session
+- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)
 - `--strike` (float64, default: 0, required): Strike price
-- `--type` (string): Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Order type
 - `--underlying` (string, required): Underlying symbol
 
 ## schwab-agent order replace
@@ -1405,24 +1400,24 @@ original order status becomes REPLACED after the new order is created.
 
 ### Flags
 
-- `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
+- `--action` (string, required): Order action
 - `--activation-price` (float64, default: 0): Price that activates the trailing stop
-- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)
+- `--duration` (string): Order duration
 - `--order-id` (string): Order ID
 - `--price` (float64, default: 0): Limit price
-- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
-- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)
+- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK)
 - `--quantity` (float64, default: 0, required): Share quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
-- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE}
-- `--stop-link-basis` (string): Trailing stop reference price (LAST, BID, ASK, MARK) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
-- `--stop-link-type` (string): Trailing stop offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--session` (string): Trading session
+- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)
+- `--stop-link-basis` (string): Trailing stop reference price (LAST, BID, ASK, MARK)
+- `--stop-link-type` (string): Trailing stop offset type (VALUE, PERCENT, TICK)
 - `--stop-offset` (float64, default: 0): Trailing stop offset amount
 - `--stop-price` (float64, default: 0): Stop price
-- `--stop-type` (string): Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK) {,ASK,BID,LAST,MARK,STANDARD}
+- `--stop-type` (string): Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)
 - `--symbol` (string, required): Equity symbol
-- `--type` (string): Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Order type
 
 ## schwab-agent order replace option
 
@@ -1433,21 +1428,21 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 
 ### Flags
 
-- `--action` (string, required): Order action {,BUY,BUY_TO_CLOSE,BUY_TO_COVER,BUY_TO_OPEN,EXCHANGE,SELL,SELL_SHORT,SELL_SHORT_EXEMPT,SELL_TO_CLOSE,SELL_TO_OPEN}
+- `--action` (string, required): Order action
 - `--call` (bool, default: false): Call option
-- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO) {,AMEX,AUTO,BATS,BOX,C2,CBOE,ECN_ARCA,INET,ISE,NASDAQ,NYSE,PHLX}
-- `--duration` (string): Order duration {,DAY,END_OF_MONTH,END_OF_WEEK,FILL_OR_KILL,GOOD_TILL_CANCEL,IMMEDIATE_OR_CANCEL,NEXT_END_OF_MONTH}
+- `--destination` (string): Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)
+- `--duration` (string): Order duration
 - `--expiration` (string, required): Expiration date (YYYY-MM-DD)
 - `--order-id` (string): Order ID
 - `--price` (float64, default: 0): Limit price
-- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE) {,ASK,ASK_BID,AVERAGE,BASE,BID,LAST,MANUAL,MARK,TRIGGER}
-- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK) {,PERCENT,TICK,VALUE}
+- `--price-link-basis` (string): Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)
+- `--price-link-type` (string): Price link offset type (VALUE, PERCENT, TICK)
 - `--put` (bool, default: false): Put option
 - `--quantity` (float64, default: 0, required): Contract quantity
-- `--session` (string): Trading session {,AM,NORMAL,PM,SEAMLESS}
-- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE) {,ALL_OR_NONE,ALL_OR_NONE_DO_NOT_REDUCE,DO_NOT_REDUCE}
+- `--session` (string): Trading session
+- `--special-instruction` (string): Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)
 - `--strike` (float64, default: 0, required): Strike price
-- `--type` (string): Order type {,LIMIT,LIMIT_ON_CLOSE,MARKET,MARKET_ON_CLOSE,NET_CREDIT,NET_DEBIT,NET_ZERO,STOP,STOP_LIMIT,TRAILING_STOP,TRAILING_STOP_LIMIT}
+- `--type` (string): Order type
 - `--underlying` (string, required): Underlying symbol
 
 ## schwab-agent position
@@ -1468,8 +1463,8 @@ P&L, and sort filters to shrink output for portfolio triage workflows.
 - `--losers-only` (bool, default: false): Show only positions with negative unrealized P&L
 - `--max-pnl` (float64, default: 0): Maximum unrealized P&L to include when set
 - `--min-pnl` (float64, default: 0): Minimum unrealized P&L to include when set
-- `--sort` (string): Sort positions by pnl-desc, pnl-asc, or value-desc {,pnl-asc,pnl-desc,value-desc}
-- `--symbol` (stringSlice, default: []): Filter by symbol (repeatable, comma-separated values allowed)
+- `--sort` (string): Sort positions by pnl-desc, pnl-asc, or value-desc
+- `--symbol` (stringArray, default: []): Filter by symbol (repeatable, comma-separated values allowed)
 
 ## schwab-agent quote
 
@@ -1491,7 +1486,7 @@ mutually exclusive with positional symbol arguments.
 
 - `--call` (bool, default: false): Call option
 - `--expiration` (string): Expiration date (YYYY-MM-DD) for option quote
-- `--fields` (stringSlice, default: []): Quote fields to return (repeatable): quote, fundamental, extended, reference, regular
+- `--fields` (stringArray, default: []): Quote fields to return (repeatable): quote, fundamental, extended, reference, regular
 - `--indicative` (bool, default: false): Request indicative (non-tradeable) quotes
 - `--put` (bool, default: false): Put option
 - `--strike` (float64, default: 0): Strike price for option quote
@@ -1566,7 +1561,7 @@ relatively low. Use --std-dev to widen or narrow the bands (default 2.0).
 - `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
 - `--period` (int, default: 20): BBands period
 - `--points` (int, default: 1): Number of output points (default 1; 0 = all)
-- `--std-dev` (float64, default: 2.0): Standard deviations
+- `--std-dev` (float64, default: 2): Standard deviations
 
 ## schwab-agent ta dashboard
 
@@ -1681,7 +1676,3 @@ suggests bearish.
 
 - `--interval` (string, default: daily): Data interval (daily, weekly, 1min, 5min, 15min, 30min)
 - `--points` (int, default: 1): Number of output points (default 1; 0 = all)
-
-## Optional
-
-- [JSON Schema](#json-schema): Machine-readable schema available via `schwab-agent --jsonschema`

@@ -48,15 +48,14 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 	root := commands.BuildCommandTree(w, configPath, tokenPath, version, deps, authDeps)
 
 	if err := structcli.Setup(root,
-		structcli.WithJSONSchema(),
 		structcli.WithDebug(debug.Options{Exit: true}),
 	); err != nil {
 		panic(err)
 	}
 
 	// Register --instruction/--order-type flag aliases on qualifying commands.
-	// This must happen AFTER structcli.Setup() because adding non-structcli
-	// flags before Setup interferes with structcli's JSON Schema generation.
+	// This runs after structcli.Setup() so aliases are layered on top of the
+	// generated command tree without affecting structcli's remaining setup hooks.
 	commands.RegisterOrderFlagAliasesOnTree(root)
 
 	return root

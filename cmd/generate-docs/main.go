@@ -47,11 +47,9 @@ func run() error {
 		commands.DefaultAuthDeps(),
 	)
 
-	// Setup is required so JSONSchema (used internally by the generators)
-	// can read flag metadata and enum values.
-	if err := structcli.Setup(root,
-		structcli.WithJSONSchema(),
-	); err != nil {
+	// Setup is required so the generators can read structcli-managed flag
+	// metadata and enum values, even though runtime-only setup hooks are absent.
+	if err := structcli.Setup(root); err != nil {
 		return fmt.Errorf("structcli setup: %w", err)
 	}
 
@@ -84,6 +82,8 @@ func run() error {
 		return fmt.Errorf("generating llms.txt: %w", err)
 	}
 
+	llmstxt = removeLLMsJSONSchemaReference(llmstxt)
+
 	//nolint:gosec // G306: public documentation files should be world-readable
 	if err := os.WriteFile(filepath.Join(outDir, "llms.txt"), llmstxt, 0o644); err != nil {
 		return fmt.Errorf("writing llms.txt: %w", err)
@@ -115,6 +115,64 @@ func labelSkillCodeFences(content []byte) []byte {
 	}
 
 	return []byte(strings.Join(lines, "\n"))
+}
+
+func removeLLMsJSONSchemaReference(content []byte) []byte {
+	lines := strings.Split(string(content), "\n")
+	out := make([]string, 0, len(lines))
+
+	for i := 0; i < len(lines); i++ {
+		if lines[i] != "## Optional" {
+			out = append(out, lines[i])
+			continue
+		}
+
+		optionalLines, next := collectFilteredOptionalLines(lines, i+1)
+		if len(optionalLines) > 0 {
+			// structcli's llms.txt generator always advertises --jsonschema, even
+			// when the command tree does not install that runtime flag. Keep any
+			// other optional entries, but drop the now-stale JSON Schema reference.
+			out = append(out, "## Optional", "")
+			out = append(out, optionalLines...)
+		}
+
+		i = next - 1
+	}
+
+	return []byte(strings.Join(out, "\n"))
+}
+
+func collectFilteredOptionalLines(lines []string, start int) (optionalLines []string, next int) {
+	optionalLines = make([]string, 0)
+	next = start
+
+	for next < len(lines) && !strings.HasPrefix(lines[next], "## ") {
+		line := lines[next]
+		if !isGeneratedJSONSchemaOptionalLine(line) {
+			optionalLines = append(optionalLines, line)
+		}
+		next++
+	}
+
+	return trimBlankLines(optionalLines), next
+}
+
+func isGeneratedJSONSchemaOptionalLine(line string) bool {
+	return strings.Contains(line, "[JSON Schema]") && strings.Contains(line, "--jsonschema")
+}
+
+func trimBlankLines(lines []string) []string {
+	start := 0
+	for start < len(lines) && lines[start] == "" {
+		start++
+	}
+
+	end := len(lines)
+	for end > start && lines[end-1] == "" {
+		end--
+	}
+
+	return lines[start:end]
 }
 
 // projectRoot returns the repository root by walking up from this source

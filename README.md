@@ -228,7 +228,7 @@ This prevents accidental trades from misconfigured agents.
 
 ## Agent integration
 
-schwab-agent is built for coding agents and LLM tools that need a reliable command contract instead of prose-only instructions. Use the generated files in this repo for workflow guidance, but use JSON Schema from the binary as the source of truth for commands and flags.
+schwab-agent is built for coding agents and LLM tools that need a reliable command contract instead of prose-only instructions. Use the generated files in this repo plus command help output for workflow guidance, commands, and flags.
 
 ### Claude Code and other skill-aware tools
 
@@ -265,17 +265,17 @@ When using OpenCode or Codex, start in the repository root so the tool can load 
 
 ### Command discovery for shell automation
 
-For shell-based automation, run `schwab-agent --jsonschema=tree` first when you need to discover commands, flags, enum values, defaults, config keys, or environment variable bindings. Treat this JSON Schema tree as the authoritative command contract, then use `SKILL.md`, `llms.txt`, and `--help` for workflow guidance and examples after choosing the command and flags from the schema.
+For shell-based automation, use `SKILL.md`, `llms.txt`, and `--help` output to discover commands, flags, enum values, defaults, config keys, or environment variable bindings. The project no longer exposes a runtime JSON Schema endpoint from the binary.
 
 ```bash
-# Canonical shell-agent discovery path for the full CLI contract
-schwab-agent --jsonschema=tree
+# Full generated command reference
+less SKILL.md
 
-# Schema for a specific subcommand
-schwab-agent quote --jsonschema
+# Runtime help for a specific command
+schwab-agent quote --help
 
-# Flat JSON Schema for the entire CLI, useful for tools that do not need hierarchy
-schwab-agent --jsonschema
+# Compact generated reference for LLM-oriented workflows
+less llms.txt
 ```
 
 ## Development

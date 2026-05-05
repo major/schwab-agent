@@ -437,8 +437,8 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 	// while the tag-driven helper can only express static defaults.
 	cmd.Flags().IntSliceVar(&opts.Period, "period", []int{cfg.defaultPeriod}, "Indicator period (repeatable or comma-separated)")
 
-	// Fix DefValue format: pflag uses "[20]" but structcli JSON Schema expects "20" (comma-separated).
-	// Without this, structcli's schema generator tries to parse "[20]" as a JSON number, which fails.
+	// Keep DefValue in the same comma-separated format users pass on the CLI.
+	// pflag's default "[20]" rendering is harder to read in help and generated docs.
 	if f := cmd.Flags().Lookup("period"); f != nil {
 		f.DefValue = strconv.Itoa(cfg.defaultPeriod)
 	}
