@@ -217,7 +217,7 @@ func TestTADashboard_ValidEnvelope(t *testing.T) {
 		requestCount++
 		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
 		assert.Equal(t, "AAPL", r.URL.Query().Get("symbol"))
-		assert.Equal(t, "1", r.URL.Query().Get("period"), "252 daily candles should fit in one year")
+		assert.Equal(t, "2", r.URL.Query().Get("period"), "252 daily candles need a buffered request")
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(mockCandleListJSON("AAPL", 252)))
@@ -273,6 +273,36 @@ func TestTADashboard_ValidEnvelope(t *testing.T) {
 	require.True(t, ok, "values should be an array")
 	require.Len(t, values, 1, "dashboard defaults to the latest point")
 	assert.Equal(t, latest, values[0].(map[string]any), "default values row should match latest")
+}
+
+func TestTADashboard_DailyLongRangeUsesBufferedHistoryRequest(t *testing.T) {
+	// Arrange: Schwab can return only 251 candles for a 1-year daily request, so
+	// dashboard must request a wider period while still accepting exactly the 252
+	// candles needed for a complete long-range row.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
+		assert.Equal(t, "GNRC", r.URL.Query().Get("symbol"))
+		assert.Equal(t, "year", r.URL.Query().Get("periodType"))
+		assert.Equal(t, "2", r.URL.Query().Get("period"))
+		assert.Equal(t, "daily", r.URL.Query().Get("frequencyType"))
+		assert.Equal(t, "1", r.URL.Query().Get("frequency"))
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(mockCandleListJSON("GNRC", 252)))
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewTACmd(testClient(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "dashboard", "GNRC", "--points", "1")
+	require.NoError(t, err)
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	values, ok := data["values"].([]any)
+	require.True(t, ok, "values should be an array")
+	require.Len(t, values, 1)
 }
 
 func TestTADashboard_SingleSymbolReturnsSymbolMap(t *testing.T) {
