@@ -648,7 +648,7 @@ schwab-agent order build butterfly --underlying F --expiration 2026-06-18 --lowe
 
 #### `schwab-agent order build buy-with-stop`
 
-Creates a bracket order for buying shares with automatic stop-loss protection.
+Build a buy-with-stop bracket order request JSON locally with automatic stop-loss protection.
 The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
 Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
 Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.
@@ -1253,7 +1253,7 @@ the parent cascades to all child orders.
 
 #### `schwab-agent order place buy-with-stop`
 
-Creates a bracket order for buying shares with automatic stop-loss protection.
+Place a buy-with-stop bracket order through the Schwab API with automatic stop-loss protection.
 The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
 Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
 Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.
@@ -1452,7 +1452,7 @@ schwab-agent order preview bracket --symbol NVDA --action BUY --quantity 10 --ty
 
 #### `schwab-agent order preview buy-with-stop`
 
-Creates a bracket order for buying shares with automatic stop-loss protection.
+Preview a buy-with-stop bracket order through the Schwab API without placing it.
 The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
 Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
 Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.

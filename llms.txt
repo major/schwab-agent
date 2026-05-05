@@ -166,7 +166,7 @@ auto-inverted from the entry action.
 - [schwab-agent order build butterfly](#schwab-agent-order-build-butterfly): Build a butterfly spread order request JSON. Uses three ordered strikes at
 the same expiration: lower wing, middle body, upper wing. Buying opens a long
 butterfly with long wings and two short body contracts.
-- [schwab-agent order build buy-with-stop](#schwab-agent-order-build-buy-with-stop): Creates a bracket order for buying shares with automatic stop-loss protection.
+- [schwab-agent order build buy-with-stop](#schwab-agent-order-build-buy-with-stop): Build a buy-with-stop bracket order request JSON locally with automatic stop-loss protection.
 The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
 Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
 Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.
@@ -241,7 +241,7 @@ returned previewDigest.digest value.
 At least one of --take-profit or --stop-loss is required. Exit instructions are
 auto-inverted from the entry action (BUY entry creates SELL exits). Canceling
 the parent cascades to all child orders.
-- [schwab-agent order place buy-with-stop](#schwab-agent-order-place-buy-with-stop): Creates a bracket order for buying shares with automatic stop-loss protection.
+- [schwab-agent order place buy-with-stop](#schwab-agent-order-place-buy-with-stop): Place a buy-with-stop bracket order through the Schwab API with automatic stop-loss protection.
 The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
 Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
 Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.
@@ -269,7 +269,7 @@ safety guards since no order is actually placed.
 - [schwab-agent order preview bracket](#schwab-agent-order-preview-bracket): Preview a bracket order without placing it. At least one of --take-profit or
 --stop-loss is required. The preview response includes the locally built trigger
 order and Schwab's validation, fee, and commission details.
-- [schwab-agent order preview buy-with-stop](#schwab-agent-order-preview-buy-with-stop): Creates a bracket order for buying shares with automatic stop-loss protection.
+- [schwab-agent order preview buy-with-stop](#schwab-agent-order-preview-buy-with-stop): Preview a buy-with-stop bracket order through the Schwab API without placing it.
 The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
 Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
 Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.
@@ -782,7 +782,7 @@ butterfly with long wings and two short body contracts.
 
 ## schwab-agent order build buy-with-stop
 
-Creates a bracket order for buying shares with automatic stop-loss protection.
+Build a buy-with-stop bracket order request JSON locally with automatic stop-loss protection.
 The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
 Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
 Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.
@@ -1182,7 +1182,7 @@ the parent cascades to all child orders.
 
 ## schwab-agent order place buy-with-stop
 
-Creates a bracket order for buying shares with automatic stop-loss protection.
+Place a buy-with-stop bracket order through the Schwab API with automatic stop-loss protection.
 The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
 Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
 Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.
@@ -1305,7 +1305,7 @@ order and Schwab's validation, fee, and commission details.
 
 ## schwab-agent order preview buy-with-stop
 
-Creates a bracket order for buying shares with automatic stop-loss protection.
+Preview a buy-with-stop bracket order through the Schwab API without placing it.
 The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
 Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
 Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.
