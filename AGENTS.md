@@ -48,7 +48,7 @@ CI runs lint (golangci-lint v2.11), test (race detector + coverage + build verif
 
 Shell script at `scripts/smoke-test.sh`. Two tiers:
 
-- **Tier 1** (no auth, CI-safe): help text for all 80 commands/subcommands, symbol build/parse, all 18 order build sub-types with full permutations, flag alias tests, shorthand/alias error cases (183 tests). Runs in CI and locally via `make smoke-ci`.
+- **Tier 1** (no auth, CI-safe): help text for all 80 commands/subcommands, symbol build/parse, all 19 order build sub-types with full permutations, flag alias tests, shorthand/alias error cases (194 tests). Runs in CI and locally via `make smoke-ci`.
 - **Tier 2** (auth required, local only): read-only API commands (account, position, quote, order list, chain, history, instrument, market, all 11 TA indicators). Requires a valid token. Runs locally via `make smoke` (both tiers) or `SMOKE_TIER=2 ./scripts/smoke-test.sh` (tier 2 only).
 
 Each test validates exit code 0, valid JSON output, and the correct envelope structure (`.data` for API commands, raw JSON for order builds). `SMOKE_BIN` env var overrides the binary path.
