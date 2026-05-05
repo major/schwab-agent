@@ -65,7 +65,15 @@ func newBuyWithStopPreviewCmd(c *client.Ref, configPath string, w io.Writer) *co
 
 // applyBuyWithStopHelp keeps the three buy-with-stop command variants aligned.
 func applyBuyWithStopHelp(cmd *cobra.Command, verb string) {
-	cmd.Long = `Creates a bracket order for buying shares with automatic stop-loss protection.
+	description := "Preview a buy-with-stop bracket order through the Schwab API without placing it."
+	switch verb {
+	case "build":
+		description = "Build a buy-with-stop bracket order request JSON locally with automatic stop-loss protection."
+	case "place":
+		description = "Place a buy-with-stop bracket order through the Schwab API with automatic stop-loss protection."
+	}
+
+	cmd.Long = description + `
 The entry fills first as a TRIGGER parent, then the stop-loss activates automatically.
 Optional --take-profit adds a second exit leg, creating an OCO structure where one exit fill cancels the other.
 Exit legs are always GOOD_TILL_CANCEL regardless of --duration, which only controls the entry order.

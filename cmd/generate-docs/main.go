@@ -48,10 +48,9 @@ func run() error {
 	)
 
 	// Setup is required so JSONSchema (used internally by the generators)
-	// can read flag metadata, enum values, and help topics.
+	// can read flag metadata and enum values.
 	if err := structcli.Setup(root,
 		structcli.WithJSONSchema(),
-		structcli.WithHelpTopics(),
 	); err != nil {
 		return fmt.Errorf("structcli setup: %w", err)
 	}

@@ -186,10 +186,5 @@ func hasSkipAuthAnnotation(cmd *cobra.Command) bool {
 		}
 	}
 
-	// structcli help topic commands (env-vars, config-keys) don't require auth
-	if structcli.IsHelpTopicCommand(cmd) {
-		return true
-	}
-
 	return false
 }

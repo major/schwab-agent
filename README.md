@@ -205,6 +205,8 @@ schwab-agent order place --spec @order.json
 | `market` | Market hours and top movers |
 | `symbol` | Build and parse OCC option symbols (no auth required) |
 | `instrument` | Search instruments |
+| `env-vars` | Show supported environment variables (no auth required) |
+| `config-keys` | Show config keys and related flags (no auth required) |
 
 ### Global flags
 

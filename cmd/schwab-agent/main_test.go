@@ -247,17 +247,33 @@ func TestBeforeHook_SkipsAuthForCompletionCommand(t *testing.T) {
 	assert.Contains(t, stdout, "bash completion")
 }
 
-func TestSkipAuth_HelpTopic(t *testing.T) {
-	// env-vars help topic must bypass PersistentPreRunE (no token/config needed).
+func TestSkipAuth_EnvVarsCommand(t *testing.T) {
+	// The Cobra-native env-vars reference command must bypass PersistentPreRunE
+	// because users need auth/config guidance before credentials exist.
 	var buf bytes.Buffer
 	app := buildAppWithDeps(&buf, commands.RootDeps{})
 	app.SetArgs([]string{"env-vars"})
 	_, err := structcli.ExecuteC(app)
 	require.NoError(t, err)
 
-	// Verify output contains help topic content.
 	output := buf.String()
 	assert.Contains(t, output, "Environment Variables")
+	assert.Contains(t, output, "SCHWAB_CLIENT_ID")
+}
+
+func TestSkipAuth_ConfigKeysCommand(t *testing.T) {
+	// The generated config-key reference reads the live Cobra tree without
+	// requiring a token file or API client.
+	var buf bytes.Buffer
+	app := buildAppWithDeps(&buf, commands.RootDeps{})
+	app.SetArgs([]string{"config-keys"})
+	_, err := structcli.ExecuteC(app)
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "Configuration Keys")
+	assert.Contains(t, output, "schwab-agent (global)")
+	assert.Contains(t, output, "--account")
 }
 
 func TestBeforeHook_ReturnsAuthErrorForAPICommand(t *testing.T) {
