@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -56,12 +55,8 @@ type quoteGetOpts struct {
 	Put        bool     `flag:"put" flagdescr:"Put option"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *quoteGetOpts) Attach(_ *cobra.Command) error { return nil }
-
-// Validate implements structcli.Validatable. Called automatically during
-// Unmarshal() after flag decoding. Checks that all --fields values are
-// recognized quote field names.
+// Validate is called by validateCobraOptions after Cobra decodes bound flags.
+// Checks that all --fields values are recognized quote field names.
 func (o *quoteGetOpts) Validate(_ context.Context) []error {
 	var errs []error
 	for _, f := range o.Fields {
@@ -119,7 +114,7 @@ mutually exclusive with positional symbol arguments.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Unmarshal decodes flags and runs quoteGetOpts.Validate(),
 			// which rejects unrecognized --fields values.
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -166,9 +161,7 @@ mutually exclusive with positional symbol arguments.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 	cmd.MarkFlagsMutuallyExclusive("call", "put")
 
 	return cmd

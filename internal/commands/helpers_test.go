@@ -2,14 +2,15 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/leodido/structcli"
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
+	"github.com/major/schwab-agent/internal/models"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,11 +25,51 @@ type flagValidationTestOpts struct {
 	Interval taInterval `flag:"interval" flagdescr:"Data interval" default:"daily"`
 }
 
-// Attach implements structcli.Options for defineAndConstrainTestOpts.
-func (o *defineAndConstrainTestOpts) Attach(_ *cobra.Command) error { return nil }
+type cobraFlagCoverageOpts struct {
+	Symbol   string           `flag:"symbol" flagdescr:"Symbol" flagshort:"s" default:"AAPL"`
+	Count    int              `flag:"count" flagdescr:"Count" default:"3"`
+	Price    float64          `flag:"price" flagdescr:"Price" default:"1.25"`
+	Enabled  bool             `flag:"enabled" flagdescr:"Enabled" default:"true"`
+	Fields   []string         `flag:"field" flagdescr:"Field"`
+	Duration models.Duration  `flag:"duration" flagdescr:"Duration" default:"DAY"`
+	Type     models.OrderType `flag:"type" flagdescr:"Order type"`
+}
 
-// Attach implements structcli.Options for flagValidationTestOpts.
-func (o *flagValidationTestOpts) Attach(_ *cobra.Command) error { return nil }
+type requiredCobraFlagOpts struct {
+	Symbol string `flag:"symbol" flagdescr:"Symbol" flagrequired:"true"`
+}
+
+type unsupportedSliceFlagOpts struct {
+	Values []int `flag:"value" flagdescr:"Value"`
+}
+
+type unsupportedMapFlagOpts struct {
+	Values map[string]string `flag:"value" flagdescr:"Value"`
+}
+
+type unsupportedDefaultOpts struct {
+	Values []string `flag:"value" flagdescr:"Value" default:"bad"`
+}
+
+type invalidIntDefaultOpts struct {
+	Count int `flag:"count" flagdescr:"Count" default:"bad"`
+}
+
+type invalidFloatDefaultOpts struct {
+	Price float64 `flag:"price" flagdescr:"Price" default:"bad"`
+}
+
+type invalidBoolDefaultOpts struct {
+	Enabled bool `flag:"enabled" flagdescr:"Enabled" default:"bad"`
+}
+
+type validationCoverageOpts struct {
+	errs []error
+}
+
+func (o *validationCoverageOpts) Validate(_ context.Context) []error {
+	return o.errs
+}
 
 // testClient creates a *client.Ref backed by the given httptest server.
 func testClient(t *testing.T, server *httptest.Server) *client.Ref {
@@ -237,16 +278,158 @@ func TestDefineAndConstrain(t *testing.T) {
 	assert.Contains(t, err.Error(), "if any flags in the group [call put] are set none of the others can be")
 }
 
+func TestDefineCobraFlags(t *testing.T) {
+	t.Run("binds supported flag types defaults enums and aliases", func(t *testing.T) {
+		// Arrange
+		opts := &cobraFlagCoverageOpts{}
+		cmd := &cobra.Command{
+			Use: "bind",
+			RunE: func(_ *cobra.Command, _ []string) error {
+				return nil
+			},
+		}
+		defineCobraFlags(cmd, opts)
+
+		// Assert defaults are applied before Cobra executes so handlers can read opts directly.
+		assert.Equal(t, "AAPL", opts.Symbol)
+		assert.Equal(t, 3, opts.Count)
+		assert.Equal(t, 1.25, opts.Price)
+		assert.True(t, opts.Enabled)
+		assert.Equal(t, models.DurationDay, opts.Duration)
+		require.NotNil(t, cmd.Flags().Lookup("duration"))
+		assert.Equal(t, []string{"DAY", "END_OF_MONTH", "END_OF_WEEK", "FILL_OR_KILL", "GOOD_TILL_CANCEL", "IMMEDIATE_OR_CANCEL", "NEXT_END_OF_MONTH"}, cmd.Flags().Lookup("duration").Annotations[structcliFlagEnumAnnotation])
+
+		// Act
+		_, err := runTestCommand(
+			t,
+			cmd,
+			"--symbol", "MSFT",
+			"--count", "7",
+			"--price", "2.50",
+			"--enabled=false",
+			"--field", "quote",
+			"--field", "fundamental",
+			"--duration", "gtc",
+			"--type", "MOC",
+		)
+
+		// Assert
+		require.NoError(t, err)
+		assert.Equal(t, "MSFT", opts.Symbol)
+		assert.Equal(t, 7, opts.Count)
+		assert.Equal(t, 2.50, opts.Price)
+		assert.False(t, opts.Enabled)
+		assert.Equal(t, []string{"quote", "fundamental"}, opts.Fields)
+		assert.Equal(t, models.DurationGoodTillCancel, opts.Duration)
+		assert.Equal(t, models.OrderTypeMarketOnClose, opts.Type)
+	})
+
+	t.Run("required tagged flag is enforced", func(t *testing.T) {
+		// Arrange
+		cmd := &cobra.Command{Use: "required", RunE: func(_ *cobra.Command, _ []string) error { return nil }}
+		defineCobraFlags(cmd, &requiredCobraFlagOpts{})
+
+		// Act
+		_, err := runTestCommand(t, cmd)
+
+		// Assert
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `required flag(s) "symbol" not set`)
+	})
+
+	t.Run("rejects invalid options argument", func(t *testing.T) {
+		// Arrange
+		cmd := &cobra.Command{Use: "invalid"}
+
+		// Act / Assert
+		assert.PanicsWithValue(t, "defineCobraFlags requires a pointer to an options struct", func() {
+			defineCobraFlags(cmd, cobraFlagCoverageOpts{})
+		})
+		assert.PanicsWithValue(t, "defineCobraFlags requires a pointer to an options struct", func() {
+			defineCobraFlags(cmd, (*cobraFlagCoverageOpts)(nil))
+		})
+	})
+
+	t.Run("rejects invalid defaults and unsupported flag types", func(t *testing.T) {
+		for name, opts := range map[string]any{
+			"invalid int default":      &invalidIntDefaultOpts{},
+			"invalid float default":    &invalidFloatDefaultOpts{},
+			"invalid bool default":     &invalidBoolDefaultOpts{},
+			"unsupported default type": &unsupportedDefaultOpts{},
+			"unsupported slice flag":   &unsupportedSliceFlagOpts{},
+			"unsupported map flag":     &unsupportedMapFlagOpts{},
+		} {
+			t.Run(name, func(t *testing.T) {
+				// Arrange
+				cmd := &cobra.Command{Use: name}
+
+				// Act / Assert
+				assert.Panics(t, func() {
+					defineCobraFlags(cmd, opts)
+				})
+			})
+		}
+	})
+}
+
+func TestCobraStringEnumValue(t *testing.T) {
+	t.Run("handles nil and invalid reflect values", func(t *testing.T) {
+		assert.Empty(t, (*cobraStringEnumValue)(nil).String())
+		assert.Empty(t, (&cobraStringEnumValue{}).String())
+		assert.Equal(t, "string", (&cobraStringEnumValue{}).Type())
+	})
+
+	t.Run("accepts blank canonical and alias values", func(t *testing.T) {
+		// Arrange
+		opts := &cobraFlagCoverageOpts{}
+		cmd := &cobra.Command{Use: "enum", RunE: func(_ *cobra.Command, _ []string) error { return nil }}
+		defineCobraFlags(cmd, opts)
+
+		// Act / Assert
+		_, err := runTestCommand(t, cmd, "--type", "limit")
+		require.NoError(t, err)
+		assert.Equal(t, models.OrderTypeLimit, opts.Type)
+
+		value := cmd.Flags().Lookup("type").Value
+		require.NoError(t, value.Set(""))
+		assert.Empty(t, opts.Type)
+		assert.Equal(t, `invalid value "bogus" (allowed: LIMIT, LIMIT_ON_CLOSE, MARKET, MARKET_ON_CLOSE, NET_CREDIT, NET_DEBIT, NET_ZERO, STOP, STOP_LIMIT, TRAILING_STOP, TRAILING_STOP_LIMIT)`, value.Set("bogus").Error())
+	})
+}
+
+func TestValidateCobraOptions(t *testing.T) {
+	t.Run("ignores structs without validation hooks", func(t *testing.T) {
+		assert.NoError(t, validateCobraOptions(context.Background(), &cobraFlagCoverageOpts{}))
+	})
+
+	t.Run("accepts empty validation result", func(t *testing.T) {
+		assert.NoError(t, validateCobraOptions(context.Background(), &validationCoverageOpts{}))
+	})
+
+	t.Run("combines validation messages", func(t *testing.T) {
+		// Arrange
+		opts := &validationCoverageOpts{errs: []error{errors.New("first"), errors.New("second")}}
+
+		// Act
+		err := validateCobraOptions(context.Background(), opts)
+
+		// Assert
+		var valErr *apperr.ValidationError
+		require.ErrorAs(t, err, &valErr)
+		assert.Equal(t, "first; second", valErr.Error())
+	})
+}
+
 func TestNormalizeFlagValidationError(t *testing.T) {
 	t.Run("invalid enum includes bad value and valid values", func(t *testing.T) {
-		// Arrange - structcli annotates registered enum flags with the canonical
+		// Arrange - Cobra enum registration annotates flags with the canonical
 		// values that should appear in remediation text.
 		cmd := &cobra.Command{
 			Use:  "indicator",
 			RunE: func(_ *cobra.Command, _ []string) error { return nil },
 		}
 		cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
-		require.NoError(t, structcli.Define(cmd, &flagValidationTestOpts{}))
+		defineCobraFlags(cmd, &flagValidationTestOpts{})
 
 		// Act
 		_, err := runTestCommand(t, cmd, "--interval", "bogus")

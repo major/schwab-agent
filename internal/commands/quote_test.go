@@ -7,8 +7,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	structclierrors "github.com/leodido/structcli/errors"
-
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 	"github.com/stretchr/testify/assert"
@@ -263,9 +261,9 @@ func TestNewQuoteGetInvalidField(t *testing.T) {
 	)
 	require.Error(t, err)
 
-	// Validation now runs inside structcli.Unmarshal via quoteGetOpts.Validate(),
-	// producing structcli's ValidationError instead of apperr's.
-	var valErr *structclierrors.ValidationError
+	// Validation now runs after Cobra flag parsing via quoteGetOpts.Validate(),
+	// keeping command-level validation in the existing apperr hierarchy.
+	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "bogus")
 	assert.Empty(t, buf.String())

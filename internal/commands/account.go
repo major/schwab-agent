@@ -9,7 +9,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -81,24 +80,15 @@ type accountListOpts struct {
 	Positions bool `flag:"positions" flagdescr:"Include current positions for each account"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *accountListOpts) Attach(_ *cobra.Command) error { return nil }
-
 // accountSummaryOpts holds the options for the compact account summary command.
 type accountSummaryOpts struct {
 	Positions bool `flag:"positions" flagdescr:"Include compact current positions for each account"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *accountSummaryOpts) Attach(_ *cobra.Command) error { return nil }
-
 // accountGetOpts holds the options for the account get subcommand.
 type accountGetOpts struct {
 	Positions bool `flag:"positions" flagdescr:"Include current positions in the account response"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *accountGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 // accountTransactionListOpts holds the options for the account transaction list subcommand.
 type accountTransactionListOpts struct {
@@ -107,9 +97,6 @@ type accountTransactionListOpts struct {
 	To     string `flag:"to" flagdescr:"End date (YYYY-MM-DDTHH:MM:SSZ)"`
 	Symbol string `flag:"symbol" flagdescr:"Filter by symbol"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *accountTransactionListOpts) Attach(_ *cobra.Command) error { return nil }
 
 // resolveAccount determines the account hash from multiple sources.
 // Priority: flag > positional args (if provided) > config default > error.
@@ -715,7 +702,7 @@ list --positions when you need the full Schwab account payload with positions.`,
 		Example: `  schwab-agent account summary
   schwab-agent account summary --positions`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -756,9 +743,7 @@ list --positions when you need the full Schwab account payload with positions.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	return cmd
 }
@@ -778,7 +763,7 @@ one-command account picker.`,
 		Example: `  schwab-agent account list
   schwab-agent account list --positions`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -803,9 +788,7 @@ one-command account picker.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	return cmd
 }
@@ -824,7 +807,7 @@ config. Results are enriched with nicknames from the preferences API. Use
   schwab-agent account get ABCDEF1234567890
   schwab-agent account get --positions`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -863,9 +846,7 @@ config. Results are enriched with nicknames from the preferences API. Use
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	return cmd
 }
@@ -956,7 +937,7 @@ default account unless --account is specified.`,
   schwab-agent account transaction list --types TRADE --symbol AAPL
   schwab-agent account transaction list --from 2025-01-01T00:00:00Z --to 2025-01-31T23:59:59Z`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -986,9 +967,7 @@ default account unless --account is specified.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	return cmd
 }

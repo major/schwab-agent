@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -185,7 +184,7 @@ type simpleTAConfig struct {
 
 // taCommandConfig describes the Cobra metadata and typed builder shared by TA
 // commands that accept one or more symbols and write one result per symbol.
-type taCommandConfig[O structcli.Options, R any] struct {
+type taCommandConfig[O any, R any] struct {
 	name    string
 	short   string
 	long    string
@@ -245,12 +244,8 @@ type simpleTAOpts struct {
 	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *simpleTAOpts) Attach(_ *cobra.Command) error { return nil }
-
-// Validate implements structcli.Validatable. Called automatically during
-// Unmarshal() after flag decoding. Checks that all requested periods are
-// positive and unique.
+// Validate is called by validateCobraOptions after Cobra decodes bound flags.
+// Checks that all requested periods are positive and unique.
 func (o *simpleTAOpts) Validate(_ context.Context) []error {
 	if len(o.Period) == 0 {
 		return []error{fmt.Errorf("at least one period is required")}
@@ -285,18 +280,12 @@ type macdOpts struct {
 	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *macdOpts) Attach(_ *cobra.Command) error { return nil }
-
 // atrOpts holds CLI flags for the ATR subcommand.
 type atrOpts struct {
 	Period   int        `flag:"period" flagdescr:"Indicator period" default:"14" flaggroup:"indicator"`
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
 	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *atrOpts) Attach(_ *cobra.Command) error { return nil }
 
 // bbandsOpts holds CLI flags for the Bollinger Bands subcommand.
 type bbandsOpts struct {
@@ -305,9 +294,6 @@ type bbandsOpts struct {
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
 	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *bbandsOpts) Attach(_ *cobra.Command) error { return nil }
 
 // stochOpts holds CLI flags for the Stochastic Oscillator subcommand.
 type stochOpts struct {
@@ -318,9 +304,6 @@ type stochOpts struct {
 	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *stochOpts) Attach(_ *cobra.Command) error { return nil }
-
 // adxOpts holds CLI flags for the ADX subcommand.
 type adxOpts struct {
 	Period   int        `flag:"period" flagdescr:"Indicator period" default:"14" flaggroup:"indicator"`
@@ -328,17 +311,11 @@ type adxOpts struct {
 	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *adxOpts) Attach(_ *cobra.Command) error { return nil }
-
 // vwapOpts holds CLI flags for the VWAP subcommand.
 type vwapOpts struct {
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
 	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *vwapOpts) Attach(_ *cobra.Command) error { return nil }
 
 // hvOpts holds CLI flags for the Historical Volatility subcommand.
 type hvOpts struct {
@@ -346,25 +323,16 @@ type hvOpts struct {
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *hvOpts) Attach(_ *cobra.Command) error { return nil }
-
 // expectedMoveOpts holds CLI flags for the Expected Move subcommand.
 type expectedMoveOpts struct {
 	DTE int `flag:"dte" flagdescr:"Target days to expiration" default:"30" flaggroup:"indicator"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *expectedMoveOpts) Attach(_ *cobra.Command) error { return nil }
 
 // dashboardOpts holds CLI flags for the opinionated TA dashboard command.
 type dashboardOpts struct {
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
 	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *dashboardOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewTACmd returns the Cobra command for technical analysis indicators.
 func NewTACmd(c *client.Ref, w io.Writer) *cobra.Command {
@@ -455,7 +423,7 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Unmarshal decodes flags and runs simpleTAOpts.Validate(),
 			// which rejects zero/negative and duplicate periods.
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -465,9 +433,8 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 		},
 	}
 
-	// Period uses IntSliceVar because its default varies per indicator (cfg.defaultPeriod)
-	// and structcli struct tags require static defaults.
-	// Register BEFORE Define so structcli's schema generator handles it correctly.
+	// Period uses IntSliceVar because its default varies per indicator (cfg.defaultPeriod),
+	// while the tag-driven helper can only express static defaults.
 	cmd.Flags().IntSliceVar(&opts.Period, "period", []int{cfg.defaultPeriod}, "Indicator period (repeatable or comma-separated)")
 
 	// Fix DefValue format: pflag uses "[20]" but structcli JSON Schema expects "20" (comma-separated).
@@ -476,19 +443,17 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 		f.DefValue = strconv.Itoa(cfg.defaultPeriod)
 	}
 
-	if err := structcli.Define(cmd, opts, structcli.WithExclusions("period")); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }
 
-// makeCobraTACommand builds the repeated Cobra/structcli plumbing for TA
+// makeCobraTACommand builds the repeated Cobra plumbing for TA
 // commands whose real work lives in a typed per-symbol builder. Keeping the
 // builders typed makes indicator-specific code easy to read while this helper
 // enforces the common normalized symbol-keyed output shape.
-func makeCobraTACommand[O structcli.Options, R any](cfg taCommandConfig[O, R], c *client.Ref, w io.Writer) *cobra.Command {
+func makeCobraTACommand[O any, R any](cfg taCommandConfig[O, R], c *client.Ref, w io.Writer) *cobra.Command {
 	opts := cfg.newOpts()
 	cmd := &cobra.Command{
 		Use:     cfg.name + " SYMBOL [SYMBOL...]",
@@ -497,7 +462,7 @@ func makeCobraTACommand[O structcli.Options, R any](cfg taCommandConfig[O, R], c
 		Example: cfg.example,
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -507,9 +472,7 @@ func makeCobraTACommand[O structcli.Options, R any](cfg taCommandConfig[O, R], c
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
@@ -565,7 +528,7 @@ high-low ranges. Signals are neutral factual labels for agents, not trading advi
   schwab-agent ta dashboard NVDA --interval weekly --points 10`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -575,9 +538,7 @@ high-low ranges. Signals are neutral factual labels for agents, not trading advi
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd

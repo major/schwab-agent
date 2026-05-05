@@ -24,27 +24,31 @@ func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
 - All commands accept `*client.Ref` and `io.Writer` (some also take `configPath string`), except `symbol` which only takes `io.Writer` (no API client needed)
 - RunE functions use `*cobra.Command` and `[]string` args from spf13/cobra
 
-### Struct Tag Flag Pattern
+### Cobra Tag Flag Pattern
 
-Command flags are defined using structcli struct tags:
+Most command flags are defined with project-owned struct tags and registered by
+`defineCobraFlags(cmd, opts)`:
 
 ```go
 type quoteGetOpts struct {
-    Symbols []string `flag:"symbol" flagdescr:"Symbol(s) to quote" flagshort:"s"`
-    Fields  bool     `flag:"fields" flagdescr:"Include all quote fields"`
+    Fields     []string `flag:"fields" flagdescr:"Quote fields to return (repeatable): quote, fundamental, extended, reference, regular"`
+    Indicative bool     `flag:"indicative" flagdescr:"Request indicative (non-tradeable) quotes"`
+    Underlying string   `flag:"underlying" flagdescr:"Underlying symbol for option quote"`
+    Expiration string   `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD) for option quote"`
+    Strike     float64  `flag:"strike" flagdescr:"Strike price for option quote"`
+    Call       bool     `flag:"call" flagdescr:"Call option"`
+    Put        bool     `flag:"put" flagdescr:"Put option"`
 }
-
-func (o *quoteGetOpts) Attach(_ *cobra.Command) error { return nil }
 ```
 
-- `structcli.Define(cmd, opts)` in command setup replaces manual `cmd.Flags()` calls
-- `structcli.Unmarshal(cmd, opts)` at top of RunE before reading option fields
-- `defineAndConstrain[O](cmd, opts, exclusivePairs...)` from helpers.go wraps `Define()` + `MarkFlagsMutuallyExclusive`/`MarkFlagsOneRequired` for order commands with mutual exclusion constraints
+- `defineCobraFlags(cmd, opts)` binds tagged fields directly to Cobra/pflag values
+- `validateCobraOptions(cmd.Context(), opts)` runs optional `Validate(context.Context) []error` hooks after parsing and before handler logic reads option fields
+- `defineAndConstrain[O](cmd, opts, exclusivePairs...)` from helpers.go wraps `defineCobraFlags()` + `MarkFlagsMutuallyExclusive`/`MarkFlagsOneRequired` for order commands with mutual exclusion constraints
 - Root persistent flags (--account, --verbose, --config, --token) remain as manual Cobra registrations
 
 ### Flag Aliases
 
-Order subcommands that use `--action` and `--type` also accept `--instruction` and `--order-type` as aliases. `registerOrderFlagAliases()` adds the alias flags with mutual exclusivity constraints. `resolveOrderFlagAliasesViaFlags()` runs pre-Unmarshal in RunE, copying alias values to canonical flags via `cmd.Flags().Set()`. `RegisterOrderFlagAliasesOnTree(root)` walks the full command tree post-setup to register aliases on all 14 qualifying subcommands. Alias flags use a lowercase "alias for --" Usage prefix so structcli's JSON Schema generator skips them.
+Order subcommands that use `--action` and `--type` also accept `--instruction` and `--order-type` as aliases. `registerOrderFlagAliases()` adds the alias flags with mutual exclusivity constraints. `resolveOrderFlagAliasesViaFlags()` runs before handlers read their bound option structs, copying alias values to canonical flags via `cmd.Flags().Set()`. `RegisterOrderFlagAliasesOnTree(root)` walks the full command tree post-setup to register aliases on all 14 qualifying subcommands. Alias flags use a lowercase "alias for --" Usage prefix so structcli's JSON Schema generator skips them.
 
 ## Adding a New Command
 

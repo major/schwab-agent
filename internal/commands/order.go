@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -34,16 +33,10 @@ type orderListOpts struct {
 	Recent bool     `flag:"recent" flagdescr:"Show recent order activity, including terminal statuses, from the last 24 hours unless --from is set"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *orderListOpts) Attach(_ *cobra.Command) error { return nil }
-
 // orderGetOpts holds local flags for the order get subcommand.
 type orderGetOpts struct {
 	OrderID string `flag:"order-id" flagdescr:"Order ID"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *orderGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewOrderCmd returns the Cobra command for order operations.
 func NewOrderCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
@@ -114,7 +107,7 @@ results.`,
   schwab-agent order list --status WORKING,FILLED,EXPIRED
   schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -183,9 +176,7 @@ results.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	return cmd
 }
@@ -202,7 +193,7 @@ priority. Requires a default account or --account flag.`,
 		Example: `  schwab-agent order get 1234567890
   schwab-agent order get --order-id 1234567890`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -236,9 +227,7 @@ priority. Requires a default account or --account flag.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	return cmd
 }

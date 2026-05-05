@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -208,9 +207,6 @@ type positionListOpts struct {
 	Sort        positionSort `flag:"sort" flagdescr:"Sort positions by pnl-desc, pnl-asc, or value-desc"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *positionListOpts) Attach(_ *cobra.Command) error { return nil }
-
 // newPositionListCmd returns the Cobra subcommand for listing positions.
 // Default: single account (resolved via --account flag or config default).
 // With --all-accounts: flattens positions from all linked accounts into a
@@ -232,7 +228,7 @@ P&L, and sort filters to shrink output for portfolio triage workflows.`,
 	  schwab-agent position list --losers-only --sort pnl-asc
 	  schwab-agent position list --min-pnl -100 --max-pnl 500 --sort value-desc`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -258,9 +254,7 @@ P&L, and sort filters to shrink output for portfolio triage workflows.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	cmd.PersistentFlags().String("account", "", "Account hash, account number, or nickname (overrides config default)")
 

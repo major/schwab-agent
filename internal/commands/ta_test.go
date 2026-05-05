@@ -13,8 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	structclierrors "github.com/leodido/structcli/errors"
-
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -664,10 +662,10 @@ func TestTASimplePeriodValidation(t *testing.T) {
 			cmd := NewTACmd(testClient(t, server), &buf)
 			_, err := runTestCommand(t, cmd, tt.args...)
 
-			// Assert: validation now runs inside structcli.Unmarshal via
-			// simpleTAOpts.Validate(), producing structcli's ValidationError.
+			// Assert: validation now runs after Cobra flag parsing via
+			// simpleTAOpts.Validate(), producing the project ValidationError.
 			require.Error(t, err)
-			var valErr *structclierrors.ValidationError
+			var valErr *apperr.ValidationError
 			assert.ErrorAs(t, err, &valErr)
 		})
 	}

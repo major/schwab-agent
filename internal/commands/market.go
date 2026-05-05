@@ -3,7 +3,6 @@ package commands
 import (
 	"io"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -25,9 +24,6 @@ type marketMoversOpts struct {
 	Sort      moversSort      `flag:"sort" flagdescr:"Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)"`
 	Frequency moversFrequency `flag:"frequency" flagdescr:"Minimum percent change magnitude (0, 1, 5, 10, 30, 60)"`
 }
-
-// Attach implements structcli.Attachable.
-func (o *marketMoversOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewMarketCmd returns the Cobra command for market hours and movers lookups.
 func NewMarketCmd(c *client.Ref, w io.Writer) *cobra.Command {
@@ -97,7 +93,7 @@ names (e.g. '$SPX').`,
   schwab-agent market movers '$DJI' --sort VOLUME --frequency 5
   schwab-agent market movers EQUITY_ALL --sort PERCENT_CHANGE_UP`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -123,9 +119,7 @@ names (e.g. '$SPX').`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd

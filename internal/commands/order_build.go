@@ -5,7 +5,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/models"
@@ -17,9 +16,6 @@ type buildFTSOpts struct {
 	Primary   string `flag:"primary" flagdescr:"Primary order spec (inline JSON, @file, or - for stdin)" flagrequired:"true"`
 	Secondary string `flag:"secondary" flagdescr:"Secondary order spec (inline JSON, @file, or - for stdin)" flagrequired:"true"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *buildFTSOpts) Attach(_ *cobra.Command) error { return nil }
 
 // makeCobraBuildOrderCommand creates a Cobra build subcommand that parses
 // flags, validates params, and writes raw order request JSON without API calls.
@@ -37,14 +33,14 @@ func makeCobraBuildOrderCommand[O any, P any](
 		Use:   name,
 		Short: usage,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resolve --instruction/--order-type aliases before Unmarshal
-			// picks up flag values into the opts struct. Safe no-op for
+			// Resolve --instruction/--order-type aliases through pflag before
+			// handlers read the bound option structs. Safe no-op for
 			// multi-leg strategies that don't have alias flags registered.
 			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
 				return err
 			}
 
-			if err := structcli.Unmarshal(cmd, any(opts).(structcli.Options)); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -251,7 +247,7 @@ triggered. Both --primary and --secondary accept inline JSON, @file, or
 		Example: `  schwab-agent order build fts --primary @entry.json --secondary @exit.json
   schwab-agent order build fts --primary '{"orderType":"LIMIT",...}' --secondary '{"orderType":"STOP",...}'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -297,9 +293,7 @@ triggered. Both --primary and --secondary accept inline JSON, @file, or
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	return cmd
 }

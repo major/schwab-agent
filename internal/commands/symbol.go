@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -31,9 +30,6 @@ type symbolBuildOpts struct {
 	Call       bool    `flag:"call" flagdescr:"Call option"`
 	Put        bool    `flag:"put" flagdescr:"Put option"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *symbolBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewSymbolCmd returns the Cobra command for option symbol utilities.
 // These are pure computation commands that do not require API authentication.
@@ -65,7 +61,7 @@ constructed symbol and its components.`,
 		Example: `  schwab-agent symbol build --underlying AAPL --expiration 2025-06-20 --strike 200 --call
   schwab-agent symbol build --underlying TSLA --expiration 2025-12-19 --strike 350.50 --put`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -90,9 +86,7 @@ constructed symbol and its components.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	cmd.MarkFlagsMutuallyExclusive("call", "put")
 	cmd.MarkFlagsOneRequired("call", "put")
