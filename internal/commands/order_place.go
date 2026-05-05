@@ -352,7 +352,7 @@ bracket orders, OCO has no entry leg.`
   # Close a short position with exits
   schwab-agent order place oco --symbol TSLA --action BUY --quantity 10 --take-profit 200 --stop-loss 250`
 
-	cmd.AddCommand(equityCmd, optionCmd, bracketCmd, ocoCmd)
+	cmd.AddCommand(equityCmd, optionCmd, bracketCmd, ocoCmd, newBuyWithStopPlaceCmd(c, configPath, w))
 
 	return cmd
 }
@@ -537,7 +537,7 @@ will validate during preview.`
 	ocoCmd.Example = `  schwab-agent order preview oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140
 	  schwab-agent order preview oco --symbol TSLA --action BUY --quantity 10 --stop-loss 250`
 
-	cmd.AddCommand(equityCmd, optionCmd, bracketCmd, ocoCmd)
+	cmd.AddCommand(equityCmd, optionCmd, bracketCmd, ocoCmd, newBuyWithStopPreviewCmd(c, configPath, w))
 
 	return cmd
 }

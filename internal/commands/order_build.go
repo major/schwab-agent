@@ -228,7 +228,7 @@ expiration, and strikes must keep the put side below the call side.`
 	doubleDiagonalBuild.Example = `  schwab-agent order build double-diagonal --underlying F --near-expiration 2026-06-18 --far-expiration 2026-07-17 --put-far-strike 9 --put-near-strike 10 --call-near-strike 14 --call-far-strike 15 --open --quantity 1 --price 0.80`
 
 	cmd.AddCommand(
-		equityBuild, optionBuild, bracketBuild, ocoBuild,
+		equityBuild, optionBuild, bracketBuild, ocoBuild, newBuyWithStopBuildCmd(w),
 		verticalBuild, ironCondorBuild, straddleBuild, strangleBuild,
 		coveredCallBuild, collarBuild, calendarBuild, diagonalBuild,
 		butterflyBuild, condorBuild, verticalRollBuild, backRatioBuild, doubleDiagonalBuild,
