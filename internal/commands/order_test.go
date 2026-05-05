@@ -3179,6 +3179,126 @@ func TestNewOrderCmdReplace_InvalidAction(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid action")
 }
 
+// TestNewOrderCmdReplaceInfersLimitFromPrice verifies that when --price is
+// provided without --type, order replace infers LIMIT instead of defaulting to
+// MARKET. This is the fix for the bug where chasing a limit order with a new
+// price silently submitted a MARKET order.
+func TestNewOrderCmdReplaceInfersLimitFromPrice(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	var received models.OrderRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &received))
+
+			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/67890":
+			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "CRDO")
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "CRDO")
+		default:
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act: pass --price but omit --type; should infer LIMIT
+	stdout, err := runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order", "replace", "12345",
+		"--symbol", "CRDO",
+		"--action", "BUY",
+		"--quantity", "68",
+		"--price", "194.16",
+	)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
+	require.NotNil(t, received.Price)
+	assert.Equal(t, 194.16, *received.Price)
+
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	submittedOrder, ok := data["submittedOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "LIMIT", submittedOrder["orderType"])
+}
+
+// TestOrderReplaceOptionInfersLimitFromPrice verifies that order replace option
+// infers LIMIT when --price is provided but --type/--order-type is omitted.
+func TestOrderReplaceOptionInfersLimitFromPrice(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	var received models.OrderRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &received))
+
+			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/67890":
+			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "AAPL  "+testFutureExpTime.Format("060102")+"C00200000")
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
+			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "AAPL")
+		default:
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := testClient(t, server)
+
+	// Act: pass --price but omit --type/--order-type; should infer LIMIT
+	stdout, err := runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order", "replace", "option", "12345",
+		"--underlying", "AAPL",
+		"--expiration", testFutureExpDate,
+		"--strike", "200",
+		"--call",
+		"--action", "BUY_TO_OPEN",
+		"--quantity", "1",
+		"--price", "6.50",
+	)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
+	require.NotNil(t, received.Price)
+	assert.Equal(t, 6.50, *received.Price)
+
+	envelope := decodeEnvelope(t, stdout)
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "replace", data["action"])
+	submittedOrder, ok := data["submittedOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "LIMIT", submittedOrder["orderType"])
+}
+
 // --- FTS build tests ---
 
 // validPrimarySpec returns a minimal valid primary order spec for FTS tests.
