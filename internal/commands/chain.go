@@ -3,7 +3,6 @@ package commands
 import (
 	"io"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -26,9 +25,6 @@ type chainGetOpts struct {
 	InterestRate           string            `flag:"interest-rate" flagdescr:"Interest rate for theoretical pricing calculations" flaggroup:"pricing"`
 	DaysToExpiration       string            `flag:"days-to-expiration" flagdescr:"Days to expiration for theoretical pricing calculations" flaggroup:"pricing"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *chainGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewChainCmd returns the Cobra command for option chain operations.
 func NewChainCmd(c *client.Ref, w io.Writer) *cobra.Command {
@@ -63,7 +59,7 @@ specific moneyness with --strike-range (ITM, NTM, OTM, ALL).`,
   schwab-agent chain get AAPL --strike-range NTM --include-underlying-quote`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -101,9 +97,7 @@ specific moneyness with --strike-range (ITM, NTM, OTM, ALL).`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd

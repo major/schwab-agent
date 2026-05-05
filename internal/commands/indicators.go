@@ -3,7 +3,6 @@ package commands
 import (
 	"io"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -29,7 +28,7 @@ volume context, and 20/252-candle high-low ranges.`,
 		GroupID: "market-data",
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -39,9 +38,7 @@ volume context, and 20/252-candle high-low ranges.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd

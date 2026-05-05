@@ -4,7 +4,6 @@ package commands
 import (
 	"io"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -26,9 +25,6 @@ type historyGetOpts struct {
 	From          string               `flag:"from" flagdescr:"Start date (milliseconds since epoch)" flaggroup:"range"`
 	To            string               `flag:"to" flagdescr:"End date (milliseconds since epoch)" flaggroup:"range"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *historyGetOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewHistoryCmd returns the Cobra command for price history lookups.
 func NewHistoryCmd(c *client.Ref, w io.Writer) *cobra.Command {
@@ -63,7 +59,7 @@ date ranges via epoch milliseconds. Returns OHLCV candle data.`,
   schwab-agent history get AAPL --from 1735689600000 --to 1743379200000`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -87,9 +83,7 @@ date ranges via epoch milliseconds. Returns OHLCV candle data.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd

@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -28,13 +27,6 @@ type optionTicketGetOpts struct {
 	Strike     float64 `flag:"strike" flagdescr:"Option strike price" flaggroup:"contract"`
 	Call       bool    `flag:"call" flagdescr:"Select the call contract" flaggroup:"contract"`
 	Put        bool    `flag:"put" flagdescr:"Select the put contract" flaggroup:"contract"`
-}
-
-// Attach implements structcli.Options.
-func (o *optionTicketGetOpts) Attach(cmd *cobra.Command) error {
-	cmd.MarkFlagsOneRequired("call", "put")
-	cmd.MarkFlagsMutuallyExclusive("call", "put")
-	return nil
 }
 
 // optionTicketData is the agent-facing payload for an option ticket lookup.
@@ -106,7 +98,7 @@ lookup, and OCC symbol construction into one read-only CLI call.`,
   schwab-agent option ticket get TSLA --expiration 2026-03-20 --strike 180 --put`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -119,9 +111,9 @@ lookup, and OCC symbol construction into one read-only CLI call.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
+	cmd.MarkFlagsOneRequired("call", "put")
+	cmd.MarkFlagsMutuallyExclusive("call", "put")
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd

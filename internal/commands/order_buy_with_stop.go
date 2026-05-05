@@ -25,9 +25,6 @@ type buyWithStopPlaceOpts struct {
 	Session    models.Session   `flag:"session"     flagdescr:"Trading session"                                             flaggroup:"order"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *buyWithStopPlaceOpts) Attach(_ *cobra.Command) error { return nil }
-
 // parseBuyWithStopParams converts command flags into BUY-with-stop builder params.
 func parseBuyWithStopParams(opts *buyWithStopPlaceOpts, _ []string) (*orderbuilder.BuyWithStopParams, error) {
 	return &orderbuilder.BuyWithStopParams{

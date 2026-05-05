@@ -3112,6 +3112,59 @@ func TestOrderReplaceOptionSuccess(t *testing.T) {
 	assert.Equal(t, true, data["replaced"])
 }
 
+func TestOrderReplaceOptionAliasValidation(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		args    []string
+		wantMsg string
+	}{
+		{
+			name: "invalid instruction alias",
+			args: []string{
+				"order", "replace", "option", "12345",
+				"--underlying", "AAPL",
+				"--expiration", testFutureExpDate,
+				"--strike", "200",
+				"--call",
+				"--instruction", "BOGUS",
+				"--quantity", "1",
+				"--order-type", "LIMIT",
+				"--price", "5.00",
+			},
+			wantMsg: "invalid value \"BOGUS\"",
+		},
+		{
+			name: "invalid order type alias",
+			args: []string{
+				"order", "replace", "option", "12345",
+				"--underlying", "AAPL",
+				"--expiration", testFutureExpDate,
+				"--strike", "200",
+				"--call",
+				"--instruction", "BUY_TO_OPEN",
+				"--quantity", "1",
+				"--order-type", "BOGUS",
+				"--price", "5.00",
+			},
+			wantMsg: "invalid value \"BOGUS\"",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			stdout, err := runOrderCommand(t, nil, writeTestConfigMutable(t, "hash123"), "", tc.args...)
+
+			require.Error(t, err)
+			assert.Empty(t, stdout)
+			assert.Contains(t, err.Error(), tc.wantMsg)
+		})
+	}
+}
+
 func TestOrderReplaceOptionCallPutMutuallyExclusive(t *testing.T) {
 	t.Parallel()
 

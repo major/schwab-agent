@@ -5,7 +5,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -51,33 +50,21 @@ type orderPlaceOpts struct {
 	FromPreview string `flag:"from-preview" flagdescr:"Place the exact order payload saved by order preview --save-preview"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *orderPlaceOpts) Attach(_ *cobra.Command) error { return nil }
-
 // orderPreviewOpts holds local flags for order preview.
 type orderPreviewOpts struct {
 	Spec        string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin" flagrequired:"true"`
 	SavePreview bool   `flag:"save-preview" flagdescr:"Save this preview locally and return a digest for order place --from-preview"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *orderPreviewOpts) Attach(_ *cobra.Command) error { return nil }
-
 // orderCancelOpts holds local flags for order cancellation.
 type orderCancelOpts struct {
 	OrderID string `flag:"order-id" flagdescr:"Order ID"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *orderCancelOpts) Attach(_ *cobra.Command) error { return nil }
-
 // orderReplaceOpts holds local flags for order replacement.
 type orderReplaceOpts struct {
 	OrderID string `flag:"order-id" flagdescr:"Order ID"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *orderReplaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // fetchOrderActionData returns the order details after a successful mutable
 // action. The follow-up GET is deliberately best-effort: once Schwab accepts a
@@ -278,7 +265,7 @@ returned previewDigest.digest value.`,
   # Place from inline JSON
   schwab-agent order place --spec '{"orderType":"LIMIT",...}'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -321,9 +308,7 @@ returned previewDigest.digest value.`,
 	}
 
 	cmd.SetFlagErrorFunc(suggestSubcommands)
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 	cmd.MarkFlagsMutuallyExclusive("spec", "from-preview")
 
 	equityCmd := makeCobraPlaceOrderCommand(c, configPath, w, "equity", "Place an equity order", func() *equityPlaceOpts { return &equityPlaceOpts{} }, func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) }, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
@@ -401,13 +386,13 @@ func makeCobraPlaceOrderCommand[O any, P any](
 		Use:   name,
 		Short: usage,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resolve --instruction/--order-type aliases before Unmarshal
-			// picks up flag values into the opts struct.
+			// Resolve --instruction/--order-type aliases through pflag before
+			// handlers read the bound option structs.
 			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
 				return err
 			}
 
-			if err := structcli.Unmarshal(cmd, any(opts).(structcli.Options)); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -483,7 +468,7 @@ safety guards since no order is actually placed.`,
   schwab-agent order preview option --underlying AAPL --expiration 2026-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
   schwab-agent order build equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 200 | schwab-agent order preview --spec -`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -526,9 +511,7 @@ safety guards since no order is actually placed.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	equityCmd := makeCobraPreviewOrderCommand(c, configPath, w, "equity", "Preview an equity order", func() *equityPlaceOpts { return &equityPlaceOpts{} }, func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) }, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
 	equityCmd.Long = `Preview an equity (stock) order without placing it. Supports the same flags
@@ -588,13 +571,13 @@ func makeCobraPreviewOrderCommand[O any, P any](
 		Use:   name,
 		Short: usage,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resolve --instruction/--order-type aliases before Unmarshal
-			// picks up flag values into the opts struct.
+			// Resolve --instruction/--order-type aliases through pflag before
+			// handlers read the bound option structs.
 			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
 				return err
 			}
 
-			if err := structcli.Unmarshal(cmd, any(opts).(structcli.Options)); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -664,7 +647,7 @@ config flag. The order ID can be passed as a positional argument or with
 		Example: `  schwab-agent order cancel 1234567890
    schwab-agent order cancel --order-id 1234567890`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -705,9 +688,7 @@ config flag. The order ID can be passed as a positional argument or with
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	return cmd
 }
@@ -726,16 +707,16 @@ original order status becomes REPLACED after the new order is created.`,
 		Example: `  schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY
    schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resolve --instruction/--order-type aliases before Unmarshal
-			// picks up flag values into the opts structs.
+			// Resolve --instruction/--order-type aliases through pflag before
+			// handlers read the bound option structs.
 			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
 				return err
 			}
 
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
-			if err := structcli.Unmarshal(cmd, equityOpts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), equityOpts); err != nil {
 				return err
 			}
 
@@ -799,9 +780,7 @@ original order status becomes REPLACED after the new order is created.`,
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	defineAndConstrain(cmd, equityOpts)
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	cmd.AddCommand(newOrderReplaceOptionCmd(c, configPath, w))
 
@@ -823,22 +802,23 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 		Example: `  schwab-agent order replace option 1234567890 --underlying AAPL --expiration 2026-06-19 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
    schwab-agent order replace option --order-id 1234567890 --underlying AAPL --expiration 2026-06-19 --strike 190 --put --instruction SELL_TO_OPEN --quantity 1 --order-type LIMIT --price 3.50`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			// Resolve aliases through pflag so the canonical enum-backed flags keep
+			// validating alias values before the bound option structs are read.
+			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
 				return err
 			}
-			if err := structcli.Unmarshal(cmd, optionOpts); err != nil {
+
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
-			if err := resolveOrderFlagAliases(cmd, &optionOpts.Action, &optionOpts.Type); err != nil {
+			if err := validateCobraOptions(cmd.Context(), optionOpts); err != nil {
 				return err
 			}
 
 			// If --type was not explicitly provided but --price was, infer LIMIT.
-			// resolveOrderFlagAliases (used here) writes directly into optionOpts.Type
-			// without calling cmd.Flags().Set, so Changed("type") stays false when
-			// only --order-type was set. Check both flags to cover both aliases.
-			typeExplicit := cmd.Flags().Changed("type") || cmd.Flags().Changed("order-type")
-			if !typeExplicit && optionOpts.Price > 0 {
+			// resolveOrderFlagAliasesViaFlags has already copied --order-type into
+			// --type, so a single Changed("type") check covers both aliases.
+			if !cmd.Flags().Changed("type") && optionOpts.Price > 0 {
 				optionOpts.Type = models.OrderTypeLimit
 			}
 
@@ -903,9 +883,7 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	defineAndConstrain(cmd, optionOpts, []string{"call", "put"})
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	return cmd
 }

@@ -41,9 +41,6 @@ type equityPlaceOpts struct {
 	PriceLinkType      models.PriceLinkType        `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *equityPlaceOpts) Attach(_ *cobra.Command) error { return nil }
-
 // optionPlaceOpts holds flags shared by option place and build flows.
 type optionPlaceOpts struct {
 	Underlying         string                      `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
@@ -63,9 +60,6 @@ type optionPlaceOpts struct {
 	PriceLinkType      models.PriceLinkType        `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *optionPlaceOpts) Attach(_ *cobra.Command) error { return nil }
-
 // bracketPlaceOpts holds flags shared by bracket place and build flows.
 type bracketPlaceOpts struct {
 	Symbol     string             `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
@@ -79,9 +73,6 @@ type bracketPlaceOpts struct {
 	Session    models.Session     `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *bracketPlaceOpts) Attach(_ *cobra.Command) error { return nil }
-
 // ocoPlaceOpts holds flags shared by OCO place and build flows.
 type ocoPlaceOpts struct {
 	Symbol     string             `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
@@ -92,9 +83,6 @@ type ocoPlaceOpts struct {
 	Duration   models.Duration    `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
 	Session    models.Session     `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *ocoPlaceOpts) Attach(_ *cobra.Command) error { return nil }
 
 // verticalBuildOpts holds flags for vertical spread build flows.
 type verticalBuildOpts struct {
@@ -112,9 +100,6 @@ type verticalBuildOpts struct {
 	Session     models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *verticalBuildOpts) Attach(_ *cobra.Command) error { return nil }
-
 // ironCondorBuildOpts holds flags for iron condor build flows.
 type ironCondorBuildOpts struct {
 	Underlying      string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
@@ -130,9 +115,6 @@ type ironCondorBuildOpts struct {
 	Duration        models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
 	Session         models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *ironCondorBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // strangleBuildOpts holds flags for strangle build flows.
 type strangleBuildOpts struct {
@@ -150,9 +132,6 @@ type strangleBuildOpts struct {
 	Session    models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *strangleBuildOpts) Attach(_ *cobra.Command) error { return nil }
-
 // straddleBuildOpts holds flags for straddle build flows.
 type straddleBuildOpts struct {
 	Underlying string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
@@ -168,9 +147,6 @@ type straddleBuildOpts struct {
 	Session    models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *straddleBuildOpts) Attach(_ *cobra.Command) error { return nil }
-
 // coveredCallBuildOpts holds flags for covered call build flows.
 type coveredCallBuildOpts struct {
 	Underlying string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
@@ -181,9 +157,6 @@ type coveredCallBuildOpts struct {
 	Duration   models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
 	Session    models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *coveredCallBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // collarBuildOpts holds flags for collar-with-stock build flows.
 type collarBuildOpts struct {
@@ -198,9 +171,6 @@ type collarBuildOpts struct {
 	Duration   models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
 	Session    models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *collarBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // calendarBuildOpts holds flags for calendar spread build flows.
 type calendarBuildOpts struct {
@@ -218,9 +188,6 @@ type calendarBuildOpts struct {
 	Session        models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *calendarBuildOpts) Attach(_ *cobra.Command) error { return nil }
-
 // diagonalBuildOpts holds flags for diagonal spread build flows.
 type diagonalBuildOpts struct {
 	Underlying     string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
@@ -237,9 +204,6 @@ type diagonalBuildOpts struct {
 	Duration       models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
 	Session        models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *diagonalBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // butterflyBuildOpts holds flags for butterfly spread build flows.
 type butterflyBuildOpts struct {
@@ -259,9 +223,6 @@ type butterflyBuildOpts struct {
 	Duration     models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
 	Session      models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *butterflyBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // condorBuildOpts holds flags for condor spread build flows.
 type condorBuildOpts struct {
@@ -283,9 +244,6 @@ type condorBuildOpts struct {
 	Session           models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *condorBuildOpts) Attach(_ *cobra.Command) error { return nil }
-
 // backRatioBuildOpts holds flags for back-ratio spread build flows.
 type backRatioBuildOpts struct {
 	Underlying  string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
@@ -304,9 +262,6 @@ type backRatioBuildOpts struct {
 	Duration    models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
 	Session     models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *backRatioBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // verticalRollBuildOpts holds flags for vertical roll build flows.
 type verticalRollBuildOpts struct {
@@ -327,9 +282,6 @@ type verticalRollBuildOpts struct {
 	Session          models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
 
-// Attach implements structcli.Options interface.
-func (o *verticalRollBuildOpts) Attach(_ *cobra.Command) error { return nil }
-
 // doubleDiagonalBuildOpts holds flags for double diagonal spread build flows.
 type doubleDiagonalBuildOpts struct {
 	Underlying     string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
@@ -346,9 +298,6 @@ type doubleDiagonalBuildOpts struct {
 	Duration       models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
 	Session        models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *doubleDiagonalBuildOpts) Attach(_ *cobra.Command) error { return nil }
 
 // Valid enum values for CLI flag parsing. Each slice corresponds to one enum
 // type in the models package and is used by the generic parseEnum/requireEnum

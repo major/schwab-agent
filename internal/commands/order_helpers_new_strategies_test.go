@@ -11,23 +11,34 @@ import (
 	"github.com/major/schwab-agent/internal/models"
 )
 
-// TestNewStrategyAttachMethods verifies the structcli option types satisfy their
-// Attach hooks without side effects. These methods intentionally stay tiny, but
-// exercising them keeps the generated flag option surface covered.
-func TestNewStrategyAttachMethods(t *testing.T) {
+// TestNewStrategyCobraFlagRegistration verifies the newer option strategies can
+// register their tagged fields through the Cobra-native migration helper.
+func TestNewStrategyCobraFlagRegistration(t *testing.T) {
 	t.Parallel()
 
-	cmd := &cobra.Command{Use: "test"}
-	attachers := []interface{ Attach(*cobra.Command) error }{
-		&butterflyBuildOpts{},
-		&condorBuildOpts{},
-		&backRatioBuildOpts{},
-		&verticalRollBuildOpts{},
-		&doubleDiagonalBuildOpts{},
+	tests := []struct {
+		name  string
+		opts  any
+		flags []string
+	}{
+		{name: "butterfly", opts: &butterflyBuildOpts{}, flags: []string{"underlying", "expiration", "lower-strike", "middle-strike", "upper-strike"}},
+		{name: "condor", opts: &condorBuildOpts{}, flags: []string{"underlying", "expiration", "lower-strike", "lower-middle-strike", "upper-middle-strike", "upper-strike"}},
+		{name: "back-ratio", opts: &backRatioBuildOpts{}, flags: []string{"underlying", "expiration", "short-strike", "long-strike", "long-ratio"}},
+		{name: "vertical-roll", opts: &verticalRollBuildOpts{}, flags: []string{"underlying", "close-expiration", "open-expiration", "close-long-strike", "open-long-strike"}},
+		{name: "double-diagonal", opts: &doubleDiagonalBuildOpts{}, flags: []string{"underlying", "near-expiration", "far-expiration", "put-far-strike", "call-far-strike"}},
 	}
 
-	for _, attacher := range attachers {
-		require.NoError(t, attacher.Attach(cmd))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cmd := &cobra.Command{Use: tt.name}
+			defineCobraFlags(cmd, tt.opts)
+
+			for _, name := range tt.flags {
+				assert.NotNil(t, cmd.Flags().Lookup(name))
+			}
+		})
 	}
 }
 

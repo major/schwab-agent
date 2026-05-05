@@ -118,9 +118,9 @@ func resolveOrderFlagAliases(cmd *cobra.Command, action *models.Instruction, ord
 
 // resolveOrderFlagAliasesViaFlags resolves --instruction and --order-type alias
 // flag values by copying them to their primary Cobra flags (--action and --type)
-// before structcli.Unmarshal runs. This works with generic factory patterns
-// where the opts struct type isn't accessible. The function is a safe no-op for
-// commands that don't have the alias flags registered.
+// before RunE reads the bound opts struct. This works with generic factory
+// patterns where the opts struct type isn't accessible. The function is a safe
+// no-op for commands that don't have the alias flags registered.
 func resolveOrderFlagAliasesViaFlags(cmd *cobra.Command) error {
 	// Resolve --instruction -> --action
 	instructionFlag := cmd.Flags().Lookup("instruction")

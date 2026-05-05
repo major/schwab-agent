@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/auth"
@@ -87,9 +86,6 @@ type authDefaultAccountData struct {
 type authLoginOpts struct {
 	NoBrowser bool `flag:"no-browser" flagdescr:"Print the authorization URL in the JSON response instead of opening a browser"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *authLoginOpts) Attach(_ *cobra.Command) error { return nil }
 
 // requireAuthConfig returns a valid auth config or loads it from disk.
 func requireAuthConfig(cfg *auth.Config, configPath string) (*auth.Config, error) {
@@ -232,7 +228,7 @@ it is automatically set as the default.`,
 		Example: `  schwab-agent auth login
   schwab-agent auth login --no-browser`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -289,9 +285,7 @@ it is automatically set as the default.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 
 	return cmd
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -19,9 +18,6 @@ type analyzeOpts struct {
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
 	Points   int        `flag:"points" flagdescr:"Number of TA output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *analyzeOpts) Attach(_ *cobra.Command) error { return nil }
 
 // analyzeResult holds the combined quote and TA dashboard data for a single
 // symbol. Fields use `any` to avoid tight coupling to specific response types;
@@ -51,7 +47,7 @@ but TA fails, that symbol appears with its quote and a null analysis field.`,
 		GroupID: "market-data",
 		Args:   cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -62,9 +58,7 @@ but TA fails, that symbol appears with its quote and a null analysis field.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd

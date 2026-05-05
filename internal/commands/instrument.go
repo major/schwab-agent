@@ -3,7 +3,6 @@ package commands
 import (
 	"io"
 
-	"github.com/leodido/structcli"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/client"
@@ -25,9 +24,6 @@ type instrumentGetData struct {
 type instrumentSearchOpts struct {
 	Projection instrumentProjection `flag:"projection" flagdescr:"Search projection (symbol-search, symbol-regex, desc-search, desc-regex, search, fundamental)" default:"symbol-search"`
 }
-
-// Attach implements structcli.Options interface.
-func (o *instrumentSearchOpts) Attach(_ *cobra.Command) error { return nil }
 
 // NewInstrumentCmd returns the Cobra command for instrument search and lookup.
 func NewInstrumentCmd(c *client.Ref, w io.Writer) *cobra.Command {
@@ -59,7 +55,7 @@ desc-regex, search, or fundamental.`,
   schwab-agent instrument search AAPL --projection fundamental`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := structcli.Unmarshal(cmd, opts); err != nil {
+			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
 
@@ -74,9 +70,7 @@ desc-regex, search, or fundamental.`,
 		},
 	}
 
-	if err := structcli.Define(cmd, opts); err != nil {
-		panic(err)
-	}
+	defineCobraFlags(cmd, opts)
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
