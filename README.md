@@ -84,7 +84,7 @@ schwab-agent auth status
 
 ## Usage
 
-Every command returns structured JSON. Success responses use a `{"data": ..., "metadata": ...}` envelope. Errors use structcli's top-level `StructuredError` shape, for example `{"error":"unknown_flag","exit_code":12,"message":"unknown flag: --bogus","command":"schwab-agent quote get","flag":"bogus"}`. Domain errors use the same shape, with remediation text in `hint` when available.
+Every command returns structured JSON. Success responses use a `{"data": ..., "metadata": ...}` envelope. Errors use the top-level `StructuredError` shape, for example `{"error":"unknown_flag","exit_code":12,"message":"unknown flag: --bogus","command":"schwab-agent quote get","flag":"bogus"}`. Domain errors use the same shape, with remediation text in `hint` when available.
 
 Run any command with `--help` to see detailed usage, examples, and available flags.
 
@@ -312,8 +312,8 @@ internal/
 | 3 | Authentication required, expired, or failed |
 | 4 | HTTP error from Schwab API |
 | 5 | Order rejected |
-| 10-19 | structcli input errors, such as missing flags, invalid flag values, and unknown commands |
-| 20-29 | structcli config or environment errors |
+| 10-19 | CLI input errors, such as missing flags, invalid flag values, and unknown commands |
+| 20-29 | CLI config or environment errors |
 
 ## License
 

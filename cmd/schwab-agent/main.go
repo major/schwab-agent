@@ -50,7 +50,6 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 	if err := structcli.Setup(root,
 		structcli.WithJSONSchema(),
 		structcli.WithHelpTopics(),
-		structcli.WithFlagErrors(),
 		structcli.WithDebug(debug.Options{Exit: true}),
 	); err != nil {
 		panic(err)

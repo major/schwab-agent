@@ -52,7 +52,6 @@ func run() error {
 	if err := structcli.Setup(root,
 		structcli.WithJSONSchema(),
 		structcli.WithHelpTopics(),
-		structcli.WithFlagErrors(),
 	); err != nil {
 		return fmt.Errorf("structcli setup: %w", err)
 	}
