@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	weeksPerYear = 52
+	weeksPerYear               = 52
+	dailyLookbackSafetyCandles = 10
 
 	// regularSessionMinutesPerDay is the number of 1-minute candles in a regular
 	// US market session (9:30-16:00 = 6.5 hours). Extended hours are excluded;
@@ -92,7 +93,12 @@ func IntervalToHistoryParams(interval string, requiredCandles int) (periodType, 
 
 	switch interval {
 	case "daily":
-		years := max(1, ceilDiv(requiredCandles, tradingDaysPerYear))
+		// A one-calendar-year daily Schwab request can return fewer than 252
+		// candles depending on holidays, current market timing, and symbol-level
+		// gaps. Add a small sizing buffer before rounding to documented periods so
+		// callers that need a complete 252-candle trading-year window request 2
+		// years, while smaller daily indicators still use the minimum 1-year fetch.
+		years := max(1, ceilDiv(requiredCandles+dailyLookbackSafetyCandles, tradingDaysPerYear))
 		years = nextValidPeriod(years, validYearPeriods)
 		return "year", strconv.Itoa(years), "daily", "1", nil
 	case "weekly":

@@ -87,13 +87,32 @@ func TestIntervalToHistoryParams(t *testing.T) {
 			wantFT:          "daily",
 			wantF:           "1",
 		},
-		// 252 candles fits in 1 year
 		{
-			name:            "daily stays 1 year when sufficient",
+			name:            "daily stays 1 year below buffered boundary",
+			interval:        "daily",
+			requiredCandles: 242,
+			wantPT:          "year",
+			wantP:           "1",
+			wantFT:          "daily",
+			wantF:           "1",
+		},
+		{
+			name:            "daily uses 2 years at buffered boundary",
+			interval:        "daily",
+			requiredCandles: 243,
+			wantPT:          "year",
+			wantP:           "2",
+			wantFT:          "daily",
+			wantF:           "1",
+		},
+		// 252 candles needs a 2-year request because Schwab can return too few daily
+		// candles for a one-calendar-year lookback around holidays/current sessions.
+		{
+			name:            "daily uses 2 years at trading-year requirement",
 			interval:        "daily",
 			requiredCandles: 252,
 			wantPT:          "year",
-			wantP:           "1",
+			wantP:           "2",
 			wantFT:          "daily",
 			wantF:           "1",
 		},
@@ -189,6 +208,13 @@ func TestIntervalToHistoryParams(t *testing.T) {
 			errMsg:          "indicator requires 999999 candles but daily interval supports at most 5040",
 		},
 		{
+			name:            "daily exceeds max capacity by one candle",
+			interval:        "daily",
+			requiredCandles: 5041,
+			wantErr:         true,
+			errMsg:          "indicator requires 5041 candles but daily interval supports at most 5040",
+		},
+		{
 			name:            "15min exceeds max capacity",
 			interval:        "15min",
 			requiredCandles: 999999,
@@ -255,9 +281,9 @@ func TestCeilDiv(t *testing.T) {
 
 func TestNextValidPeriod(t *testing.T) {
 	tests := []struct {
-		n    int
+		n     int
 		valid []int
-		want int
+		want  int
 	}{
 		{1, validYearPeriods, 1},
 		{3, validYearPeriods, 3},
