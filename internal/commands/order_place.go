@@ -713,6 +713,13 @@ original order status becomes REPLACED after the new order is created.`,
 				return err
 			}
 
+			// If --type was not explicitly provided but --price was, infer LIMIT.
+			// resolveOrderFlagAliasesViaFlags has already copied --order-type into
+			// --type, so a single Changed("type") check covers both aliases.
+			if !cmd.Flags().Changed("type") && equityOpts.Price > 0 {
+				equityOpts.Type = models.OrderTypeLimit
+			}
+
 			configFlag, err := cmd.Flags().GetString("config")
 			if err != nil {
 				return err
@@ -798,6 +805,14 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 			}
 			if err := resolveOrderFlagAliases(cmd, &optionOpts.Action, &optionOpts.Type); err != nil {
 				return err
+			}
+
+			// If --type was not explicitly provided but --price was, infer LIMIT.
+			// resolveOrderFlagAliases has already copied --order-type into optionOpts.Type,
+			// so check both the canonical and alias flag Changed states.
+			typeExplicit := cmd.Flags().Changed("type") || cmd.Flags().Changed("order-type")
+			if !typeExplicit && optionOpts.Price > 0 {
+				optionOpts.Type = models.OrderTypeLimit
 			}
 
 			configFlag, err := cmd.Flags().GetString("config")
