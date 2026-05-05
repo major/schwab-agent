@@ -230,7 +230,7 @@ schwab-agent is built for coding agents and LLM tools that need a reliable comma
 
 ### Claude Code and other skill-aware tools
 
-Use the checked-in `SKILL.md` when your tool supports Agent Skills, including Claude Code. It contains trigger phrases, command descriptions, flag tables, examples, and MCP server hints generated from the live CLI command tree.
+Use the checked-in `SKILL.md` when your tool supports Agent Skills, including Claude Code. It contains trigger phrases, command descriptions, flag tables, and examples generated from the live CLI command tree.
 
 For Claude Code, copy or symlink this repository's generated skill into your skills directory if you want it available outside this repo:
 

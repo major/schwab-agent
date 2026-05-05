@@ -1581,4 +1581,3 @@ suggests bearish.
 ## Optional
 
 - [JSON Schema](#json-schema): Machine-readable schema available via `schwab-agent --jsonschema`
-- [MCP Server](#mcp): Available as MCP server via `schwab-agent --mcp`

@@ -61,10 +61,9 @@ func run() error {
 	// Generate SKILL.md (Anthropic skill file format with YAML frontmatter,
 	// per-command flag tables, and trigger phrases).
 	skill, err := generate.Skill(root, generate.SkillOptions{
-		Name:      "schwab-agent",
-		Author:    "major",
-		Version:   version,
-		MCPServer: "schwab-agent --mcp",
+		Name:    "schwab-agent",
+		Author:  "major",
+		Version: version,
 	})
 	if err != nil {
 		return fmt.Errorf("generating SKILL.md: %w", err)
@@ -79,11 +78,10 @@ func run() error {
 
 	fmt.Fprintf(os.Stderr, "wrote %s\n", filepath.Join(outDir, "SKILL.md"))
 
-	// Generate llms.txt (llmstxt.org standard with commands index, flag
-	// definitions, and MCP server info).
+	// Generate llms.txt (llmstxt.org standard with commands index and flag
+	// definitions).
 	llmstxt, err := generate.LLMsTxt(root, generate.LLMsTxtOptions{
 		ModulePath: "github.com/major/schwab-agent",
-		IncludeMCP: true,
 	})
 	if err != nil {
 		return fmt.Errorf("generating llms.txt: %w", err)

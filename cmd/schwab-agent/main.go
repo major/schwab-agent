@@ -12,7 +12,6 @@ import (
 
 	"github.com/leodido/structcli"
 	"github.com/leodido/structcli/debug"
-	structclimcp "github.com/leodido/structcli/mcp"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/commands"
@@ -54,26 +53,6 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 		structcli.WithFlagErrors(),
 		structcli.WithAppName("schwab-agent"),
 		structcli.WithDebug(debug.Options{Exit: true}),
-		structcli.WithMCP(structclimcp.Options{
-			Name:    "schwab-agent",
-			Version: version,
-			Exclude: []string{
-				// Interactive browser-based OAuth flow, not usable from MCP clients.
-				"auth-login",
-				// Shell completion generators are irrelevant in MCP mode.
-				"completion-bash",
-				"completion-zsh",
-				"completion-fish",
-				"completion-powershell",
-			},
-			// CommandFactory builds a fresh command tree per MCP tool call so that
-			// PersistentPreRunE (auth lifecycle) runs for each invocation. Without
-			// this, MCP mode skips PersistentPreRunE entirely and commands that
-			// need an authenticated API client would fail.
-			CommandFactory: func(_ []string, stdout io.Writer, _ io.Writer) (*cobra.Command, error) {
-				return commands.BuildCommandTree(stdout, configPath, tokenPath, version, deps, authDeps), nil
-			},
-		}),
 	); err != nil {
 		panic(err)
 	}

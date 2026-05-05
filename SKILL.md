@@ -16,7 +16,6 @@ description: |
 metadata:
   author: major
   version: dev
-  mcp-server: schwab-agent --mcp
 ---
 
 # schwab-agent

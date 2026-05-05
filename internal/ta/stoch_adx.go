@@ -10,7 +10,7 @@ import (
 
 // Stochastic computes the Stochastic Oscillator (%K and %D lines).
 //
-// CRITICAL parameter mapping (schwab-mcp vs go-talib naming differs):
+// CRITICAL parameter mapping (CLI vs go-talib naming differs):
 //
 //	kPeriod  (CLI: --k-period)  -> talib fastKPeriod (lookback, default 14)
 //	smoothK  (CLI: --smooth-k)  -> talib slowKPeriod  (smoothing of %K, default 3)

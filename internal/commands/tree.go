@@ -9,8 +9,7 @@ import (
 )
 
 // BuildCommandTree constructs the full command tree without calling
-// structcli.Setup. It is shared by the main CLI, the MCP CommandFactory
-// (which needs a fresh tree per tool call), and the doc generator.
+// structcli.Setup. It is shared by the main CLI and the doc generator.
 func BuildCommandTree(
 	w io.Writer,
 	configPath, tokenPath, version string,
