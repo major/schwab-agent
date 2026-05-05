@@ -8,7 +8,13 @@ import (
 )
 
 const (
-	weeksPerYear               = 52
+	weeksPerYear = 52
+
+	// dailyLookbackSafetyCandles is added before sizing daily Schwab API period
+	// requests. The daily endpoint can return fewer candles than a plain 1-year
+	// request suggests because of holidays, partial current sessions, and
+	// symbol-level data gaps, so keep a 10-candle margin before reducing this;
+	// IntervalToHistoryParams has the request-sizing rationale where this is used.
 	dailyLookbackSafetyCandles = 10
 
 	// regularSessionMinutesPerDay is the number of 1-minute candles in a regular
