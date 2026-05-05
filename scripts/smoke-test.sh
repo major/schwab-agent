@@ -193,6 +193,7 @@ run_help_test "account list"      account list
 run_help_test "account get"       account get
 run_help_test "account numbers"   account numbers
 run_help_test "account set-default" account set-default
+run_help_test "account resolve" account resolve
 run_help_test "account transaction" account transaction
 run_help_test "account transaction list" account transaction list
 run_help_test "account transaction get"  account transaction get
@@ -740,6 +741,7 @@ run_test "account summary" account summary
 run_test "account summary --positions" account summary --positions
 run_test "account list" account list
 run_test "account numbers" account numbers
+run_test "account resolve" account resolve
 run_test "account list --positions" account list --positions
 
 # Extract the first account hash for account-specific commands.
