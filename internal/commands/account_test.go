@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/auth"
+	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -1306,4 +1308,422 @@ func TestResolveAccount_WhitespaceOnlyPositionalArgSkipped(t *testing.T) {
 	account, err := resolveAccount(nil, "", "/nonexistent/config.json", []string{"  "})
 	require.Error(t, err)
 	assert.Empty(t, account)
+}
+
+// --- enrichAccountHash tests ---
+
+func TestEnrichAccountHash(t *testing.T) {
+	tests := []struct {
+		name                  string
+		hash                  string
+		routes                map[string]any
+		useNilClient          bool
+		expectedAccountNumber string
+		expectedNickName      string
+		expectedAccountType   string
+	}{
+		{
+			name: "successful enrichment",
+			hash: "ABCDEF1234567890",
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": []map[string]string{
+					{"accountNumber": "12345", "hashValue": "ABCDEF1234567890"},
+				},
+				"/trader/v1/userPreference": map[string]any{"accounts": []map[string]string{
+					{"accountNumber": "12345", "nickName": "My IRA", "type": "MARGIN"},
+				}},
+			},
+			expectedAccountNumber: "12345",
+			expectedNickName:      "My IRA",
+			expectedAccountType:   "MARGIN",
+		},
+		{
+			name: "AccountNumbers API fails",
+			hash: "ABCDEF1234567890",
+			routes: map[string]any{
+				"/trader/v1/userPreference": map[string]any{"accounts": []map[string]string{}},
+			},
+		},
+		{
+			name: "hash not in AccountNumbers",
+			hash: "ABCDEF1234567890",
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": []map[string]string{
+					{"accountNumber": "12345", "hashValue": "FEDCBA0987654321"},
+				},
+				"/trader/v1/userPreference": map[string]any{"accounts": []map[string]string{
+					{"accountNumber": "12345", "nickName": "My IRA", "type": "MARGIN"},
+				}},
+			},
+		},
+		{
+			name: "UserPreference API fails",
+			hash: "ABCDEF1234567890",
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": []map[string]string{
+					{"accountNumber": "12345", "hashValue": "ABCDEF1234567890"},
+				},
+			},
+			expectedAccountNumber: "12345",
+		},
+		{
+			name:         "nil client",
+			hash:         "ABCDEF1234567890",
+			useNilClient: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			var c *client.Ref
+			if !tt.useNilClient {
+				srv := accountMockServer(t, tt.routes)
+				defer srv.Close()
+				c = testClient(t, srv)
+			}
+
+			// Act
+			accountNumber, nickName, accountType := enrichAccountHash(context.Background(), c, tt.hash)
+
+			// Assert
+			assert.Equal(t, tt.expectedAccountNumber, accountNumber)
+			assert.Equal(t, tt.expectedNickName, nickName)
+			assert.Equal(t, tt.expectedAccountType, accountType)
+		})
+	}
+}
+
+// --- resolveAccountDetailed tests ---
+
+func TestResolveAccountDetailed(t *testing.T) {
+	tests := []struct {
+		name           string
+		accountFlag    string
+		positionalArgs []string
+		defaultAccount string
+		routes         map[string]any
+		expected       resolvedAccountInfo
+		expectError    bool
+	}{
+		{
+			name:        "hash input successful enrichment",
+			accountFlag: "ABCDEF1234567890",
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": []map[string]string{
+					{"accountNumber": "12345", "hashValue": "ABCDEF1234567890"},
+				},
+				"/trader/v1/userPreference": map[string]any{"accounts": []map[string]string{
+					{"accountNumber": "12345", "nickName": "My IRA", "type": "MARGIN"},
+				}},
+			},
+			expected: resolvedAccountInfo{
+				Hash:          "ABCDEF1234567890",
+				AccountNumber: "12345",
+				NickName:      "My IRA",
+				AccountType:   "MARGIN",
+				Source:        "explicit",
+				DisplayLabel:  "My IRA",
+			},
+		},
+		{
+			name:        "hash input enrichment fails",
+			accountFlag: "ABCDEF1234567890",
+			routes:      map[string]any{},
+			expected: resolvedAccountInfo{
+				Hash:         "ABCDEF1234567890",
+				Source:       "explicit",
+				DisplayLabel: "...7890",
+			},
+		},
+		{
+			name:        "account number input",
+			accountFlag: "67890",
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": []map[string]string{
+					{"accountNumber": "12345", "hashValue": "ABCDEF1234567890"},
+					{"accountNumber": "67890", "hashValue": "FEDCBA0987654321"},
+				},
+				"/trader/v1/userPreference": map[string]any{"accounts": []map[string]string{
+					{"accountNumber": "67890", "nickName": "Joint Taxable", "type": "CASH"},
+				}},
+			},
+			expected: resolvedAccountInfo{
+				Hash:          "FEDCBA0987654321",
+				AccountNumber: "67890",
+				NickName:      "Joint Taxable",
+				AccountType:   "CASH",
+				Source:        "explicit",
+				DisplayLabel:  "Joint Taxable",
+			},
+		},
+		{
+			name:        "nickname input",
+			accountFlag: "joint taxable",
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": []map[string]string{
+					{"accountNumber": "12345", "hashValue": "ABCDEF1234567890"},
+					{"accountNumber": "67890", "hashValue": "FEDCBA0987654321"},
+				},
+				"/trader/v1/userPreference": map[string]any{"accounts": []map[string]string{
+					{"accountNumber": "12345", "nickName": "My IRA", "type": "MARGIN"},
+					{"accountNumber": "67890", "nickName": "Joint Taxable", "type": "CASH"},
+				}},
+			},
+			expected: resolvedAccountInfo{
+				Hash:          "FEDCBA0987654321",
+				AccountNumber: "67890",
+				NickName:      "Joint Taxable",
+				AccountType:   "CASH",
+				Source:        "explicit",
+				DisplayLabel:  "Joint Taxable",
+			},
+		},
+		{
+			name:        "nickname collision",
+			accountFlag: "Trading",
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": []map[string]string{
+					{"accountNumber": "12345", "hashValue": "ABCDEF1234567890"},
+					{"accountNumber": "67890", "hashValue": "FEDCBA0987654321"},
+				},
+				"/trader/v1/userPreference": map[string]any{"accounts": []map[string]string{
+					{"accountNumber": "12345", "nickName": "Trading", "type": "MARGIN"},
+					{"accountNumber": "67890", "nickName": "trading", "type": "CASH"},
+				}},
+			},
+			expectError: true,
+		},
+		{
+			name:        "no account specified no default",
+			routes:      map[string]any{},
+			expectError: true,
+		},
+		{
+			name:           "default from config",
+			defaultAccount: "67890",
+			routes: map[string]any{
+				"/trader/v1/accounts/accountNumbers": []map[string]string{
+					{"accountNumber": "67890", "hashValue": "FEDCBA0987654321"},
+				},
+				"/trader/v1/userPreference": map[string]any{"accounts": []map[string]string{
+					{"accountNumber": "67890", "nickName": "Default Taxable", "type": "CASH"},
+				}},
+			},
+			expected: resolvedAccountInfo{
+				Hash:          "FEDCBA0987654321",
+				AccountNumber: "67890",
+				NickName:      "Default Taxable",
+				AccountType:   "CASH",
+				Source:        "default",
+				DisplayLabel:  "Default Taxable",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			srv := accountMockServer(t, tt.routes)
+			defer srv.Close()
+
+			configPath := "/nonexistent/config.json"
+			if tt.defaultAccount != "" {
+				configPath = writeAccountTestConfig(t, t.TempDir(), tt.defaultAccount)
+			}
+
+			// Act
+			account, err := resolveAccountDetailed(context.Background(), testClient(t, srv), tt.accountFlag, configPath, tt.positionalArgs)
+
+			// Assert
+			if tt.expectError {
+				require.Error(t, err)
+				var accountErr *apperr.AccountNotFoundError
+				assert.ErrorAs(t, err, &accountErr)
+				assert.Empty(t, account)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, account)
+		})
+	}
+}
+
+// --- accountDisplayLabel tests ---
+
+func TestAccountDisplayLabel(t *testing.T) {
+	tests := []struct {
+		name     string
+		nickname string
+		hash     string
+		expected string
+	}{
+		{
+			name:     "nickname present",
+			nickname: "My Roth IRA",
+			hash:     "0123456789abcdef",
+			expected: "My Roth IRA",
+		},
+		{
+			name:     "nickname empty, hash long",
+			nickname: "",
+			hash:     "0123456789abcdef",
+			expected: "...cdef",
+		},
+		{
+			name:     "nickname empty, hash short",
+			nickname: "",
+			hash:     "abc",
+			expected: "...abc",
+		},
+		{
+			name:     "both empty",
+			nickname: "",
+			hash:     "",
+			expected: "...",
+		},
+		{
+			name:     "whitespace-only nickname",
+			nickname: "   ",
+			hash:     "0123456789abcdef",
+			expected: "...cdef",
+		},
+		{
+			name:     "nickname with leading/trailing whitespace",
+			nickname: "  My Account  ",
+			hash:     "0123456789abcdef",
+			expected: "My Account",
+		},
+		{
+			name:     "hash exactly 4 chars",
+			nickname: "",
+			hash:     "abcd",
+			expected: "...abcd",
+		},
+		{
+			name:     "hash 5 chars",
+			nickname: "",
+			hash:     "abcde",
+			expected: "...bcde",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := accountDisplayLabel(tt.nickname, tt.hash)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// --- firstAccountIdentifierWithSource tests ---
+
+func TestFirstAccountIdentifierWithSource(t *testing.T) {
+	tests := []struct {
+		name           string
+		accountFlag    string
+		positionalArgs []string
+		configPath     string
+		expectedID     string
+		expectedSource string
+	}{
+		{
+			name:           "flag provided",
+			accountFlag:    "hash123",
+			positionalArgs: []string{},
+			configPath:     "",
+			expectedID:     "hash123",
+			expectedSource: "explicit",
+		},
+		{
+			name:           "flag with whitespace trimmed",
+			accountFlag:    "  hash123  ",
+			positionalArgs: []string{},
+			configPath:     "",
+			expectedID:     "hash123",
+			expectedSource: "explicit",
+		},
+		{
+			name:           "positional arg provided",
+			accountFlag:    "",
+			positionalArgs: []string{"positional123"},
+			configPath:     "",
+			expectedID:     "positional123",
+			expectedSource: "explicit",
+		},
+		{
+			name:           "positional arg with whitespace trimmed",
+			accountFlag:    "",
+			positionalArgs: []string{"  positional123  "},
+			configPath:     "",
+			expectedID:     "positional123",
+			expectedSource: "explicit",
+		},
+		{
+			name:           "flag takes priority over positional",
+			accountFlag:    "flag123",
+			positionalArgs: []string{"positional123"},
+			configPath:     "",
+			expectedID:     "flag123",
+			expectedSource: "explicit",
+		},
+		{
+			name:           "config default used",
+			accountFlag:    "",
+			positionalArgs: []string{},
+			configPath:     "", // will be set in test
+			expectedID:     "config_default",
+			expectedSource: "default",
+		},
+		{
+			name:           "no account anywhere",
+			accountFlag:    "",
+			positionalArgs: []string{},
+			configPath:     "/nonexistent/config.json",
+			expectedID:     "",
+			expectedSource: "",
+		},
+		{
+			name:           "empty positional args skipped",
+			accountFlag:    "",
+			positionalArgs: []string{},
+			configPath:     "/nonexistent/config.json",
+			expectedID:     "",
+			expectedSource: "",
+		},
+		{
+			name:           "whitespace-only positional arg skipped",
+			accountFlag:    "",
+			positionalArgs: []string{"   "},
+			configPath:     "/nonexistent/config.json",
+			expectedID:     "",
+			expectedSource: "",
+		},
+		{
+			name:           "whitespace-only flag skipped",
+			accountFlag:    "   ",
+			positionalArgs: []string{"positional123"},
+			configPath:     "",
+			expectedID:     "positional123",
+			expectedSource: "explicit",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			configPath := tt.configPath
+			if tt.expectedSource == "default" {
+				// Create a temporary config file with default_account
+				tmpDir := t.TempDir()
+				configPath = writeAccountTestConfig(t, tmpDir, "config_default")
+			}
+
+			id, source := firstAccountIdentifierWithSource(tt.accountFlag, tt.positionalArgs, configPath)
+
+			assert.Equal(t, tt.expectedID, id)
+			assert.Equal(t, tt.expectedSource, source)
+		})
+	}
 }
