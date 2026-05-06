@@ -27,8 +27,8 @@ type orderListOpts struct {
 	// Keep status as []string to support comma-separated repeatable input.
 	// RunE validates values against the registered enum set after expanding.
 	Status []string `flag:"status" flagdescr:"Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc."`
-	From   string   `flag:"from" flagdescr:"Filter by entered time lower bound"`
-	To     string   `flag:"to" flagdescr:"Filter by entered time upper bound"`
+	From   string   `flag:"from"   flagdescr:"Filter by entered time lower bound"`
+	To     string   `flag:"to"     flagdescr:"Filter by entered time upper bound"`
 	Recent bool     `flag:"recent" flagdescr:"Show recent order activity, including terminal statuses, from the last 24 hours unless --from is set"`
 }
 

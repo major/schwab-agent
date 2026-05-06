@@ -241,7 +241,7 @@ func writeTASymbolResults(w io.Writer, symbols []string, compute func(symbol str
 type simpleTAOpts struct {
 	Period   []int
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points"   flagdescr:"Number of output points (default 1; 0 = all)"            default:"1"     flaggroup:"data"`
 }
 
 // Validate is called by validateCobraOptions after Cobra decodes bound flags.
@@ -273,53 +273,53 @@ func (o *simpleTAOpts) Validate(_ context.Context) []error {
 
 // macdOpts holds CLI flags for the MACD subcommand.
 type macdOpts struct {
-	Fast     int        `flag:"fast" flagdescr:"Fast EMA period" default:"12" flaggroup:"indicator"`
-	Slow     int        `flag:"slow" flagdescr:"Slow EMA period" default:"26" flaggroup:"indicator"`
-	Signal   int        `flag:"signal" flagdescr:"Signal EMA period" default:"9" flaggroup:"indicator"`
+	Fast     int        `flag:"fast"     flagdescr:"Fast EMA period"                                         default:"12"    flaggroup:"indicator"`
+	Slow     int        `flag:"slow"     flagdescr:"Slow EMA period"                                         default:"26"    flaggroup:"indicator"`
+	Signal   int        `flag:"signal"   flagdescr:"Signal EMA period"                                       default:"9"     flaggroup:"indicator"`
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points"   flagdescr:"Number of output points (default 1; 0 = all)"            default:"1"     flaggroup:"data"`
 }
 
 // atrOpts holds CLI flags for the ATR subcommand.
 type atrOpts struct {
-	Period   int        `flag:"period" flagdescr:"Indicator period" default:"14" flaggroup:"indicator"`
+	Period   int        `flag:"period"   flagdescr:"Indicator period"                                        default:"14"    flaggroup:"indicator"`
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points"   flagdescr:"Number of output points (default 1; 0 = all)"            default:"1"     flaggroup:"data"`
 }
 
 // bbandsOpts holds CLI flags for the Bollinger Bands subcommand.
 type bbandsOpts struct {
-	Period   int        `flag:"period" flagdescr:"BBands period" default:"20" flaggroup:"indicator"`
-	StdDev   float64    `flag:"std-dev" flagdescr:"Standard deviations" default:"2.0" flaggroup:"indicator"`
+	Period   int        `flag:"period"   flagdescr:"BBands period"                                           default:"20"    flaggroup:"indicator"`
+	StdDev   float64    `flag:"std-dev"  flagdescr:"Standard deviations"                                     default:"2.0"   flaggroup:"indicator"`
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points"   flagdescr:"Number of output points (default 1; 0 = all)"            default:"1"     flaggroup:"data"`
 }
 
 // stochOpts holds CLI flags for the Stochastic Oscillator subcommand.
 type stochOpts struct {
-	KPeriod  int        `flag:"k-period" flagdescr:"Fast %K lookback period" default:"14" flaggroup:"indicator"`
-	SmoothK  int        `flag:"smooth-k" flagdescr:"Slow %K smoothing period" default:"3" flaggroup:"indicator"`
-	DPeriod  int        `flag:"d-period" flagdescr:"Slow %D period" default:"3" flaggroup:"indicator"`
+	KPeriod  int        `flag:"k-period" flagdescr:"Fast %K lookback period"                                 default:"14"    flaggroup:"indicator"`
+	SmoothK  int        `flag:"smooth-k" flagdescr:"Slow %K smoothing period"                                default:"3"     flaggroup:"indicator"`
+	DPeriod  int        `flag:"d-period" flagdescr:"Slow %D period"                                          default:"3"     flaggroup:"indicator"`
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points"   flagdescr:"Number of output points (default 1; 0 = all)"            default:"1"     flaggroup:"data"`
 }
 
 // adxOpts holds CLI flags for the ADX subcommand.
 type adxOpts struct {
-	Period   int        `flag:"period" flagdescr:"Indicator period" default:"14" flaggroup:"indicator"`
+	Period   int        `flag:"period"   flagdescr:"Indicator period"                                        default:"14"    flaggroup:"indicator"`
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points"   flagdescr:"Number of output points (default 1; 0 = all)"            default:"1"     flaggroup:"data"`
 }
 
 // vwapOpts holds CLI flags for the VWAP subcommand.
 type vwapOpts struct {
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points"   flagdescr:"Number of output points (default 1; 0 = all)"            default:"1"     flaggroup:"data"`
 }
 
 // hvOpts holds CLI flags for the Historical Volatility subcommand.
 type hvOpts struct {
-	Period   int        `flag:"period" flagdescr:"Indicator period" default:"20" flaggroup:"indicator"`
+	Period   int        `flag:"period"   flagdescr:"Indicator period"                                        default:"20"    flaggroup:"indicator"`
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
 }
 
@@ -331,7 +331,7 @@ type expectedMoveOpts struct {
 // dashboardOpts holds CLI flags for the opinionated TA dashboard command.
 type dashboardOpts struct {
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points"   flagdescr:"Number of output points (default 1; 0 = all)"            default:"1"     flaggroup:"data"`
 }
 
 // NewTACmd returns the Cobra command for technical analysis indicators.
@@ -435,7 +435,8 @@ func makeCobraSimpleTACommand(cfg *simpleTAConfig, c *client.Ref, w io.Writer) *
 
 	// Period uses IntSliceVar because its default varies per indicator (cfg.defaultPeriod),
 	// while the tag-driven helper can only express static defaults.
-	cmd.Flags().IntSliceVar(&opts.Period, "period", []int{cfg.defaultPeriod}, "Indicator period (repeatable or comma-separated)")
+	cmd.Flags().
+		IntSliceVar(&opts.Period, "period", []int{cfg.defaultPeriod}, "Indicator period (repeatable or comma-separated)")
 
 	// Keep DefValue in the same comma-separated format users pass on the CLI.
 	// pflag's default "[20]" rendering is harder to read in help and generated docs.
@@ -508,7 +509,15 @@ func computeSimpleTAOutput(
 	}
 
 	if len(periods) == 1 {
-		return buildTAOutput(cfg.name, symbol, interval, periods[0], opts.Points, timestamps, valuesByPeriod[periods[0]])
+		return buildTAOutput(
+			cfg.name,
+			symbol,
+			interval,
+			periods[0],
+			opts.Points,
+			timestamps,
+			valuesByPeriod[periods[0]],
+		)
 	}
 
 	return buildMultiTAOutput(cfg.name, symbol, interval, periods, opts.Points, timestamps, valuesByPeriod)
@@ -544,7 +553,12 @@ high-low ranges. Signals are neutral factual labels for agents, not trading advi
 	return cmd
 }
 
-func buildTADashboard(ctx context.Context, c *client.Ref, symbol, interval string, points int) (dashboardOutput, error) {
+func buildTADashboard(
+	ctx context.Context,
+	c *client.Ref,
+	symbol, interval string,
+	points int,
+) (dashboardOutput, error) {
 	const (
 		smaFastPeriod    = 21
 		smaMediumPeriod  = 50
@@ -1062,7 +1076,14 @@ func buildStochOutput(ctx context.Context, c *client.Ref, opts *stochOpts, symbo
 	// Stochastic chains three windowed ops (raw %K, smoothed %K, %D);
 	// total depth is the sum of all window sizes.
 	interval := string(opts.Interval)
-	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.KPeriod+opts.SmoothK+opts.DPeriod, "stoch")
+	candles, timestamps, err := fetchAndValidateCandles(
+		ctx,
+		c,
+		symbol,
+		interval,
+		opts.KPeriod+opts.SmoothK+opts.DPeriod,
+		"stoch",
+	)
 	if err != nil {
 		return stochOutput{}, err
 	}
@@ -1294,7 +1315,12 @@ and lower bounds).`,
 	}, c, w)
 }
 
-func buildExpectedMoveOutput(ctx context.Context, c *client.Ref, opts *expectedMoveOpts, symbol string) (expectedMoveOutput, error) {
+func buildExpectedMoveOutput(
+	ctx context.Context,
+	c *client.Ref,
+	opts *expectedMoveOpts,
+	symbol string,
+) (expectedMoveOutput, error) {
 	// Expected Move needs the underlying quote and near-the-money contracts in one response.
 	// Keep this to a single chain call so the underlying snapshot and option prices stay aligned.
 	chain, err := c.OptionChain(ctx, symbol, &client.ChainParams{
@@ -1367,7 +1393,8 @@ func buildExpectedMoveOutput(ctx context.Context, c *client.Ref, opts *expectedM
 		}
 
 		diff := math.Abs(strike - underlyingPrice)
-		if bestStrikeDiff < 0 || diff < bestStrikeDiff || (diff == bestStrikeDiff && strike < mustParseFloat(atmStrikeKey)) {
+		if bestStrikeDiff < 0 || diff < bestStrikeDiff ||
+			(diff == bestStrikeDiff && strike < mustParseFloat(atmStrikeKey)) {
 			bestStrikeDiff = diff
 			atmStrikeKey = strikeKey
 		}

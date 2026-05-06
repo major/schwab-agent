@@ -1268,7 +1268,12 @@ func TestResolveAccount_FlagBeforePositionalArg(t *testing.T) {
 	defer srv.Close()
 
 	// Act
-	account, err := resolveAccount(testClient(t, srv), "12345", "/nonexistent/config.json", []string{"0123456789abcdef"})
+	account, err := resolveAccount(
+		testClient(t, srv),
+		"12345",
+		"/nonexistent/config.json",
+		[]string{"0123456789abcdef"},
+	)
 
 	// Assert
 	require.NoError(t, err)
@@ -1553,7 +1558,13 @@ func TestResolveAccountDetailed(t *testing.T) {
 			}
 
 			// Act
-			account, err := resolveAccountDetailed(context.Background(), testClient(t, srv), tt.accountFlag, configPath, tt.positionalArgs)
+			account, err := resolveAccountDetailed(
+				context.Background(),
+				testClient(t, srv),
+				tt.accountFlag,
+				configPath,
+				tt.positionalArgs,
+			)
 
 			// Assert
 			if tt.expectError {

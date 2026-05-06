@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/models"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/models"
 )
 
 func TestRegisterOrderFlagAliases(t *testing.T) {

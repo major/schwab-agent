@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/major/schwab-agent/internal/apperr"
 )
 
@@ -240,7 +241,10 @@ func TestLoadConfig_InvalidBaseURL_ReturnsValidationError(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
-	require.NoError(t, os.WriteFile(configPath, []byte(`{"client_id":"id","client_secret":"secret","base_url":"://bad"}`), 0o600))
+	require.NoError(
+		t,
+		os.WriteFile(configPath, []byte(`{"client_id":"id","client_secret":"secret","base_url":"://bad"}`), 0o600),
+	)
 
 	// Act
 	cfg, err := LoadConfig(configPath)

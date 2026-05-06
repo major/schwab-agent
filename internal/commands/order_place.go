@@ -46,13 +46,13 @@ type orderPreviewData struct {
 
 // orderPlaceOpts holds local flags for top-level spec-based order placement.
 type orderPlaceOpts struct {
-	Spec        string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin"`
+	Spec        string `flag:"spec"         flagdescr:"Inline JSON, @file, or - for stdin"`
 	FromPreview string `flag:"from-preview" flagdescr:"Place the exact order payload saved by order preview --save-preview"`
 }
 
 // orderPreviewOpts holds local flags for order preview.
 type orderPreviewOpts struct {
-	Spec        string `flag:"spec" flagdescr:"Inline JSON, @file, or - for stdin" flagrequired:"true"`
+	Spec        string `flag:"spec"         flagdescr:"Inline JSON, @file, or - for stdin"                                           flagrequired:"true"`
 	SavePreview bool   `flag:"save-preview" flagdescr:"Save this preview locally and return a digest for order place --from-preview"`
 }
 
@@ -70,7 +70,13 @@ type orderReplaceOpts struct {
 // action. The follow-up GET is deliberately best-effort: once Schwab accepts a
 // mutation, the CLI must not turn that successful trade action into a command
 // failure just because the read-after-write lookup is delayed or unavailable.
-func fetchOrderActionData(cmd *cobra.Command, c *client.Ref, account, action string, orderID int64, submittedOrder *models.OrderRequest) (data orderActionData, errs []string) {
+func fetchOrderActionData(
+	cmd *cobra.Command,
+	c *client.Ref,
+	account, action string,
+	orderID int64,
+	submittedOrder *models.OrderRequest,
+) (data orderActionData, errs []string) {
 	data = orderActionData{
 		Action:            action,
 		OrderID:           orderID,
@@ -78,13 +84,17 @@ func fetchOrderActionData(cmd *cobra.Command, c *client.Ref, account, action str
 		VerificationState: "unverified",
 	}
 	if orderID == 0 {
-		data.VerificationFailures = []string{"order details unavailable: Schwab accepted the order action but did not return an order ID"}
+		data.VerificationFailures = []string{
+			"order details unavailable: Schwab accepted the order action but did not return an order ID",
+		}
 		return data, data.VerificationFailures
 	}
 
 	order, err := c.GetOrder(cmd.Context(), account, orderID)
 	if err != nil {
-		data.VerificationFailures = []string{fmt.Sprintf("order details unavailable after successful order action: %v", err)}
+		data.VerificationFailures = []string{
+			fmt.Sprintf("order details unavailable after successful order action: %v", err),
+		}
 		return data, data.VerificationFailures
 	}
 
@@ -100,7 +110,13 @@ func fetchOrderActionData(cmd *cobra.Command, c *client.Ref, account, action str
 // header. In that fallback case the client only knows the original ID, so we
 // avoid a duplicate GET and report the original order as the best available
 // verification target.
-func fetchReplaceActionData(cmd *cobra.Command, c *client.Ref, account string, originalOrderID, replacementOrderID int64, submittedOrder *models.OrderRequest) (data orderActionData, errs []string) {
+func fetchReplaceActionData(
+	cmd *cobra.Command,
+	c *client.Ref,
+	account string,
+	originalOrderID, replacementOrderID int64,
+	submittedOrder *models.OrderRequest,
+) (data orderActionData, errs []string) {
 	data, errs = fetchOrderActionData(cmd, c, account, "replace", replacementOrderID, submittedOrder)
 	data.Replaced = true
 	data.OriginalOrderID = &originalOrderID
@@ -144,7 +160,12 @@ func fetchReplaceActionData(cmd *cobra.Command, c *client.Ref, account string, o
 // order lookup succeeds, or a partial envelope when Schwab accepted the mutation
 // but the follow-up details could not be fetched. That distinction lets agents
 // trust the order action occurred while still seeing why `data.order` is absent.
-func writeOrderActionResult(w io.Writer, data *orderActionData, errs []string, acct resolvedAccountInfo) error { //nolint:gocritic // hugeParam: resolvedAccountInfo is passed by value intentionally; callers construct it inline and pointer indirection would complicate all call sites.
+func writeOrderActionResult(
+	w io.Writer,
+	data *orderActionData,
+	errs []string,
+	acct resolvedAccountInfo,
+) error { //nolint:gocritic // hugeParam: resolvedAccountInfo is passed by value intentionally; callers construct it inline and pointer indirection would complicate all call sites.
 	metadata := output.NewMetadata()
 	metadata.Account = acct.Hash
 	metadata.AccountNickName = acct.NickName
@@ -169,7 +190,12 @@ type orderPlacePayload struct {
 // placement. `--from-preview` deliberately bypasses spec parsing so the mutable
 // submit path reuses the exact payload saved during preview instead of rebuilding
 // an order from fresh flags or JSON.
-func resolveOrderPlacePayload(cmd *cobra.Command, c *client.Ref, configPath string, opts *orderPlaceOpts) (*orderPlacePayload, error) {
+func resolveOrderPlacePayload(
+	cmd *cobra.Command,
+	c *client.Ref,
+	configPath string,
+	opts *orderPlaceOpts,
+) (*orderPlacePayload, error) {
 	if strings.TrimSpace(opts.FromPreview) != "" {
 		entry, err := loadOrderPreview(opts.FromPreview)
 		if err != nil {
@@ -203,7 +229,12 @@ func resolveOrderPlacePayload(cmd *cobra.Command, c *client.Ref, configPath stri
 			DisplayLabel:  accountDisplayLabel(nickName, entry.Account),
 		}
 
-		return &orderPlacePayload{Account: entry.Account, AccountInfo: acct, Order: entry.Order, PreviewDigest: entry.Digest}, nil
+		return &orderPlacePayload{
+			Account:       entry.Account,
+			AccountInfo:   acct,
+			Order:         entry.Order,
+			PreviewDigest: entry.Digest,
+		}, nil
 	}
 
 	accountFlag, err := cmd.Flags().GetString("account")
@@ -224,7 +255,13 @@ func resolveOrderPlacePayload(cmd *cobra.Command, c *client.Ref, configPath stri
 
 // writeOrderPreviewResult optionally saves the previewed order to the local
 // digest ledger before emitting the standard preview envelope.
-func writeOrderPreviewResult(w io.Writer, acct resolvedAccountInfo, order *models.OrderRequest, preview *models.PreviewOrder, savePreview bool) error { //nolint:gocritic // hugeParam: resolvedAccountInfo is passed by value intentionally; callers construct it inline and pointer indirection would complicate all call sites.
+func writeOrderPreviewResult(
+	w io.Writer,
+	acct resolvedAccountInfo,
+	order *models.OrderRequest,
+	preview *models.PreviewOrder,
+	savePreview bool,
+) error { //nolint:gocritic // hugeParam: resolvedAccountInfo is passed by value intentionally; callers construct it inline and pointer indirection would complicate all call sites.
 	data := orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}
 	if savePreview {
 		digestData, err := saveOrderPreview(acct.Hash, order, preview)
@@ -273,7 +310,9 @@ returned previewDigest.digest value.`,
 			previewDigest := strings.TrimSpace(opts.FromPreview)
 			fromPreviewProvided := previewDigest != ""
 			if specProvided == fromPreviewProvided {
-				return newValidationError("provide exactly one of --spec or --from-preview for `order place` without a subcommand")
+				return newValidationError(
+					"provide exactly one of --spec or --from-preview for `order place` without a subcommand",
+				)
 			}
 
 			configFlag, err := cmd.Flags().GetString("config")
@@ -311,7 +350,18 @@ returned previewDigest.digest value.`,
 	defineCobraFlags(cmd, opts)
 	cmd.MarkFlagsMutuallyExclusive("spec", "from-preview")
 
-	equityCmd := makeCobraPlaceOrderCommand(c, configPath, w, "equity", "Place an equity order", func() *equityPlaceOpts { return &equityPlaceOpts{} }, func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) }, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
+	equityCmd := makeCobraPlaceOrderCommand(
+		c,
+		configPath,
+		w,
+		"equity",
+		"Place an equity order",
+		func() *equityPlaceOpts { return &equityPlaceOpts{} },
+		func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) },
+		parseEquityParams,
+		orderbuilder.ValidateEquityOrder,
+		orderbuilder.BuildEquityOrder,
+	)
 	equityCmd.Long = `Place an equity (stock) order. Supports MARKET, LIMIT, STOP, STOP_LIMIT, and
 TRAILING_STOP order types. Default type is MARKET if --type is omitted. Duration
 aliases GTC, FOK, and IOC are accepted alongside their full names. Requires
@@ -325,9 +375,20 @@ i-also-like-to-live-dangerously in config for placement.`
   # Sell with a stop-limit order
   schwab-agent order place equity --symbol AAPL --action SELL --quantity 10 --type STOP_LIMIT --stop-price 145 --price 144`
 
-	optionCmd := makeCobraPlaceOrderCommand(c, configPath, w, "option", "Place an option order", func() *optionPlaceOpts { return &optionPlaceOpts{} }, func(cmd *cobra.Command, opts *optionPlaceOpts) {
-		defineAndConstrain(cmd, opts, []string{"call", "put"})
-	}, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder)
+	optionCmd := makeCobraPlaceOrderCommand(
+		c,
+		configPath,
+		w,
+		"option",
+		"Place an option order",
+		func() *optionPlaceOpts { return &optionPlaceOpts{} },
+		func(cmd *cobra.Command, opts *optionPlaceOpts) {
+			defineAndConstrain(cmd, opts, []string{"call", "put"})
+		},
+		parseOptionParams,
+		orderbuilder.ValidateOptionOrder,
+		orderbuilder.BuildOptionOrder,
+	)
 	optionCmd.Long = `Place a single-leg option order. Requires --underlying, --expiration, --strike,
 and exactly one of --call or --put. Use BUY_TO_OPEN/SELL_TO_CLOSE for new
 positions and SELL_TO_OPEN/BUY_TO_CLOSE for existing ones. Requires
@@ -339,7 +400,18 @@ i-also-like-to-live-dangerously in config for placement.`
   # Close an existing call position
   schwab-agent order place option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action SELL_TO_CLOSE --quantity 1`
 
-	bracketCmd := makeCobraPlaceOrderCommand(c, configPath, w, "bracket", "Place a bracket order", func() *bracketPlaceOpts { return &bracketPlaceOpts{} }, func(cmd *cobra.Command, opts *bracketPlaceOpts) { defineAndConstrain(cmd, opts) }, parseBracketParams, orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder)
+	bracketCmd := makeCobraPlaceOrderCommand(
+		c,
+		configPath,
+		w,
+		"bracket",
+		"Place a bracket order",
+		func() *bracketPlaceOpts { return &bracketPlaceOpts{} },
+		func(cmd *cobra.Command, opts *bracketPlaceOpts) { defineAndConstrain(cmd, opts) },
+		parseBracketParams,
+		orderbuilder.ValidateBracketOrder,
+		orderbuilder.BuildBracketOrder,
+	)
 	bracketCmd.Long = `Place a bracket order that combines an entry trade with automatic exit orders.
 At least one of --take-profit or --stop-loss is required. Exit instructions are
 auto-inverted from the entry action (BUY entry creates SELL exits). Canceling
@@ -351,7 +423,18 @@ the parent cascades to all child orders.`
   # Buy with only a take-profit target
   schwab-agent order place bracket --symbol TSLA --action BUY --quantity 5 --type MARKET --take-profit 300`
 
-	ocoCmd := makeCobraPlaceOrderCommand(c, configPath, w, "oco", "Place a one-cancels-other order for an existing position", func() *ocoPlaceOpts { return &ocoPlaceOpts{} }, func(cmd *cobra.Command, opts *ocoPlaceOpts) { defineAndConstrain(cmd, opts) }, parseOCOParams, orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder)
+	ocoCmd := makeCobraPlaceOrderCommand(
+		c,
+		configPath,
+		w,
+		"oco",
+		"Place a one-cancels-other order for an existing position",
+		func() *ocoPlaceOpts { return &ocoPlaceOpts{} },
+		func(cmd *cobra.Command, opts *ocoPlaceOpts) { defineAndConstrain(cmd, opts) },
+		parseOCOParams,
+		orderbuilder.ValidateOCOOrder,
+		orderbuilder.BuildOCOOrder,
+	)
 	ocoCmd.Long = `Place a one-cancels-other order for an existing position. When one exit fills,
 the other is automatically canceled. At least one of --take-profit or --stop-loss
 is required. For long positions use SELL; for short positions use BUY. Unlike
@@ -513,7 +596,18 @@ safety guards since no order is actually placed.`,
 
 	defineCobraFlags(cmd, opts)
 
-	equityCmd := makeCobraPreviewOrderCommand(c, configPath, w, "equity", "Preview an equity order", func() *equityPlaceOpts { return &equityPlaceOpts{} }, func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) }, parseEquityParams, orderbuilder.ValidateEquityOrder, orderbuilder.BuildEquityOrder)
+	equityCmd := makeCobraPreviewOrderCommand(
+		c,
+		configPath,
+		w,
+		"equity",
+		"Preview an equity order",
+		func() *equityPlaceOpts { return &equityPlaceOpts{} },
+		func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) },
+		parseEquityParams,
+		orderbuilder.ValidateEquityOrder,
+		orderbuilder.BuildEquityOrder,
+	)
 	equityCmd.Long = `Preview an equity (stock) order without placing it. Supports the same flags
 as order place equity, but skips the mutable-operation safety gate because no
 order is submitted. The response includes the built order request plus Schwab's
@@ -522,9 +616,20 @@ return a digest for exact-payload placement.`
 	equityCmd.Example = `  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10
 	  schwab-agent order preview equity --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 150 --duration GTC`
 
-	optionCmd := makeCobraPreviewOrderCommand(c, configPath, w, "option", "Preview an option order", func() *optionPlaceOpts { return &optionPlaceOpts{} }, func(cmd *cobra.Command, opts *optionPlaceOpts) {
-		defineAndConstrain(cmd, opts, []string{"call", "put"})
-	}, parseOptionParams, orderbuilder.ValidateOptionOrder, orderbuilder.BuildOptionOrder)
+	optionCmd := makeCobraPreviewOrderCommand(
+		c,
+		configPath,
+		w,
+		"option",
+		"Preview an option order",
+		func() *optionPlaceOpts { return &optionPlaceOpts{} },
+		func(cmd *cobra.Command, opts *optionPlaceOpts) {
+			defineAndConstrain(cmd, opts, []string{"call", "put"})
+		},
+		parseOptionParams,
+		orderbuilder.ValidateOptionOrder,
+		orderbuilder.BuildOptionOrder,
+	)
 	optionCmd.Long = `Preview a single-leg option order without placing it. Requires --underlying,
 --expiration, --strike, and exactly one of --call or --put. The response includes
 the locally built OCC order request and Schwab's preview response. Add
@@ -532,14 +637,36 @@ the locally built OCC order request and Schwab's preview response. Add
 	optionCmd.Example = `  schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 200 --call --action BUY_TO_OPEN --quantity 1
 	  schwab-agent order preview option --underlying AAPL --expiration 2025-06-20 --strike 190 --put --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 3.50`
 
-	bracketCmd := makeCobraPreviewOrderCommand(c, configPath, w, "bracket", "Preview a bracket order", func() *bracketPlaceOpts { return &bracketPlaceOpts{} }, func(cmd *cobra.Command, opts *bracketPlaceOpts) { defineAndConstrain(cmd, opts) }, parseBracketParams, orderbuilder.ValidateBracketOrder, orderbuilder.BuildBracketOrder)
+	bracketCmd := makeCobraPreviewOrderCommand(
+		c,
+		configPath,
+		w,
+		"bracket",
+		"Preview a bracket order",
+		func() *bracketPlaceOpts { return &bracketPlaceOpts{} },
+		func(cmd *cobra.Command, opts *bracketPlaceOpts) { defineAndConstrain(cmd, opts) },
+		parseBracketParams,
+		orderbuilder.ValidateBracketOrder,
+		orderbuilder.BuildBracketOrder,
+	)
 	bracketCmd.Long = `Preview a bracket order without placing it. At least one of --take-profit or
 --stop-loss is required. The preview response includes the locally built trigger
 order and Schwab's validation, fee, and commission details.`
 	bracketCmd.Example = `  schwab-agent order preview bracket --symbol NVDA --action BUY --quantity 10 --type MARKET --take-profit 150 --stop-loss 120
 	  schwab-agent order preview bracket --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 180 --stop-loss 170`
 
-	ocoCmd := makeCobraPreviewOrderCommand(c, configPath, w, "oco", "Preview a one-cancels-other order", func() *ocoPlaceOpts { return &ocoPlaceOpts{} }, func(cmd *cobra.Command, opts *ocoPlaceOpts) { defineAndConstrain(cmd, opts) }, parseOCOParams, orderbuilder.ValidateOCOOrder, orderbuilder.BuildOCOOrder)
+	ocoCmd := makeCobraPreviewOrderCommand(
+		c,
+		configPath,
+		w,
+		"oco",
+		"Preview a one-cancels-other order",
+		func() *ocoPlaceOpts { return &ocoPlaceOpts{} },
+		func(cmd *cobra.Command, opts *ocoPlaceOpts) { defineAndConstrain(cmd, opts) },
+		parseOCOParams,
+		orderbuilder.ValidateOCOOrder,
+		orderbuilder.BuildOCOOrder,
+	)
 	ocoCmd.Long = `Preview a one-cancels-other order for an existing position without placing it.
 When both exits are present, the built order shows the OCO relationship Schwab
 will validate during preview.`
@@ -630,7 +757,8 @@ func makeCobraPreviewOrderCommand[O any, P any](
 	if flagSetup != nil {
 		flagSetup(cmd, opts)
 	}
-	cmd.Flags().Bool("save-preview", false, "Save this preview locally and return a digest for order place --from-preview")
+	cmd.Flags().
+		Bool("save-preview", false, "Save this preview locally and return a digest for order place --from-preview")
 
 	return cmd
 }
@@ -849,7 +977,13 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 				return err
 			}
 
-			occSymbol, err := buildOCCSymbol(optionOpts.Underlying, optionOpts.Expiration, optionOpts.Strike, optionOpts.Call, optionOpts.Put)
+			occSymbol, err := buildOCCSymbol(
+				optionOpts.Underlying,
+				optionOpts.Expiration,
+				optionOpts.Strike,
+				optionOpts.Call,
+				optionOpts.Put,
+			)
 			if err != nil {
 				return err
 			}

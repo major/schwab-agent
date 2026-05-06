@@ -92,9 +92,9 @@ type accountGetOpts struct {
 
 // accountTransactionListOpts holds the options for the account transaction list subcommand.
 type accountTransactionListOpts struct {
-	Types  string `flag:"types" flagdescr:"Transaction type filter (TRADE, DIVIDEND, etc.)"`
-	From   string `flag:"from" flagdescr:"Start date (YYYY-MM-DDTHH:MM:SSZ)"`
-	To     string `flag:"to" flagdescr:"End date (YYYY-MM-DDTHH:MM:SSZ)"`
+	Types  string `flag:"types"  flagdescr:"Transaction type filter (TRADE, DIVIDEND, etc.)"`
+	From   string `flag:"from"   flagdescr:"Start date (YYYY-MM-DDTHH:MM:SSZ)"`
+	To     string `flag:"to"     flagdescr:"End date (YYYY-MM-DDTHH:MM:SSZ)"`
 	Symbol string `flag:"symbol" flagdescr:"Filter by symbol"`
 }
 
@@ -107,7 +107,9 @@ func resolveAccount(c *client.Ref, accountFlag, configPath string, positionalArg
 		return "", apperr.NewAccountNotFoundError(
 			"no account specified: use --account flag or set default_account in config",
 			nil,
-			apperr.WithDetails("Run `schwab-agent account summary` or `schwab-agent account numbers` to list accounts, then `schwab-agent account set-default` to set one"),
+			apperr.WithDetails(
+				"Run `schwab-agent account summary` or `schwab-agent account numbers` to list accounts, then `schwab-agent account set-default` to set one",
+			),
 		)
 	}
 
@@ -121,7 +123,9 @@ func resolveAccount(c *client.Ref, accountFlag, configPath string, positionalArg
 		return "", apperr.NewAccountNotFoundError(
 			fmt.Sprintf("Account %q cannot be resolved without an API client", accountID),
 			nil,
-			apperr.WithDetails("Use an account hash directly or run with an authenticated client to resolve account numbers and nicknames"),
+			apperr.WithDetails(
+				"Use an account hash directly or run with an authenticated client to resolve account numbers and nicknames",
+			),
 		)
 	}
 
@@ -147,13 +151,21 @@ func resolveAccount(c *client.Ref, accountFlag, configPath string, positionalArg
 	}
 	if len(matches) > 1 {
 		return "", apperr.NewAccountNotFoundError(
-			fmt.Sprintf("multiple accounts match nickname %q. Candidates: %s", accountID, formatResolvedAccountCandidates(matches)),
+			fmt.Sprintf(
+				"multiple accounts match nickname %q. Candidates: %s",
+				accountID,
+				formatResolvedAccountCandidates(matches),
+			),
 			nil,
 		)
 	}
 
 	return "", apperr.NewAccountNotFoundError(
-		fmt.Sprintf("Account '%s' not found. Available accounts: %s", accountID, formatAvailableAccounts(numbers, prefs)),
+		fmt.Sprintf(
+			"Account '%s' not found. Available accounts: %s",
+			accountID,
+			formatAvailableAccounts(numbers, prefs),
+		),
 		nil,
 	)
 }
@@ -216,13 +228,20 @@ func lookupPrefs(prefs *models.UserPreference, accountNumber string) (nickName, 
 
 // resolveAccountDetailed resolves an account identifier and keeps the joined
 // account metadata needed for user-facing labels and output metadata.
-func resolveAccountDetailed(ctx context.Context, c *client.Ref, accountFlag, configPath string, positionalArgs []string) (resolvedAccountInfo, error) {
+func resolveAccountDetailed(
+	ctx context.Context,
+	c *client.Ref,
+	accountFlag, configPath string,
+	positionalArgs []string,
+) (resolvedAccountInfo, error) {
 	accountID, source := firstAccountIdentifierWithSource(accountFlag, positionalArgs, configPath)
 	if accountID == "" {
 		return resolvedAccountInfo{}, apperr.NewAccountNotFoundError(
 			"no account specified: use --account flag or set default_account in config",
 			nil,
-			apperr.WithDetails("Run `schwab-agent account summary` or `schwab-agent account numbers` to list accounts, then `schwab-agent account set-default` to set one"),
+			apperr.WithDetails(
+				"Run `schwab-agent account summary` or `schwab-agent account numbers` to list accounts, then `schwab-agent account set-default` to set one",
+			),
 		)
 	}
 
@@ -247,7 +266,9 @@ func resolveAccountDetailed(ctx context.Context, c *client.Ref, accountFlag, con
 		return resolvedAccountInfo{}, apperr.NewAccountNotFoundError(
 			fmt.Sprintf("Account %q cannot be resolved without an API client", accountID),
 			nil,
-			apperr.WithDetails("Use an account hash directly or run with an authenticated client to resolve account numbers and nicknames"),
+			apperr.WithDetails(
+				"Use an account hash directly or run with an authenticated client to resolve account numbers and nicknames",
+			),
 		)
 	}
 
@@ -300,13 +321,21 @@ func resolveAccountDetailed(ctx context.Context, c *client.Ref, accountFlag, con
 	}
 	if len(matches) > 1 {
 		return resolvedAccountInfo{}, apperr.NewAccountNotFoundError(
-			fmt.Sprintf("multiple accounts match nickname %q. Candidates: %s", accountID, formatResolvedAccountCandidates(matches)),
+			fmt.Sprintf(
+				"multiple accounts match nickname %q. Candidates: %s",
+				accountID,
+				formatResolvedAccountCandidates(matches),
+			),
 			nil,
 		)
 	}
 
 	return resolvedAccountInfo{}, apperr.NewAccountNotFoundError(
-		fmt.Sprintf("Account '%s' not found. Available accounts: %s", accountID, formatAvailableAccounts(numbers, prefs)),
+		fmt.Sprintf(
+			"Account '%s' not found. Available accounts: %s",
+			accountID,
+			formatAvailableAccounts(numbers, prefs),
+		),
 		nil,
 	)
 }
@@ -336,7 +365,11 @@ func firstAccountIdentifier(accountFlag, configPath string, positionalArgs []str
 // returns both the selected identifier and its source. Source is "explicit" for
 // flag or positional args, "default" for config default_account, or "" if no
 // account is found.
-func firstAccountIdentifierWithSource(accountFlag string, positionalArgs []string, configPath string) (identifier, source string) {
+func firstAccountIdentifierWithSource(
+	accountFlag string,
+	positionalArgs []string,
+	configPath string,
+) (identifier, source string) {
 	if strings.TrimSpace(accountFlag) != "" {
 		return strings.TrimSpace(accountFlag), "explicit"
 	}
@@ -489,7 +522,10 @@ func matchingNicknameAccounts(
 func formatResolvedAccountCandidates(candidates []resolvedAccountCandidate) string {
 	parts := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
-		parts = append(parts, fmt.Sprintf("%s (account: %s, hash: %s)", candidate.nickname, candidate.accountNumber, candidate.hash))
+		parts = append(
+			parts,
+			fmt.Sprintf("%s (account: %s, hash: %s)", candidate.nickname, candidate.accountNumber, candidate.hash),
+		)
 	}
 	return strings.Join(parts, ", ")
 }
@@ -672,7 +708,8 @@ from the preferences API (best-effort, degrades gracefully).`,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
-	cmd.PersistentFlags().String("account", "", "Account hash, account number, or nickname to use (overrides config default)")
+	cmd.PersistentFlags().
+		String("account", "", "Account hash, account number, or nickname to use (overrides config default)")
 
 	cmd.AddCommand(
 		newAccountSummaryCmd(c, w),

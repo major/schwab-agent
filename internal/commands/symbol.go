@@ -24,11 +24,11 @@ type symbolResult struct {
 
 // symbolBuildOpts holds the options for the symbol build subcommand.
 type symbolBuildOpts struct {
-	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol (e.g. AAPL)" flagrequired:"true"`
-	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true"`
-	Strike     float64 `flag:"strike" flagdescr:"Strike price (e.g. 200, 450.50)" flagrequired:"true"`
-	Call       bool    `flag:"call" flagdescr:"Call option"`
-	Put        bool    `flag:"put" flagdescr:"Put option"`
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol (e.g. AAPL)"   flagrequired:"true"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"    flagrequired:"true"`
+	Strike     float64 `flag:"strike"     flagdescr:"Strike price (e.g. 200, 450.50)" flagrequired:"true"`
+	Call       bool    `flag:"call"       flagdescr:"Call option"`
+	Put        bool    `flag:"put"        flagdescr:"Put option"`
 }
 
 // NewSymbolCmd returns the Cobra command for option symbol utilities.

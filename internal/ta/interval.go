@@ -82,7 +82,10 @@ func maxCandlesForInterval(interval string) int {
 //
 // Returns a ValidationError if requiredCandles exceeds the API's maximum capacity for
 // the given interval, or if the interval is not recognized.
-func IntervalToHistoryParams(interval string, requiredCandles int) (periodType, period, freqType, freq string, err error) {
+func IntervalToHistoryParams(
+	interval string,
+	requiredCandles int,
+) (periodType, period, freqType, freq string, err error) {
 	// Fail early when the request exceeds the API's maximum history depth.
 	// Without this check, the period gets silently capped and the post-fetch
 	// validation produces a confusing "got N candles" error that blames the

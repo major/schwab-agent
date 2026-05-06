@@ -13,7 +13,10 @@ import (
 // All three output slices are zero-stripped and aligned to the shortest length.
 // fastPeriod must be < slowPeriod. All periods must be > 0.
 // len(closes) must be >= slowPeriod + signalPeriod.
-func MACD(closes []float64, fastPeriod, slowPeriod, signalPeriod int) (macdLine, signalLine, histogram []float64, err error) {
+func MACD(
+	closes []float64,
+	fastPeriod, slowPeriod, signalPeriod int,
+) (macdLine, signalLine, histogram []float64, err error) {
 	if fastPeriod <= 0 || slowPeriod <= 0 || signalPeriod <= 0 {
 		return nil, nil, nil, apperr.NewValidationError(
 			"macd: all periods must be > 0",

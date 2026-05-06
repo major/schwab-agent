@@ -22,281 +22,281 @@ const mutableDisabledMessage = `Mutable operations are disabled by default. ` +
 
 // equityPlaceOpts holds flags shared by equity place, build, and replace flows.
 type equityPlaceOpts struct {
-	Symbol             string                      `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
-	Action             models.Instruction          `flag:"action" flagdescr:"Order action" flagrequired:"true" flaggroup:"order"`
-	Quantity           float64                     `flag:"quantity" flagdescr:"Share quantity" flagrequired:"true" flaggroup:"execution"`
-	Type               models.OrderType            `flag:"type" flagdescr:"Order type" flaggroup:"order"`
-	Price              float64                     `flag:"price" flagdescr:"Limit price" flaggroup:"pricing"`
-	StopPrice          float64                     `flag:"stop-price" flagdescr:"Stop price" flaggroup:"pricing"`
-	StopOffset         float64                     `flag:"stop-offset" flagdescr:"Trailing stop offset amount" flaggroup:"pricing"`
-	StopLinkBasis      models.StopPriceLinkBasis   `flag:"stop-link-basis" flagdescr:"Trailing stop reference price (LAST, BID, ASK, MARK)" flaggroup:"pricing"`
-	StopLinkType       models.StopPriceLinkType    `flag:"stop-link-type" flagdescr:"Trailing stop offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
-	StopType           models.StopType             `flag:"stop-type" flagdescr:"Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)" flaggroup:"pricing"`
-	ActivationPrice    float64                     `flag:"activation-price" flagdescr:"Price that activates the trailing stop" flaggroup:"pricing"`
-	Duration           models.Duration             `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session            models.Session              `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
-	SpecialInstruction models.SpecialInstruction   `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)" flaggroup:"execution"`
-	Destination        models.RequestedDestination `flag:"destination" flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)" flaggroup:"execution"`
-	PriceLinkBasis     models.PriceLinkBasis       `flag:"price-link-basis" flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)" flaggroup:"pricing"`
-	PriceLinkType      models.PriceLinkType        `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
+	Symbol             string                      `flag:"symbol"              flagdescr:"Equity symbol"                                                                                        flagrequired:"true" flaggroup:"order"`
+	Action             models.Instruction          `flag:"action"              flagdescr:"Order action"                                                                                         flagrequired:"true" flaggroup:"order"`
+	Quantity           float64                     `flag:"quantity"            flagdescr:"Share quantity"                                                                                       flagrequired:"true" flaggroup:"execution"`
+	Type               models.OrderType            `flag:"type"                flagdescr:"Order type"                                                                                                               flaggroup:"order"`
+	Price              float64                     `flag:"price"               flagdescr:"Limit price"                                                                                                              flaggroup:"pricing"`
+	StopPrice          float64                     `flag:"stop-price"          flagdescr:"Stop price"                                                                                                               flaggroup:"pricing"`
+	StopOffset         float64                     `flag:"stop-offset"         flagdescr:"Trailing stop offset amount"                                                                                              flaggroup:"pricing"`
+	StopLinkBasis      models.StopPriceLinkBasis   `flag:"stop-link-basis"     flagdescr:"Trailing stop reference price (LAST, BID, ASK, MARK)"                                                                     flaggroup:"pricing"`
+	StopLinkType       models.StopPriceLinkType    `flag:"stop-link-type"      flagdescr:"Trailing stop offset type (VALUE, PERCENT, TICK)"                                                                         flaggroup:"pricing"`
+	StopType           models.StopType             `flag:"stop-type"           flagdescr:"Trailing stop trigger type (STANDARD, BID, ASK, LAST, MARK)"                                                              flaggroup:"pricing"`
+	ActivationPrice    float64                     `flag:"activation-price"    flagdescr:"Price that activates the trailing stop"                                                                                   flaggroup:"pricing"`
+	Duration           models.Duration             `flag:"duration"            flagdescr:"Order duration"                                                                                                           flaggroup:"order"`
+	Session            models.Session              `flag:"session"             flagdescr:"Trading session"                                                                                                          flaggroup:"order"`
+	SpecialInstruction models.SpecialInstruction   `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"                                              flaggroup:"execution"`
+	Destination        models.RequestedDestination `flag:"destination"         flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)"                     flaggroup:"execution"`
+	PriceLinkBasis     models.PriceLinkBasis       `flag:"price-link-basis"    flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)"                               flaggroup:"pricing"`
+	PriceLinkType      models.PriceLinkType        `flag:"price-link-type"     flagdescr:"Price link offset type (VALUE, PERCENT, TICK)"                                                                            flaggroup:"pricing"`
 }
 
 // optionPlaceOpts holds flags shared by option place and build flows.
 type optionPlaceOpts struct {
-	Underlying         string                      `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration         string                      `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	Strike             float64                     `flag:"strike" flagdescr:"Strike price" flagrequired:"true" flaggroup:"contract"`
-	Call               bool                        `flag:"call" flagdescr:"Call option" flaggroup:"contract"`
-	Put                bool                        `flag:"put" flagdescr:"Put option" flaggroup:"contract"`
-	Action             models.Instruction          `flag:"action" flagdescr:"Order action" flagrequired:"true" flaggroup:"order"`
-	Quantity           float64                     `flag:"quantity" flagdescr:"Contract quantity" flagrequired:"true" flaggroup:"execution"`
-	Type               models.OrderType            `flag:"type" flagdescr:"Order type" flaggroup:"order"`
-	Price              float64                     `flag:"price" flagdescr:"Limit price" flaggroup:"pricing"`
-	Duration           models.Duration             `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session            models.Session              `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
-	SpecialInstruction models.SpecialInstruction   `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)" flaggroup:"execution"`
-	Destination        models.RequestedDestination `flag:"destination" flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)" flaggroup:"execution"`
-	PriceLinkBasis     models.PriceLinkBasis       `flag:"price-link-basis" flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)" flaggroup:"pricing"`
-	PriceLinkType      models.PriceLinkType        `flag:"price-link-type" flagdescr:"Price link offset type (VALUE, PERCENT, TICK)" flaggroup:"pricing"`
+	Underlying         string                      `flag:"underlying"          flagdescr:"Underlying symbol"                                                                                    flagrequired:"true" flaggroup:"contract"`
+	Expiration         string                      `flag:"expiration"          flagdescr:"Expiration date (YYYY-MM-DD)"                                                                         flagrequired:"true" flaggroup:"contract"`
+	Strike             float64                     `flag:"strike"              flagdescr:"Strike price"                                                                                         flagrequired:"true" flaggroup:"contract"`
+	Call               bool                        `flag:"call"                flagdescr:"Call option"                                                                                                              flaggroup:"contract"`
+	Put                bool                        `flag:"put"                 flagdescr:"Put option"                                                                                                               flaggroup:"contract"`
+	Action             models.Instruction          `flag:"action"              flagdescr:"Order action"                                                                                         flagrequired:"true" flaggroup:"order"`
+	Quantity           float64                     `flag:"quantity"            flagdescr:"Contract quantity"                                                                                    flagrequired:"true" flaggroup:"execution"`
+	Type               models.OrderType            `flag:"type"                flagdescr:"Order type"                                                                                                               flaggroup:"order"`
+	Price              float64                     `flag:"price"               flagdescr:"Limit price"                                                                                                              flaggroup:"pricing"`
+	Duration           models.Duration             `flag:"duration"            flagdescr:"Order duration"                                                                                                           flaggroup:"order"`
+	Session            models.Session              `flag:"session"             flagdescr:"Trading session"                                                                                                          flaggroup:"order"`
+	SpecialInstruction models.SpecialInstruction   `flag:"special-instruction" flagdescr:"Special instruction (ALL_OR_NONE, DO_NOT_REDUCE, ALL_OR_NONE_DO_NOT_REDUCE)"                                              flaggroup:"execution"`
+	Destination        models.RequestedDestination `flag:"destination"         flagdescr:"Order routing destination (INET, ECN_ARCA, CBOE, AMEX, PHLX, ISE, BOX, NYSE, NASDAQ, BATS, C2, AUTO)"                     flaggroup:"execution"`
+	PriceLinkBasis     models.PriceLinkBasis       `flag:"price-link-basis"    flagdescr:"Price link reference price (MANUAL, BASE, TRIGGER, LAST, BID, ASK, ASK_BID, MARK, AVERAGE)"                               flaggroup:"pricing"`
+	PriceLinkType      models.PriceLinkType        `flag:"price-link-type"     flagdescr:"Price link offset type (VALUE, PERCENT, TICK)"                                                                            flaggroup:"pricing"`
 }
 
 // bracketPlaceOpts holds flags shared by bracket place and build flows.
 type bracketPlaceOpts struct {
-	Symbol     string             `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
-	Action     models.Instruction `flag:"action" flagdescr:"Order action" flagrequired:"true" flaggroup:"order"`
-	Quantity   float64            `flag:"quantity" flagdescr:"Share quantity" flagrequired:"true" flaggroup:"execution"`
-	Type       models.OrderType   `flag:"type" flagdescr:"Entry order type" flaggroup:"order"`
-	Price      float64            `flag:"price" flagdescr:"Entry price" flaggroup:"pricing"`
-	TakeProfit float64            `flag:"take-profit" flagdescr:"Take-profit exit price" flaggroup:"pricing"`
-	StopLoss   float64            `flag:"stop-loss" flagdescr:"Stop-loss exit price" flaggroup:"pricing"`
-	Duration   models.Duration    `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session    models.Session     `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Symbol     string             `flag:"symbol"      flagdescr:"Equity symbol"          flagrequired:"true" flaggroup:"order"`
+	Action     models.Instruction `flag:"action"      flagdescr:"Order action"           flagrequired:"true" flaggroup:"order"`
+	Quantity   float64            `flag:"quantity"    flagdescr:"Share quantity"         flagrequired:"true" flaggroup:"execution"`
+	Type       models.OrderType   `flag:"type"        flagdescr:"Entry order type"                           flaggroup:"order"`
+	Price      float64            `flag:"price"       flagdescr:"Entry price"                                flaggroup:"pricing"`
+	TakeProfit float64            `flag:"take-profit" flagdescr:"Take-profit exit price"                     flaggroup:"pricing"`
+	StopLoss   float64            `flag:"stop-loss"   flagdescr:"Stop-loss exit price"                       flaggroup:"pricing"`
+	Duration   models.Duration    `flag:"duration"    flagdescr:"Order duration"                             flaggroup:"order"`
+	Session    models.Session     `flag:"session"     flagdescr:"Trading session"                            flaggroup:"order"`
 }
 
 // ocoPlaceOpts holds flags shared by OCO place and build flows.
 type ocoPlaceOpts struct {
-	Symbol     string             `flag:"symbol" flagdescr:"Equity symbol" flagrequired:"true" flaggroup:"order"`
-	Action     models.Instruction `flag:"action" flagdescr:"Exit action (SELL to close long, BUY to close short)" flagrequired:"true" flaggroup:"order"`
-	Quantity   float64            `flag:"quantity" flagdescr:"Share quantity" flagrequired:"true" flaggroup:"execution"`
-	TakeProfit float64            `flag:"take-profit" flagdescr:"Take-profit exit price (limit order)" flaggroup:"pricing"`
-	StopLoss   float64            `flag:"stop-loss" flagdescr:"Stop-loss exit price (stop order)" flaggroup:"pricing"`
-	Duration   models.Duration    `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session    models.Session     `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Symbol     string             `flag:"symbol"      flagdescr:"Equity symbol"                                        flagrequired:"true" flaggroup:"order"`
+	Action     models.Instruction `flag:"action"      flagdescr:"Exit action (SELL to close long, BUY to close short)" flagrequired:"true" flaggroup:"order"`
+	Quantity   float64            `flag:"quantity"    flagdescr:"Share quantity"                                       flagrequired:"true" flaggroup:"execution"`
+	TakeProfit float64            `flag:"take-profit" flagdescr:"Take-profit exit price (limit order)"                                     flaggroup:"pricing"`
+	StopLoss   float64            `flag:"stop-loss"   flagdescr:"Stop-loss exit price (stop order)"                                        flaggroup:"pricing"`
+	Duration   models.Duration    `flag:"duration"    flagdescr:"Order duration"                                                           flaggroup:"order"`
+	Session    models.Session     `flag:"session"     flagdescr:"Trading session"                                                          flaggroup:"order"`
 }
 
 // verticalBuildOpts holds flags for vertical spread build flows.
 type verticalBuildOpts struct {
-	Underlying  string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration  string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	LongStrike  float64         `flag:"long-strike" flagdescr:"Strike price of the option being bought" flagrequired:"true" flaggroup:"contract"`
-	ShortStrike float64         `flag:"short-strike" flagdescr:"Strike price of the option being sold" flagrequired:"true" flaggroup:"contract"`
-	Call        bool            `flag:"call" flagdescr:"Call spread" flaggroup:"contract"`
-	Put         bool            `flag:"put" flagdescr:"Put spread" flaggroup:"contract"`
-	Open        bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close       bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity    float64         `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
-	Price       float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration    models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session     models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying  string          `flag:"underlying"   flagdescr:"Underlying symbol"                       flagrequired:"true" flaggroup:"contract"`
+	Expiration  string          `flag:"expiration"   flagdescr:"Expiration date (YYYY-MM-DD)"            flagrequired:"true" flaggroup:"contract"`
+	LongStrike  float64         `flag:"long-strike"  flagdescr:"Strike price of the option being bought" flagrequired:"true" flaggroup:"contract"`
+	ShortStrike float64         `flag:"short-strike" flagdescr:"Strike price of the option being sold"   flagrequired:"true" flaggroup:"contract"`
+	Call        bool            `flag:"call"         flagdescr:"Call spread"                                                 flaggroup:"contract"`
+	Put         bool            `flag:"put"          flagdescr:"Put spread"                                                  flaggroup:"contract"`
+	Open        bool            `flag:"open"         flagdescr:"Opening position"                                            flaggroup:"execution"`
+	Close       bool            `flag:"close"        flagdescr:"Closing position"                                            flaggroup:"execution"`
+	Quantity    float64         `flag:"quantity"     flagdescr:"Number of contracts"                     flagrequired:"true" flaggroup:"execution"`
+	Price       float64         `flag:"price"        flagdescr:"Net debit or credit amount"              flagrequired:"true" flaggroup:"pricing"`
+	Duration    models.Duration `flag:"duration"     flagdescr:"Order duration"                                              flaggroup:"order"`
+	Session     models.Session  `flag:"session"      flagdescr:"Trading session"                                             flaggroup:"order"`
 }
 
 // ironCondorBuildOpts holds flags for iron condor build flows.
 type ironCondorBuildOpts struct {
-	Underlying      string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration      string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	PutLongStrike   float64         `flag:"put-long-strike" flagdescr:"Lowest strike: put being bought (protection)" flagrequired:"true" flaggroup:"contract"`
-	PutShortStrike  float64         `flag:"put-short-strike" flagdescr:"Put being sold (premium)" flagrequired:"true" flaggroup:"contract"`
-	CallShortStrike float64         `flag:"call-short-strike" flagdescr:"Call being sold (premium)" flagrequired:"true" flaggroup:"contract"`
-	CallLongStrike  float64         `flag:"call-long-strike" flagdescr:"Highest strike: call being bought (protection)" flagrequired:"true" flaggroup:"contract"`
-	Open            bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close           bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity        float64         `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
-	Price           float64         `flag:"price" flagdescr:"Net credit or debit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration        models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session         models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying      string          `flag:"underlying"        flagdescr:"Underlying symbol"                              flagrequired:"true" flaggroup:"contract"`
+	Expiration      string          `flag:"expiration"        flagdescr:"Expiration date (YYYY-MM-DD)"                   flagrequired:"true" flaggroup:"contract"`
+	PutLongStrike   float64         `flag:"put-long-strike"   flagdescr:"Lowest strike: put being bought (protection)"   flagrequired:"true" flaggroup:"contract"`
+	PutShortStrike  float64         `flag:"put-short-strike"  flagdescr:"Put being sold (premium)"                       flagrequired:"true" flaggroup:"contract"`
+	CallShortStrike float64         `flag:"call-short-strike" flagdescr:"Call being sold (premium)"                      flagrequired:"true" flaggroup:"contract"`
+	CallLongStrike  float64         `flag:"call-long-strike"  flagdescr:"Highest strike: call being bought (protection)" flagrequired:"true" flaggroup:"contract"`
+	Open            bool            `flag:"open"              flagdescr:"Opening position"                                                   flaggroup:"execution"`
+	Close           bool            `flag:"close"             flagdescr:"Closing position"                                                   flaggroup:"execution"`
+	Quantity        float64         `flag:"quantity"          flagdescr:"Number of contracts"                            flagrequired:"true" flaggroup:"execution"`
+	Price           float64         `flag:"price"             flagdescr:"Net credit or debit amount"                     flagrequired:"true" flaggroup:"pricing"`
+	Duration        models.Duration `flag:"duration"          flagdescr:"Order duration"                                                     flaggroup:"order"`
+	Session         models.Session  `flag:"session"           flagdescr:"Trading session"                                                    flaggroup:"order"`
 }
 
 // strangleBuildOpts holds flags for strangle build flows.
 type strangleBuildOpts struct {
-	Underlying string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	CallStrike float64         `flag:"call-strike" flagdescr:"Strike price for the call leg" flagrequired:"true" flaggroup:"contract"`
-	PutStrike  float64         `flag:"put-strike" flagdescr:"Strike price for the put leg" flagrequired:"true" flaggroup:"contract"`
-	Buy        bool            `flag:"buy" flagdescr:"Buy the strangle (long, net debit)" flaggroup:"execution"`
-	Sell       bool            `flag:"sell" flagdescr:"Sell the strangle (short, net credit)" flaggroup:"execution"`
-	Open       bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close      bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity   float64         `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
-	Price      float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration   models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session    models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying string          `flag:"underlying"  flagdescr:"Underlying symbol"                     flagrequired:"true" flaggroup:"contract"`
+	Expiration string          `flag:"expiration"  flagdescr:"Expiration date (YYYY-MM-DD)"          flagrequired:"true" flaggroup:"contract"`
+	CallStrike float64         `flag:"call-strike" flagdescr:"Strike price for the call leg"         flagrequired:"true" flaggroup:"contract"`
+	PutStrike  float64         `flag:"put-strike"  flagdescr:"Strike price for the put leg"          flagrequired:"true" flaggroup:"contract"`
+	Buy        bool            `flag:"buy"         flagdescr:"Buy the strangle (long, net debit)"                        flaggroup:"execution"`
+	Sell       bool            `flag:"sell"        flagdescr:"Sell the strangle (short, net credit)"                     flaggroup:"execution"`
+	Open       bool            `flag:"open"        flagdescr:"Opening position"                                          flaggroup:"execution"`
+	Close      bool            `flag:"close"       flagdescr:"Closing position"                                          flaggroup:"execution"`
+	Quantity   float64         `flag:"quantity"    flagdescr:"Number of contracts"                   flagrequired:"true" flaggroup:"execution"`
+	Price      float64         `flag:"price"       flagdescr:"Net debit or credit amount"            flagrequired:"true" flaggroup:"pricing"`
+	Duration   models.Duration `flag:"duration"    flagdescr:"Order duration"                                            flaggroup:"order"`
+	Session    models.Session  `flag:"session"     flagdescr:"Trading session"                                           flaggroup:"order"`
 }
 
 // straddleBuildOpts holds flags for straddle build flows.
 type straddleBuildOpts struct {
-	Underlying string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	Strike     float64         `flag:"strike" flagdescr:"Strike price (shared by call and put legs)" flagrequired:"true" flaggroup:"contract"`
-	Buy        bool            `flag:"buy" flagdescr:"Buy the straddle (long, net debit)" flaggroup:"execution"`
-	Sell       bool            `flag:"sell" flagdescr:"Sell the straddle (short, net credit)" flaggroup:"execution"`
-	Open       bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close      bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity   float64         `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
-	Price      float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration   models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session    models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying string          `flag:"underlying" flagdescr:"Underlying symbol"                          flagrequired:"true" flaggroup:"contract"`
+	Expiration string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"               flagrequired:"true" flaggroup:"contract"`
+	Strike     float64         `flag:"strike"     flagdescr:"Strike price (shared by call and put legs)" flagrequired:"true" flaggroup:"contract"`
+	Buy        bool            `flag:"buy"        flagdescr:"Buy the straddle (long, net debit)"                             flaggroup:"execution"`
+	Sell       bool            `flag:"sell"       flagdescr:"Sell the straddle (short, net credit)"                          flaggroup:"execution"`
+	Open       bool            `flag:"open"       flagdescr:"Opening position"                                               flaggroup:"execution"`
+	Close      bool            `flag:"close"      flagdescr:"Closing position"                                               flaggroup:"execution"`
+	Quantity   float64         `flag:"quantity"   flagdescr:"Number of contracts"                        flagrequired:"true" flaggroup:"execution"`
+	Price      float64         `flag:"price"      flagdescr:"Net debit or credit amount"                 flagrequired:"true" flaggroup:"pricing"`
+	Duration   models.Duration `flag:"duration"   flagdescr:"Order duration"                                                 flaggroup:"order"`
+	Session    models.Session  `flag:"session"    flagdescr:"Trading session"                                                flaggroup:"order"`
 }
 
 // coveredCallBuildOpts holds flags for covered call build flows.
 type coveredCallBuildOpts struct {
-	Underlying string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	Strike     float64         `flag:"strike" flagdescr:"Call strike price" flagrequired:"true" flaggroup:"contract"`
-	Quantity   float64         `flag:"quantity" flagdescr:"Number of contracts (1 contract = 100 shares)" flagrequired:"true" flaggroup:"execution"`
-	Price      float64         `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration   models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session    models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying string          `flag:"underlying" flagdescr:"Underlying symbol"                             flagrequired:"true" flaggroup:"contract"`
+	Expiration string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"                  flagrequired:"true" flaggroup:"contract"`
+	Strike     float64         `flag:"strike"     flagdescr:"Call strike price"                             flagrequired:"true" flaggroup:"contract"`
+	Quantity   float64         `flag:"quantity"   flagdescr:"Number of contracts (1 contract = 100 shares)" flagrequired:"true" flaggroup:"execution"`
+	Price      float64         `flag:"price"      flagdescr:"Net debit amount"                              flagrequired:"true" flaggroup:"pricing"`
+	Duration   models.Duration `flag:"duration"   flagdescr:"Order duration"                                                    flaggroup:"order"`
+	Session    models.Session  `flag:"session"    flagdescr:"Trading session"                                                   flaggroup:"order"`
 }
 
 // collarBuildOpts holds flags for collar-with-stock build flows.
 type collarBuildOpts struct {
-	Underlying string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	PutStrike  float64         `flag:"put-strike" flagdescr:"Protective put strike price" flagrequired:"true" flaggroup:"contract"`
-	CallStrike float64         `flag:"call-strike" flagdescr:"Covered call strike price" flagrequired:"true" flaggroup:"contract"`
-	Expiration string          `flag:"expiration" flagdescr:"Expiration date for both options (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	Quantity   float64         `flag:"quantity" flagdescr:"Number of contracts (1 contract = 100 shares)" flagrequired:"true" flaggroup:"execution"`
-	Open       bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close      bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Price      float64         `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration   models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session    models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying string          `flag:"underlying"  flagdescr:"Underlying symbol"                             flagrequired:"true" flaggroup:"contract"`
+	PutStrike  float64         `flag:"put-strike"  flagdescr:"Protective put strike price"                   flagrequired:"true" flaggroup:"contract"`
+	CallStrike float64         `flag:"call-strike" flagdescr:"Covered call strike price"                     flagrequired:"true" flaggroup:"contract"`
+	Expiration string          `flag:"expiration"  flagdescr:"Expiration date for both options (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	Quantity   float64         `flag:"quantity"    flagdescr:"Number of contracts (1 contract = 100 shares)" flagrequired:"true" flaggroup:"execution"`
+	Open       bool            `flag:"open"        flagdescr:"Opening position"                                                  flaggroup:"execution"`
+	Close      bool            `flag:"close"       flagdescr:"Closing position"                                                  flaggroup:"execution"`
+	Price      float64         `flag:"price"       flagdescr:"Net debit amount"                              flagrequired:"true" flaggroup:"pricing"`
+	Duration   models.Duration `flag:"duration"    flagdescr:"Order duration"                                                    flaggroup:"order"`
+	Session    models.Session  `flag:"session"     flagdescr:"Trading session"                                                   flaggroup:"order"`
 }
 
 // calendarBuildOpts holds flags for calendar spread build flows.
 type calendarBuildOpts struct {
-	Underlying     string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
+	Underlying     string          `flag:"underlying"      flagdescr:"Underlying symbol"                      flagrequired:"true" flaggroup:"contract"`
 	NearExpiration string          `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	FarExpiration  string          `flag:"far-expiration" flagdescr:"Far-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	Strike         float64         `flag:"strike" flagdescr:"Strike price (shared by both legs)" flagrequired:"true" flaggroup:"contract"`
-	Call           bool            `flag:"call" flagdescr:"Call calendar spread" flaggroup:"contract"`
-	Put            bool            `flag:"put" flagdescr:"Put calendar spread" flaggroup:"contract"`
-	Open           bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close          bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity       float64         `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
-	Price          float64         `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration       models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session        models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	FarExpiration  string          `flag:"far-expiration"  flagdescr:"Far-term expiration date (YYYY-MM-DD)"  flagrequired:"true" flaggroup:"contract"`
+	Strike         float64         `flag:"strike"          flagdescr:"Strike price (shared by both legs)"     flagrequired:"true" flaggroup:"contract"`
+	Call           bool            `flag:"call"            flagdescr:"Call calendar spread"                                       flaggroup:"contract"`
+	Put            bool            `flag:"put"             flagdescr:"Put calendar spread"                                        flaggroup:"contract"`
+	Open           bool            `flag:"open"            flagdescr:"Opening position"                                           flaggroup:"execution"`
+	Close          bool            `flag:"close"           flagdescr:"Closing position"                                           flaggroup:"execution"`
+	Quantity       float64         `flag:"quantity"        flagdescr:"Number of contracts"                    flagrequired:"true" flaggroup:"execution"`
+	Price          float64         `flag:"price"           flagdescr:"Net debit amount"                       flagrequired:"true" flaggroup:"pricing"`
+	Duration       models.Duration `flag:"duration"        flagdescr:"Order duration"                                             flaggroup:"order"`
+	Session        models.Session  `flag:"session"         flagdescr:"Trading session"                                            flaggroup:"order"`
 }
 
 // diagonalBuildOpts holds flags for diagonal spread build flows.
 type diagonalBuildOpts struct {
-	Underlying     string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	NearExpiration string          `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	FarExpiration  string          `flag:"far-expiration" flagdescr:"Far-term expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	NearStrike     float64         `flag:"near-strike" flagdescr:"Strike price for the near-term (sold) leg" flagrequired:"true" flaggroup:"contract"`
-	FarStrike      float64         `flag:"far-strike" flagdescr:"Strike price for the far-term (bought) leg" flagrequired:"true" flaggroup:"contract"`
-	Call           bool            `flag:"call" flagdescr:"Call diagonal spread" flaggroup:"contract"`
-	Put            bool            `flag:"put" flagdescr:"Put diagonal spread" flaggroup:"contract"`
-	Open           bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close          bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity       float64         `flag:"quantity" flagdescr:"Number of contracts" flagrequired:"true" flaggroup:"execution"`
-	Price          float64         `flag:"price" flagdescr:"Net debit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration       models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session        models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying     string          `flag:"underlying"      flagdescr:"Underlying symbol"                          flagrequired:"true" flaggroup:"contract"`
+	NearExpiration string          `flag:"near-expiration" flagdescr:"Near-term expiration date (YYYY-MM-DD)"     flagrequired:"true" flaggroup:"contract"`
+	FarExpiration  string          `flag:"far-expiration"  flagdescr:"Far-term expiration date (YYYY-MM-DD)"      flagrequired:"true" flaggroup:"contract"`
+	NearStrike     float64         `flag:"near-strike"     flagdescr:"Strike price for the near-term (sold) leg"  flagrequired:"true" flaggroup:"contract"`
+	FarStrike      float64         `flag:"far-strike"      flagdescr:"Strike price for the far-term (bought) leg" flagrequired:"true" flaggroup:"contract"`
+	Call           bool            `flag:"call"            flagdescr:"Call diagonal spread"                                           flaggroup:"contract"`
+	Put            bool            `flag:"put"             flagdescr:"Put diagonal spread"                                            flaggroup:"contract"`
+	Open           bool            `flag:"open"            flagdescr:"Opening position"                                               flaggroup:"execution"`
+	Close          bool            `flag:"close"           flagdescr:"Closing position"                                               flaggroup:"execution"`
+	Quantity       float64         `flag:"quantity"        flagdescr:"Number of contracts"                        flagrequired:"true" flaggroup:"execution"`
+	Price          float64         `flag:"price"           flagdescr:"Net debit amount"                           flagrequired:"true" flaggroup:"pricing"`
+	Duration       models.Duration `flag:"duration"        flagdescr:"Order duration"                                                 flaggroup:"order"`
+	Session        models.Session  `flag:"session"         flagdescr:"Trading session"                                                flaggroup:"order"`
 }
 
 // butterflyBuildOpts holds flags for butterfly spread build flows.
 type butterflyBuildOpts struct {
-	Underlying   string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration   string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	LowerStrike  float64         `flag:"lower-strike" flagdescr:"Lower wing strike" flagrequired:"true" flaggroup:"contract"`
-	MiddleStrike float64         `flag:"middle-strike" flagdescr:"Middle body strike" flagrequired:"true" flaggroup:"contract"`
-	UpperStrike  float64         `flag:"upper-strike" flagdescr:"Upper wing strike" flagrequired:"true" flaggroup:"contract"`
-	Call         bool            `flag:"call" flagdescr:"Call butterfly" flaggroup:"contract"`
-	Put          bool            `flag:"put" flagdescr:"Put butterfly" flaggroup:"contract"`
-	Buy          bool            `flag:"buy" flagdescr:"Buy a long butterfly" flaggroup:"execution"`
-	Sell         bool            `flag:"sell" flagdescr:"Sell a short butterfly" flaggroup:"execution"`
-	Open         bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close        bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity     float64         `flag:"quantity" flagdescr:"Wing contract quantity" flagrequired:"true" flaggroup:"execution"`
-	Price        float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration     models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session      models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying   string          `flag:"underlying"    flagdescr:"Underlying symbol"            flagrequired:"true" flaggroup:"contract"`
+	Expiration   string          `flag:"expiration"    flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	LowerStrike  float64         `flag:"lower-strike"  flagdescr:"Lower wing strike"            flagrequired:"true" flaggroup:"contract"`
+	MiddleStrike float64         `flag:"middle-strike" flagdescr:"Middle body strike"           flagrequired:"true" flaggroup:"contract"`
+	UpperStrike  float64         `flag:"upper-strike"  flagdescr:"Upper wing strike"            flagrequired:"true" flaggroup:"contract"`
+	Call         bool            `flag:"call"          flagdescr:"Call butterfly"                                   flaggroup:"contract"`
+	Put          bool            `flag:"put"           flagdescr:"Put butterfly"                                    flaggroup:"contract"`
+	Buy          bool            `flag:"buy"           flagdescr:"Buy a long butterfly"                             flaggroup:"execution"`
+	Sell         bool            `flag:"sell"          flagdescr:"Sell a short butterfly"                           flaggroup:"execution"`
+	Open         bool            `flag:"open"          flagdescr:"Opening position"                                 flaggroup:"execution"`
+	Close        bool            `flag:"close"         flagdescr:"Closing position"                                 flaggroup:"execution"`
+	Quantity     float64         `flag:"quantity"      flagdescr:"Wing contract quantity"       flagrequired:"true" flaggroup:"execution"`
+	Price        float64         `flag:"price"         flagdescr:"Net debit or credit amount"   flagrequired:"true" flaggroup:"pricing"`
+	Duration     models.Duration `flag:"duration"      flagdescr:"Order duration"                                   flaggroup:"order"`
+	Session      models.Session  `flag:"session"       flagdescr:"Trading session"                                  flaggroup:"order"`
 }
 
 // condorBuildOpts holds flags for condor spread build flows.
 type condorBuildOpts struct {
-	Underlying        string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration        string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	LowerStrike       float64         `flag:"lower-strike" flagdescr:"Lower wing strike" flagrequired:"true" flaggroup:"contract"`
-	LowerMiddleStrike float64         `flag:"lower-middle-strike" flagdescr:"Lower middle strike" flagrequired:"true" flaggroup:"contract"`
-	UpperMiddleStrike float64         `flag:"upper-middle-strike" flagdescr:"Upper middle strike" flagrequired:"true" flaggroup:"contract"`
-	UpperStrike       float64         `flag:"upper-strike" flagdescr:"Upper wing strike" flagrequired:"true" flaggroup:"contract"`
-	Call              bool            `flag:"call" flagdescr:"Call condor" flaggroup:"contract"`
-	Put               bool            `flag:"put" flagdescr:"Put condor" flaggroup:"contract"`
-	Buy               bool            `flag:"buy" flagdescr:"Buy a long condor" flaggroup:"execution"`
-	Sell              bool            `flag:"sell" flagdescr:"Sell a short condor" flaggroup:"execution"`
-	Open              bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close             bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity          float64         `flag:"quantity" flagdescr:"Contract quantity per strike" flagrequired:"true" flaggroup:"execution"`
-	Price             float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration          models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session           models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying        string          `flag:"underlying"          flagdescr:"Underlying symbol"            flagrequired:"true" flaggroup:"contract"`
+	Expiration        string          `flag:"expiration"          flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	LowerStrike       float64         `flag:"lower-strike"        flagdescr:"Lower wing strike"            flagrequired:"true" flaggroup:"contract"`
+	LowerMiddleStrike float64         `flag:"lower-middle-strike" flagdescr:"Lower middle strike"          flagrequired:"true" flaggroup:"contract"`
+	UpperMiddleStrike float64         `flag:"upper-middle-strike" flagdescr:"Upper middle strike"          flagrequired:"true" flaggroup:"contract"`
+	UpperStrike       float64         `flag:"upper-strike"        flagdescr:"Upper wing strike"            flagrequired:"true" flaggroup:"contract"`
+	Call              bool            `flag:"call"                flagdescr:"Call condor"                                      flaggroup:"contract"`
+	Put               bool            `flag:"put"                 flagdescr:"Put condor"                                       flaggroup:"contract"`
+	Buy               bool            `flag:"buy"                 flagdescr:"Buy a long condor"                                flaggroup:"execution"`
+	Sell              bool            `flag:"sell"                flagdescr:"Sell a short condor"                              flaggroup:"execution"`
+	Open              bool            `flag:"open"                flagdescr:"Opening position"                                 flaggroup:"execution"`
+	Close             bool            `flag:"close"               flagdescr:"Closing position"                                 flaggroup:"execution"`
+	Quantity          float64         `flag:"quantity"            flagdescr:"Contract quantity per strike" flagrequired:"true" flaggroup:"execution"`
+	Price             float64         `flag:"price"               flagdescr:"Net debit or credit amount"   flagrequired:"true" flaggroup:"pricing"`
+	Duration          models.Duration `flag:"duration"            flagdescr:"Order duration"                                   flaggroup:"order"`
+	Session           models.Session  `flag:"session"             flagdescr:"Trading session"                                  flaggroup:"order"`
 }
 
 // backRatioBuildOpts holds flags for back-ratio spread build flows.
 type backRatioBuildOpts struct {
-	Underlying  string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	Expiration  string          `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	ShortStrike float64         `flag:"short-strike" flagdescr:"Short option strike" flagrequired:"true" flaggroup:"contract"`
-	LongStrike  float64         `flag:"long-strike" flagdescr:"Long option strike" flagrequired:"true" flaggroup:"contract"`
-	Call        bool            `flag:"call" flagdescr:"Call back-ratio" flaggroup:"contract"`
-	Put         bool            `flag:"put" flagdescr:"Put back-ratio" flaggroup:"contract"`
-	Open        bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close       bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity    float64         `flag:"quantity" flagdescr:"Short-leg contract quantity" flagrequired:"true" flaggroup:"execution"`
-	LongRatio   float64         `flag:"long-ratio" flagdescr:"Long contracts per short contract" default:"2" flaggroup:"execution"`
-	Debit       bool            `flag:"debit" flagdescr:"Build as NET_DEBIT" flaggroup:"pricing"`
-	Credit      bool            `flag:"credit" flagdescr:"Build as NET_CREDIT" flaggroup:"pricing"`
-	Price       float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration    models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session     models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying  string          `flag:"underlying"   flagdescr:"Underlying symbol"                 flagrequired:"true" flaggroup:"contract"`
+	Expiration  string          `flag:"expiration"   flagdescr:"Expiration date (YYYY-MM-DD)"      flagrequired:"true" flaggroup:"contract"`
+	ShortStrike float64         `flag:"short-strike" flagdescr:"Short option strike"               flagrequired:"true" flaggroup:"contract"`
+	LongStrike  float64         `flag:"long-strike"  flagdescr:"Long option strike"                flagrequired:"true" flaggroup:"contract"`
+	Call        bool            `flag:"call"         flagdescr:"Call back-ratio"                                       flaggroup:"contract"`
+	Put         bool            `flag:"put"          flagdescr:"Put back-ratio"                                        flaggroup:"contract"`
+	Open        bool            `flag:"open"         flagdescr:"Opening position"                                      flaggroup:"execution"`
+	Close       bool            `flag:"close"        flagdescr:"Closing position"                                      flaggroup:"execution"`
+	Quantity    float64         `flag:"quantity"     flagdescr:"Short-leg contract quantity"       flagrequired:"true" flaggroup:"execution"`
+	LongRatio   float64         `flag:"long-ratio"   flagdescr:"Long contracts per short contract"                     flaggroup:"execution" default:"2"`
+	Debit       bool            `flag:"debit"        flagdescr:"Build as NET_DEBIT"                                    flaggroup:"pricing"`
+	Credit      bool            `flag:"credit"       flagdescr:"Build as NET_CREDIT"                                   flaggroup:"pricing"`
+	Price       float64         `flag:"price"        flagdescr:"Net debit or credit amount"        flagrequired:"true" flaggroup:"pricing"`
+	Duration    models.Duration `flag:"duration"     flagdescr:"Order duration"                                        flaggroup:"order"`
+	Session     models.Session  `flag:"session"      flagdescr:"Trading session"                                       flaggroup:"order"`
 }
 
 // verticalRollBuildOpts holds flags for vertical roll build flows.
 type verticalRollBuildOpts struct {
-	Underlying       string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	CloseExpiration  string          `flag:"close-expiration" flagdescr:"Expiration of the vertical being closed (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	OpenExpiration   string          `flag:"open-expiration" flagdescr:"Expiration of the vertical being opened (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	CloseLongStrike  float64         `flag:"close-long-strike" flagdescr:"Long strike of the vertical being closed" flagrequired:"true" flaggroup:"contract"`
-	CloseShortStrike float64         `flag:"close-short-strike" flagdescr:"Short strike of the vertical being closed" flagrequired:"true" flaggroup:"contract"`
-	OpenLongStrike   float64         `flag:"open-long-strike" flagdescr:"Long strike of the vertical being opened" flagrequired:"true" flaggroup:"contract"`
-	OpenShortStrike  float64         `flag:"open-short-strike" flagdescr:"Short strike of the vertical being opened" flagrequired:"true" flaggroup:"contract"`
-	Call             bool            `flag:"call" flagdescr:"Call vertical roll" flaggroup:"contract"`
-	Put              bool            `flag:"put" flagdescr:"Put vertical roll" flaggroup:"contract"`
-	Debit            bool            `flag:"debit" flagdescr:"Build as NET_DEBIT" flaggroup:"pricing"`
-	Credit           bool            `flag:"credit" flagdescr:"Build as NET_CREDIT" flaggroup:"pricing"`
-	Quantity         float64         `flag:"quantity" flagdescr:"Contract quantity" flagrequired:"true" flaggroup:"execution"`
-	Price            float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration         models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session          models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying       string          `flag:"underlying"         flagdescr:"Underlying symbol"                                    flagrequired:"true" flaggroup:"contract"`
+	CloseExpiration  string          `flag:"close-expiration"   flagdescr:"Expiration of the vertical being closed (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	OpenExpiration   string          `flag:"open-expiration"    flagdescr:"Expiration of the vertical being opened (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	CloseLongStrike  float64         `flag:"close-long-strike"  flagdescr:"Long strike of the vertical being closed"             flagrequired:"true" flaggroup:"contract"`
+	CloseShortStrike float64         `flag:"close-short-strike" flagdescr:"Short strike of the vertical being closed"            flagrequired:"true" flaggroup:"contract"`
+	OpenLongStrike   float64         `flag:"open-long-strike"   flagdescr:"Long strike of the vertical being opened"             flagrequired:"true" flaggroup:"contract"`
+	OpenShortStrike  float64         `flag:"open-short-strike"  flagdescr:"Short strike of the vertical being opened"            flagrequired:"true" flaggroup:"contract"`
+	Call             bool            `flag:"call"               flagdescr:"Call vertical roll"                                                       flaggroup:"contract"`
+	Put              bool            `flag:"put"                flagdescr:"Put vertical roll"                                                        flaggroup:"contract"`
+	Debit            bool            `flag:"debit"              flagdescr:"Build as NET_DEBIT"                                                       flaggroup:"pricing"`
+	Credit           bool            `flag:"credit"             flagdescr:"Build as NET_CREDIT"                                                      flaggroup:"pricing"`
+	Quantity         float64         `flag:"quantity"           flagdescr:"Contract quantity"                                    flagrequired:"true" flaggroup:"execution"`
+	Price            float64         `flag:"price"              flagdescr:"Net debit or credit amount"                           flagrequired:"true" flaggroup:"pricing"`
+	Duration         models.Duration `flag:"duration"           flagdescr:"Order duration"                                                           flaggroup:"order"`
+	Session          models.Session  `flag:"session"            flagdescr:"Trading session"                                                          flaggroup:"order"`
 }
 
 // doubleDiagonalBuildOpts holds flags for double diagonal spread build flows.
 type doubleDiagonalBuildOpts struct {
-	Underlying     string          `flag:"underlying" flagdescr:"Underlying symbol" flagrequired:"true" flaggroup:"contract"`
-	NearExpiration string          `flag:"near-expiration" flagdescr:"Near expiration for short legs (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	FarExpiration  string          `flag:"far-expiration" flagdescr:"Far expiration for long legs (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
-	PutFarStrike   float64         `flag:"put-far-strike" flagdescr:"Far put long strike" flagrequired:"true" flaggroup:"contract"`
-	PutNearStrike  float64         `flag:"put-near-strike" flagdescr:"Near put short strike" flagrequired:"true" flaggroup:"contract"`
-	CallNearStrike float64         `flag:"call-near-strike" flagdescr:"Near call short strike" flagrequired:"true" flaggroup:"contract"`
-	CallFarStrike  float64         `flag:"call-far-strike" flagdescr:"Far call long strike" flagrequired:"true" flaggroup:"contract"`
-	Open           bool            `flag:"open" flagdescr:"Opening position" flaggroup:"execution"`
-	Close          bool            `flag:"close" flagdescr:"Closing position" flaggroup:"execution"`
-	Quantity       float64         `flag:"quantity" flagdescr:"Contract quantity" flagrequired:"true" flaggroup:"execution"`
-	Price          float64         `flag:"price" flagdescr:"Net debit or credit amount" flagrequired:"true" flaggroup:"pricing"`
-	Duration       models.Duration `flag:"duration" flagdescr:"Order duration" flaggroup:"order"`
-	Session        models.Session  `flag:"session" flagdescr:"Trading session" flaggroup:"order"`
+	Underlying     string          `flag:"underlying"       flagdescr:"Underlying symbol"                           flagrequired:"true" flaggroup:"contract"`
+	NearExpiration string          `flag:"near-expiration"  flagdescr:"Near expiration for short legs (YYYY-MM-DD)" flagrequired:"true" flaggroup:"contract"`
+	FarExpiration  string          `flag:"far-expiration"   flagdescr:"Far expiration for long legs (YYYY-MM-DD)"   flagrequired:"true" flaggroup:"contract"`
+	PutFarStrike   float64         `flag:"put-far-strike"   flagdescr:"Far put long strike"                         flagrequired:"true" flaggroup:"contract"`
+	PutNearStrike  float64         `flag:"put-near-strike"  flagdescr:"Near put short strike"                       flagrequired:"true" flaggroup:"contract"`
+	CallNearStrike float64         `flag:"call-near-strike" flagdescr:"Near call short strike"                      flagrequired:"true" flaggroup:"contract"`
+	CallFarStrike  float64         `flag:"call-far-strike"  flagdescr:"Far call long strike"                        flagrequired:"true" flaggroup:"contract"`
+	Open           bool            `flag:"open"             flagdescr:"Opening position"                                                flaggroup:"execution"`
+	Close          bool            `flag:"close"            flagdescr:"Closing position"                                                flaggroup:"execution"`
+	Quantity       float64         `flag:"quantity"         flagdescr:"Contract quantity"                           flagrequired:"true" flaggroup:"execution"`
+	Price          float64         `flag:"price"            flagdescr:"Net debit or credit amount"                  flagrequired:"true" flaggroup:"pricing"`
+	Duration       models.Duration `flag:"duration"         flagdescr:"Order duration"                                                  flaggroup:"order"`
+	Session        models.Session  `flag:"session"          flagdescr:"Trading session"                                                 flaggroup:"order"`
 }
 
 // Valid enum values for CLI flag parsing. Each slice corresponds to one enum

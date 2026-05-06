@@ -27,39 +27,66 @@ func ValidateEquityOrder(params *EquityParams) error {
 		}
 	case models.OrderTypeStop:
 		if params.StopPrice == 0 {
-			return validationError("STOP order requires a stop price", "Add `--stop-price <amount>` to specify the stop price")
+			return validationError(
+				"STOP order requires a stop price",
+				"Add `--stop-price <amount>` to specify the stop price",
+			)
 		}
 	case models.OrderTypeStopLimit:
 		if params.Price == 0 || params.StopPrice == 0 {
-			return validationError("STOP_LIMIT order requires both price and stop price", "Add `--price <amount> --stop-price <amount>`")
+			return validationError(
+				"STOP_LIMIT order requires both price and stop price",
+				"Add `--price <amount> --stop-price <amount>`",
+			)
 		}
 	case models.OrderTypeTrailingStop:
 		if params.StopPriceOffset <= 0 {
-			return validationError("TRAILING_STOP order requires a stop price offset", "Add `--stop-offset <amount>` to specify how far the stop trails")
+			return validationError(
+				"TRAILING_STOP order requires a stop price offset",
+				"Add `--stop-offset <amount>` to specify how far the stop trails",
+			)
 		}
 	case models.OrderTypeTrailingStopLimit:
 		if params.StopPriceOffset <= 0 {
-			return validationError("TRAILING_STOP_LIMIT order requires a stop price offset", "Add `--stop-offset <amount>` to specify how far the stop trails")
+			return validationError(
+				"TRAILING_STOP_LIMIT order requires a stop price offset",
+				"Add `--stop-offset <amount>` to specify how far the stop trails",
+			)
 		}
 
 		if params.Price == 0 {
-			return validationError("TRAILING_STOP_LIMIT order requires a limit price", "Add `--price <amount>` to specify the limit price")
+			return validationError(
+				"TRAILING_STOP_LIMIT order requires a limit price",
+				"Add `--price <amount>` to specify the limit price",
+			)
 		}
 	case models.OrderTypeMarketOnClose:
 		// MOC orders are like MARKET orders - no price or stop price allowed
 		if params.Price != 0 {
-			return validationError("MARKET_ON_CLOSE order does not accept a price", "Remove `--price` flag for MOC orders")
+			return validationError(
+				"MARKET_ON_CLOSE order does not accept a price",
+				"Remove `--price` flag for MOC orders",
+			)
 		}
 		if params.StopPrice != 0 {
-			return validationError("MARKET_ON_CLOSE order does not accept a stop price", "Remove `--stop-price` flag for MOC orders")
+			return validationError(
+				"MARKET_ON_CLOSE order does not accept a stop price",
+				"Remove `--stop-price` flag for MOC orders",
+			)
 		}
 	case models.OrderTypeLimitOnClose:
 		// LOC orders are like LIMIT orders - price is required
 		if params.Price == 0 {
-			return validationError("LIMIT_ON_CLOSE order requires a price", "Add `--price <amount>` to specify the limit price")
+			return validationError(
+				"LIMIT_ON_CLOSE order requires a price",
+				"Add `--price <amount>` to specify the limit price",
+			)
 		}
 		if params.StopPrice != 0 {
-			return validationError("LIMIT_ON_CLOSE order does not accept a stop price", "Remove `--stop-price` flag for LOC orders")
+			return validationError(
+				"LIMIT_ON_CLOSE order does not accept a stop price",
+				"Remove `--stop-price` flag for LOC orders",
+			)
 		}
 	}
 
@@ -93,7 +120,10 @@ func ValidateOptionOrder(params *OptionParams) error {
 	}
 
 	if params.Strike <= 0 {
-		return validationError("option strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+		return validationError(
+			"option strike price must be greater than zero",
+			"Add `--strike <price>` with a positive value",
+		)
 	}
 
 	if err := validatePriceLinkPair(params.PriceLinkBasis, params.PriceLinkType); err != nil {
@@ -117,7 +147,10 @@ func ValidateOCOOrder(params *OCOParams) error {
 	}
 
 	if params.TakeProfit == 0 && params.StopLoss == 0 {
-		return validationError("OCO order requires at least one exit condition", "Add `--take-profit <amount>` and/or `--stop-loss <amount>`")
+		return validationError(
+			"OCO order requires at least one exit condition",
+			"Add `--take-profit <amount>` and/or `--stop-loss <amount>`",
+		)
 	}
 
 	if err := validateOCOPriceRelationships(params); err != nil {
@@ -172,7 +205,10 @@ func ValidateBracketOrder(params *BracketParams) error {
 	}
 
 	if params.TakeProfit == 0 && params.StopLoss == 0 {
-		return validationError("bracket order requires at least one exit condition", "Add `--take-profit <amount>` and/or `--stop-loss <amount>`")
+		return validationError(
+			"bracket order requires at least one exit condition",
+			"Add `--take-profit <amount>` and/or `--stop-loss <amount>`",
+		)
 	}
 
 	if params.Price > 0 {
@@ -226,22 +262,34 @@ func validateFTSLeg(name string, order *models.OrderRequest) error {
 func validateBracketPriceRelationships(params *BracketParams) error {
 	if params.Action == models.InstructionBuy {
 		if params.TakeProfit > 0 && params.TakeProfit <= params.Price {
-			return validationError("take-profit price must be above the entry price for a BUY bracket", "Increase `--take-profit` so it is above the entry price")
+			return validationError(
+				"take-profit price must be above the entry price for a BUY bracket",
+				"Increase `--take-profit` so it is above the entry price",
+			)
 		}
 
 		if params.StopLoss > 0 && params.StopLoss >= params.Price {
-			return validationError("stop-loss price must be below the entry price for a BUY bracket", "Lower `--stop-loss` so it is below the entry price")
+			return validationError(
+				"stop-loss price must be below the entry price for a BUY bracket",
+				"Lower `--stop-loss` so it is below the entry price",
+			)
 		}
 
 		return nil
 	}
 
 	if params.TakeProfit > 0 && params.TakeProfit >= params.Price {
-		return validationError("take-profit price must be below the entry price for a SELL bracket", "Lower `--take-profit` so it is below the entry price")
+		return validationError(
+			"take-profit price must be below the entry price for a SELL bracket",
+			"Lower `--take-profit` so it is below the entry price",
+		)
 	}
 
 	if params.StopLoss > 0 && params.StopLoss <= params.Price {
-		return validationError("stop-loss price must be above the entry price for a SELL bracket", "Raise `--stop-loss` so it is above the entry price")
+		return validationError(
+			"stop-loss price must be above the entry price for a SELL bracket",
+			"Raise `--stop-loss` so it is above the entry price",
+		)
 	}
 
 	return nil
@@ -262,15 +310,24 @@ func ValidateVerticalOrder(params *VerticalParams) error {
 	}
 
 	if params.LongStrike <= 0 {
-		return validationError("long strike price must be greater than zero", "Add `--long-strike <price>` with a positive value")
+		return validationError(
+			"long strike price must be greater than zero",
+			"Add `--long-strike <price>` with a positive value",
+		)
 	}
 
 	if params.ShortStrike <= 0 {
-		return validationError("short strike price must be greater than zero", "Add `--short-strike <price>` with a positive value")
+		return validationError(
+			"short strike price must be greater than zero",
+			"Add `--short-strike <price>` with a positive value",
+		)
 	}
 
 	if params.LongStrike == params.ShortStrike {
-		return validationError("long and short strikes must be different", "Use different values for `--long-strike` and `--short-strike`")
+		return validationError(
+			"long and short strikes must be different",
+			"Use different values for `--long-strike` and `--short-strike`",
+		)
 	}
 
 	return validateSpreadPrice(params.Price, "vertical spreads")
@@ -303,20 +360,32 @@ func ValidateIronCondorOrder(params *IronCondorParams) error {
 
 	for _, s := range strikes {
 		if s.value <= 0 {
-			return validationError(s.name+" must be greater than zero", "Add `--"+s.name+" <price>` with a positive value")
+			return validationError(
+				s.name+" must be greater than zero",
+				"Add `--"+s.name+" <price>` with a positive value",
+			)
 		}
 	}
 
 	if params.PutLongStrike >= params.PutShortStrike {
-		return validationError("put-long-strike must be below put-short-strike", "The protective put (bought) must be at a lower strike than the sold put")
+		return validationError(
+			"put-long-strike must be below put-short-strike",
+			"The protective put (bought) must be at a lower strike than the sold put",
+		)
 	}
 
 	if params.PutShortStrike >= params.CallShortStrike {
-		return validationError("put-short-strike must be below call-short-strike", "The put and call short strikes define the profit zone and must not overlap")
+		return validationError(
+			"put-short-strike must be below call-short-strike",
+			"The put and call short strikes define the profit zone and must not overlap",
+		)
 	}
 
 	if params.CallShortStrike >= params.CallLongStrike {
-		return validationError("call-short-strike must be below call-long-strike", "The protective call (bought) must be at a higher strike than the sold call")
+		return validationError(
+			"call-short-strike must be below call-long-strike",
+			"The protective call (bought) must be at a higher strike than the sold call",
+		)
 	}
 
 	return validateSpreadPrice(params.Price, "iron condors")
@@ -345,7 +414,10 @@ func ValidateButterflyOrder(params *ButterflyParams) error {
 	}
 
 	if params.LowerStrike >= params.MiddleStrike || params.MiddleStrike >= params.UpperStrike {
-		return validationError("butterfly strikes must be ordered lower < middle < upper", "Use three increasing strikes with `--lower-strike`, `--middle-strike`, and `--upper-strike`")
+		return validationError(
+			"butterfly strikes must be ordered lower < middle < upper",
+			"Use three increasing strikes with `--lower-strike`, `--middle-strike`, and `--upper-strike`",
+		)
 	}
 
 	if !sameStrikeWidth(params.MiddleStrike-params.LowerStrike, params.UpperStrike-params.MiddleStrike) {
@@ -385,8 +457,12 @@ func ValidateCondorOrder(params *CondorParams) error {
 		return err
 	}
 
-	if params.LowerStrike >= params.LowerMiddleStrike || params.LowerMiddleStrike >= params.UpperMiddleStrike || params.UpperMiddleStrike >= params.UpperStrike {
-		return validationError("condor strikes must be ordered lower < lower-middle < upper-middle < upper", "Use four increasing strikes for the condor wings and middle strikes")
+	if params.LowerStrike >= params.LowerMiddleStrike || params.LowerMiddleStrike >= params.UpperMiddleStrike ||
+		params.UpperMiddleStrike >= params.UpperStrike {
+		return validationError(
+			"condor strikes must be ordered lower < lower-middle < upper-middle < upper",
+			"Use four increasing strikes for the condor wings and middle strikes",
+		)
 	}
 
 	if !sameStrikeWidth(params.LowerMiddleStrike-params.LowerStrike, params.UpperStrike-params.UpperMiddleStrike) {
@@ -425,19 +501,31 @@ func ValidateBackRatioOrder(params *BackRatioParams) error {
 	}
 
 	if params.ShortStrike == params.LongStrike {
-		return validationError("short and long strikes must be different", "Use different values for `--short-strike` and `--long-strike`")
+		return validationError(
+			"short and long strikes must be different",
+			"Use different values for `--short-strike` and `--long-strike`",
+		)
 	}
 
 	if params.PutCall == models.PutCallCall && params.LongStrike <= params.ShortStrike {
-		return validationError("call back-ratio long strike must be above short strike", "For call back-ratios, sell the lower strike and buy more contracts at the higher strike")
+		return validationError(
+			"call back-ratio long strike must be above short strike",
+			"For call back-ratios, sell the lower strike and buy more contracts at the higher strike",
+		)
 	}
 
 	if params.PutCall == models.PutCallPut && params.LongStrike >= params.ShortStrike {
-		return validationError("put back-ratio long strike must be below short strike", "For put back-ratios, sell the higher strike and buy more contracts at the lower strike")
+		return validationError(
+			"put back-ratio long strike must be below short strike",
+			"For put back-ratios, sell the higher strike and buy more contracts at the lower strike",
+		)
 	}
 
 	if params.LongRatio <= 1 {
-		return validationError("long ratio must be greater than one", "Use `--long-ratio 2` for the standard one-by-two back-ratio")
+		return validationError(
+			"long ratio must be greater than one",
+			"Use `--long-ratio 2` for the standard one-by-two back-ratio",
+		)
 	}
 
 	if math.Trunc(params.LongRatio) != params.LongRatio {
@@ -470,7 +558,10 @@ func ValidateVerticalRollOrder(params *VerticalRollParams) error {
 	}
 
 	if params.OpenExpiration.Before(params.CloseExpiration) {
-		return validationError("open expiration must not be before close expiration", "Use `--open-expiration` on or after `--close-expiration`")
+		return validationError(
+			"open expiration must not be before close expiration",
+			"Use `--open-expiration` on or after `--close-expiration`",
+		)
 	}
 
 	if err := validatePositiveStrikes([]namedStrike{
@@ -483,21 +574,31 @@ func ValidateVerticalRollOrder(params *VerticalRollParams) error {
 	}
 
 	if params.CloseLongStrike == params.CloseShortStrike {
-		return validationError("close long and short strikes must be different", "Use different values for `--close-long-strike` and `--close-short-strike`")
+		return validationError(
+			"close long and short strikes must be different",
+			"Use different values for `--close-long-strike` and `--close-short-strike`",
+		)
 	}
 
 	if params.OpenLongStrike == params.OpenShortStrike {
-		return validationError("open long and short strikes must be different", "Use different values for `--open-long-strike` and `--open-short-strike`")
+		return validationError(
+			"open long and short strikes must be different",
+			"Use different values for `--open-long-strike` and `--open-short-strike`",
+		)
 	}
 
-	if !sameStrikeWidth(spreadWidth(params.CloseLongStrike, params.CloseShortStrike), spreadWidth(params.OpenLongStrike, params.OpenShortStrike)) {
+	if !sameStrikeWidth(
+		spreadWidth(params.CloseLongStrike, params.CloseShortStrike),
+		spreadWidth(params.OpenLongStrike, params.OpenShortStrike),
+	) {
 		return validationError(
 			"vertical roll widths must match",
 			"Use equal close and open spread widths for `VERTICAL_ROLL`; unequal widths are a separate unbalanced strategy type",
 		)
 	}
 
-	if params.CloseExpiration.Equal(params.OpenExpiration) && params.CloseLongStrike == params.OpenLongStrike && params.CloseShortStrike == params.OpenShortStrike {
+	if params.CloseExpiration.Equal(params.OpenExpiration) && params.CloseLongStrike == params.OpenLongStrike &&
+		params.CloseShortStrike == params.OpenShortStrike {
 		return validationError(
 			"vertical roll must change strikes or expiration",
 			"Use different open strikes or a later `--open-expiration` so the roll changes the position",
@@ -530,7 +631,10 @@ func ValidateDoubleDiagonalOrder(params *DoubleDiagonalParams) error {
 	}
 
 	if params.NearExpiration.Equal(params.FarExpiration) || params.NearExpiration.After(params.FarExpiration) {
-		return validationError("near expiration must be before far expiration", "Use `--near-expiration` before `--far-expiration`")
+		return validationError(
+			"near expiration must be before far expiration",
+			"Use `--near-expiration` before `--far-expiration`",
+		)
 	}
 
 	if err := validatePositiveStrikes([]namedStrike{
@@ -542,8 +646,12 @@ func ValidateDoubleDiagonalOrder(params *DoubleDiagonalParams) error {
 		return err
 	}
 
-	if params.PutFarStrike >= params.PutNearStrike || params.PutNearStrike >= params.CallNearStrike || params.CallNearStrike >= params.CallFarStrike {
-		return validationError("double diagonal strikes must be ordered put-far < put-near < call-near < call-far", "Keep put strikes below call strikes so the near short legs do not overlap")
+	if params.PutFarStrike >= params.PutNearStrike || params.PutNearStrike >= params.CallNearStrike ||
+		params.CallNearStrike >= params.CallFarStrike {
+		return validationError(
+			"double diagonal strikes must be ordered put-far < put-near < call-near < call-far",
+			"Keep put strikes below call strikes so the near short legs do not overlap",
+		)
 	}
 
 	return validateSpreadPrice(params.Price, "double diagonals")
@@ -564,15 +672,24 @@ func ValidateStrangleOrder(params *StrangleParams) error {
 	}
 
 	if params.CallStrike <= 0 {
-		return validationError("call strike price must be greater than zero", "Add `--call-strike <price>` with a positive value")
+		return validationError(
+			"call strike price must be greater than zero",
+			"Add `--call-strike <price>` with a positive value",
+		)
 	}
 
 	if params.PutStrike <= 0 {
-		return validationError("put strike price must be greater than zero", "Add `--put-strike <price>` with a positive value")
+		return validationError(
+			"put strike price must be greater than zero",
+			"Add `--put-strike <price>` with a positive value",
+		)
 	}
 
 	if params.CallStrike == params.PutStrike {
-		return validationError("call and put strikes must be different (use straddle for same strike)", "Use different values for `--call-strike` and `--put-strike`")
+		return validationError(
+			"call and put strikes must be different (use straddle for same strike)",
+			"Use different values for `--call-strike` and `--put-strike`",
+		)
 	}
 
 	return validateSpreadPrice(params.Price, "strangles")
@@ -678,11 +795,17 @@ func ValidateDiagonalOrder(params *DiagonalParams) error {
 	}
 
 	if params.NearStrike <= 0 {
-		return validationError("near strike price must be greater than zero", "Add `--near-strike <price>` with a positive value")
+		return validationError(
+			"near strike price must be greater than zero",
+			"Add `--near-strike <price>` with a positive value",
+		)
 	}
 
 	if params.FarStrike <= 0 {
-		return validationError("far strike price must be greater than zero", "Add `--far-strike <price>` with a positive value")
+		return validationError(
+			"far strike price must be greater than zero",
+			"Add `--far-strike <price>` with a positive value",
+		)
 	}
 
 	if params.NearStrike == params.FarStrike {
@@ -714,7 +837,10 @@ func ValidateCoveredCallOrder(params *CoveredCallParams) error {
 	}
 
 	if params.Strike <= 0 {
-		return validationError("call strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+		return validationError(
+			"call strike price must be greater than zero",
+			"Add `--strike <price>` with a positive value",
+		)
 	}
 
 	// Covered calls are always a net debit, so the generic "debit or credit"
@@ -741,11 +867,17 @@ func ValidateCollarOrder(params *CollarParams) error {
 	}
 
 	if params.PutStrike <= 0 {
-		return validationError("put strike price must be greater than zero", "Add `--put-strike <price>` with a positive value")
+		return validationError(
+			"put strike price must be greater than zero",
+			"Add `--put-strike <price>` with a positive value",
+		)
 	}
 
 	if params.CallStrike <= 0 {
-		return validationError("call strike price must be greater than zero", "Add `--call-strike <price>` with a positive value")
+		return validationError(
+			"call strike price must be greater than zero",
+			"Add `--call-strike <price>` with a positive value",
+		)
 	}
 
 	if params.PutStrike >= params.CallStrike {
@@ -761,7 +893,10 @@ func ValidateCollarOrder(params *CollarParams) error {
 // validateUnderlying checks that the underlying symbol is not empty.
 func validateUnderlying(underlying string) error {
 	if strings.TrimSpace(underlying) == "" {
-		return validationError("underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+		return validationError(
+			"underlying symbol is required",
+			"Add `--underlying <TICKER>` to specify the underlying stock",
+		)
 	}
 
 	return nil
@@ -779,7 +914,10 @@ func validateQuantity(quantity float64) error {
 // validateExpiration checks that the expiration date is in the future.
 func validateExpiration(expiration time.Time) error {
 	if expiration.IsZero() || !expiration.After(time.Now().UTC()) {
-		return validationError("option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+		return validationError(
+			"option expiration date is in the past",
+			"Use a future expiration date with `--expiration YYYY-MM-DD`",
+		)
 	}
 
 	return nil
@@ -788,7 +926,10 @@ func validateExpiration(expiration time.Time) error {
 // validateSpreadPrice checks that the spread price is positive.
 func validateSpreadPrice(price float64, strategy string) error {
 	if price <= 0 {
-		return validationError("price is required for "+strategy, "Add `--price <amount>` to specify the net debit or credit")
+		return validationError(
+			"price is required for "+strategy,
+			"Add `--price <amount>` to specify the net debit or credit",
+		)
 	}
 
 	return nil
@@ -804,7 +945,10 @@ type namedStrike struct {
 func validatePositiveStrikes(strikes []namedStrike) error {
 	for _, strike := range strikes {
 		if strike.value <= 0 {
-			return validationError(strike.name+" must be greater than zero", "Add `--"+strike.name+" <price>` with a positive value")
+			return validationError(
+				strike.name+" must be greater than zero",
+				"Add `--"+strike.name+" <price>` with a positive value",
+			)
 		}
 	}
 

@@ -52,8 +52,13 @@ func BuildOptionOrder(params *OptionParams) (*models.OrderRequest, error) {
 				Instruction: params.Action,
 				Quantity:    params.Quantity,
 				Instrument: models.OrderInstrument{
-					AssetType:            models.AssetTypeOption,
-					Symbol:               BuildOCCSymbol(params.Underlying, params.Expiration, params.Strike, string(params.PutCall)),
+					AssetType: models.AssetTypeOption,
+					Symbol: BuildOCCSymbol(
+						params.Underlying,
+						params.Expiration,
+						params.Strike,
+						string(params.PutCall),
+					),
 					PutCall:              &putCall,
 					UnderlyingSymbol:     &underlying,
 					OptionMultiplier:     &multiplier,

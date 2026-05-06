@@ -16,7 +16,7 @@ import (
 // controls as ta dashboard since analyze wraps it alongside a quote fetch.
 type analyzeOpts struct {
 	Interval taInterval `flag:"interval" flagdescr:"Data interval (daily, weekly, 1min, 5min, 15min, 30min)" default:"daily" flaggroup:"data"`
-	Points   int        `flag:"points" flagdescr:"Number of TA output points (default 1; 0 = all)" default:"1" flaggroup:"data"`
+	Points   int        `flag:"points"   flagdescr:"Number of TA output points (default 1; 0 = all)"         default:"1"     flaggroup:"data"`
 }
 
 // analyzeResult holds the combined quote and TA dashboard data for a single

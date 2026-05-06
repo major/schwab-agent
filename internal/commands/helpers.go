@@ -252,9 +252,20 @@ func cobraEnumValues(value any) (valid []string, aliases map[string]string) {
 	case *models.Instruction:
 		return enumStrings(validInstructions), nil
 	case *models.OrderType:
-		return enumStrings(validOrderTypes), map[string]string{"MOC": string(models.OrderTypeMarketOnClose), "LOC": string(models.OrderTypeLimitOnClose)}
+		return enumStrings(
+				validOrderTypes,
+			), map[string]string{
+				"MOC": string(models.OrderTypeMarketOnClose),
+				"LOC": string(models.OrderTypeLimitOnClose),
+			}
 	case *models.Duration:
-		return enumStrings(validDurations), map[string]string{"GTC": string(models.DurationGoodTillCancel), "FOK": string(models.DurationFillOrKill), "IOC": string(models.DurationImmediateOrCancel)}
+		return enumStrings(
+				validDurations,
+			), map[string]string{
+				"GTC": string(models.DurationGoodTillCancel),
+				"FOK": string(models.DurationFillOrKill),
+				"IOC": string(models.DurationImmediateOrCancel),
+			}
 	case *models.Session:
 		return enumStrings(validSessions), nil
 	case *models.StopPriceLinkBasis:
@@ -276,25 +287,101 @@ func cobraEnumValues(value any) (valid []string, aliases map[string]string) {
 	case *chainContractType:
 		return enumStrings([]chainContractType{chainContractTypeCall, chainContractTypePut, chainContractTypeAll}), nil
 	case *chainStrategy:
-		return enumStrings([]chainStrategy{chainStrategySingle, chainStrategyAnalytical, chainStrategyCovered, chainStrategyVertical, chainStrategyCalendar, chainStrategyStrangle, chainStrategyStraddle, chainStrategyButterfly, chainStrategyCondor, chainStrategyDiagonal, chainStrategyCollar, chainStrategyRoll}), nil
+		return enumStrings(
+			[]chainStrategy{
+				chainStrategySingle,
+				chainStrategyAnalytical,
+				chainStrategyCovered,
+				chainStrategyVertical,
+				chainStrategyCalendar,
+				chainStrategyStrangle,
+				chainStrategyStraddle,
+				chainStrategyButterfly,
+				chainStrategyCondor,
+				chainStrategyDiagonal,
+				chainStrategyCollar,
+				chainStrategyRoll,
+			},
+		), nil
 	case *strikeRange:
-		return enumStrings([]strikeRange{strikeRangeITM, strikeRangeNTM, strikeRangeOTM, strikeRangeSAK, strikeRangeSBK, strikeRangeSNK, strikeRangeAll}), nil
+		return enumStrings(
+			[]strikeRange{
+				strikeRangeITM,
+				strikeRangeNTM,
+				strikeRangeOTM,
+				strikeRangeSAK,
+				strikeRangeSBK,
+				strikeRangeSNK,
+				strikeRangeAll,
+			},
+		), nil
 	case *historyPeriodType:
-		return enumStrings([]historyPeriodType{historyPeriodTypeDay, historyPeriodTypeMonth, historyPeriodTypeYear, historyPeriodTypeYTD}), nil
+		return enumStrings(
+			[]historyPeriodType{
+				historyPeriodTypeDay,
+				historyPeriodTypeMonth,
+				historyPeriodTypeYear,
+				historyPeriodTypeYTD,
+			},
+		), nil
 	case *historyFrequencyType:
-		return enumStrings([]historyFrequencyType{historyFrequencyTypeMinute, historyFrequencyTypeDaily, historyFrequencyTypeWeekly, historyFrequencyTypeMonthly}), nil
+		return enumStrings(
+			[]historyFrequencyType{
+				historyFrequencyTypeMinute,
+				historyFrequencyTypeDaily,
+				historyFrequencyTypeWeekly,
+				historyFrequencyTypeMonthly,
+			},
+		), nil
 	case *historyFrequency:
-		return enumStrings([]historyFrequency{historyFrequency1, historyFrequency5, historyFrequency10, historyFrequency15, historyFrequency30}), nil
+		return enumStrings(
+			[]historyFrequency{
+				historyFrequency1,
+				historyFrequency5,
+				historyFrequency10,
+				historyFrequency15,
+				historyFrequency30,
+			},
+		), nil
 	case *instrumentProjection:
-		return enumStrings([]instrumentProjection{instrumentProjectionSymbolSearch, instrumentProjectionSymbolRegex, instrumentProjectionDescSearch, instrumentProjectionDescRegex, instrumentProjectionSearch, instrumentProjectionFundamental}), nil
+		return enumStrings(
+			[]instrumentProjection{
+				instrumentProjectionSymbolSearch,
+				instrumentProjectionSymbolRegex,
+				instrumentProjectionDescSearch,
+				instrumentProjectionDescRegex,
+				instrumentProjectionSearch,
+				instrumentProjectionFundamental,
+			},
+		), nil
 	case *moversSort:
-		return enumStrings([]moversSort{moversSortVolume, moversSortTrades, moversSortPercentChangeUp, moversSortPercentChangeDown}), nil
+		return enumStrings(
+			[]moversSort{moversSortVolume, moversSortTrades, moversSortPercentChangeUp, moversSortPercentChangeDown},
+		), nil
 	case *moversFrequency:
-		return enumStrings([]moversFrequency{moversFrequency0, moversFrequency1, moversFrequency5, moversFrequency10, moversFrequency30, moversFrequency60}), nil
+		return enumStrings(
+			[]moversFrequency{
+				moversFrequency0,
+				moversFrequency1,
+				moversFrequency5,
+				moversFrequency10,
+				moversFrequency30,
+				moversFrequency60,
+			},
+		), nil
 	case *positionSort:
 		return enumStrings([]positionSort{positionSortPnLDesc, positionSortPnLAsc, positionSortValueDesc}), nil
 	case *taInterval:
-		return enumStrings([]taInterval{taIntervalDaily, taIntervalWeekly, taInterval1Min, taInterval5Min, taInterval15Min, taInterval30Min}), nil
+		return enumStrings(
+			[]taInterval{
+				taIntervalDaily,
+				taIntervalWeekly,
+				taInterval1Min,
+				taInterval5Min,
+				taInterval15Min,
+				taInterval30Min,
+			},
+		), nil
 	default:
 		return nil, nil
 	}
@@ -370,7 +457,8 @@ func defaultSubcommand(sub *cobra.Command) func(cmd *cobra.Command, args []strin
 // is most useful for parent commands whose subcommands own distinct flags: an
 // unknown flag on the parent usually means the user skipped the subcommand.
 func suggestSubcommands(cmd *cobra.Command, err error) error {
-	if !strings.Contains(err.Error(), "unknown flag") && !strings.Contains(err.Error(), "flag provided but not defined") {
+	if !strings.Contains(err.Error(), "unknown flag") &&
+		!strings.Contains(err.Error(), "flag provided but not defined") {
 		return err
 	}
 
@@ -426,7 +514,9 @@ func normalizeFlagValidationErrorWithCommand(cmd *cobra.Command, err error) erro
 		return err
 	}
 
-	return newValidationError(fmt.Sprintf("invalid %s: %q (valid: %s)", flagName, invalidValue, validEnumString(validValues)))
+	return newValidationError(
+		fmt.Sprintf("invalid %s: %q (valid: %s)", flagName, invalidValue, validEnumString(validValues)),
+	)
 }
 
 func normalizeFlagValidationErrorFunc(cmd *cobra.Command, err error) error {

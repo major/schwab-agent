@@ -79,9 +79,10 @@ func (cfg *Config) TLSConfig() *tls.Config {
 	if cfg == nil || !cfg.BaseURLInsecure {
 		return nil
 	}
-	return &tls.Config{InsecureSkipVerify: true} //nolint:gosec // base_url_insecure is an explicit opt-in for local self-signed proxies
+	return &tls.Config{
+		InsecureSkipVerify: true,
+	} //nolint:gosec // base_url_insecure is an explicit opt-in for local self-signed proxies
 }
-
 
 // resolveAPIPath joins an API path onto the normalized base URL while
 // preserving any proxy path prefix present in base_url.
@@ -207,7 +208,11 @@ func SaveConfig(configPath string, cfg *Config) error {
 	}
 
 	// Marshal config to JSON
-	data, err := json.MarshalIndent(cfg, "", "  ") //nolint:gosec // G117: config file intentionally stores client_secret with 0600 perms
+	data, err := json.MarshalIndent(
+		cfg,
+		"",
+		"  ",
+	) //nolint:gosec // G117: config file intentionally stores client_secret with 0600 perms
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}

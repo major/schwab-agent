@@ -109,7 +109,14 @@ func writeFlagSection(w io.Writer, title string, flags *pflag.FlagSet) error {
 		return err
 	}
 	for _, row := range rows {
-		if _, err := fmt.Fprintf(w, "    %-22s  --%-22s  %-12s  %s\n", row.key, row.flag, row.valueType, row.defaultValue); err != nil {
+		if _, err := fmt.Fprintf(
+			w,
+			"    %-22s  --%-22s  %-12s  %s\n",
+			row.key,
+			row.flag,
+			row.valueType,
+			row.defaultValue,
+		); err != nil {
 			return err
 		}
 	}

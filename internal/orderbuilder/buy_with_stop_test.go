@@ -5,10 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/models"
 )
 
 // TestValidateBuyWithStopOrder verifies buy-with-stop input validation without
@@ -327,7 +328,16 @@ func TestBuildBuyWithStopOrder(t *testing.T) {
 			// Assert
 			require.NoError(t, err)
 			require.NotNil(t, order)
-			assertBuyWithStopEntry(t, order, &tt.params, tt.wantEntryType, tt.wantEntryDuration, tt.wantSession, tt.wantPrice, tt.wantPriceSet)
+			assertBuyWithStopEntry(
+				t,
+				order,
+				&tt.params,
+				tt.wantEntryType,
+				tt.wantEntryDuration,
+				tt.wantSession,
+				tt.wantPrice,
+				tt.wantPriceSet,
+			)
 
 			if tt.wantOCO {
 				assertBuyWithStopOCOExits(t, order, &tt.params, tt.wantSession)
@@ -414,7 +424,12 @@ func assertBuyWithStopOCOExits(
 	assert.Equal(t, params.StopLoss, *stopLoss.StopPrice)
 }
 
-func assertBuyWithStopExitCommon(t *testing.T, order *models.OrderRequest, wantSession models.Session, wantQuantity float64) {
+func assertBuyWithStopExitCommon(
+	t *testing.T,
+	order *models.OrderRequest,
+	wantSession models.Session,
+	wantQuantity float64,
+) {
 	t.Helper()
 
 	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)

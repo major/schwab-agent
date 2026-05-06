@@ -4,10 +4,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/models"
 )
 
 // TestBuildOCOOrderFullOCO verifies OCO → 2 SINGLE structure with both exits.

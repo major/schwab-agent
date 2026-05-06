@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/orderbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/models"
+	"github.com/major/schwab-agent/internal/orderbuilder"
 )
 
 func testPreviewLedgerOrder(t *testing.T) *models.OrderRequest {

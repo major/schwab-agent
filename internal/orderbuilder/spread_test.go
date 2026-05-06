@@ -4,9 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/major/schwab-agent/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/models"
 )
 
 // TestBuildVerticalOrderBullCallOpen verifies a bull call spread (debit to open).
@@ -89,8 +90,17 @@ func TestBuildCondorOrderShortClose(t *testing.T) {
 	expiration := time.Date(2026, time.June, 18, 0, 0, 0, 0, time.UTC)
 
 	order, err := BuildCondorOrder(&CondorParams{
-		Underlying: "F", Expiration: expiration, LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16,
-		PutCall: models.PutCallPut, Buy: false, Open: false, Quantity: 1, Price: 0.75,
+		Underlying:        "F",
+		Expiration:        expiration,
+		LowerStrike:       10,
+		LowerMiddleStrike: 12,
+		UpperMiddleStrike: 14,
+		UpperStrike:       16,
+		PutCall:           models.PutCallPut,
+		Buy:               false,
+		Open:              false,
+		Quantity:          1,
+		Price:             0.75,
 	})
 
 	require.NoError(t, err)

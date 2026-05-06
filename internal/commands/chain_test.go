@@ -7,10 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/output"
 )
 
 func TestNewChainCmd(t *testing.T) {
@@ -121,7 +122,9 @@ func TestNewChainCmd(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			if r.URL.Path == "/marketdata/v1/expirationchain" {
 				assert.Equal(t, "AAPL", r.URL.Query().Get("symbol"))
-				_, _ = w.Write([]byte(`{"expirationList":[{"expirationDate":"2024-01-19"},{"expirationDate":"2024-02-16"}]}`))
+				_, _ = w.Write(
+					[]byte(`{"expirationList":[{"expirationDate":"2024-01-19"},{"expirationDate":"2024-02-16"}]}`),
+				)
 				return
 			}
 			w.WriteHeader(http.StatusNotFound)

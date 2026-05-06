@@ -87,7 +87,11 @@ func TestAuthorizeURL_UsesDerivedBaseURL(t *testing.T) {
 
 	parsedURL, err := url.Parse(authURL)
 	require.NoError(t, err)
-	assert.Equal(t, "https://proxy.example.com/prefix/v1/oauth/authorize", parsedURL.Scheme+"://"+parsedURL.Host+parsedURL.Path)
+	assert.Equal(
+		t,
+		"https://proxy.example.com/prefix/v1/oauth/authorize",
+		parsedURL.Scheme+"://"+parsedURL.Host+parsedURL.Path,
+	)
 }
 
 func TestExchangeCode_Success_UsesBasicAuthAndReturnsTokenFile(t *testing.T) {

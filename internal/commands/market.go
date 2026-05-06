@@ -21,7 +21,7 @@ type moversData struct {
 
 // marketMoversOpts holds the options for the market movers subcommand.
 type marketMoversOpts struct {
-	Sort      moversSort      `flag:"sort" flagdescr:"Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)"`
+	Sort      moversSort      `flag:"sort"      flagdescr:"Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)"`
 	Frequency moversFrequency `flag:"frequency" flagdescr:"Minimum percent change magnitude (0, 1, 5, 10, 30, 60)"`
 }
 

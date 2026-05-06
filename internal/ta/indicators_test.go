@@ -17,8 +17,8 @@ func TestSMA_Correct(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.Len(t, result, 8)
-	assert.InDelta(t, 2.0, result[0], 1e-6)  // (1+2+3)/3
-	assert.InDelta(t, 9.0, result[7], 1e-6)  // (8+9+10)/3
+	assert.InDelta(t, 2.0, result[0], 1e-6) // (1+2+3)/3
+	assert.InDelta(t, 9.0, result[7], 1e-6) // (8+9+10)/3
 }
 
 func TestSMA_InvalidPeriod(t *testing.T) {
@@ -114,4 +114,3 @@ func TestRSI_InsufficientData(t *testing.T) {
 	var valErr *apperr.ValidationError
 	assert.ErrorAs(t, err, &valErr)
 }
-

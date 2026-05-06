@@ -1313,10 +1313,10 @@ func TestOrderToRequest(t *testing.T) {
 				}
 
 				parentOrder := Order{
-					Session:            SessionNormal,
-					Duration:           DurationGoodTillCancel,
-					OrderType:          OrderTypeLimit,
-					OrderStrategyType:  OrderStrategyTypeOCO,
+					Session:              SessionNormal,
+					Duration:             DurationGoodTillCancel,
+					OrderType:            OrderTypeLimit,
+					OrderStrategyType:    OrderStrategyTypeOCO,
 					ChildOrderStrategies: []Order{childOrder1, childOrder2},
 				}
 
@@ -1455,12 +1455,12 @@ func TestOrderToRequest(t *testing.T) {
 				}
 
 				child := Order{
-					Session:            SessionNormal,
-					Duration:           DurationDay,
-					OrderType:          OrderTypeLimit,
-					Price:              &price,
-					Quantity:           &qty,
-					OrderStrategyType:  OrderStrategyTypeTrigger,
+					Session:              SessionNormal,
+					Duration:             DurationDay,
+					OrderType:            OrderTypeLimit,
+					Price:                &price,
+					Quantity:             &qty,
+					OrderStrategyType:    OrderStrategyTypeTrigger,
 					ChildOrderStrategies: []Order{grandchild},
 					OrderLegCollection: []OrderLegCollection{
 						{
@@ -1475,10 +1475,10 @@ func TestOrderToRequest(t *testing.T) {
 				}
 
 				parent := Order{
-					Session:            SessionNormal,
-					Duration:           DurationDay,
-					OrderType:          OrderTypeMarket,
-					OrderStrategyType:  OrderStrategyTypeTrigger,
+					Session:              SessionNormal,
+					Duration:             DurationDay,
+					OrderType:            OrderTypeMarket,
+					OrderStrategyType:    OrderStrategyTypeTrigger,
 					ChildOrderStrategies: []Order{child},
 					OrderLegCollection: []OrderLegCollection{
 						{

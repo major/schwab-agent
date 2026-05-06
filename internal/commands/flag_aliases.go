@@ -1,10 +1,11 @@
 package commands
 
 import (
-	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/models"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/models"
 )
 
 // registerOrderFlagAliases registers --instruction and --order-type aliases

@@ -199,7 +199,10 @@ func TestNewAuthCmd_LoginAutoSetsDefaultAccount(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/oauth/token":
 			assert.Equal(t, http.MethodPost, r.Method)
-			_, _ = io.WriteString(w, `{"access_token":"access-token","token_type":"Bearer","expires_in":1800,"refresh_token":"refresh-token","scope":"api"}`)
+			_, _ = io.WriteString(
+				w,
+				`{"access_token":"access-token","token_type":"Bearer","expires_in":1800,"refresh_token":"refresh-token","scope":"api"}`,
+			)
 		case "/trader/v1/accounts/accountNumbers":
 			assert.Equal(t, "Bearer access-token", r.Header.Get("Authorization"))
 			w.Header().Set("Content-Type", "application/json")
@@ -220,7 +223,11 @@ func TestNewAuthCmd_LoginAutoSetsDefaultAccount(t *testing.T) {
 			_, err := fmt.Fprintln(w, "https://example.com/authorize")
 			require.NoError(t, err)
 
-			response, err := http.Post(tokenEndpoint, "application/x-www-form-urlencoded", bytes.NewBufferString("grant_type=authorization_code"))
+			response, err := http.Post(
+				tokenEndpoint,
+				"application/x-www-form-urlencoded",
+				bytes.NewBufferString("grant_type=authorization_code"),
+			)
 			if err != nil {
 				return err
 			}

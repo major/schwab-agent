@@ -104,7 +104,10 @@ func flattenAccountPositions(accounts []models.Account, numberToHash map[string]
 		}
 
 		for i := range acct.SecuritiesAccount.Positions {
-			entries = append(entries, newPositionEntry(acctNum, acctHash, acctNick, &acct.SecuritiesAccount.Positions[i]))
+			entries = append(
+				entries,
+				newPositionEntry(acctNum, acctHash, acctNick, &acct.SecuritiesAccount.Positions[i]),
+			)
 		}
 	}
 
@@ -200,11 +203,11 @@ func NewPositionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comman
 // positionListOpts holds the options for the position list subcommand.
 type positionListOpts struct {
 	AllAccounts bool         `flag:"all-accounts" flagdescr:"Show positions across all linked accounts"`
-	Symbols     []string     `flag:"symbol" flagdescr:"Filter by symbol (repeatable, comma-separated values allowed)"`
-	LosersOnly  bool         `flag:"losers-only" flagdescr:"Show only positions with negative unrealized P&L"`
-	MinPnL      float64      `flag:"min-pnl" flagdescr:"Minimum unrealized P&L to include when set"`
-	MaxPnL      float64      `flag:"max-pnl" flagdescr:"Maximum unrealized P&L to include when set"`
-	Sort        positionSort `flag:"sort" flagdescr:"Sort positions by pnl-desc, pnl-asc, or value-desc"`
+	Symbols     []string     `flag:"symbol"       flagdescr:"Filter by symbol (repeatable, comma-separated values allowed)"`
+	LosersOnly  bool         `flag:"losers-only"  flagdescr:"Show only positions with negative unrealized P&L"`
+	MinPnL      float64      `flag:"min-pnl"      flagdescr:"Minimum unrealized P&L to include when set"`
+	MaxPnL      float64      `flag:"max-pnl"      flagdescr:"Maximum unrealized P&L to include when set"`
+	Sort        positionSort `flag:"sort"         flagdescr:"Sort positions by pnl-desc, pnl-asc, or value-desc"`
 }
 
 // newPositionListCmd returns the Cobra subcommand for listing positions.
@@ -303,7 +306,10 @@ func cobraListSingleAccountPositions(
 
 	if account.SecuritiesAccount != nil {
 		for i := range account.SecuritiesAccount.Positions {
-			entries = append(entries, newPositionEntry(acctNum, hash, acctNick, &account.SecuritiesAccount.Positions[i]))
+			entries = append(
+				entries,
+				newPositionEntry(acctNum, hash, acctNick, &account.SecuritiesAccount.Positions[i]),
+			)
 		}
 	}
 

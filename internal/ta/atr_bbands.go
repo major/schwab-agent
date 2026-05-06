@@ -20,7 +20,12 @@ func ATR(highs, lows, closes []float64, period int) ([]float64, error) {
 	}
 	if len(highs) != len(lows) || len(highs) != len(closes) {
 		return nil, apperr.NewValidationError(
-			fmt.Sprintf("atr: mismatched slice lengths: highs=%d, lows=%d, closes=%d", len(highs), len(lows), len(closes)),
+			fmt.Sprintf(
+				"atr: mismatched slice lengths: highs=%d, lows=%d, closes=%d",
+				len(highs),
+				len(lows),
+				len(closes),
+			),
 			nil,
 		)
 	}

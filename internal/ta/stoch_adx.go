@@ -27,7 +27,12 @@ func Stochastic(highs, lows, closes []float64, kPeriod, smoothK, dPeriod int) (s
 	}
 	if len(highs) != len(lows) || len(highs) != len(closes) {
 		return nil, nil, apperr.NewValidationError(
-			fmt.Sprintf("stochastic: mismatched slice lengths: highs=%d, lows=%d, closes=%d", len(highs), len(lows), len(closes)),
+			fmt.Sprintf(
+				"stochastic: mismatched slice lengths: highs=%d, lows=%d, closes=%d",
+				len(highs),
+				len(lows),
+				len(closes),
+			),
 			nil,
 		)
 	}
@@ -64,7 +69,12 @@ func ADX(highs, lows, closes []float64, period int) (adx, plusDI, minusDI []floa
 	}
 	if len(highs) != len(lows) || len(highs) != len(closes) {
 		return nil, nil, nil, apperr.NewValidationError(
-			fmt.Sprintf("adx: mismatched slice lengths: highs=%d, lows=%d, closes=%d", len(highs), len(lows), len(closes)),
+			fmt.Sprintf(
+				"adx: mismatched slice lengths: highs=%d, lows=%d, closes=%d",
+				len(highs),
+				len(lows),
+				len(closes),
+			),
 			nil,
 		)
 	}

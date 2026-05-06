@@ -46,13 +46,13 @@ func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
 
 // quoteGetOpts holds the options for the quote get subcommand.
 type quoteGetOpts struct {
-	Fields     []string `flag:"fields" flagdescr:"Quote fields to return (repeatable): quote, fundamental, extended, reference, regular"`
+	Fields     []string `flag:"fields"     flagdescr:"Quote fields to return (repeatable): quote, fundamental, extended, reference, regular"`
 	Indicative bool     `flag:"indicative" flagdescr:"Request indicative (non-tradeable) quotes"`
 	Underlying string   `flag:"underlying" flagdescr:"Underlying symbol for option quote"`
 	Expiration string   `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD) for option quote"`
-	Strike     float64  `flag:"strike" flagdescr:"Strike price for option quote"`
-	Call       bool     `flag:"call" flagdescr:"Call option"`
-	Put        bool     `flag:"put" flagdescr:"Put option"`
+	Strike     float64  `flag:"strike"     flagdescr:"Strike price for option quote"`
+	Call       bool     `flag:"call"       flagdescr:"Call option"`
+	Put        bool     `flag:"put"        flagdescr:"Put option"`
 }
 
 // Validate is called by validateCobraOptions after Cobra decodes bound flags.
@@ -131,7 +131,9 @@ mutually exclusive with positional symbol arguments.`,
 				// Option flags and positional symbols are mutually exclusive.
 				if len(args) > 0 {
 					return apperr.NewValidationError(
-						"cannot combine positional symbols with option flags (--underlying, --expiration, --strike, --call/--put)", nil)
+						"cannot combine positional symbols with option flags (--underlying, --expiration, --strike, --call/--put)",
+						nil,
+					)
 				}
 
 				// Validate all required option flags are present.
@@ -151,7 +153,9 @@ mutually exclusive with positional symbol arguments.`,
 			// Positional symbol mode: require at least one symbol.
 			if len(args) == 0 {
 				return apperr.NewValidationError(
-					"at least one symbol is required (or use option flags: --underlying, --expiration, --strike, --call/--put)", nil)
+					"at least one symbol is required (or use option flags: --underlying, --expiration, --strike, --call/--put)",
+					nil,
+				)
 			}
 
 			if len(args) == 1 {

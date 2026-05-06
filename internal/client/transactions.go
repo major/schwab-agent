@@ -24,7 +24,11 @@ type TransactionParams struct {
 //
 // The types parameter filters by transaction type (e.g. "TRADE", "DIVIDEND").
 // When not provided, no type filter is sent, which returns all types.
-func (c *Client) Transactions(ctx context.Context, hashValue string, params TransactionParams) ([]models.Transaction, error) {
+func (c *Client) Transactions(
+	ctx context.Context,
+	hashValue string,
+	params TransactionParams,
+) ([]models.Transaction, error) {
 	path := fmt.Sprintf("/trader/v1/accounts/%s/transactions", hashValue)
 
 	queryParams := make(map[string]string)

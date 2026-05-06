@@ -51,7 +51,11 @@ type savedOrderPreview struct {
 
 // saveOrderPreview stores a previewed order in the local state ledger and
 // returns the digest metadata callers should include in the preview envelope.
-func saveOrderPreview(account string, order *models.OrderRequest, preview *models.PreviewOrder) (*previewDigestData, error) {
+func saveOrderPreview(
+	account string,
+	order *models.OrderRequest,
+	preview *models.PreviewOrder,
+) (*previewDigestData, error) {
 	createdAt := time.Now().UTC()
 	expiresAt := createdAt.Add(previewLedgerTTL)
 	canonicalOrder, digest, err := previewDigestFor(account, order)
@@ -85,7 +89,10 @@ func saveOrderPreview(account string, order *models.OrderRequest, preview *model
 	// MkdirAll only applies the requested mode when it creates a directory.
 	// Tighten existing directories too, because preview files contain exact order
 	// payloads and the command help promises private ledger storage.
-	if err := os.Chmod(ledgerDir, 0o700); err != nil { //nolint:gosec // Directories need execute bits; 0700 keeps the ledger private.
+	if err := os.Chmod(
+		ledgerDir,
+		0o700,
+	); err != nil { //nolint:gosec // Directories need execute bits; 0700 keeps the ledger private.
 		return nil, fmt.Errorf("secure preview ledger directory: %w", err)
 	}
 
@@ -131,7 +138,8 @@ func loadOrderPreview(digest string) (*savedOrderPreview, error) {
 	if err := json.Unmarshal(data, &entry); err != nil {
 		return nil, apperr.NewValidationError("preview ledger entry is not valid JSON", err)
 	}
-	if entry.Version != previewLedgerSchemaVersion || entry.Operation != previewLedgerOperation || entry.Endpoint != previewLedgerEndpoint {
+	if entry.Version != previewLedgerSchemaVersion || entry.Operation != previewLedgerOperation ||
+		entry.Endpoint != previewLedgerEndpoint {
 		return nil, apperr.NewValidationError("preview ledger entry uses an unsupported schema or operation", nil)
 	}
 	if entry.Order == nil {

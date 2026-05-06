@@ -7,10 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/output"
 )
 
 func TestNewQuoteCmd(t *testing.T) {
@@ -197,7 +198,9 @@ func TestNewQuoteGetMultiWithFields(t *testing.T) {
 		assert.Equal(t, "extended", q.Get("fields"))
 
 		if r.URL.Path == "/marketdata/v1/quotes" {
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0},"MSFT":{"symbol":"MSFT","lastPrice":400.0}}`))
+			_, _ = w.Write(
+				[]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0},"MSFT":{"symbol":"MSFT","lastPrice":400.0}}`),
+			)
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)

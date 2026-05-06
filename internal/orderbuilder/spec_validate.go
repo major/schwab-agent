@@ -53,7 +53,10 @@ func validateSingleOrderRequest(order *models.OrderRequest, path string) error {
 	}
 
 	if len(order.ChildOrderStrategies) > 0 {
-		return validationError(path+" SINGLE order cannot contain childOrderStrategies", "Use orderStrategyType TRIGGER or OCO for child order strategies")
+		return validationError(
+			path+" SINGLE order cannot contain childOrderStrategies",
+			"Use orderStrategyType TRIGGER or OCO for child order strategies",
+		)
 	}
 
 	return nil
@@ -62,7 +65,10 @@ func validateSingleOrderRequest(order *models.OrderRequest, path string) error {
 // validateExecutableOrderRequest validates fields for an order node that actually submits legs.
 func validateExecutableOrderRequest(order *models.OrderRequest, path string) error {
 	if order.OrderType == "" {
-		return validationError(path+" orderType is required", "Set orderType to MARKET, LIMIT, STOP, STOP_LIMIT, or another Schwab order type")
+		return validationError(
+			path+" orderType is required",
+			"Set orderType to MARKET, LIMIT, STOP, STOP_LIMIT, or another Schwab order type",
+		)
 	}
 
 	if err := validateOrderRequestPricing(order, path); err != nil {
@@ -74,7 +80,10 @@ func validateExecutableOrderRequest(order *models.OrderRequest, path string) err
 	}
 
 	for index := range order.OrderLegCollection {
-		if err := validateOrderRequestLeg(&order.OrderLegCollection[index], fmt.Sprintf("%s.orderLegCollection[%d]", path, index)); err != nil {
+		if err := validateOrderRequestLeg(
+			&order.OrderLegCollection[index],
+			fmt.Sprintf("%s.orderLegCollection[%d]", path, index),
+		); err != nil {
 			return err
 		}
 	}
@@ -85,11 +94,17 @@ func validateExecutableOrderRequest(order *models.OrderRequest, path string) err
 // validateOCOOrderRequest validates one-cancels-other containers and their children.
 func validateOCOOrderRequest(order *models.OrderRequest, path string) error {
 	if len(order.ChildOrderStrategies) == 0 {
-		return validationError(path+" OCO order requires childOrderStrategies", "Add child orders that Schwab should link together")
+		return validationError(
+			path+" OCO order requires childOrderStrategies",
+			"Add child orders that Schwab should link together",
+		)
 	}
 
 	if len(order.OrderLegCollection) > 0 {
-		return validationError(path+" OCO parent must not contain direct order legs", "Move executable legs into childOrderStrategies")
+		return validationError(
+			path+" OCO parent must not contain direct order legs",
+			"Move executable legs into childOrderStrategies",
+		)
 	}
 
 	return validateChildOrderRequests(order, path)
@@ -98,7 +113,10 @@ func validateOCOOrderRequest(order *models.OrderRequest, path string) error {
 // validateTriggerOrderRequest validates first-triggers-second and bracket-style specs.
 func validateTriggerOrderRequest(order *models.OrderRequest, path string) error {
 	if len(order.ChildOrderStrategies) == 0 {
-		return validationError(path+" TRIGGER order requires childOrderStrategies", "Add child orders that Schwab should activate after the parent fills")
+		return validationError(
+			path+" TRIGGER order requires childOrderStrategies",
+			"Add child orders that Schwab should activate after the parent fills",
+		)
 	}
 
 	// A TRIGGER node is not just a container: Schwab bracket and first-triggers-second
@@ -131,18 +149,27 @@ func validateOrderRequestPricing(order *models.OrderRequest, path string) error 
 	case models.OrderTypeLimit, models.OrderTypeLimitOnClose, models.OrderTypeStopLimit,
 		models.OrderTypeTrailingStopLimit, models.OrderTypeNetDebit, models.OrderTypeNetCredit:
 		if order.Price == nil || *order.Price <= 0 {
-			return validationError(path+" "+string(order.OrderType)+" order requires a positive price", "Set price to a value greater than zero")
+			return validationError(
+				path+" "+string(order.OrderType)+" order requires a positive price",
+				"Set price to a value greater than zero",
+			)
 		}
 	}
 
 	switch order.OrderType {
 	case models.OrderTypeStop, models.OrderTypeStopLimit:
 		if order.StopPrice == nil || *order.StopPrice <= 0 {
-			return validationError(path+" "+string(order.OrderType)+" order requires a positive stopPrice", "Set stopPrice to a value greater than zero")
+			return validationError(
+				path+" "+string(order.OrderType)+" order requires a positive stopPrice",
+				"Set stopPrice to a value greater than zero",
+			)
 		}
 	case models.OrderTypeTrailingStop, models.OrderTypeTrailingStopLimit:
 		if order.StopPriceOffset == nil || *order.StopPriceOffset <= 0 {
-			return validationError(path+" "+string(order.OrderType)+" order requires a positive stopPriceOffset", "Set stopPriceOffset to a value greater than zero")
+			return validationError(
+				path+" "+string(order.OrderType)+" order requires a positive stopPriceOffset",
+				"Set stopPriceOffset to a value greater than zero",
+			)
 		}
 	}
 
@@ -174,7 +201,10 @@ func validateOrderRequestLeg(leg *models.OrderLegCollection, path string) error 
 	}
 
 	if leg.Instruction == "" {
-		return validationError(path+" instruction is required", "Set instruction to BUY, SELL, BUY_TO_OPEN, SELL_TO_CLOSE, or another Schwab instruction")
+		return validationError(
+			path+" instruction is required",
+			"Set instruction to BUY, SELL, BUY_TO_OPEN, SELL_TO_CLOSE, or another Schwab instruction",
+		)
 	}
 
 	if leg.Quantity <= 0 {
@@ -191,15 +221,22 @@ func validateOrderRequestInstrument(instrument *models.OrderInstrument, path str
 	}
 
 	if instrument.AssetType == "" {
-		return validationError(path+" assetType is required", "Set assetType to EQUITY, OPTION, or another Schwab asset type")
+		return validationError(
+			path+" assetType is required",
+			"Set assetType to EQUITY, OPTION, or another Schwab asset type",
+		)
 	}
 
 	if strings.TrimSpace(instrument.Symbol) == "" {
 		return validationError(path+" symbol is required", "Set symbol to the tradable equity or OCC option symbol")
 	}
 
-	if instrument.AssetType == models.AssetTypeOption && instrument.OptionStrikePrice != nil && *instrument.OptionStrikePrice <= 0 {
-		return validationError(path+" optionStrikePrice must be greater than zero", "Use a positive option strike price")
+	if instrument.AssetType == models.AssetTypeOption && instrument.OptionStrikePrice != nil &&
+		*instrument.OptionStrikePrice <= 0 {
+		return validationError(
+			path+" optionStrikePrice must be greater than zero",
+			"Use a positive option strike price",
+		)
 	}
 
 	return nil

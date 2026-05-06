@@ -245,7 +245,13 @@ it is automatically set as the default.`,
 			var loginOutput strings.Builder
 			openBrowser := !opts.NoBrowser
 
-			if err := deps.RunLogin(loginConfig, resolvedTokenPath, deps.OAuthTokenEndpoint(), openBrowser, &loginOutput); err != nil {
+			if err := deps.RunLogin(
+				loginConfig,
+				resolvedTokenPath,
+				deps.OAuthTokenEndpoint(),
+				openBrowser,
+				&loginOutput,
+			); err != nil {
 				return err
 			}
 
@@ -257,7 +263,8 @@ it is automatically set as the default.`,
 			defaultAccount := configDefaultAccount(loginConfig)
 			autoSetDefault := false
 
-			accounts, err := deps.NewAccountClient(tokenFile.Token.AccessToken, loginConfig).AccountNumbers(cmd.Context())
+			accounts, err := deps.NewAccountClient(tokenFile.Token.AccessToken, loginConfig).
+				AccountNumbers(cmd.Context())
 			if err != nil {
 				return err
 			}

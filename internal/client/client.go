@@ -16,8 +16,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/major/schwab-agent/internal/apperr"
 	"resty.dev/v3"
+
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 const (

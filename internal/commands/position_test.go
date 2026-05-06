@@ -532,7 +532,20 @@ func TestPositionListFiltersPnLAndSortsAscending(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewPositionCmd(c, configPath, &buf)
 
-	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123", "--losers-only", "--min-pnl", "-600", "--max-pnl", "-100", "--sort", "pnl-asc")
+	_, err := runTestCommand(
+		t,
+		cmd,
+		"list",
+		"--account",
+		"HASH123",
+		"--losers-only",
+		"--min-pnl",
+		"-600",
+		"--max-pnl",
+		"-100",
+		"--sort",
+		"pnl-asc",
+	)
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())

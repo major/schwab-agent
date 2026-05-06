@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/models"
 )
 
 // TestBuildOCCSymbol verifies OCC symbol formatting for representative contracts.
