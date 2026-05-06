@@ -10,6 +10,7 @@ import (
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
+	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
 
@@ -23,6 +24,11 @@ func allMarkets() []string {
 type moversData struct {
 	Movers *marketdata.MoverResponse `json:"movers"`
 }
+
+// marketHoursData is the market-hours output shape historically returned by
+// schwab-agent. schwab-go intentionally uses value fields, so the command adapts
+// those values back to the existing pointer-based model before writing JSON.
+type marketHoursData map[string]map[string]models.MarketHours
 
 // marketMoversOpts holds the options for the market movers subcommand.
 type marketMoversOpts struct {
@@ -65,23 +71,84 @@ more market names to filter.`,
 				markets = allMarkets()
 			}
 
-			// Use the single-market endpoint when exactly one market
-			// is requested, and the multi-market endpoint otherwise.
+			// Use the single-market endpoint when exactly one market is requested,
+			// matching Schwab's two market-hours routes while keeping the CLI output
+			// shape identical for both paths.
 			if len(markets) == 1 {
-				result, err := c.Market(cmd.Context(), markets[0])
+				result, err := c.MarketData.GetMarketHoursSingle(cmd.Context(), markets[0], "")
 				if err != nil {
-					return err
+					return mapSchwabGoError(err)
 				}
-				return output.WriteSuccess(w, result, output.NewMetadata())
+				return output.WriteSuccess(w, convertMarketHours(result), output.NewMetadata())
 			}
 
-			result, err := c.Markets(cmd.Context(), markets)
+			result, err := c.MarketData.GetMarketHours(cmd.Context(), markets, "")
 			if err != nil {
-				return err
+				return mapSchwabGoError(err)
 			}
-			return output.WriteSuccess(w, result, output.NewMetadata())
+			return output.WriteSuccess(w, convertMarketHours(result), output.NewMetadata())
 		},
 	}
+}
+
+func convertMarketHours(hours marketdata.MarketHoursMap) marketHoursData {
+	converted := make(marketHoursData, len(hours))
+	for market, products := range hours {
+		convertedProducts := make(map[string]models.MarketHours, len(products))
+		for product, productHours := range products {
+			convertedProducts[product] = convertMarketHoursEntry(productHours)
+		}
+		converted[market] = convertedProducts
+	}
+	return converted
+}
+
+func convertMarketHoursEntry(hours marketdata.MarketHours) models.MarketHours {
+	isOpen := hours.IsOpen
+	return models.MarketHours{
+		MarketType:   stringPtr(hours.MarketType),
+		Product:      stringPtr(hours.Product),
+		ProductName:  stringPtr(hours.ProductName),
+		IsOpen:       &isOpen,
+		SessionHours: convertMarketSessionHours(hours.SessionHours),
+		Exchange:     stringPtr(hours.Exchange),
+		Category:     stringPtr(hours.Category),
+		Date:         stringPtr(hours.Date),
+	}
+}
+
+func convertMarketSessionHours(sessionHours map[string][]marketdata.SessionHours) *models.SessionHours {
+	if len(sessionHours) == 0 {
+		return nil
+	}
+
+	return &models.SessionHours{
+		PreMarket:     convertMarketSessions(sessionHours["preMarket"]),
+		RegularMarket: convertMarketSessions(sessionHours["regularMarket"]),
+		PostMarket:    convertMarketSessions(sessionHours["postMarket"]),
+	}
+}
+
+func convertMarketSessions(sessions []marketdata.SessionHours) []models.MarketSession {
+	if len(sessions) == 0 {
+		return nil
+	}
+
+	converted := make([]models.MarketSession, 0, len(sessions))
+	for _, session := range sessions {
+		converted = append(converted, models.MarketSession{
+			Start: stringPtr(session.Start),
+			End:   stringPtr(session.End),
+		})
+	}
+	return converted
+}
+
+func stringPtr(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 // newMarketMoversCmd returns the Cobra subcommand for market movers.
