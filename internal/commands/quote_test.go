@@ -14,6 +14,19 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
+const (
+	aaplQuoteEntryPrefix    = `{"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","quote":{"lastPrice":150.0}}`
+	aaplQuoteEntryResponse  = aaplQuoteEntryPrefix + `}`
+	multiQuoteEntryResponse = aaplQuoteEntryPrefix +
+		`,"MSFT":{"assetMainType":"EQUITY","symbol":"MSFT","quote":{"lastPrice":400.0}}}`
+	amznCallQuoteEntryResponse = `{"AMZN  260515C00270000":` +
+		`{"assetMainType":"OPTION","symbol":"AMZN  260515C00270000",` +
+		`"quote":{"lastPrice":5.50}}}`
+	amznPutQuoteEntryResponse = `{"AMZN  260515P00270000":` +
+		`{"assetMainType":"OPTION","symbol":"AMZN  260515P00270000",` +
+		`"quote":{"lastPrice":3.25}}}`
+)
+
 func TestNewQuoteCmd(t *testing.T) {
 	// Table-driven test covering both explicit ("quote get") and shorthand
 	// ("quote") invocation paths for single and multi-symbol lookups.
@@ -29,14 +42,14 @@ func TestNewQuoteCmd(t *testing.T) {
 		{
 			name:       "explicit single symbol",
 			serverPath: "/marketdata/v1/AAPL/quotes",
-			serverBody: `{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`,
+			serverBody: aaplQuoteEntryResponse,
 			args:       []string{"get", "AAPL"},
 			expectKeys: []string{"AAPL"},
 		},
 		{
 			name:       "explicit multiple symbols",
 			serverPath: "/marketdata/v1/quotes",
-			serverBody: `{"AAPL":{"symbol":"AAPL","lastPrice":150.0},"MSFT":{"symbol":"MSFT","lastPrice":400.0}}`,
+			serverBody: multiQuoteEntryResponse,
 			args:       []string{"get", "AAPL", "MSFT"},
 			expectKeys: []string{"AAPL", "MSFT"},
 		},
@@ -55,7 +68,7 @@ func TestNewQuoteCmd(t *testing.T) {
 			defer server.Close()
 
 			var buf bytes.Buffer
-			cmd := NewQuoteCmd(testClient(t, server), &buf)
+			cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 			_, err := runTestCommand(t, cmd, tt.args...)
 			require.NoError(t, err)
 
@@ -78,7 +91,7 @@ func TestNewQuoteGetPartialSuccess(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/marketdata/v1/quotes" {
 			// Only AAPL found; INVALID is absent from the response.
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
+			_, _ = w.Write([]byte(aaplQuoteEntryResponse))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -86,7 +99,7 @@ func TestNewQuoteGetPartialSuccess(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get", "AAPL", "INVALID")
 	require.NoError(t, err)
 
@@ -114,7 +127,7 @@ func TestNewQuoteGetSingleNotFound(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get", "INVALID")
 	require.Error(t, err)
 
@@ -128,7 +141,7 @@ func TestNewQuoteGetNoArgs(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get")
 	require.Error(t, err)
 
@@ -145,7 +158,7 @@ func TestNewQuoteNoSubcommand(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd)
 	require.Error(t, err)
 
@@ -164,7 +177,7 @@ func TestNewQuoteGetWithFields(t *testing.T) {
 		assert.Equal(t, "quote,fundamental", q.Get("fields"))
 
 		if r.URL.Path == "/marketdata/v1/AAPL/quotes" {
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
+			_, _ = w.Write([]byte(aaplQuoteEntryResponse))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -172,7 +185,7 @@ func TestNewQuoteGetWithFields(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get",
 		"--fields", "quote",
 		"--fields", "fundamental",
@@ -198,9 +211,7 @@ func TestNewQuoteGetMultiWithFields(t *testing.T) {
 		assert.Equal(t, "extended", q.Get("fields"))
 
 		if r.URL.Path == "/marketdata/v1/quotes" {
-			_, _ = w.Write(
-				[]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0},"MSFT":{"symbol":"MSFT","lastPrice":400.0}}`),
-			)
+			_, _ = w.Write([]byte(multiQuoteEntryResponse))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -208,7 +219,7 @@ func TestNewQuoteGetMultiWithFields(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get",
 		"--fields", "extended",
 		"AAPL", "MSFT",
@@ -230,9 +241,10 @@ func TestNewQuoteGetWithIndicative(t *testing.T) {
 		// Verify the indicative query parameter is set to "true".
 		q := r.URL.Query()
 		assert.Equal(t, "true", q.Get("indicative"))
+		assert.Equal(t, "AAPL", q.Get("symbols"))
 
-		if r.URL.Path == "/marketdata/v1/AAPL/quotes" {
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
+		if r.URL.Path == "/marketdata/v1/quotes" {
+			_, _ = w.Write([]byte(aaplQuoteEntryResponse))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -240,7 +252,7 @@ func TestNewQuoteGetWithIndicative(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get",
 		"--indicative",
 		"AAPL",
@@ -257,7 +269,7 @@ func TestNewQuoteGetInvalidField(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get",
 		"--fields", "bogus",
 		"AAPL",
@@ -277,7 +289,7 @@ func TestNewQuoteGetTechnicalFieldSuggestsTAHelp(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get",
 		"--fields", "technical",
 		"AAPL",
@@ -300,7 +312,7 @@ func TestNewQuoteGetNoFlagsNoExtraParams(t *testing.T) {
 		assert.Empty(t, q.Get("indicative"), "indicative should be absent when not specified")
 
 		if r.URL.Path == "/marketdata/v1/AAPL/quotes" {
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
+			_, _ = w.Write([]byte(aaplQuoteEntryResponse))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -308,7 +320,7 @@ func TestNewQuoteGetNoFlagsNoExtraParams(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get", "AAPL")
 	require.NoError(t, err)
 
@@ -327,7 +339,7 @@ func TestNewQuoteGetCommaSeparatedFields(t *testing.T) {
 		assert.Equal(t, "quote,fundamental", q.Get("fields"))
 
 		if r.URL.Path == "/marketdata/v1/AAPL/quotes" {
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
+			_, _ = w.Write([]byte(aaplQuoteEntryResponse))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -335,7 +347,7 @@ func TestNewQuoteGetCommaSeparatedFields(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get",
 		"--fields", "QUOTE,FUNDAMENTAL",
 		"AAPL",
@@ -357,12 +369,12 @@ func TestNewQuoteGetOptionFlagsCall(t *testing.T) {
 	occSymbol := "AMZN  260515C00270000"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"AMZN  260515C00270000":{"symbol":"AMZN  260515C00270000","lastPrice":5.50}}`))
+		_, _ = w.Write([]byte(amznCallQuoteEntryResponse))
 	}))
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get",
 		"--underlying", "AMZN",
 		"--expiration", "2026-05-15",
@@ -383,12 +395,12 @@ func TestNewQuoteGetOptionFlagsPut(t *testing.T) {
 	occSymbol := "AMZN  260515P00270000"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"AMZN  260515P00270000":{"symbol":"AMZN  260515P00270000","lastPrice":3.25}}`))
+		_, _ = w.Write([]byte(amznPutQuoteEntryResponse))
 	}))
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get",
 		"--underlying", "AMZN",
 		"--expiration", "2026-05-15",
@@ -410,7 +422,7 @@ func TestNewQuoteGetOptionFlagsWithPositionalArgs(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get",
 		"AAPL",
 		"--underlying", "AMZN",
@@ -433,7 +445,7 @@ func TestNewQuoteGetOptionFlagsMissingRequired(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get",
 		"--underlying", "AMZN",
 		"--strike", "270",
@@ -453,7 +465,7 @@ func TestNewQuoteGetCallAndPutMutuallyExclusive(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get",
 		"--underlying", "AMZN",
 		"--expiration", "2026-05-15",
@@ -475,7 +487,7 @@ func TestNewQuoteGetFieldsCaseInsensitive(t *testing.T) {
 		assert.Equal(t, "quote,reference", q.Get("fields"))
 
 		if r.URL.Path == "/marketdata/v1/AAPL/quotes" {
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
+			_, _ = w.Write([]byte(aaplQuoteEntryResponse))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -483,7 +495,7 @@ func TestNewQuoteGetFieldsCaseInsensitive(t *testing.T) {
 	defer server.Close()
 
 	var buf bytes.Buffer
-	cmd := NewQuoteCmd(testClient(t, server), &buf)
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "get",
 		"--fields", "Quote",
 		"--fields", "REFERENCE",
