@@ -24,7 +24,8 @@ import (
 var ErrMissingCredentials = errors.New("missing required credentials")
 
 const (
-	defaultBaseURL = "https://api.schwabapi.com"
+	defaultBaseURL     = "https://api.schwabapi.com"
+	defaultCallbackURL = "https://127.0.0.1:8182"
 )
 
 // Config holds Schwab API credentials and settings.
@@ -178,7 +179,7 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	// Set default callback URL if still empty
 	if cfg.CallbackURL == "" {
-		cfg.CallbackURL = "https://127.0.0.1:8182"
+		cfg.CallbackURL = defaultCallbackURL
 	}
 
 	normalizedBaseURL, err := normalizeBaseURL(cfg.BaseURL)

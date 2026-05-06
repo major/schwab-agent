@@ -40,13 +40,13 @@ type orderGetOpts struct {
 // NewOrderCmd returns the Cobra command for order operations.
 func NewOrderCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "order",
+		Use:   commandUseOrder,
 		Short: "List, build, preview, place, cancel, and replace orders",
 		Long: `Manage orders across your Schwab accounts. Supports listing, viewing, placing,
 previewing, building, canceling, and replacing orders. Placing, canceling, and
 replacing orders require the "i-also-like-to-live-dangerously" config flag.
 Duration aliases GTC, FOK, and IOC are accepted.`,
-		GroupID: "trading",
+		GroupID: groupIDTrading,
 		RunE:    requireSubcommand,
 	}
 
@@ -96,7 +96,7 @@ func filterNonTerminalOrders(orders []models.Order) []models.Order {
 func newOrderListCmd(c *client.Ref, _ string, w io.Writer) *cobra.Command {
 	opts := &orderListOpts{}
 	cmd := &cobra.Command{
-		Use:   "list",
+		Use:   commandUseList,
 		Short: "List orders (defaults to non-terminal statuses)",
 		Long: `List orders for the current account, or all accounts when no --account is set.
 By default, terminal statuses (FILLED, CANCELED, REJECTED, EXPIRED, REPLACED)

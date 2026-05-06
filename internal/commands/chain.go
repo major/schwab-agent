@@ -31,7 +31,7 @@ func NewChainCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "chain",
 		Short:   "Option chain operations",
-		GroupID: "market-data",
+		GroupID: groupIDMarketData,
 		RunE:    requireSubcommand,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
@@ -70,7 +70,7 @@ specific moneyness with --strike-range (ITM, NTM, OTM, ALL).`,
 			// uses its default behavior.
 			includeUnderlying := ""
 			if opts.IncludeUnderlyingQuote {
-				includeUnderlying = "true"
+				includeUnderlying = annotationValueTrue
 			}
 
 			params := client.ChainParams{

@@ -34,7 +34,7 @@ func (c *Client) Transactions(
 	queryParams := make(map[string]string)
 	queryParams["startDate"], queryParams["endDate"] = defaultDateRange(params.StartDate, params.EndDate)
 	setParam(queryParams, "types", params.Types)
-	setParam(queryParams, "symbol", params.Symbol)
+	setParam(queryParams, queryParamSymbol, params.Symbol)
 
 	var result []models.Transaction
 	err := c.doGet(ctx, path, queryParams, &result)

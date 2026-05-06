@@ -37,12 +37,12 @@ func isValidQuoteField(field string) bool {
 func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	getCmd := newQuoteGetCmd(c, w)
 	cmd := &cobra.Command{
-		Use:     "quote",
+		Use:     commandUseQuote,
 		Short:   "Stock quote operations",
 		Long:    "Get quotes for one or more symbols",
 		Args:    cobra.ArbitraryArgs,
 		RunE:    defaultSubcommand(getCmd),
-		GroupID: "market-data",
+		GroupID: groupIDMarketData,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
@@ -131,8 +131,8 @@ mutually exclusive with positional symbol arguments.`,
 			optionMode := cmd.Flags().Changed("underlying") ||
 				cmd.Flags().Changed("expiration") ||
 				cmd.Flags().Changed("strike") ||
-				cmd.Flags().Changed("call") ||
-				cmd.Flags().Changed("put")
+				cmd.Flags().Changed(flagCall) ||
+				cmd.Flags().Changed(flagPut)
 
 			if optionMode {
 				// Option flags and positional symbols are mutually exclusive.
@@ -173,7 +173,7 @@ mutually exclusive with positional symbol arguments.`,
 	}
 
 	defineCobraFlags(cmd, opts)
-	cmd.MarkFlagsMutuallyExclusive("call", "put")
+	cmd.MarkFlagsMutuallyExclusive(flagCall, flagPut)
 
 	return cmd
 }
@@ -192,7 +192,7 @@ func validateOptionQuoteFlags(cmd *cobra.Command) error {
 	if !cmd.Flags().Changed("strike") {
 		missing = append(missing, "--strike")
 	}
-	if !cmd.Flags().Changed("call") && !cmd.Flags().Changed("put") {
+	if !cmd.Flags().Changed(flagCall) && !cmd.Flags().Changed(flagPut) {
 		missing = append(missing, "--call or --put")
 	}
 	if len(missing) > 0 {

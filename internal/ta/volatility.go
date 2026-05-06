@@ -8,6 +8,13 @@ import (
 )
 
 const (
+	volatilityRegimeElevated = "elevated"
+	volatilityRegimeExtreme  = "extreme"
+	volatilityRegimeHigh     = "high"
+	volatilityRegimeLow      = "low"
+	volatilityRegimeNormal   = "normal"
+	volatilityRegimeVeryLow  = "very_low"
+
 	tradingDaysPerYear = 252
 	regimeVeryLow      = 10.0
 	regimeLow          = 15.0
@@ -101,17 +108,17 @@ func HistoricalVolatility(closes []float64, period int) (*HistoricalVolatilityRe
 func classifyRegime(annualizedVol float64) string {
 	switch {
 	case annualizedVol < regimeVeryLow:
-		return "very_low"
+		return volatilityRegimeVeryLow
 	case annualizedVol < regimeLow:
-		return "low"
+		return volatilityRegimeLow
 	case annualizedVol < regimeNormal:
-		return "normal"
+		return volatilityRegimeNormal
 	case annualizedVol < regimeElevated:
-		return "elevated"
+		return volatilityRegimeElevated
 	case annualizedVol < regimeHigh:
-		return "high"
+		return volatilityRegimeHigh
 	default:
-		return "extreme"
+		return volatilityRegimeExtreme
 	}
 }
 

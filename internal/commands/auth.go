@@ -201,8 +201,8 @@ func NewAuthCmd(configPath, tokenPath string, w io.Writer, deps AuthDeps) *cobra
 status checks token expiration, and refresh forces a token refresh. Auth
 commands bypass the global auth check so they can run without existing tokens.
 Tokens are stored locally and refreshed automatically during normal use.`,
-		Annotations: map[string]string{"skipAuth": "true"},
-		GroupID:     "account-mgmt",
+		Annotations: map[string]string{annotationSkipAuth: annotationValueTrue},
+		GroupID:     groupIDAccountMgmt,
 		RunE:        requireSubcommand,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)

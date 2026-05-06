@@ -25,8 +25,8 @@ func newEnvVarsCmd(w io.Writer) *cobra.Command {
 		Use:         "env-vars",
 		Short:       "Show supported environment variables",
 		Long:        "Show environment variables that schwab-agent reads for authentication, API configuration, and state.",
-		Annotations: map[string]string{"skipAuth": "true"},
-		GroupID:     "tools",
+		Annotations: map[string]string{annotationSkipAuth: annotationValueTrue},
+		GroupID:     groupIDTools,
 		Args:        cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			_, err := fmt.Fprint(w, `Environment Variables
@@ -52,8 +52,8 @@ func newConfigKeysCmd(w io.Writer) *cobra.Command {
 		Use:         "config-keys",
 		Short:       "Show config keys and related flags",
 		Long:        "Show config keys derived from the current Cobra command tree and their corresponding flags.",
-		Annotations: map[string]string{"skipAuth": "true"},
-		GroupID:     "tools",
+		Annotations: map[string]string{annotationSkipAuth: annotationValueTrue},
+		GroupID:     groupIDTools,
 		Args:        cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return writeConfigKeys(w, cmd.Root())

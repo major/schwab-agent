@@ -2,6 +2,11 @@ package client
 
 import "time"
 
+const (
+	queryParamFields = "fields"
+	queryParamSymbol = "symbol"
+)
+
 // setParam adds a key-value pair to the map if value is non-empty.
 func setParam(m map[string]string, key, value string) {
 	if value != "" {

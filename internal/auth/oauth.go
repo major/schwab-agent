@@ -29,8 +29,10 @@ import (
 )
 
 const (
+	callbackLoopbackHost = "127.0.0.1"
+
 	// defaultCallbackAddr limits the local callback server to loopback.
-	defaultCallbackAddr = "127.0.0.1:8182"
+	defaultCallbackAddr = callbackLoopbackHost + ":8182"
 
 	// callbackSuccessHTML is the browser response shown after login completes.
 	callbackSuccessHTML = "<html><body><p>Authentication successful! You can close this tab.</p></body></html>"
@@ -336,7 +338,7 @@ func validateCallbackAddr(addr string) (string, error) {
 		return "", apperr.NewAuthCallbackError("callback address must include host and port", err)
 	}
 
-	if host != "127.0.0.1" {
+	if host != callbackLoopbackHost {
 		return "", apperr.NewAuthCallbackError("callback server must bind to 127.0.0.1 only", nil)
 	}
 
@@ -354,7 +356,7 @@ func generateSelfSignedCertificate() (tls.Certificate, error) {
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
-			CommonName: "127.0.0.1",
+			CommonName: callbackLoopbackHost,
 		},
 		NotBefore:             now.Add(-1 * time.Minute),
 		NotAfter:              now.Add(24 * time.Hour),
@@ -362,7 +364,7 @@ func generateSelfSignedCertificate() (tls.Certificate, error) {
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		DNSNames:              []string{"localhost"},
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		IPAddresses:           []net.IP{net.ParseIP(callbackLoopbackHost)},
 	}
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)

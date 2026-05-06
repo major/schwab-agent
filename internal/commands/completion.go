@@ -13,8 +13,8 @@ func NewCompletionCmd(w io.Writer) *cobra.Command {
 		Use:         "completion",
 		Short:       "Generate shell completion scripts",
 		Long:        "Generate shell completion scripts for bash, zsh, fish, or powershell.",
-		Annotations: map[string]string{"skipAuth": "true"},
-		GroupID:     "tools",
+		Annotations: map[string]string{annotationSkipAuth: annotationValueTrue},
+		GroupID:     groupIDTools,
 		RunE:        requireSubcommand,
 	}
 

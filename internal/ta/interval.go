@@ -8,6 +8,20 @@ import (
 )
 
 const (
+	intervalDaily  = "daily"
+	intervalWeekly = "weekly"
+	interval1Min   = "1min"
+	interval5Min   = "5min"
+	interval15Min  = "15min"
+	interval30Min  = "30min"
+
+	historyPeriodTypeDay  = "day"
+	historyPeriodTypeYear = "year"
+
+	historyFrequencyTypeDaily  = "daily"
+	historyFrequencyTypeMinute = "minute"
+	historyFrequencyTypeWeekly = "weekly"
+
 	weeksPerYear = 52
 
 	// dailyLookbackSafetyCandles is added before sizing daily Schwab API period
@@ -60,17 +74,17 @@ func nextValidPeriod(n int, valid []int) int {
 // Returns 0 for unknown intervals.
 func maxCandlesForInterval(interval string) int {
 	switch interval {
-	case "daily":
+	case intervalDaily:
 		return maxYearPeriod * tradingDaysPerYear
-	case "weekly":
+	case intervalWeekly:
 		return maxYearPeriod * weeksPerYear
-	case "1min":
+	case interval1Min:
 		return maxDayPeriod * regularSessionMinutesPerDay
-	case "5min":
+	case interval5Min:
 		return maxDayPeriod * (regularSessionMinutesPerDay / 5)
-	case "15min":
+	case interval15Min:
 		return maxDayPeriod * (regularSessionMinutesPerDay / 15)
-	case "30min":
+	case interval30Min:
 		return maxDayPeriod * (regularSessionMinutesPerDay / 30)
 	default:
 		return 0
@@ -105,7 +119,7 @@ func IntervalToHistoryParams(
 	}
 
 	switch interval {
-	case "daily":
+	case intervalDaily:
 		// A one-calendar-year daily Schwab request can return fewer than 252
 		// candles depending on holidays, current market timing, and symbol-level
 		// gaps. Add a small sizing buffer before rounding to documented periods so
@@ -113,27 +127,27 @@ func IntervalToHistoryParams(
 		// years, while smaller daily indicators still use the minimum 1-year fetch.
 		years := max(1, ceilDiv(requiredCandles+dailyLookbackSafetyCandles, tradingDaysPerYear))
 		years = nextValidPeriod(years, validYearPeriods())
-		return "year", strconv.Itoa(years), "daily", "1", nil
-	case "weekly":
+		return historyPeriodTypeYear, strconv.Itoa(years), historyFrequencyTypeDaily, "1", nil
+	case intervalWeekly:
 		years := max(1, ceilDiv(requiredCandles, weeksPerYear))
 		years = nextValidPeriod(years, validYearPeriods())
-		return "year", strconv.Itoa(years), "weekly", "1", nil
-	case "1min":
+		return historyPeriodTypeYear, strconv.Itoa(years), historyFrequencyTypeWeekly, "1", nil
+	case interval1Min:
 		days := max(1, ceilDiv(requiredCandles, regularSessionMinutesPerDay))
 		days = nextValidPeriod(days, validDayPeriods())
-		return "day", strconv.Itoa(days), "minute", "1", nil
-	case "5min":
+		return historyPeriodTypeDay, strconv.Itoa(days), historyFrequencyTypeMinute, "1", nil
+	case interval5Min:
 		days := max(1, ceilDiv(requiredCandles, regularSessionMinutesPerDay/5))
 		days = nextValidPeriod(days, validDayPeriods())
-		return "day", strconv.Itoa(days), "minute", "5", nil
-	case "15min":
+		return historyPeriodTypeDay, strconv.Itoa(days), historyFrequencyTypeMinute, "5", nil
+	case interval15Min:
 		days := max(1, ceilDiv(requiredCandles, regularSessionMinutesPerDay/15))
 		days = nextValidPeriod(days, validDayPeriods())
-		return "day", strconv.Itoa(days), "minute", "15", nil
-	case "30min":
+		return historyPeriodTypeDay, strconv.Itoa(days), historyFrequencyTypeMinute, "15", nil
+	case interval30Min:
 		days := max(1, ceilDiv(requiredCandles, regularSessionMinutesPerDay/30))
 		days = nextValidPeriod(days, validDayPeriods())
-		return "day", strconv.Itoa(days), "minute", "30", nil
+		return historyPeriodTypeDay, strconv.Itoa(days), historyFrequencyTypeMinute, "30", nil
 	default:
 		return "", "", "", "", apperr.NewValidationError(
 			"unsupported interval: "+interval,

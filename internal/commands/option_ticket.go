@@ -54,11 +54,11 @@ type optionTicketChainSummary struct {
 // NewOptionCmd returns the Cobra command for option planning workflows.
 func NewOptionCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "option",
+		Use:     commandUseOption,
 		Short:   "Option planning workflows",
 		Long:    "Option planning workflows that combine quote, chain, and symbol context for agents.",
 		RunE:    requireSubcommand,
-		GroupID: "market-data",
+		GroupID: groupIDMarketData,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
@@ -112,8 +112,8 @@ lookup, and OCC symbol construction into one read-only CLI call.`,
 	}
 
 	defineCobraFlags(cmd, opts)
-	cmd.MarkFlagsOneRequired("call", "put")
-	cmd.MarkFlagsMutuallyExclusive("call", "put")
+	cmd.MarkFlagsOneRequired(flagCall, flagPut)
+	cmd.MarkFlagsMutuallyExclusive(flagCall, flagPut)
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
@@ -145,7 +145,7 @@ func buildOptionTicket(
 		return nil, newValidationError("strike must be greater than zero")
 	}
 
-	quote, err := c.Quote(ctx, symbol, client.QuoteParams{Fields: []string{"quote", "fundamental", "reference"}})
+	quote, err := c.Quote(ctx, symbol, client.QuoteParams{Fields: []string{quoteFieldQuote, quoteFieldFundamental, quoteFieldReference}})
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func optionTicketChainParams(expiration time.Time, putCall models.PutCall, strik
 		Strategy:               string(chainStrategySingle),
 		FromDate:               expirationDate,
 		ToDate:                 expirationDate,
-		IncludeUnderlyingQuote: "true",
+		IncludeUnderlyingQuote: annotationValueTrue,
 		Strike:                 strconv.FormatFloat(strike, 'f', -1, 64),
 	}
 }

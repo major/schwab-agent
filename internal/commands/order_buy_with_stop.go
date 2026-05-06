@@ -53,7 +53,7 @@ func newBuyWithStopPlaceCmd(c *client.Ref, configPath string, w io.Writer) *cobr
 		orderbuilder.ValidateBuyWithStopOrder,
 		orderbuilder.BuildBuyWithStopOrder,
 	)
-	applyBuyWithStopHelp(cmd, "place")
+	applyBuyWithStopHelp(cmd, commandUsePlace)
 
 	return cmd
 }
@@ -70,7 +70,7 @@ func newBuyWithStopBuildCmd(w io.Writer) *cobra.Command {
 		orderbuilder.ValidateBuyWithStopOrder,
 		orderbuilder.BuildBuyWithStopOrder,
 	)
-	applyBuyWithStopHelp(cmd, "build")
+	applyBuyWithStopHelp(cmd, commandUseBuild)
 
 	return cmd
 }
@@ -89,7 +89,7 @@ func newBuyWithStopPreviewCmd(c *client.Ref, configPath string, w io.Writer) *co
 		orderbuilder.ValidateBuyWithStopOrder,
 		orderbuilder.BuildBuyWithStopOrder,
 	)
-	applyBuyWithStopHelp(cmd, "preview")
+	applyBuyWithStopHelp(cmd, commandUsePreview)
 
 	return cmd
 }
@@ -98,9 +98,9 @@ func newBuyWithStopPreviewCmd(c *client.Ref, configPath string, w io.Writer) *co
 func applyBuyWithStopHelp(cmd *cobra.Command, verb string) {
 	description := "Preview a buy-with-stop bracket order through the Schwab API without placing it."
 	switch verb {
-	case "build":
+	case commandUseBuild:
 		description = "Build a buy-with-stop bracket order request JSON locally with automatic stop-loss protection."
-	case "place":
+	case commandUsePlace:
 		description = "Place a buy-with-stop bracket order through the Schwab API with automatic stop-loss protection."
 	}
 

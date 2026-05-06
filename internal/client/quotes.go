@@ -23,7 +23,7 @@ type QuoteParams struct {
 func quoteParams(p QuoteParams) map[string]string {
 	m := map[string]string{}
 	if len(p.Fields) > 0 {
-		m["fields"] = strings.Join(p.Fields, ",")
+		m[queryParamFields] = strings.Join(p.Fields, ",")
 	}
 	if p.Indicative {
 		m["indicative"] = "true"

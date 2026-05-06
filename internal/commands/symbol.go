@@ -35,12 +35,12 @@ type symbolBuildOpts struct {
 // These are pure computation commands that do not require API authentication.
 func NewSymbolCmd(w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "symbol",
+		Use:   commandUseSymbol,
 		Short: "OCC symbol operations",
 		Long: `Build and parse OCC-format option symbols locally. These are pure computation
 commands that make no API calls and require no authentication.`,
-		GroupID:     "tools",
-		Annotations: map[string]string{"skipAuth": "true"},
+		GroupID:     groupIDTools,
+		Annotations: map[string]string{annotationSkipAuth: annotationValueTrue},
 		RunE:        requireSubcommand,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
@@ -53,7 +53,7 @@ commands that make no API calls and require no authentication.`,
 func newSymbolBuildCmd(w io.Writer) *cobra.Command {
 	opts := &symbolBuildOpts{}
 	cmd := &cobra.Command{
-		Use:   "build",
+		Use:   commandUseBuild,
 		Short: "Build an OCC option symbol from components",
 		Long: `Build an OCC option symbol from underlying, expiration date, strike price, and
 contract type. No API call or authentication required. Output is JSON with the
@@ -88,8 +88,8 @@ constructed symbol and its components.`,
 
 	defineCobraFlags(cmd, opts)
 
-	cmd.MarkFlagsMutuallyExclusive("call", "put")
-	cmd.MarkFlagsOneRequired("call", "put")
+	cmd.MarkFlagsMutuallyExclusive(flagCall, flagPut)
+	cmd.MarkFlagsOneRequired(flagCall, flagPut)
 	return cmd
 }
 

@@ -28,9 +28,9 @@ type instrumentSearchOpts struct {
 // NewInstrumentCmd returns the Cobra command for instrument search and lookup.
 func NewInstrumentCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "instrument",
+		Use:     commandUseInstrument,
 		Short:   "Search and look up instruments",
-		GroupID: "market-data",
+		GroupID: groupIDMarketData,
 		RunE:    requireSubcommand,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)

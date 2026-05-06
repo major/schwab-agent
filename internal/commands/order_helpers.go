@@ -476,9 +476,9 @@ func normalizeOrderType(orderType, fallback models.OrderType) models.OrderType {
 	switch orderType {
 	case "":
 		return fallback
-	case models.OrderType("MOC"):
+	case models.OrderType(orderTypeAliasMarketOnClose):
 		return models.OrderTypeMarketOnClose
-	case models.OrderType("LOC"):
+	case models.OrderType(orderTypeAliasLimitOnClose):
 		return models.OrderTypeLimitOnClose
 	default:
 		return orderType
@@ -490,11 +490,11 @@ func normalizeOrderType(orderType, fallback models.OrderType) models.OrderType {
 func normalizeDuration(duration models.Duration) models.Duration {
 	//nolint:exhaustive // Only legacy aliases need rewriting; all canonical values pass through unchanged.
 	switch duration {
-	case models.Duration("GTC"):
+	case models.Duration(durationAliasGoodTillCancel):
 		return models.DurationGoodTillCancel
-	case models.Duration("FOK"):
+	case models.Duration(durationAliasFillOrKill):
 		return models.DurationFillOrKill
-	case models.Duration("IOC"):
+	case models.Duration(durationAliasImmediateOrCancel):
 		return models.DurationImmediateOrCancel
 	default:
 		return duration
@@ -544,9 +544,9 @@ func parseOrderType(raw string, fallback models.OrderType) (models.OrderType, er
 
 	// Resolve aliases before standard enum validation.
 	switch upper {
-	case "MOC":
+	case orderTypeAliasMarketOnClose:
 		return models.OrderTypeMarketOnClose, nil
-	case "LOC":
+	case orderTypeAliasLimitOnClose:
 		return models.OrderTypeLimitOnClose, nil
 	}
 
@@ -559,11 +559,11 @@ func parseDuration(raw string) (models.Duration, error) {
 	upper := strings.ToUpper(strings.TrimSpace(raw))
 
 	switch upper {
-	case "GTC":
+	case durationAliasGoodTillCancel:
 		return models.DurationGoodTillCancel, nil
-	case "FOK":
+	case durationAliasFillOrKill:
 		return models.DurationFillOrKill, nil
-	case "IOC":
+	case durationAliasImmediateOrCancel:
 		return models.DurationImmediateOrCancel, nil
 	}
 

@@ -387,7 +387,7 @@ the same parser for single-symbol and batch analysis. Use --interval to select
 data frequency (daily, weekly, 1min, 5min, 15min, 30min). Time-series commands
 default --points to 1 for token-efficient latest-value output; use --points 0
 when you need the full computed series.`,
-		GroupID: "market-data",
+		GroupID: groupIDMarketData,
 		Args:    cobra.ArbitraryArgs,
 		RunE:    defaultSubcommand(dashboardCmd),
 	}
@@ -396,7 +396,7 @@ when you need the full computed series.`,
 	cmd.AddCommand(
 		dashboardCmd,
 		makeCobraSimpleTACommand(&simpleTAConfig{
-			name:  "sma",
+			name:  indicatorNameSMA,
 			usage: "Simple Moving Average",
 			long: `Compute Simple Moving Average for a symbol. The --period flag sets the lookback
 window (default 20). Multiple periods can be requested in one command using
@@ -747,12 +747,12 @@ func dashboardBaseRows(inputs dashboardInputs, baseStart int) []map[string]any {
 	for i := range rowCount {
 		candleIndex := baseStart + i
 		rows[i] = map[string]any{
-			"datetime": inputs.Timestamps[candleIndex],
-			"open":     inputs.Opens[candleIndex],
-			"high":     inputs.Highs[candleIndex],
-			"low":      inputs.Lows[candleIndex],
-			"close":    inputs.Closes[candleIndex],
-			"volume":   inputs.Volumes[candleIndex],
+			dashboardKeyDatetime: inputs.Timestamps[candleIndex],
+			"open":               inputs.Opens[candleIndex],
+			"high":               inputs.Highs[candleIndex],
+			"low":                inputs.Lows[candleIndex],
+			dashboardKeyClose:    inputs.Closes[candleIndex],
+			dashboardKeyVolume:   inputs.Volumes[candleIndex],
 		}
 	}
 
@@ -765,7 +765,7 @@ func addDashboardSeries(rows []map[string]any, series dashboardSeries) error {
 		"sma_50":         series.SMA50,
 		"sma_200":        series.SMA200,
 		"rsi_14":         series.RSI14,
-		"macd":           series.MACD,
+		dashboardKeyMACD: series.MACD,
 		"macd_signal":    series.MACDSignal,
 		"macd_histogram": series.MACDHist,
 		"atr_14":         series.ATR14,
@@ -793,7 +793,7 @@ func addDashboardDerivedFields(rows []map[string]any, inputs dashboardInputs, ba
 }
 
 func addDashboardDerivedRow(row map[string]any, inputs dashboardInputs, candleIndex int) error {
-	closePrice, err := dashboardRowFloat(row, "close")
+	closePrice, err := dashboardRowFloat(row, dashboardKeyClose)
 	if err != nil {
 		return err
 	}
@@ -805,7 +805,7 @@ func addDashboardDerivedRow(row map[string]any, inputs dashboardInputs, candleIn
 	if err != nil {
 		return err
 	}
-	volume, err := dashboardRowFloat(row, "volume")
+	volume, err := dashboardRowFloat(row, dashboardKeyVolume)
 	if err != nil {
 		return err
 	}
@@ -953,7 +953,7 @@ func dashboardRowFloat(row map[string]any, key string) (float64, error) {
 }
 
 func dashboardSignals(latest map[string]any) (map[string]any, error) {
-	closePrice, err := dashboardRowFloat(latest, "close")
+	closePrice, err := dashboardRowFloat(latest, dashboardKeyClose)
 	if err != nil {
 		return nil, err
 	}
@@ -1052,7 +1052,7 @@ func volumeSignal(relativeVolume float64) string {
 
 func cobraTAMACDCommand(c *client.Ref, w io.Writer) *cobra.Command {
 	return makeCobraTACommand(taCommandConfig[*macdOpts, macdOutput]{
-		name:  "macd",
+		name:  indicatorNameMACD,
 		short: "Moving Average Convergence/Divergence",
 		long: `Compute MACD (Moving Average Convergence/Divergence) for a symbol. Uses
 --fast, --slow, and --signal periods instead of --period. Output keys include
@@ -1069,7 +1069,7 @@ slow=26, signal=9.`,
 func buildMACDOutput(ctx context.Context, c *client.Ref, opts *macdOpts, symbol string) (macdOutput, error) {
 	// MACD layers slow EMA + signal EMA; 2x the combined period provides convergence.
 	interval := string(opts.Interval)
-	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, (opts.Slow+opts.Signal)*2, "macd")
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, (opts.Slow+opts.Signal)*2, indicatorNameMACD)
 	if err != nil {
 		return macdOutput{}, err
 	}
@@ -1101,7 +1101,7 @@ func buildMACDOutput(ctx context.Context, c *client.Ref, opts *macdOpts, symbol 
 	out = tailLimit(out, opts.Points)
 
 	return macdOutput{
-		Indicator: "macd",
+		Indicator: indicatorNameMACD,
 		Symbol:    symbol,
 		Interval:  interval,
 		Fast:      opts.Fast,
@@ -1479,7 +1479,7 @@ func buildExpectedMoveOutput(
 	// Keep this to a single chain call so the underlying snapshot and option prices stay aligned.
 	chain, err := c.OptionChain(ctx, symbol, &client.ChainParams{
 		ContractType:           "ALL",
-		IncludeUnderlyingQuote: "true",
+		IncludeUnderlyingQuote: annotationValueTrue,
 		StrikeRange:            "NTM",
 	})
 	if err != nil {
@@ -1522,7 +1522,7 @@ func buildExpectedMoveOutput(
 		return expectedMoveOutput{}, fmt.Errorf("no put contracts for %s at strike %s", symbol, atmStrikeKey)
 	}
 
-	callPrice, err := contractPrice(callContracts[0], symbol, atmStrikeKey, "call")
+	callPrice, err := contractPrice(callContracts[0], symbol, atmStrikeKey, flagCall)
 	if err != nil {
 		return expectedMoveOutput{}, err
 	}
@@ -1692,8 +1692,8 @@ func buildTAOutput(
 	out := make([]map[string]any, len(values))
 	for i, v := range values {
 		out[i] = map[string]any{
-			"datetime": timestamps[i],
-			indicator:  v,
+			dashboardKeyDatetime: timestamps[i],
+			indicator:            v,
 		}
 	}
 
@@ -1733,7 +1733,7 @@ func buildMultiTAOutput(
 
 	out := make([]map[string]any, maxValues)
 	for i := range maxValues {
-		out[i] = map[string]any{"datetime": timestamps[i]}
+		out[i] = map[string]any{dashboardKeyDatetime: timestamps[i]}
 	}
 
 	for _, period := range periods {

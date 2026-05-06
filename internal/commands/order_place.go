@@ -131,7 +131,7 @@ func fetchReplaceActionData(
 	if err != nil {
 		failure := fmt.Sprintf("original order details unavailable after successful replace: %v", err)
 		data.VerificationFailures = append(data.VerificationFailures, failure)
-		data.VerificationState = "partial"
+		data.VerificationState = verificationStatePartial
 		return data, append(errs, failure)
 	}
 
@@ -144,7 +144,7 @@ func fetchReplaceActionData(
 		}
 		failure := fmt.Sprintf("original order status is %s after replace, expected REPLACED", status)
 		data.VerificationFailures = append(data.VerificationFailures, failure)
-		data.VerificationState = "partial"
+		data.VerificationState = verificationStatePartial
 		return data, append(errs, failure)
 	}
 
@@ -152,7 +152,7 @@ func fetchReplaceActionData(
 		return data, errs
 	}
 
-	data.VerificationState = "partial"
+	data.VerificationState = verificationStatePartial
 	return data, errs
 }
 
@@ -253,7 +253,7 @@ func resolveOrderPlacePreviewPayload(
 		AccountNumber: accountNumber,
 		NickName:      nickName,
 		AccountType:   accountType,
-		Source:        "preview",
+		Source:        accountSourcePreview,
 		DisplayLabel:  accountDisplayLabel(nickName, entry.Account),
 	}
 
@@ -341,7 +341,7 @@ func buildTypedOrder[O any, P any](
 func newOrderPlaceCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 	opts := &orderPlaceOpts{}
 	cmd := &cobra.Command{
-		Use:   "place",
+		Use:   commandUsePlace,
 		Short: "Place an order",
 		Long: `Place an order via subcommand (equity, option, bracket, oco), from a JSON spec
 with --spec, or from an exact saved preview with --from-preview. Requires
@@ -412,7 +412,7 @@ func runOrderPlaceSpec(
 		return err
 	}
 
-	data, errs := fetchOrderActionData(cmd, c, payload.Account, "place", response.OrderID, payload.Order)
+	data, errs := fetchOrderActionData(cmd, c, payload.Account, commandUsePlace, response.OrderID, payload.Order)
 	data.PreviewDigest = payload.PreviewDigest
 	return writeOrderActionResult(w, &data, errs, payload.AccountInfo)
 }
@@ -441,7 +441,7 @@ func newEquityTypedOrderCommand(
 		c,
 		configPath,
 		w,
-		"equity",
+		commandUseEquity,
 		usage,
 		func() *equityPlaceOpts { return &equityPlaceOpts{} },
 		func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) },
@@ -469,7 +469,7 @@ func newOptionTypedOrderCommand(
 		usage,
 		func() *optionPlaceOpts { return &optionPlaceOpts{} },
 		func(cmd *cobra.Command, opts *optionPlaceOpts) {
-			defineAndConstrain(cmd, opts, []string{"call", "put"})
+			defineAndConstrain(cmd, opts, []string{flagCall, flagPut})
 		},
 		parseOptionParams,
 		orderbuilder.ValidateOptionOrder,
@@ -676,7 +676,7 @@ func runTypedOrderPlace[O any, P any](
 		return err
 	}
 
-	data, errs := fetchOrderActionData(cmd, c, acct.Hash, "place", response.OrderID, order)
+	data, errs := fetchOrderActionData(cmd, c, acct.Hash, commandUsePlace, response.OrderID, order)
 	return writeOrderActionResult(w, &data, errs, acct)
 }
 
@@ -684,7 +684,7 @@ func runTypedOrderPlace[O any, P any](
 func newOrderPreviewCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 	opts := &orderPreviewOpts{}
 	cmd := &cobra.Command{
-		Use:   "preview",
+		Use:   commandUsePreview,
 		Short: "Preview an order from JSON spec or typed flags",
 		Long: `Preview an order from a JSON spec or typed subcommand flags without placing it.
 Typed preview subcommands reuse the same local builders as order place, then
@@ -1098,7 +1098,7 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
-	defineAndConstrain(cmd, optionOpts, []string{"call", "put"})
+	defineAndConstrain(cmd, optionOpts, []string{flagCall, flagPut})
 	defineCobraFlags(cmd, opts)
 
 	return cmd

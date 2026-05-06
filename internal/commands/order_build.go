@@ -73,14 +73,14 @@ func makeCobraBuildOrderCommand[O any, P any](
 // newOrderBuildCmd returns the parent build command for offline order construction.
 func newOrderBuildCmd(w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "build",
+		Use:   commandUseBuild,
 		Short: "Build order request JSON without calling the API",
 		Long: `Build order request JSON locally without calling the API or requiring
 authentication. Output is raw JSON (not envelope-wrapped) that can be piped to
 order preview or order place --spec - for a staged workflow. Supports equity,
 option, bracket, OCO, and multi-leg option strategies.`,
 		RunE:        requireSubcommand,
-		Annotations: map[string]string{"skipAuth": "true"},
+		Annotations: map[string]string{annotationSkipAuth: annotationValueTrue},
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
@@ -94,7 +94,7 @@ option, bracket, OCO, and multi-leg option strategies.`,
 func orderBuildCoreCommands(w io.Writer) []*cobra.Command {
 	equityBuild := makeCobraBuildOrderCommand(
 		w,
-		"equity",
+		commandUseEquity,
 		"Build an equity order request",
 		func() *equityPlaceOpts { return &equityPlaceOpts{} },
 		func(cmd *cobra.Command, opts *equityPlaceOpts) { defineAndConstrain(cmd, opts) },
@@ -115,7 +115,7 @@ or to order preview --spec - to check estimated commissions.`
 		"Build an option order request",
 		func() *optionPlaceOpts { return &optionPlaceOpts{} },
 		func(cmd *cobra.Command, opts *optionPlaceOpts) {
-			defineAndConstrain(cmd, opts, []string{"call", "put"})
+			defineAndConstrain(cmd, opts, []string{flagCall, flagPut})
 		},
 		parseOptionParams,
 		orderbuilder.ValidateOptionOrder,
@@ -179,7 +179,7 @@ func orderBuildVerticalStrategyCommands(w io.Writer) []*cobra.Command {
 		"Build a vertical spread order request",
 		func() *verticalBuildOpts { return &verticalBuildOpts{} },
 		func(cmd *cobra.Command, opts *verticalBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"open", "close"})
+			defineAndConstrain(cmd, opts, []string{flagCall, flagPut}, []string{flagOpen, flagClose})
 		},
 		parseVerticalParams,
 		orderbuilder.ValidateVerticalOrder,
@@ -199,7 +199,7 @@ NET_DEBIT or NET_CREDIT is auto-determined from the strike relationship.`
 		"Build an iron condor order request",
 		func() *ironCondorBuildOpts { return &ironCondorBuildOpts{} },
 		func(cmd *cobra.Command, opts *ironCondorBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{"open", "close"})
+			defineAndConstrain(cmd, opts, []string{flagOpen, flagClose})
 		},
 		parseIronCondorParams,
 		orderbuilder.ValidateIronCondorOrder,
@@ -216,7 +216,7 @@ generates a NET_CREDIT.`
 		"Build a straddle order request",
 		func() *straddleBuildOpts { return &straddleBuildOpts{} },
 		func(cmd *cobra.Command, opts *straddleBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{"buy", "sell"}, []string{"open", "close"})
+			defineAndConstrain(cmd, opts, []string{flagBuy, flagSell}, []string{flagOpen, flagClose})
 		},
 		parseStraddleParams,
 		orderbuilder.ValidateStraddleOrder,
@@ -238,7 +238,7 @@ func orderBuildCombinationStrategyCommands(w io.Writer) []*cobra.Command {
 		"Build a strangle order request",
 		func() *strangleBuildOpts { return &strangleBuildOpts{} },
 		func(cmd *cobra.Command, opts *strangleBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{"buy", "sell"}, []string{"open", "close"})
+			defineAndConstrain(cmd, opts, []string{flagBuy, flagSell}, []string{flagOpen, flagClose})
 		},
 		parseStrangleParams,
 		orderbuilder.ValidateStrangleOrder,
@@ -272,7 +272,7 @@ already own, use order place option --action SELL_TO_OPEN instead.`
 		"Build a collar-with-stock order request (buy shares + buy put + sell call)",
 		func() *collarBuildOpts { return &collarBuildOpts{} },
 		func(cmd *cobra.Command, opts *collarBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{"open", "close"})
+			defineAndConstrain(cmd, opts, []string{flagOpen, flagClose})
 		},
 		parseCollarParams,
 		orderbuilder.ValidateCollarOrder,
@@ -298,7 +298,7 @@ func orderBuildCalendarStrategyCommands(w io.Writer) []*cobra.Command {
 		"Build a calendar spread order request (same strike, different expirations)",
 		func() *calendarBuildOpts { return &calendarBuildOpts{} },
 		func(cmd *cobra.Command, opts *calendarBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"open", "close"})
+			defineAndConstrain(cmd, opts, []string{flagCall, flagPut}, []string{flagOpen, flagClose})
 		},
 		parseCalendarParams,
 		orderbuilder.ValidateCalendarOrder,
@@ -315,7 +315,7 @@ contract. Profits from time decay differential between the two legs.`
 		"Build a diagonal spread order request (different strikes and expirations)",
 		func() *diagonalBuildOpts { return &diagonalBuildOpts{} },
 		func(cmd *cobra.Command, opts *diagonalBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"open", "close"})
+			defineAndConstrain(cmd, opts, []string{flagCall, flagPut}, []string{flagOpen, flagClose})
 		},
 		parseDiagonalParams,
 		orderbuilder.ValidateDiagonalOrder,
@@ -332,7 +332,7 @@ contract at a different strike. Combines elements of vertical and calendar sprea
 		"Build a butterfly spread order request",
 		func() *butterflyBuildOpts { return &butterflyBuildOpts{} },
 		func(cmd *cobra.Command, opts *butterflyBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"buy", "sell"}, []string{"open", "close"})
+			defineAndConstrain(cmd, opts, []string{flagCall, flagPut}, []string{flagBuy, flagSell}, []string{flagOpen, flagClose})
 		},
 		parseButterflyParams,
 		orderbuilder.ValidateButterflyOrder,
@@ -349,7 +349,7 @@ butterfly with long wings and two short body contracts.`
 		"Build a condor spread order request",
 		func() *condorBuildOpts { return &condorBuildOpts{} },
 		func(cmd *cobra.Command, opts *condorBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"buy", "sell"}, []string{"open", "close"})
+			defineAndConstrain(cmd, opts, []string{flagCall, flagPut}, []string{flagBuy, flagSell}, []string{flagOpen, flagClose})
 		},
 		parseCondorParams,
 		orderbuilder.ValidateCondorOrder,
@@ -370,7 +370,7 @@ func orderBuildRollStrategyCommands(w io.Writer) []*cobra.Command {
 		"Build a vertical roll order request",
 		func() *verticalRollBuildOpts { return &verticalRollBuildOpts{} },
 		func(cmd *cobra.Command, opts *verticalRollBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{"call", "put"}, []string{"debit", "credit"})
+			defineAndConstrain(cmd, opts, []string{flagCall, flagPut}, []string{"debit", "credit"})
 		},
 		parseVerticalRollParams,
 		orderbuilder.ValidateVerticalRollOrder,
@@ -390,8 +390,8 @@ pricing direction.`
 			defineAndConstrain(
 				cmd,
 				opts,
-				[]string{"call", "put"},
-				[]string{"open", "close"},
+				[]string{flagCall, flagPut},
+				[]string{flagOpen, flagClose},
 				[]string{"debit", "credit"},
 			)
 		},
@@ -410,7 +410,7 @@ short contract. Use --debit or --credit because back-ratios can price either way
 		"Build a double diagonal spread order request",
 		func() *doubleDiagonalBuildOpts { return &doubleDiagonalBuildOpts{} },
 		func(cmd *cobra.Command, opts *doubleDiagonalBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{"open", "close"})
+			defineAndConstrain(cmd, opts, []string{flagOpen, flagClose})
 		},
 		parseDoubleDiagonalParams,
 		orderbuilder.ValidateDoubleDiagonalOrder,

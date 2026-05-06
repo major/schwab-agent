@@ -162,7 +162,7 @@ func defineCobraFlags(cmd *cobra.Command, opts any) {
 		}
 		registerCobraFlag(cmd.Flags(), name, short, usage, field)
 
-		if fieldType.Tag.Get("flagrequired") == "true" {
+		if fieldType.Tag.Get("flagrequired") == annotationValueTrue {
 			if err := cmd.MarkFlagRequired(name); err != nil {
 				panic(err)
 			}
@@ -307,14 +307,14 @@ func modelEnumValues(value any) ([]string, map[string]string) {
 		return enumStrings(validInstructions()), nil
 	case *models.OrderType:
 		return enumStrings(validOrderTypes()), map[string]string{
-			"MOC": string(models.OrderTypeMarketOnClose),
-			"LOC": string(models.OrderTypeLimitOnClose),
+			orderTypeAliasMarketOnClose: string(models.OrderTypeMarketOnClose),
+			orderTypeAliasLimitOnClose:  string(models.OrderTypeLimitOnClose),
 		}
 	case *models.Duration:
 		return enumStrings(validDurations()), map[string]string{
-			"GTC": string(models.DurationGoodTillCancel),
-			"FOK": string(models.DurationFillOrKill),
-			"IOC": string(models.DurationImmediateOrCancel),
+			durationAliasGoodTillCancel:    string(models.DurationGoodTillCancel),
+			durationAliasFillOrKill:        string(models.DurationFillOrKill),
+			durationAliasImmediateOrCancel: string(models.DurationImmediateOrCancel),
 		}
 	case *models.Session:
 		return enumStrings(validSessions()), nil

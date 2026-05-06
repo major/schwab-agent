@@ -11,6 +11,8 @@ import (
 )
 
 const (
+	oauthGrantTypeRefreshToken = "refresh_token"
+
 	// refreshTokenMaxAge is 6.5 days in seconds, matching schwab-py's default.
 	refreshTokenMaxAge = 561600
 
@@ -108,8 +110,8 @@ func RefreshAccessToken(cfg *Config, tf *TokenFile, endpoint string) (*TokenFile
 	resp, err := client.R().
 		SetBasicAuth(cfg.ClientID, cfg.ClientSecret).
 		SetFormData(map[string]string{
-			"grant_type":    "refresh_token",
-			"refresh_token": tf.Token.RefreshToken,
+			"grant_type":               oauthGrantTypeRefreshToken,
+			oauthGrantTypeRefreshToken: tf.Token.RefreshToken,
 		}).
 		Post(endpoint)
 	if err != nil {

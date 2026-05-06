@@ -374,17 +374,17 @@ func firstAccountIdentifierWithSource(
 	configPath string,
 ) (string, string) {
 	if strings.TrimSpace(accountFlag) != "" {
-		return strings.TrimSpace(accountFlag), "explicit"
+		return strings.TrimSpace(accountFlag), accountSourceExplicit
 	}
 
 	if len(positionalArgs) > 0 && strings.TrimSpace(positionalArgs[0]) != "" {
-		return strings.TrimSpace(positionalArgs[0]), "explicit"
+		return strings.TrimSpace(positionalArgs[0]), accountSourceExplicit
 	}
 
 	if configPath != "" {
 		cfg, err := auth.LoadConfig(configPath)
 		if err == nil && strings.TrimSpace(cfg.DefaultAccount) != "" {
-			return strings.TrimSpace(cfg.DefaultAccount), "default"
+			return strings.TrimSpace(cfg.DefaultAccount), accountSourceDefault
 		}
 	}
 
@@ -723,7 +723,7 @@ func NewAccountCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command
 details, look up account numbers and hash values, set a default account, and
 query transaction history. Account list and get enrich results with nicknames
 from the preferences API (best-effort, degrades gracefully).`,
-		GroupID: "account-mgmt",
+		GroupID: groupIDAccountMgmt,
 		RunE:    requireSubcommand,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)

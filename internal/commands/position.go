@@ -190,7 +190,7 @@ func NewPositionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:     "position",
 		Short:   "View positions across accounts",
-		GroupID: "account-mgmt",
+		GroupID: groupIDAccountMgmt,
 		RunE:    requireSubcommand,
 	}
 
@@ -217,7 +217,7 @@ type positionListOpts struct {
 func newPositionListCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 	opts := &positionListOpts{}
 	cmd := &cobra.Command{
-		Use:   "list",
+		Use:   commandUseList,
 		Short: "List positions for one or all accounts",
 		Long: `List positions as a flat list with account identifiers and computed cost basis
 and P&L fields that Schwab's API does not provide directly. Uses the default

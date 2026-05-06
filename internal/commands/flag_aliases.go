@@ -49,7 +49,7 @@ func clearRequiredAnnotation(f *pflag.Flag) bool {
 	}
 
 	vals, ok := f.Annotations[cobra.BashCompOneRequiredFlag]
-	if !ok || len(vals) == 0 || vals[0] != "true" {
+	if !ok || len(vals) == 0 || vals[0] != annotationValueTrue {
 		return false
 	}
 

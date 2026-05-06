@@ -33,7 +33,7 @@ func NewHistoryCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		Short:      "Retrieve price history for a symbol",
 		Aliases:    []string{"price-history"},
 		SuggestFor: []string{"price-history"},
-		GroupID:    "market-data",
+		GroupID:    groupIDMarketData,
 		Args:       cobra.ArbitraryArgs,
 		RunE:       defaultSubcommand(getCmd),
 	}

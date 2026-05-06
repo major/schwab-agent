@@ -33,7 +33,7 @@ func (c *Client) AccountNumbers(ctx context.Context) ([]models.AccountNumber, er
 func (c *Client) Accounts(ctx context.Context, fields ...string) ([]models.Account, error) {
 	var params map[string]string
 	if len(fields) > 0 {
-		params = map[string]string{"fields": strings.Join(fields, ",")}
+		params = map[string]string{queryParamFields: strings.Join(fields, ",")}
 	}
 	var result []models.Account
 	err := c.doGet(ctx, "/trader/v1/accounts", params, &result)
@@ -55,7 +55,7 @@ func (c *Client) Account(ctx context.Context, hashValue string, fields ...string
 	path := fmt.Sprintf("/trader/v1/accounts/%s", hashValue)
 	var params map[string]string
 	if len(fields) > 0 {
-		params = map[string]string{"fields": strings.Join(fields, ",")}
+		params = map[string]string{queryParamFields: strings.Join(fields, ",")}
 	}
 	var result models.Account
 	err := c.doGet(ctx, path, params, &result)

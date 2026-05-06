@@ -13,7 +13,7 @@ import (
 // allMarkets returns the full list of Schwab market types, used as the default
 // when no specific markets are requested.
 func allMarkets() []string {
-	return []string{"equity", "option", "bond", "future", "forex"}
+	return []string{commandUseEquity, commandUseOption, "bond", "future", "forex"}
 }
 
 // moversData wraps the movers response.
@@ -32,7 +32,7 @@ func NewMarketCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "market",
 		Short:   "Market hours and top movers",
-		GroupID: "market-data",
+		GroupID: groupIDMarketData,
 		RunE:    requireSubcommand,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)

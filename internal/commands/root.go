@@ -80,10 +80,10 @@ func NewRootCmd(
 	root.PersistentFlags().String("config", defaultConfigPath, "Path to config file")
 	root.PersistentFlags().String("token", defaultTokenPath, "Path to token file")
 	root.AddGroup(
-		&cobra.Group{ID: "trading", Title: "Trading Commands"},
-		&cobra.Group{ID: "market-data", Title: "Market Data Commands"},
-		&cobra.Group{ID: "account-mgmt", Title: "Account Management Commands"},
-		&cobra.Group{ID: "tools", Title: "Tool Commands"},
+		&cobra.Group{ID: groupIDTrading, Title: "Trading Commands"},
+		&cobra.Group{ID: groupIDMarketData, Title: "Market Data Commands"},
+		&cobra.Group{ID: groupIDAccountMgmt, Title: "Account Management Commands"},
+		&cobra.Group{ID: groupIDTools, Title: "Tool Commands"},
 	)
 
 	return root
@@ -216,7 +216,7 @@ func completeRootDeps(deps RootDeps) RootDeps {
 // hasSkipAuthAnnotation checks the current command and ancestors for auth bypass.
 func hasSkipAuthAnnotation(cmd *cobra.Command) bool {
 	for current := cmd; current != nil; current = current.Parent() {
-		if current.Annotations["skipAuth"] == "true" {
+		if current.Annotations[annotationSkipAuth] == annotationValueTrue {
 			return true
 		}
 	}
