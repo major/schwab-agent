@@ -2,7 +2,7 @@
 
 > Leave generous comments when fixing bugs or working around API quirks. Anything that might save a future developer from re-discovering the same issue is worth writing down.
 
-HTTP client for the Charles Schwab API. Wraps the remaining non-schwab-go endpoints with typed Go methods. 20 files (10 source + 10 test).
+HTTP client for the Charles Schwab API. Wraps the remaining non-schwab-go endpoints with typed Go methods. 18 files (9 source + 9 test).
 
 ## Client Construction
 
@@ -58,7 +58,6 @@ Each file maps to one Schwab API resource:
 | accounts.go | `Accounts()`, `Account()` | `/trader/v1/accounts` |
 | chains.go | `Chains()` | `/marketdata/v1/chains` |
 | history.go | `PriceHistory()` | `/marketdata/v1/pricehistory` |
-| instruments.go | `Instruments()` | `/marketdata/v1/instruments` |
 | orders.go | `ListOrders()`, `AllOrders()`, `GetOrder()`, `PlaceOrder()`, `PreviewOrder()`, `ReplaceOrder()`, `CancelOrder()` | `/trader/v1/accounts/{hash}/orders` |
 | preferences.go | `UserPreference()` | `/trader/v1/userPreference` |
 | quotes.go | `Quote()`, `Quotes()` | `/marketdata/v1/quotes` |
