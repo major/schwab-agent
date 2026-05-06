@@ -12,6 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/major/schwab-go/schwab/marketdata"
+
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/models"
@@ -43,12 +45,11 @@ type optionTicketData struct {
 
 // optionTicketChainSummary preserves chain-level context without returning the full chain.
 type optionTicketChainSummary struct {
-	Status            *string            `json:"status,omitempty"`
+	Status            string             `json:"status,omitempty"`
 	Underlying        *models.Underlying `json:"underlying,omitempty"`
-	UnderlyingPrice   *float64           `json:"underlyingPrice,omitempty"`
-	IsDelayed         *bool              `json:"isDelayed,omitempty"`
-	IsChainTruncated  *bool              `json:"isChainTruncated,omitempty"`
-	NumberOfContracts *int               `json:"numberOfContracts,omitempty"`
+	UnderlyingPrice   float64            `json:"underlyingPrice,omitempty"`
+	IsDelayed         bool               `json:"isDelayed,omitempty"`
+	NumberOfContracts int                `json:"numberOfContracts,omitempty"`
 }
 
 // NewOptionCmd returns the Cobra command for option planning workflows.
@@ -154,7 +155,7 @@ func buildOptionTicket(
 		return nil, err
 	}
 
-	chain, err := c.OptionChain(ctx, symbol, optionTicketChainParams(expiration, putCall, opts.Strike))
+	chain, err := c.OptionChain(ctx, optionTicketChainParams(symbol, expiration, putCall, opts.Strike))
 	if err != nil {
 		return nil, err
 	}
@@ -186,15 +187,21 @@ func buildOptionTicket(
 }
 
 // optionTicketChainParams keeps Schwab's chain response narrow enough for LLM-friendly output.
-func optionTicketChainParams(expiration time.Time, putCall models.PutCall, strike float64) *client.ChainParams {
+func optionTicketChainParams(
+	symbol string,
+	expiration time.Time,
+	putCall models.PutCall,
+	strike float64,
+) *marketdata.OptionChainParams {
 	expirationDate := expiration.Format("2006-01-02")
-	return &client.ChainParams{
-		ContractType:           string(putCall),
-		Strategy:               string(chainStrategySingle),
+	return &marketdata.OptionChainParams{
+		Symbol:                 symbol,
+		ContractType:           marketdata.OptionChainContractType(putCall),
+		Strategy:               marketdata.OptionChainStrategySingle,
 		FromDate:               expirationDate,
 		ToDate:                 expirationDate,
-		IncludeUnderlyingQuote: annotationValueTrue,
-		Strike:                 strconv.FormatFloat(strike, 'f', -1, 64),
+		IncludeUnderlyingQuote: true,
+		Strike:                 strike,
 	}
 }
 
@@ -231,7 +238,10 @@ func matchingTicketContracts(
 }
 
 // matchingStrikeContracts returns contracts whose strike key or contract field matches the requested strike.
-func matchingStrikeContracts(strikes map[string][]*models.OptionContract, strike float64) []*models.OptionContract {
+func matchingStrikeContracts(
+	strikes map[string][]*models.OptionContract,
+	strike float64,
+) []*models.OptionContract {
 	var matches []*models.OptionContract
 	for strikeKey, contracts := range strikes {
 		parsedStrike, err := strconv.ParseFloat(strikeKey, 64)
@@ -241,7 +251,7 @@ func matchingStrikeContracts(strikes map[string][]*models.OptionContract, strike
 		}
 
 		for _, contract := range contracts {
-			if contract != nil && contract.StrikePrice != nil && nearlyEqual(*contract.StrikePrice, strike) {
+			if contract.StrikePrice != nil && nearlyEqual(*contract.StrikePrice, strike) {
 				matches = append(matches, contract)
 			}
 		}
@@ -256,12 +266,11 @@ func summarizeTicketChain(chain *models.OptionChain) optionTicketChainSummary {
 	}
 
 	return optionTicketChainSummary{
-		Status:            chain.Status,
+		Status:            stringValue(chain.Status),
 		Underlying:        chain.Underlying,
-		UnderlyingPrice:   chain.UnderlyingPrice,
-		IsDelayed:         chain.IsDelayed,
-		IsChainTruncated:  chain.IsChainTruncated,
-		NumberOfContracts: chain.NumberOfContracts,
+		UnderlyingPrice:   floatValue(chain.UnderlyingPrice),
+		IsDelayed:         boolValue(chain.IsDelayed),
+		NumberOfContracts: intValue(chain.NumberOfContracts),
 	}
 }
 
@@ -270,10 +279,38 @@ func nearlyEqual(a, b float64) bool {
 	return math.Abs(a-b) < strikeComparisonEpsilon
 }
 
-// contractSymbol safely dereferences optional symbols for deterministic sorting.
+// contractSymbol returns the contract symbol for deterministic sorting.
 func contractSymbol(contract *models.OptionContract) string {
-	if contract == nil || contract.Symbol == nil {
+	if contract == nil {
 		return ""
 	}
-	return *contract.Symbol
+	return stringValue(contract.Symbol)
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func floatValue(value *float64) float64 {
+	if value == nil {
+		return 0
+	}
+	return *value
+}
+
+func boolValue(value *bool) bool {
+	if value == nil {
+		return false
+	}
+	return *value
+}
+
+func intValue(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }

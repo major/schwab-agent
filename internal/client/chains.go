@@ -2,26 +2,14 @@ package client
 
 import (
 	"context"
+	"encoding/json"
+	"net/url"
+	"strconv"
+
+	"github.com/major/schwab-go/schwab/marketdata"
 
 	"github.com/major/schwab-agent/internal/models"
 )
-
-// ChainParams contains optional parameters for OptionChain requests.
-type ChainParams struct {
-	ContractType           string
-	StrikeCount            string
-	Strategy               string
-	FromDate               string
-	ToDate                 string
-	IncludeUnderlyingQuote string
-	Interval               string
-	Strike                 string
-	StrikeRange            string
-	Volatility             string
-	UnderlyingPrice        string
-	InterestRate           string
-	DaysToExpiration       string
-}
 
 // ExpirationChain represents the response from an expiration chain request.
 type ExpirationChain struct {
@@ -33,29 +21,33 @@ type ExpirationDate struct {
 	ExpirationDate string `json:"expirationDate"`
 }
 
-// chainParams builds the query parameter map from ChainParams, including the symbol.
-func chainParams(symbol string, params *ChainParams) map[string]string {
-	m := map[string]string{queryParamSymbol: symbol}
-	setParam(m, "contractType", params.ContractType)
-	setParam(m, "strikeCount", params.StrikeCount)
-	setParam(m, "strategy", params.Strategy)
-	setParam(m, "fromDate", params.FromDate)
-	setParam(m, "toDate", params.ToDate)
-	setParam(m, "includeUnderlyingQuote", params.IncludeUnderlyingQuote)
-	setParam(m, "interval", params.Interval)
-	setParam(m, "strike", params.Strike)
-	// The Schwab API uses "range" as the query parameter name.
-	setParam(m, "range", params.StrikeRange)
-	setParam(m, "volatility", params.Volatility)
-	setParam(m, "underlyingPrice", params.UnderlyingPrice)
-	setParam(m, "interestRate", params.InterestRate)
-	setParam(m, "daysToExpiration", params.DaysToExpiration)
-	return m
+// UnmarshalJSON accepts both the historical Schwab response field
+// (expirationDate) and the schwab-go v0.1.x field (expiration). The command
+// output keeps expirationDate for compatibility with existing agents.
+func (e *ExpirationDate) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		ExpirationDate string `json:"expirationDate"`
+		Expiration     string `json:"expiration"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	e.ExpirationDate = raw.ExpirationDate
+	if e.ExpirationDate == "" {
+		e.ExpirationDate = raw.Expiration
+	}
+	return nil
 }
 
-// OptionChain retrieves the option chain for a symbol with optional filter parameters.
-func (c *Client) OptionChain(ctx context.Context, symbol string, params *ChainParams) (*models.OptionChain, error) {
-	qp := chainParams(symbol, params)
+// OptionChain retrieves the option chain for a symbol with schwab-go parameter
+// types while decoding into the project model that preserves Schwab's observed
+// option-chain JSON names. This bridges a schwab-go v0.1.x response-model gap
+// without reintroducing the old stringly typed ChainParams API.
+func (c *Client) OptionChain(
+	ctx context.Context,
+	params *marketdata.OptionChainParams,
+) (*models.OptionChain, error) {
+	qp := optionChainQueryParams(params)
 	var result models.OptionChain
 	err := c.doGet(ctx, "/marketdata/v1/chains", qp, &result)
 	if err != nil {
@@ -73,4 +65,65 @@ func (c *Client) ExpirationChainForSymbol(ctx context.Context, symbol string) (*
 		return nil, err
 	}
 	return &result, nil
+}
+
+func optionChainQueryParams(params *marketdata.OptionChainParams) map[string]string {
+	if params == nil {
+		return nil
+	}
+
+	q := make(url.Values)
+	q.Set(queryParamSymbol, params.Symbol)
+	setOptionalQueryString(q, "contractType", string(params.ContractType))
+	setOptionalQueryInt(q, "strikeCount", params.StrikeCount)
+	setOptionalQueryBool(q, "includeUnderlyingQuote", params.IncludeUnderlyingQuote)
+	setOptionalQueryString(q, "strategy", string(params.Strategy))
+	setOptionalQueryFloat(q, "interval", params.Interval)
+	setOptionalQueryFloat(q, "strike", params.Strike)
+	setOptionalQueryString(q, "range", string(params.Range))
+	setOptionalQueryString(q, "fromDate", params.FromDate)
+	setOptionalQueryString(q, "toDate", params.ToDate)
+	setOptionalQueryFloat(q, "volatility", params.Volatility)
+	setOptionalQueryFloat(q, "underlyingPrice", params.UnderlyingPrice)
+	setOptionalQueryFloat(q, "interestRate", params.InterestRate)
+	setOptionalQueryInt(q, "daysToExpiration", params.DaysToExpiration)
+	setOptionalQueryString(q, "expMonth", string(params.ExpMonth))
+	setOptionalQueryString(q, "optionType", string(params.OptionType))
+	setOptionalQueryString(q, "entitlement", string(params.Entitlement))
+	return flattenQueryValues(q)
+}
+
+func setOptionalQueryString(q url.Values, name, value string) {
+	if value != "" {
+		q.Set(name, value)
+	}
+}
+
+func setOptionalQueryInt(q url.Values, name string, value int) {
+	if value != 0 {
+		q.Set(name, strconv.Itoa(value))
+	}
+}
+
+func setOptionalQueryBool(q url.Values, name string, value bool) {
+	if value {
+		q.Set(name, strconv.FormatBool(value))
+	}
+}
+
+func setOptionalQueryFloat(q url.Values, name string, value float64) {
+	if value != 0 {
+		q.Set(name, strconv.FormatFloat(value, 'f', -1, 64))
+	}
+}
+
+func flattenQueryValues(q url.Values) map[string]string {
+	params := make(map[string]string, len(q))
+	for key, values := range q {
+		if len(values) == 0 {
+			continue
+		}
+		params[key] = values[0]
+	}
+	return params
 }

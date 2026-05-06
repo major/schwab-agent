@@ -510,101 +510,6 @@ func TestOrderRequestWithChildStrategies(t *testing.T) {
 	assert.InDelta(t, 140.0, *grandchild.StopPrice, 0.001)
 }
 
-// TestOptionChainJSONRoundTrip verifies the nested map[string]map[string][]*OptionContract structure.
-func TestOptionChainJSONRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	input := `{
-		"symbol": "AAPL",
-		"status": "SUCCESS",
-		"isDelayed": false,
-		"isIndex": false,
-		"interestRate": 4.5,
-		"underlyingPrice": 175.50,
-		"volatility": 25.5,
-		"numberOfContracts": 2,
-		"underlying": {
-			"symbol": "AAPL",
-			"last": 175.50,
-			"totalVolume": 50000000
-		},
-		"callExpDateMap": {
-			"2026-05-16:30": {
-				"175.0": [
-					{
-						"putCall": "CALL",
-						"symbol": "AAPL  260516C00175000",
-						"bid": 5.10,
-						"ask": 5.30,
-						"last": 5.20,
-						"strikePrice": 175.0,
-						"delta": 0.52,
-						"gamma": 0.03,
-						"theta": -0.08,
-						"vega": 0.25,
-						"inTheMoney": true,
-						"openInterest": 15000
-					}
-				]
-			}
-		},
-		"putExpDateMap": {
-			"2026-05-16:30": {
-				"175.0": [
-					{
-						"putCall": "PUT",
-						"symbol": "AAPL  260516P00175000",
-						"bid": 4.80,
-						"ask": 5.00,
-						"strikePrice": 175.0,
-						"delta": -0.48,
-						"inTheMoney": false
-					}
-				]
-			}
-		}
-	}`
-
-	var chain OptionChain
-	err := json.Unmarshal([]byte(input), &chain)
-	require.NoError(t, err)
-
-	// Top-level fields.
-	assert.Equal(t, "AAPL", *chain.Symbol)
-	assert.InDelta(t, 175.50, *chain.UnderlyingPrice, 0.001)
-
-	// Underlying.
-	require.NotNil(t, chain.Underlying)
-	assert.Equal(t, "AAPL", *chain.Underlying.Symbol)
-
-	// Call map nesting: expiration -> strike -> contracts.
-	require.Contains(t, chain.CallExpDateMap, "2026-05-16:30")
-	strikes := chain.CallExpDateMap["2026-05-16:30"]
-	require.Contains(t, strikes, "175.0")
-	calls := strikes["175.0"]
-	require.Len(t, calls, 1)
-	assert.Equal(t, "CALL", *calls[0].PutCall)
-	assert.InDelta(t, 175.0, *calls[0].StrikePrice, 0.001)
-	assert.InDelta(t, 0.52, *calls[0].Delta, 0.001)
-	assert.True(t, *calls[0].InTheMoney)
-
-	// Put map.
-	require.Contains(t, chain.PutExpDateMap, "2026-05-16:30")
-	puts := chain.PutExpDateMap["2026-05-16:30"]["175.0"]
-	require.Len(t, puts, 1)
-	assert.Equal(t, "PUT", *puts[0].PutCall)
-	assert.False(t, *puts[0].InTheMoney)
-
-	// Round-trip.
-	data, err := json.Marshal(chain)
-	require.NoError(t, err)
-	var chain2 OptionChain
-	err = json.Unmarshal(data, &chain2)
-	require.NoError(t, err)
-	assert.Equal(t, *chain.Symbol, *chain2.Symbol)
-	assert.Len(t, chain2.CallExpDateMap["2026-05-16:30"]["175.0"], 1)
-}
-
 // TestAccountJSONRoundTrip verifies the Account -> SecuritiesAccount -> Position hierarchy.
 func TestAccountJSONRoundTrip(t *testing.T) {
 	t.Parallel()
@@ -982,14 +887,6 @@ func TestNilFieldsOmittedInJSON(t *testing.T) {
 	data, err := json.Marshal(pos)
 	require.NoError(t, err)
 	assert.Equal(t, "{}", string(data))
-
-	// OptionChain with only symbol set should omit all other fields.
-	symbol := "AAPL"
-	chain := OptionChain{Symbol: &symbol}
-	data, err = json.Marshal(chain)
-	require.NoError(t, err)
-	assert.Contains(t, string(data), `"symbol":"AAPL"`)
-	assert.NotContains(t, string(data), "null")
 }
 
 // TestOrderToRequest verifies that Order (response) converts correctly to OrderRequest (submission).

@@ -2,7 +2,7 @@
 
 > Leave generous comments when fixing bugs or working around API quirks. Anything that might save a future developer from re-discovering the same issue is worth writing down.
 
-HTTP client for the Charles Schwab API. Wraps the remaining non-schwab-go endpoints with typed Go methods. 18 files (9 source + 9 test).
+HTTP client for the Charles Schwab API. Wraps the remaining non-schwab-go endpoints with typed Go methods. 16 Go files (8 source + 8 test).
 
 ## Client Construction
 
@@ -56,19 +56,20 @@ Each file maps to one Schwab API resource:
 | File | Methods | API Path Prefix |
 |---|---|---|
 | accounts.go | `Accounts()`, `Account()` | `/trader/v1/accounts` |
-| chains.go | `Chains()` | `/marketdata/v1/chains` |
-| history.go | `PriceHistory()` | `/marketdata/v1/pricehistory` |
+| chains.go | `OptionChain()`, `ExpirationChainForSymbol()` | `/marketdata/v1/chains`, `/marketdata/v1/expirationchain` |
 | orders.go | `ListOrders()`, `AllOrders()`, `GetOrder()`, `PlaceOrder()`, `PreviewOrder()`, `ReplaceOrder()`, `CancelOrder()` | `/trader/v1/accounts/{hash}/orders` |
 | preferences.go | `UserPreference()` | `/trader/v1/userPreference` |
 | quotes.go | `Quote()`, `Quotes()` | `/marketdata/v1/quotes` |
 | transactions.go | `Transactions()`, `Transaction()` | `/trader/v1/accounts/{hash}/transactions` |
+
+`client.go` contains shared client construction and HTTP helpers. `params.go` contains reusable query parameter helpers, not endpoint methods.
 
 ## Query Parameters
 
 Methods accepting filters use either:
 
 - `map[string]string` passed to `doGet` (simple cases like `quotes.go`)
-- Typed param structs with `toQueryParams()` method (e.g., `OrderListParams`, `ChainParams`)
+- Typed param structs or schwab-go parameter structs (e.g., `OrderListParams`, `TransactionListParams`, `marketdata.OptionChainParams`)
 
 ## Error Conversion in Client Methods
 

@@ -83,11 +83,11 @@ func TestNewChainCmd(t *testing.T) {
 				assert.Equal(t, "AAPL", q.Get("symbol"))
 				assert.Equal(t, "ANALYTICAL", q.Get("strategy"))
 				assert.Equal(t, "true", q.Get("includeUnderlyingQuote"))
-				assert.Equal(t, "5.0", q.Get("interval"))
-				assert.Equal(t, "150.0", q.Get("strike"))
+				assert.Equal(t, "5", q.Get("interval"))
+				assert.Equal(t, "150", q.Get("strike"))
 				assert.Equal(t, "NTM", q.Get("range"))
 				assert.Equal(t, "30.5", q.Get("volatility"))
-				assert.Equal(t, "148.50", q.Get("underlyingPrice"))
+				assert.Equal(t, "148.5", q.Get("underlyingPrice"))
 				assert.Equal(t, "4.5", q.Get("interestRate"))
 				assert.Equal(t, "45", q.Get("daysToExpiration"))
 				_, _ = w.Write([]byte(`{"symbol":"AAPL","status":"SUCCESS"}`))
@@ -123,7 +123,7 @@ func TestNewChainCmd(t *testing.T) {
 			if r.URL.Path == "/marketdata/v1/expirationchain" {
 				assert.Equal(t, "AAPL", r.URL.Query().Get("symbol"))
 				_, _ = w.Write(
-					[]byte(`{"expirationList":[{"expirationDate":"2024-01-19"},{"expirationDate":"2024-02-16"}]}`),
+					[]byte(`{"expirationList":[{"expiration":"2024-01-19"},{"expiration":"2024-02-16"}]}`),
 				)
 				return
 			}
@@ -143,6 +143,9 @@ func TestNewChainCmd(t *testing.T) {
 		expList, ok := data["expirationList"].([]any)
 		require.True(t, ok)
 		assert.Len(t, expList, 2)
+		first, ok := expList[0].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "2024-01-19", first["expirationDate"])
 		assert.NotEmpty(t, envelope.Metadata.Timestamp)
 	})
 
