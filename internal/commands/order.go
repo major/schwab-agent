@@ -108,78 +108,102 @@ results.`,
   schwab-agent order list --status WORKING,FILLED,EXPIRED
   schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
-				return err
-			}
-
-			var statuses []string
-			for _, raw := range opts.Status {
-				for part := range strings.SplitSeq(raw, ",") {
-					trimmed := strings.TrimSpace(part)
-					if trimmed != "" {
-						statuses = append(statuses, trimmed)
-					}
-				}
-			}
-
-			showAll := opts.Recent && len(statuses) == 0
-			for _, s := range statuses {
-				if err := validateOrderStatusFilter(s); err != nil {
-					return err
-				}
-
-				if strings.EqualFold(s, "all") {
-					showAll = true
-					break
-				}
-			}
-
-			var apiStatuses []string
-			if !showAll {
-				apiStatuses = statuses
-			}
-
-			from := strings.TrimSpace(opts.From)
-			if opts.Recent && from == "" {
-				// Recent activity is meant for post-mutation verification. A 24-hour
-				// lookback keeps filled/canceled/replaced orders visible without the
-				// noisier 60-day default used by the underlying Schwab endpoint.
-				from = time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339)
-			}
-
-			params := client.OrderListParams{
-				Statuses:        apiStatuses,
-				FromEnteredTime: from,
-				ToEnteredTime:   strings.TrimSpace(opts.To),
-			}
-
-			account, err := cmd.Flags().GetString("account")
-			if err != nil {
-				return err
-			}
-			account = strings.TrimSpace(account)
-
-			var orders []models.Order
-			if account == "" {
-				orders, err = c.AllOrders(cmd.Context(), params)
-			} else {
-				orders, err = c.ListOrders(cmd.Context(), account, params)
-			}
-			if err != nil {
-				return err
-			}
-
-			if len(statuses) == 0 && !opts.Recent {
-				orders = filterNonTerminalOrders(orders)
-			}
-
-			return output.WriteSuccess(w, orderListData{Orders: orders}, output.NewMetadata())
+			return runOrderList(cmd, c, w, opts)
 		},
 	}
 
 	defineCobraFlags(cmd, opts)
 
 	return cmd
+}
+
+func runOrderList(cmd *cobra.Command, c *client.Ref, w io.Writer, opts *orderListOpts) error {
+	if err := validateCobraOptions(cmd.Context(), opts); err != nil {
+		return err
+	}
+
+	statuses, showAll, err := orderListStatusFilters(opts)
+	if err != nil {
+		return err
+	}
+
+	orders, err := fetchOrderList(cmd, c, orderListParams(opts, statuses, showAll))
+	if err != nil {
+		return err
+	}
+
+	if len(statuses) == 0 && !opts.Recent {
+		orders = filterNonTerminalOrders(orders)
+	}
+
+	return output.WriteSuccess(w, orderListData{Orders: orders}, output.NewMetadata())
+}
+
+func orderListStatusFilters(opts *orderListOpts) ([]string, bool, error) {
+	statuses := splitOrderStatusFilters(opts.Status)
+	showAll := opts.Recent && len(statuses) == 0
+	for _, s := range statuses {
+		if err := validateOrderStatusFilter(s); err != nil {
+			return nil, false, err
+		}
+		if strings.EqualFold(s, "all") {
+			showAll = true
+			break
+		}
+	}
+
+	return statuses, showAll, nil
+}
+
+func splitOrderStatusFilters(rawStatuses []string) []string {
+	var statuses []string
+	for _, raw := range rawStatuses {
+		for part := range strings.SplitSeq(raw, ",") {
+			if trimmed := strings.TrimSpace(part); trimmed != "" {
+				statuses = append(statuses, trimmed)
+			}
+		}
+	}
+
+	return statuses
+}
+
+func orderListParams(opts *orderListOpts, statuses []string, showAll bool) client.OrderListParams {
+	var apiStatuses []string
+	if !showAll {
+		apiStatuses = statuses
+	}
+
+	return client.OrderListParams{
+		Statuses:        apiStatuses,
+		FromEnteredTime: orderListFromTime(opts),
+		ToEnteredTime:   strings.TrimSpace(opts.To),
+	}
+}
+
+func orderListFromTime(opts *orderListOpts) string {
+	from := strings.TrimSpace(opts.From)
+	if !opts.Recent || from != "" {
+		return from
+	}
+
+	// Recent activity is meant for post-mutation verification. A 24-hour
+	// lookback keeps filled/canceled/replaced orders visible without the
+	// noisier 60-day default used by the underlying Schwab endpoint.
+	return time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339)
+}
+
+func fetchOrderList(cmd *cobra.Command, c *client.Ref, params client.OrderListParams) ([]models.Order, error) {
+	account, err := cmd.Flags().GetString("account")
+	if err != nil {
+		return nil, err
+	}
+	account = strings.TrimSpace(account)
+	if account == "" {
+		return c.AllOrders(cmd.Context(), params)
+	}
+
+	return c.ListOrders(cmd.Context(), account, params)
 }
 
 // newOrderGetCmd returns a single order by account and ID.

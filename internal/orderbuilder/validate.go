@@ -19,79 +19,119 @@ func ValidateEquityOrder(params *EquityParams) error {
 		return validationError("quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
 	}
 
+	if err := validateEquityOrderTypePrices(params); err != nil {
+		return err
+	}
+
+	return validatePriceLinkPair(params.PriceLinkBasis, params.PriceLinkType)
+}
+
+func validateEquityOrderTypePrices(params *EquityParams) error {
 	//nolint:exhaustive // Only order types with local equity-specific price rules need cases.
 	switch params.OrderType {
 	case models.OrderTypeLimit:
-		if params.Price == 0 {
-			return validationError("LIMIT order requires a price", "Add `--price <amount>` to specify the limit price")
-		}
+		return validateRequiredOrderPrice(params.Price, "LIMIT")
 	case models.OrderTypeStop:
-		if params.StopPrice == 0 {
-			return validationError(
-				"STOP order requires a stop price",
-				"Add `--stop-price <amount>` to specify the stop price",
-			)
-		}
+		return validateRequiredStopPrice(params.StopPrice, "STOP")
 	case models.OrderTypeStopLimit:
-		if params.Price == 0 || params.StopPrice == 0 {
-			return validationError(
-				"STOP_LIMIT order requires both price and stop price",
-				"Add `--price <amount> --stop-price <amount>`",
-			)
-		}
+		return validateStopLimitPrices(params)
 	case models.OrderTypeTrailingStop:
-		if params.StopPriceOffset <= 0 {
-			return validationError(
-				"TRAILING_STOP order requires a stop price offset",
-				"Add `--stop-offset <amount>` to specify how far the stop trails",
-			)
-		}
+		return validateRequiredStopOffset(params.StopPriceOffset, "TRAILING_STOP")
 	case models.OrderTypeTrailingStopLimit:
-		if params.StopPriceOffset <= 0 {
-			return validationError(
-				"TRAILING_STOP_LIMIT order requires a stop price offset",
-				"Add `--stop-offset <amount>` to specify how far the stop trails",
-			)
-		}
-
-		if params.Price == 0 {
-			return validationError(
-				"TRAILING_STOP_LIMIT order requires a limit price",
-				"Add `--price <amount>` to specify the limit price",
-			)
-		}
+		return validateTrailingStopLimitPrices(params)
 	case models.OrderTypeMarketOnClose:
-		// MOC orders are like MARKET orders - no price or stop price allowed
-		if params.Price != 0 {
-			return validationError(
-				"MARKET_ON_CLOSE order does not accept a price",
-				"Remove `--price` flag for MOC orders",
-			)
-		}
-		if params.StopPrice != 0 {
-			return validationError(
-				"MARKET_ON_CLOSE order does not accept a stop price",
-				"Remove `--stop-price` flag for MOC orders",
-			)
-		}
+		return validateMarketOnClosePrices(params)
 	case models.OrderTypeLimitOnClose:
-		// LOC orders are like LIMIT orders - price is required
-		if params.Price == 0 {
-			return validationError(
-				"LIMIT_ON_CLOSE order requires a price",
-				"Add `--price <amount>` to specify the limit price",
-			)
-		}
-		if params.StopPrice != 0 {
-			return validationError(
-				"LIMIT_ON_CLOSE order does not accept a stop price",
-				"Remove `--stop-price` flag for LOC orders",
-			)
-		}
+		return validateLimitOnClosePrices(params)
 	}
 
-	if err := validatePriceLinkPair(params.PriceLinkBasis, params.PriceLinkType); err != nil {
+	return nil
+}
+
+func validateRequiredOrderPrice(price float64, orderType string) error {
+	if price != 0 {
+		return nil
+	}
+
+	return validationError(orderType+" order requires a price", "Add `--price <amount>` to specify the limit price")
+}
+
+func validateRequiredStopPrice(stopPrice float64, orderType string) error {
+	if stopPrice != 0 {
+		return nil
+	}
+
+	return validationError(
+		orderType+" order requires a stop price",
+		"Add `--stop-price <amount>` to specify the stop price",
+	)
+}
+
+func validateRequiredStopOffset(stopPriceOffset float64, orderType string) error {
+	if stopPriceOffset > 0 {
+		return nil
+	}
+
+	return validationError(
+		orderType+" order requires a stop price offset",
+		"Add `--stop-offset <amount>` to specify how far the stop trails",
+	)
+}
+
+func validateStopLimitPrices(params *EquityParams) error {
+	if params.Price != 0 && params.StopPrice != 0 {
+		return nil
+	}
+
+	return validationError(
+		"STOP_LIMIT order requires both price and stop price",
+		"Add `--price <amount> --stop-price <amount>`",
+	)
+}
+
+func validateTrailingStopLimitPrices(params *EquityParams) error {
+	if err := validateRequiredStopOffset(params.StopPriceOffset, "TRAILING_STOP_LIMIT"); err != nil {
 		return err
+	}
+
+	if params.Price != 0 {
+		return nil
+	}
+
+	return validationError(
+		"TRAILING_STOP_LIMIT order requires a limit price",
+		"Add `--price <amount>` to specify the limit price",
+	)
+}
+
+func validateMarketOnClosePrices(params *EquityParams) error {
+	// MOC orders are like MARKET orders - no price or stop price allowed.
+	if params.Price != 0 {
+		return validationError(
+			"MARKET_ON_CLOSE order does not accept a price",
+			"Remove `--price` flag for MOC orders",
+		)
+	}
+	if params.StopPrice != 0 {
+		return validationError(
+			"MARKET_ON_CLOSE order does not accept a stop price",
+			"Remove `--stop-price` flag for MOC orders",
+		)
+	}
+
+	return nil
+}
+
+func validateLimitOnClosePrices(params *EquityParams) error {
+	// LOC orders are like LIMIT orders - price is required.
+	if err := validateRequiredOrderPrice(params.Price, "LIMIT_ON_CLOSE"); err != nil {
+		return err
+	}
+	if params.StopPrice != 0 {
+		return validationError(
+			"LIMIT_ON_CLOSE order does not accept a stop price",
+			"Remove `--stop-price` flag for LOC orders",
+		)
 	}
 
 	return nil

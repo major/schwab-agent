@@ -305,6 +305,38 @@ func effectiveConfigFlag(cmd *cobra.Command, fallback string) (string, error) {
 	return configFlag, nil
 }
 
+func commandAccountInfo(cmd *cobra.Command, c *client.Ref, configPath string) (resolvedAccountInfo, error) {
+	accountFlag, err := cmd.Flags().GetString("account")
+	if err != nil {
+		return resolvedAccountInfo{}, err
+	}
+
+	return resolveAccountDetailed(cmd.Context(), c, accountFlag, configPath, nil)
+}
+
+func buildTypedOrder[O any, P any](
+	cmd *cobra.Command,
+	opts *O,
+	args []string,
+	parse func(*O, []string) (*P, error),
+	validate func(*P) error,
+	build func(*P) (*models.OrderRequest, error),
+) (*models.OrderRequest, error) {
+	if err := validateCobraOptions(cmd.Context(), opts); err != nil {
+		return nil, err
+	}
+
+	params, err := parse(opts, args)
+	if err != nil {
+		return nil, err
+	}
+	if validateErr := validate(params); validateErr != nil {
+		return nil, validateErr
+	}
+
+	return build(params)
+}
+
 // newOrderPlaceCmd places new orders from either flags or a JSON spec.
 func newOrderPlaceCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 	opts := &orderPlaceOpts{}
@@ -503,59 +535,7 @@ func makeCobraPlaceOrderCommand[O any, P any](
 		Use:   name,
 		Short: usage,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resolve --instruction/--order-type aliases through pflag before
-			// handlers read the bound option structs.
-			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
-				return err
-			}
-
-			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
-				return err
-			}
-
-			configFlag, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			if configFlag == "" {
-				configFlag = configPath
-			}
-
-			if mutableErr := requireMutableEnabled(configFlag); mutableErr != nil {
-				return mutableErr
-			}
-
-			accountFlag, err := cmd.Flags().GetString("account")
-			if err != nil {
-				return err
-			}
-
-			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configFlag, nil)
-			if err != nil {
-				return err
-			}
-
-			params, err := parse(opts, args)
-			if err != nil {
-				return err
-			}
-
-			if validateErr := validate(params); validateErr != nil {
-				return validateErr
-			}
-
-			order, err := build(params)
-			if err != nil {
-				return err
-			}
-
-			response, err := c.PlaceOrder(cmd.Context(), acct.Hash, order)
-			if err != nil {
-				return err
-			}
-
-			data, errs := fetchOrderActionData(cmd, c, acct.Hash, "place", response.OrderID, order)
-			return writeOrderActionResult(w, &data, errs, acct)
+			return runTypedOrderPlace(cmd, c, configPath, w, opts, args, parse, validate, build)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
@@ -565,6 +545,50 @@ func makeCobraPlaceOrderCommand[O any, P any](
 	}
 
 	return cmd
+}
+
+func runTypedOrderPlace[O any, P any](
+	cmd *cobra.Command,
+	c *client.Ref,
+	configPath string,
+	w io.Writer,
+	opts *O,
+	args []string,
+	parse func(*O, []string) (*P, error),
+	validate func(*P) error,
+	build func(*P) (*models.OrderRequest, error),
+) error {
+	// Resolve --instruction/--order-type aliases through pflag before handlers
+	// read the bound option structs.
+	if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
+		return err
+	}
+
+	configFlag, err := effectiveConfigFlag(cmd, configPath)
+	if err != nil {
+		return err
+	}
+	if mutableErr := requireMutableEnabled(configFlag); mutableErr != nil {
+		return mutableErr
+	}
+
+	acct, err := commandAccountInfo(cmd, c, configFlag)
+	if err != nil {
+		return err
+	}
+
+	order, err := buildTypedOrder(cmd, opts, args, parse, validate, build)
+	if err != nil {
+		return err
+	}
+
+	response, err := c.PlaceOrder(cmd.Context(), acct.Hash, order)
+	if err != nil {
+		return err
+	}
+
+	data, errs := fetchOrderActionData(cmd, c, acct.Hash, "place", response.OrderID, order)
+	return writeOrderActionResult(w, &data, errs, acct)
 }
 
 // newOrderPreviewCmd previews an order from a JSON spec.
@@ -742,58 +766,7 @@ func makeCobraPreviewOrderCommand[O any, P any](
 		Use:   name,
 		Short: usage,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resolve --instruction/--order-type aliases through pflag before
-			// handlers read the bound option structs.
-			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
-				return err
-			}
-
-			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
-				return err
-			}
-
-			configFlag, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			if configFlag == "" {
-				configFlag = configPath
-			}
-
-			accountFlag, err := cmd.Flags().GetString("account")
-			if err != nil {
-				return err
-			}
-
-			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configFlag, nil)
-			if err != nil {
-				return err
-			}
-
-			params, err := parse(opts, args)
-			if err != nil {
-				return err
-			}
-
-			if validateErr := validate(params); validateErr != nil {
-				return validateErr
-			}
-
-			order, err := build(params)
-			if err != nil {
-				return err
-			}
-
-			preview, err := c.PreviewOrder(cmd.Context(), acct.Hash, order)
-			if err != nil {
-				return err
-			}
-
-			savePreview, err := cmd.Flags().GetBool("save-preview")
-			if err != nil {
-				return err
-			}
-			return writeOrderPreviewResult(w, acct, order, preview, savePreview)
+			return runTypedOrderPreview(cmd, c, configPath, w, opts, args, parse, validate, build)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
@@ -805,6 +778,49 @@ func makeCobraPreviewOrderCommand[O any, P any](
 		Bool("save-preview", false, "Save this preview locally and return a digest for order place --from-preview")
 
 	return cmd
+}
+
+func runTypedOrderPreview[O any, P any](
+	cmd *cobra.Command,
+	c *client.Ref,
+	configPath string,
+	w io.Writer,
+	opts *O,
+	args []string,
+	parse func(*O, []string) (*P, error),
+	validate func(*P) error,
+	build func(*P) (*models.OrderRequest, error),
+) error {
+	// Resolve --instruction/--order-type aliases through pflag before handlers
+	// read the bound option structs.
+	if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
+		return err
+	}
+
+	configFlag, err := effectiveConfigFlag(cmd, configPath)
+	if err != nil {
+		return err
+	}
+	acct, err := commandAccountInfo(cmd, c, configFlag)
+	if err != nil {
+		return err
+	}
+
+	order, err := buildTypedOrder(cmd, opts, args, parse, validate, build)
+	if err != nil {
+		return err
+	}
+
+	preview, err := c.PreviewOrder(cmd.Context(), acct.Hash, order)
+	if err != nil {
+		return err
+	}
+
+	savePreview, err := cmd.Flags().GetBool("save-preview")
+	if err != nil {
+		return err
+	}
+	return writeOrderPreviewResult(w, acct, order, preview, savePreview)
 }
 
 // newOrderCancelCmd cancels an existing order.
@@ -879,74 +895,7 @@ original order status becomes REPLACED after the new order is created.`,
 		Example: `  schwab-agent order replace 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY
    schwab-agent order replace --order-id 1234567890 --symbol AAPL --action BUY --quantity 10 --type LIMIT --price 155.00 --duration DAY`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resolve --instruction/--order-type aliases through pflag before
-			// handlers read the bound option structs.
-			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
-				return err
-			}
-
-			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
-				return err
-			}
-			if err := validateCobraOptions(cmd.Context(), equityOpts); err != nil {
-				return err
-			}
-
-			// If --type was not explicitly provided but --price was, infer LIMIT.
-			// resolveOrderFlagAliasesViaFlags has already copied --order-type into
-			// --type, so a single Changed("type") check covers both aliases.
-			if !cmd.Flags().Changed("type") && equityOpts.Price > 0 {
-				equityOpts.Type = models.OrderTypeLimit
-			}
-
-			configFlag, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			if configFlag == "" {
-				configFlag = configPath
-			}
-
-			if mutableErr := requireMutableEnabled(configFlag); mutableErr != nil {
-				return mutableErr
-			}
-
-			orderID, err := parseRequiredOrderID(opts.OrderID, args)
-			if err != nil {
-				return err
-			}
-
-			accountFlag, err := cmd.Flags().GetString("account")
-			if err != nil {
-				return err
-			}
-
-			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configFlag, nil)
-			if err != nil {
-				return err
-			}
-
-			params, err := parseEquityParams(equityOpts, args)
-			if err != nil {
-				return err
-			}
-
-			if validateErr := orderbuilder.ValidateEquityOrder(params); validateErr != nil {
-				return validateErr
-			}
-
-			order, err := orderbuilder.BuildEquityOrder(params)
-			if err != nil {
-				return err
-			}
-
-			response, err := c.ReplaceOrder(cmd.Context(), acct.Hash, orderID, order)
-			if err != nil {
-				return err
-			}
-
-			data, errs := fetchReplaceActionData(cmd, c, acct.Hash, orderID, response.OrderID, order)
-			return writeOrderActionResult(w, &data, errs, acct)
+			return runOrderReplaceEquity(cmd, c, configPath, w, opts, equityOpts, args)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
@@ -957,6 +906,109 @@ original order status becomes REPLACED after the new order is created.`,
 	cmd.AddCommand(newOrderReplaceOptionCmd(c, configPath, w))
 
 	return cmd
+}
+
+func runOrderReplaceEquity(
+	cmd *cobra.Command,
+	c *client.Ref,
+	configPath string,
+	w io.Writer,
+	opts *orderReplaceOpts,
+	equityOpts *equityPlaceOpts,
+	args []string,
+) error {
+	if err := prepareReplacementOrder(cmd, configPath, opts, equityOpts); err != nil {
+		return err
+	}
+	inferLimitOrderTypeFromPrice(cmd, &equityOpts.Type, equityOpts.Price)
+
+	configFlag, err := effectiveConfigFlag(cmd, configPath)
+	if err != nil {
+		return err
+	}
+	orderID, acct, err := replacementTarget(cmd, c, configFlag, opts, args)
+	if err != nil {
+		return err
+	}
+
+	order, err := buildTypedOrder(
+		cmd,
+		equityOpts,
+		args,
+		parseEquityParams,
+		orderbuilder.ValidateEquityOrder,
+		orderbuilder.BuildEquityOrder,
+	)
+	if err != nil {
+		return err
+	}
+
+	return replaceOrderAndWriteResult(cmd, c, w, acct, orderID, order)
+}
+
+func prepareReplacementOrder(cmd *cobra.Command, configPath string, opts *orderReplaceOpts, orderOpts any) error {
+	// Resolve --instruction/--order-type aliases through pflag before handlers
+	// read the bound option structs.
+	if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
+		return err
+	}
+	if err := validateCobraOptions(cmd.Context(), opts); err != nil {
+		return err
+	}
+	if err := validateCobraOptions(cmd.Context(), orderOpts); err != nil {
+		return err
+	}
+
+	configFlag, err := effectiveConfigFlag(cmd, configPath)
+	if err != nil {
+		return err
+	}
+	return requireMutableEnabled(configFlag)
+}
+
+func replacementTarget(
+	cmd *cobra.Command,
+	c *client.Ref,
+	configFlag string,
+	opts *orderReplaceOpts,
+	args []string,
+) (int64, resolvedAccountInfo, error) {
+	orderID, err := parseRequiredOrderID(opts.OrderID, args)
+	if err != nil {
+		return 0, resolvedAccountInfo{}, err
+	}
+
+	acct, err := commandAccountInfo(cmd, c, configFlag)
+	if err != nil {
+		return 0, resolvedAccountInfo{}, err
+	}
+
+	return orderID, acct, nil
+}
+
+func inferLimitOrderTypeFromPrice(cmd *cobra.Command, orderType *models.OrderType, price float64) {
+	// resolveOrderFlagAliasesViaFlags has already copied --order-type into
+	// --type, so a single Changed("type") check covers both aliases.
+	if !cmd.Flags().Changed("type") && price > 0 {
+		*orderType = models.OrderTypeLimit
+	}
+}
+
+func replaceOrderAndWriteResult(
+	cmd *cobra.Command,
+	c *client.Ref,
+	w io.Writer,
+	acct resolvedAccountInfo,
+	orderID int64,
+	order *models.OrderRequest,
+) error {
+	response, err := c.ReplaceOrder(cmd.Context(), acct.Hash, orderID, order)
+	if err != nil {
+		return err
+	}
+
+	data, errs := fetchReplaceActionData(cmd, c, acct.Hash, orderID, response.OrderID, order)
+	return writeOrderActionResult(w, &data, errs, acct)
 }
 
 // newOrderReplaceOptionCmd replaces an existing order with a new single-leg
@@ -974,88 +1026,7 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 		Example: `  schwab-agent order replace option 1234567890 --underlying AAPL --expiration 2026-06-19 --strike 200 --call --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5.00
    schwab-agent order replace option --order-id 1234567890 --underlying AAPL --expiration 2026-06-19 --strike 190 --put --instruction SELL_TO_OPEN --quantity 1 --order-type LIMIT --price 3.50`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resolve aliases through pflag so the canonical enum-backed flags keep
-			// validating alias values before the bound option structs are read.
-			if err := resolveOrderFlagAliasesViaFlags(cmd); err != nil {
-				return err
-			}
-
-			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
-				return err
-			}
-			if err := validateCobraOptions(cmd.Context(), optionOpts); err != nil {
-				return err
-			}
-
-			// If --type was not explicitly provided but --price was, infer LIMIT.
-			// resolveOrderFlagAliasesViaFlags has already copied --order-type into
-			// --type, so a single Changed("type") check covers both aliases.
-			if !cmd.Flags().Changed("type") && optionOpts.Price > 0 {
-				optionOpts.Type = models.OrderTypeLimit
-			}
-
-			configFlag, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			if configFlag == "" {
-				configFlag = configPath
-			}
-
-			if mutableErr := requireMutableEnabled(configFlag); mutableErr != nil {
-				return mutableErr
-			}
-
-			orderID, err := parseRequiredOrderID(opts.OrderID, args)
-			if err != nil {
-				return err
-			}
-
-			accountFlag, err := cmd.Flags().GetString("account")
-			if err != nil {
-				return err
-			}
-
-			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configFlag, nil)
-			if err != nil {
-				return err
-			}
-
-			occSymbol, err := buildOCCSymbol(
-				optionOpts.Underlying,
-				optionOpts.Expiration,
-				optionOpts.Strike,
-				optionOpts.Call,
-				optionOpts.Put,
-			)
-			if err != nil {
-				return err
-			}
-
-			params, err := parseOptionParams(optionOpts, args)
-			if err != nil {
-				return err
-			}
-
-			if validateErr := orderbuilder.ValidateOptionOrder(params); validateErr != nil {
-				return validateErr
-			}
-
-			order, err := orderbuilder.BuildOptionOrder(params)
-			if err != nil {
-				return err
-			}
-			// Keep the replacement path explicitly tied to the shared OCC builder so
-			// future option-build changes cannot accidentally drift from symbol build/parse.
-			order.OrderLegCollection[0].Instrument.Symbol = occSymbol
-
-			response, err := c.ReplaceOrder(cmd.Context(), acct.Hash, orderID, order)
-			if err != nil {
-				return err
-			}
-
-			data, errs := fetchReplaceActionData(cmd, c, acct.Hash, orderID, response.OrderID, order)
-			return writeOrderActionResult(w, &data, errs, acct)
+			return runOrderReplaceOption(cmd, c, configPath, w, opts, optionOpts, args)
 		},
 	}
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
@@ -1064,4 +1035,63 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 	defineCobraFlags(cmd, opts)
 
 	return cmd
+}
+
+func runOrderReplaceOption(
+	cmd *cobra.Command,
+	c *client.Ref,
+	configPath string,
+	w io.Writer,
+	opts *orderReplaceOpts,
+	optionOpts *optionPlaceOpts,
+	args []string,
+) error {
+	if err := prepareReplacementOrder(cmd, configPath, opts, optionOpts); err != nil {
+		return err
+	}
+	inferLimitOrderTypeFromPrice(cmd, &optionOpts.Type, optionOpts.Price)
+
+	configFlag, err := effectiveConfigFlag(cmd, configPath)
+	if err != nil {
+		return err
+	}
+	orderID, acct, err := replacementTarget(cmd, c, configFlag, opts, args)
+	if err != nil {
+		return err
+	}
+
+	order, err := buildReplacementOptionOrder(cmd, optionOpts, args)
+	if err != nil {
+		return err
+	}
+
+	return replaceOrderAndWriteResult(cmd, c, w, acct, orderID, order)
+}
+
+func buildReplacementOptionOrder(
+	cmd *cobra.Command,
+	opts *optionPlaceOpts,
+	args []string,
+) (*models.OrderRequest, error) {
+	occSymbol, err := buildOCCSymbol(opts.Underlying, opts.Expiration, opts.Strike, opts.Call, opts.Put)
+	if err != nil {
+		return nil, err
+	}
+
+	order, err := buildTypedOrder(
+		cmd,
+		opts,
+		args,
+		parseOptionParams,
+		orderbuilder.ValidateOptionOrder,
+		orderbuilder.BuildOptionOrder,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Keep the replacement path explicitly tied to the shared OCC builder so
+	// future option-build changes cannot accidentally drift from symbol build/parse.
+	order.OrderLegCollection[0].Instrument.Symbol = occSymbol
+	return order, nil
 }

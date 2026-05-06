@@ -396,17 +396,8 @@ func firstAccountIdentifierWithSource(
 // short or non-hex values fall through to API lookup so account numbers and
 // nicknames keep working.
 func isLikelyAccountHash(value string) bool {
-	if len(value) >= 16 {
-		allHex := true
-		for _, r := range value {
-			if !unicode.Is(unicode.ASCII_Hex_Digit, r) {
-				allHex = false
-				break
-			}
-		}
-		if allHex {
-			return true
-		}
+	if isLongHexAccountHash(value) {
+		return true
 	}
 
 	// Existing command tests and local Schwab-compatible fixtures use compact
@@ -416,32 +407,58 @@ func isLikelyAccountHash(value string) bool {
 	// plain account numbers. The separator check keeps legacy HASH_ABC-style test
 	// fixtures working without treating every single-token nickname containing
 	// "hash" as an opaque Schwab identifier.
-	if len(value) < 6 {
-		return false
-	}
-	hasLetter := false
-	hasDigit := false
-	hasSeparator := false
-	for _, r := range value {
-		if unicode.IsLetter(r) {
-			hasLetter = true
-			continue
-		}
-		if unicode.IsDigit(r) {
-			hasDigit = true
-			continue
-		}
-		if r == '-' || r == '_' {
-			hasSeparator = true
-			continue
-		}
-		if unicode.IsSpace(r) {
-			return false
-		}
+	return isCompactFixtureAccountHash(value)
+}
+
+func isLongHexAccountHash(value string) bool {
+	if len(value) < 16 {
 		return false
 	}
 
-	return hasLetter && (hasDigit || hasSeparator && strings.Contains(strings.ToLower(value), "hash"))
+	for _, r := range value {
+		if !unicode.Is(unicode.ASCII_Hex_Digit, r) {
+			return false
+		}
+	}
+
+	return true
+}
+
+type compactAccountHashParts struct {
+	hasLetter    bool
+	hasDigit     bool
+	hasSeparator bool
+}
+
+func isCompactFixtureAccountHash(value string) bool {
+	if len(value) < 6 {
+		return false
+	}
+
+	parts, ok := compactAccountHashPartsFor(value)
+	if !ok {
+		return false
+	}
+
+	return parts.hasLetter && (parts.hasDigit || parts.hasSeparator && strings.Contains(strings.ToLower(value), "hash"))
+}
+
+func compactAccountHashPartsFor(value string) (compactAccountHashParts, bool) {
+	parts := compactAccountHashParts{}
+	for _, r := range value {
+		switch {
+		case unicode.IsLetter(r):
+			parts.hasLetter = true
+		case unicode.IsDigit(r):
+			parts.hasDigit = true
+		case r == '-' || r == '_':
+			parts.hasSeparator = true
+		default:
+			return compactAccountHashParts{}, false
+		}
+	}
+
+	return parts, true
 }
 
 // shouldAttemptAccountHashEnrichment avoids extra network calls for compact test
