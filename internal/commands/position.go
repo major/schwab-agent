@@ -17,11 +17,11 @@ import (
 // positionEntry enriches a position with account identifiers and computed
 // cost basis / P&L fields that Schwab's API doesn't provide directly.
 type positionEntry struct {
+	models.Position
+
 	AccountNumber   string `json:"accountNumber"`
 	AccountHash     string `json:"accountHash,omitempty"`
 	AccountNickName string `json:"accountNickName,omitempty"`
-
-	models.Position
 
 	// Computed fields derived from the raw position data.
 	TotalCostBasis   *float64 `json:"totalCostBasis,omitempty"`

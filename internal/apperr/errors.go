@@ -188,6 +188,7 @@ func (e *AccountNotFoundError) ExitCode() int {
 // HTTPError indicates that an HTTP request returned a non-2xx error status code.
 type HTTPError struct {
 	SchwabError
+
 	StatusCode int
 	Body       string
 }
