@@ -285,6 +285,11 @@ func quoteMulti(ctx context.Context, c *client.Ref, w io.Writer, symbols []strin
 		return mapSchwabGoError(err)
 	}
 	quotes := quoteResponseValue(response)
+	for sym, quote := range quotes {
+		if quoteEntryMissing(quote) {
+			delete(quotes, sym)
+		}
+	}
 
 	var missing []string
 	seenMissing := make(map[string]struct{})
@@ -298,7 +303,7 @@ func quoteMulti(ctx context.Context, c *client.Ref, w io.Writer, symbols []strin
 
 	// Identify symbols absent from the response.
 	for _, sym := range symbols {
-		if quote, ok := quotes[sym]; !ok || quote == nil {
+		if _, ok := quotes[sym]; !ok {
 			addMissing(sym)
 		}
 	}
@@ -316,6 +321,10 @@ func quoteMulti(ctx context.Context, c *client.Ref, w io.Writer, symbols []strin
 	meta.Requested = len(symbols)
 	meta.Returned = len(quotes)
 	return output.WritePartial(w, quotes, missing, meta)
+}
+
+func quoteEntryMissing(quote *marketdata.QuoteEntry) bool {
+	return quote == nil || quote.Symbol == ""
 }
 
 // quoteResponseValue converts schwab-go's optional response pointer to the
