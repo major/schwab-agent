@@ -68,6 +68,33 @@ func TestNewInstrumentCmd_Search_MissingQuery(t *testing.T) {
 	assert.ErrorContains(t, err, "accepts 1 arg(s), received 0")
 }
 
+func TestNewInstrumentCmd_Search_InvalidProjection(t *testing.T) {
+	server := jsonServer(`{}`)
+	defer server.Close()
+
+	var buf bytes.Buffer
+	cmd := NewInstrumentCmd(testClient(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "search", "--projection", "unknown", "AAPL")
+	require.Error(t, err)
+	var validationErr *apperr.ValidationError
+	require.ErrorAs(t, err, &validationErr)
+}
+
+func TestNewInstrumentCmd_Search_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"server unavailable"}`))
+	}))
+	defer srv.Close()
+
+	var buf bytes.Buffer
+	cmd := NewInstrumentCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "search", "AAPL")
+	require.Error(t, err)
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+}
+
 func TestNewInstrumentCmd_Get_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
@@ -136,6 +163,59 @@ func TestNewInstrumentCmd_Get_APIError(t *testing.T) {
 	cmd := NewInstrumentCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "get", "000000000")
 	require.Error(t, err)
+	var notFoundErr *apperr.SymbolNotFoundError
+	require.ErrorAs(t, err, &notFoundErr)
+}
+
+func TestNewInstrumentCmd_Get_ServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"server unavailable"}`))
+	}))
+	defer srv.Close()
+
+	var buf bytes.Buffer
+	cmd := NewInstrumentCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "get", "000000000")
+	require.Error(t, err)
 	var httpErr *apperr.HTTPError
 	require.ErrorAs(t, err, &httpErr)
+}
+
+func TestMapInstrumentGetError(t *testing.T) {
+	plainErr := assert.AnError
+
+	tests := []struct {
+		name        string
+		input       error
+		expectedErr error
+	}{
+		{
+			name:        "nil returns nil",
+			input:       nil,
+			expectedErr: nil,
+		},
+		{
+			name:        "plain error passes through",
+			input:       plainErr,
+			expectedErr: plainErr,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := mapInstrumentGetError(tc.input)
+			if tc.expectedErr == nil {
+				require.NoError(t, got)
+				return
+			}
+
+			require.Same(t, tc.expectedErr, got)
+		})
+	}
+}
+
+func TestFindInstrumentByCUSIP_NilResponse(t *testing.T) {
+	instrument := findInstrumentByCUSIP(nil, "037833100")
+	assert.Nil(t, instrument)
 }

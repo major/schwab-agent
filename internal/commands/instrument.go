@@ -1,7 +1,9 @@
 package commands
 
 import (
+	"errors"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/major/schwab-go/schwab/marketdata"
@@ -57,10 +59,6 @@ desc-regex, search, or fundamental.`,
   schwab-agent instrument search AAPL --projection fundamental`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
-				return err
-			}
-
 			query := args[0]
 
 			result, err := c.MarketData.SearchInstruments(
@@ -70,9 +68,6 @@ desc-regex, search, or fundamental.`,
 			)
 			if err != nil {
 				return mapSchwabGoError(err)
-			}
-			if result == nil {
-				return output.WriteSuccess(w, instrumentSearchData{}, output.NewMetadata())
 			}
 
 			return output.WriteSuccess(w, instrumentSearchData{Instruments: result.Instruments}, output.NewMetadata())
@@ -105,7 +100,7 @@ description, exchange, and other metadata for the specified CUSIP.`,
 			// Upstream bug: https://github.com/major/schwab-go/issues/33
 			result, err := c.MarketData.SearchInstruments(cmd.Context(), cusip, marketdata.ProjectionSymbolSearch)
 			if err != nil {
-				return mapSchwabGoError(err)
+				return mapInstrumentGetError(err)
 			}
 
 			instrument := findInstrumentByCUSIP(result, cusip)
@@ -118,6 +113,21 @@ description, exchange, and other metadata for the specified CUSIP.`,
 	}
 
 	return cmd
+}
+
+// mapInstrumentGetError preserves the CLI's historical not-found contract for
+// CUSIP lookups while reusing the shared schwab-go mapper for every other API
+// error. The old custom instruments client returned SymbolNotFoundError for
+// Schwab 404 responses, so callers can keep treating missing CUSIPs like other
+// symbol lookup failures instead of generic HTTP failures.
+func mapInstrumentGetError(err error) error {
+	mappedErr := mapSchwabGoError(err)
+	var httpErr *apperr.HTTPError
+	if errors.As(mappedErr, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		return apperr.NewSymbolNotFoundError("instrument not found", nil)
+	}
+
+	return mappedErr
 }
 
 // findInstrumentByCUSIP returns the exact CUSIP match from a schwab-go search response.
