@@ -786,10 +786,10 @@ func cloneDashboardRow(row map[string]any) map[string]any {
 	return clone
 }
 
-func highLowWindow(highs, lows []float64, endIndex, window int) (highest, lowest float64) {
+func highLowWindow(highs, lows []float64, endIndex, window int) (float64, float64) {
 	start := max(0, endIndex-window+1)
-	highest = highs[start]
-	lowest = lows[start]
+	highest := highs[start]
+	lowest := lows[start]
 	for i := start + 1; i <= endIndex; i++ {
 		if highs[i] > highest {
 			highest = highs[i]

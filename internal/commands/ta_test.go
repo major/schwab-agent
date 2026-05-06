@@ -51,7 +51,7 @@ func mockFlatCandleListJSON(symbol string, n int) string {
 
 // decodeTAEnvelope unmarshals the output buffer and returns the single symbol's
 // payload for tests that focus on indicator content rather than envelope shape.
-func decodeTAEnvelope(t *testing.T, buf *bytes.Buffer) (envelope output.Envelope, data map[string]any) {
+func decodeTAEnvelope(t *testing.T, buf *bytes.Buffer) (output.Envelope, map[string]any) {
 	t.Helper()
 	envelope, root := decodeTAEnvelopeRoot(t, buf)
 	if len(root) == 1 {
@@ -68,13 +68,15 @@ func decodeTAEnvelope(t *testing.T, buf *bytes.Buffer) (envelope output.Envelope
 
 // decodeTAEnvelopeRoot unmarshals the output buffer into an Envelope and
 // extracts the root data map without unwrapping symbol-keyed entries.
-func decodeTAEnvelopeRoot(t *testing.T, buf *bytes.Buffer) (envelope output.Envelope, data map[string]any) {
+func decodeTAEnvelopeRoot(t *testing.T, buf *bytes.Buffer) (output.Envelope, map[string]any) {
 	t.Helper()
+	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 
 	dataBytes, err := json.Marshal(envelope.Data)
 	require.NoError(t, err)
 
+	var data map[string]any
 	require.NoError(t, json.Unmarshal(dataBytes, &data))
 	return envelope, data
 }

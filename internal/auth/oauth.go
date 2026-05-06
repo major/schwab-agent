@@ -58,8 +58,8 @@ func newOAuthClient(cfg *Config, timeout time.Duration) *resty.Client {
 }
 
 // AuthorizeURL builds the Schwab authorization URL and returns it with a random state value.
-func AuthorizeURL(cfg *Config) (authURL, state string, err error) {
-	state, err = randomOAuthState()
+func AuthorizeURL(cfg *Config) (string, string, error) {
+	state, err := randomOAuthState()
 	if err != nil {
 		return "", "", apperr.NewAuthCallbackError("failed to generate OAuth state", err)
 	}
@@ -119,7 +119,7 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*Toke
 }
 
 // StartCallbackServer starts a loopback-only HTTPS callback server and waits for one callback.
-func StartCallbackServer(addr, expectedState string) (code string, err error) {
+func StartCallbackServer(addr, expectedState string) (string, error) {
 	return startCallbackServer(addr, expectedState, nil)
 }
 

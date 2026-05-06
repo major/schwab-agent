@@ -504,7 +504,7 @@ func freeLoopbackAddress(t *testing.T) string {
 }
 
 // sendCallbackRequest sends a callback request to the local HTTPS server and returns the response.
-func sendCallbackRequest(t *testing.T, addr, code, state string) (respBody string, respStatus int) {
+func sendCallbackRequest(t *testing.T, addr, code, state string) (string, int) {
 	t.Helper()
 
 	client := &http.Client{

@@ -85,7 +85,7 @@ func verticalOrderType(longStrike, shortStrike float64, putCall models.PutCall, 
 
 // spreadInstructions returns the buy/sell instructions for the long and short
 // legs based on whether the position is being opened or closed.
-func spreadInstructions(isOpen bool) (longInstruction, shortInstruction models.Instruction) {
+func spreadInstructions(isOpen bool) (models.Instruction, models.Instruction) {
 	if isOpen {
 		return models.InstructionBuyToOpen, models.InstructionSellToOpen
 	}
@@ -444,12 +444,12 @@ func BuildDoubleDiagonalOrder(params *DoubleDiagonalParams) (*models.OrderReques
 
 // directionalSpreadInstructions returns outside and inside leg instructions for
 // strategies whose structure can be bought or sold, then opened or closed.
-func directionalSpreadInstructions(isBuy, isOpen bool) (outerInstruction, innerInstruction models.Instruction) {
+func directionalSpreadInstructions(isBuy, isOpen bool) (models.Instruction, models.Instruction) {
 	if isBuy {
 		return spreadInstructions(isOpen)
 	}
 
-	innerInstruction, outerInstruction = spreadInstructions(isOpen)
+	innerInstruction, outerInstruction := spreadInstructions(isOpen)
 	return outerInstruction, innerInstruction
 }
 

@@ -76,8 +76,8 @@ func fetchOrderActionData(
 	account, action string,
 	orderID int64,
 	submittedOrder *models.OrderRequest,
-) (data orderActionData, errs []string) {
-	data = orderActionData{
+) (orderActionData, []string) {
+	data := orderActionData{
 		Action:            action,
 		OrderID:           orderID,
 		SubmittedOrder:    submittedOrder,
@@ -116,8 +116,8 @@ func fetchReplaceActionData(
 	account string,
 	originalOrderID, replacementOrderID int64,
 	submittedOrder *models.OrderRequest,
-) (data orderActionData, errs []string) {
-	data, errs = fetchOrderActionData(cmd, c, account, "replace", replacementOrderID, submittedOrder)
+) (orderActionData, []string) {
+	data, errs := fetchOrderActionData(cmd, c, account, "replace", replacementOrderID, submittedOrder)
 	data.Replaced = true
 	data.OriginalOrderID = &originalOrderID
 

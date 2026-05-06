@@ -41,8 +41,8 @@ func ATR(highs, lows, closes []float64, period int) ([]float64, error) {
 
 // BBands computes Bollinger Bands (upper, middle, lower) using SMA.
 // stdDev is the number of standard deviations for both bands (must be > 0).
-// Returns (upper, middle, lower []float64, err error) with leading zeros stripped and lengths aligned.
-func BBands(closes []float64, period int, stdDev float64) (upper, middle, lower []float64, err error) {
+// Returns upper, middle, and lower bands with leading zeros stripped and lengths aligned.
+func BBands(closes []float64, period int, stdDev float64) ([]float64, []float64, []float64, error) {
 	if period <= 0 {
 		return nil, nil, nil, apperr.NewValidationError(
 			fmt.Sprintf("bbands period must be > 0, got %d", period),
@@ -65,9 +65,9 @@ func BBands(closes []float64, period int, stdDev float64) (upper, middle, lower 
 	// maType=0 means SMA (hardcoded per spec - do not expose maType to users)
 	rawUpper, rawMiddle, rawLower := talib.BBands(closes, period, stdDev, stdDev, 0)
 
-	upper = StripLeadingZeros(rawUpper)
-	middle = StripLeadingZeros(rawMiddle)
-	lower = StripLeadingZeros(rawLower)
+	upper := StripLeadingZeros(rawUpper)
+	middle := StripLeadingZeros(rawMiddle)
+	lower := StripLeadingZeros(rawLower)
 
 	// Align to shortest length
 	minLen := min(len(lower), min(len(middle), len(upper)))

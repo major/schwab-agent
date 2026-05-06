@@ -13,10 +13,10 @@ func setParam(m map[string]string, key, value string) {
 // (RFC 3339 format, UTC) when either value is empty. The Schwab API
 // requires date parameters on order and transaction endpoints; this
 // provides a sensible default matching the Python schwab-py client.
-func defaultDateRange(from, to string) (fromDate, toDate string) {
+func defaultDateRange(from, to string) (string, string) {
 	now := time.Now().UTC()
-	fromDate = from
-	toDate = to
+	fromDate := from
+	toDate := to
 	if fromDate == "" {
 		fromDate = now.AddDate(0, 0, -60).Format(time.RFC3339)
 	}

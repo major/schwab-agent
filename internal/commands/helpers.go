@@ -247,7 +247,7 @@ func validateCobraOptions(ctx context.Context, opts any) error {
 	return newValidationError(strings.Join(messages, "; "))
 }
 
-func cobraEnumValues(value any) (valid []string, aliases map[string]string) {
+func cobraEnumValues(value any) ([]string, map[string]string) {
 	switch value.(type) {
 	case *models.Instruction:
 		return enumStrings(validInstructions), nil

@@ -173,7 +173,7 @@ func resolveAccount(c *client.Ref, accountFlag, configPath string, positionalArg
 // enrichAccountHash returns best-effort account metadata for a Schwab hash.
 // The helper is intentionally non-fatal because callers may already have enough
 // information to continue with the hash even when auxiliary lookup APIs fail.
-func enrichAccountHash(ctx context.Context, c *client.Ref, hash string) (accountNumber, nickName, accountType string) {
+func enrichAccountHash(ctx context.Context, c *client.Ref, hash string) (string, string, string) {
 	if c == nil || c.Client == nil {
 		return "", "", ""
 	}
@@ -183,6 +183,7 @@ func enrichAccountHash(ctx context.Context, c *client.Ref, hash string) (account
 		return "", "", ""
 	}
 
+	accountNumber := ""
 	for _, number := range numbers {
 		if number.HashValue == hash {
 			accountNumber = number.AccountNumber
@@ -198,18 +199,20 @@ func enrichAccountHash(ctx context.Context, c *client.Ref, hash string) (account
 		return accountNumber, "", ""
 	}
 
-	nickName, accountType = lookupPrefs(prefs, accountNumber)
+	nickName, accountType := lookupPrefs(prefs, accountNumber)
 
 	return accountNumber, nickName, accountType
 }
 
 // lookupPrefs extracts the nickname and account type from user preferences
 // for the given account number. Returns zero values if no match is found.
-func lookupPrefs(prefs *models.UserPreference, accountNumber string) (nickName, accountType string) {
+func lookupPrefs(prefs *models.UserPreference, accountNumber string) (string, string) {
 	if prefs == nil {
 		return "", ""
 	}
 
+	nickName := ""
+	accountType := ""
 	for _, pref := range prefs.Accounts {
 		if pref.AccountNumber == nil || !strings.EqualFold(accountNumber, *pref.AccountNumber) {
 			continue
@@ -369,7 +372,7 @@ func firstAccountIdentifierWithSource(
 	accountFlag string,
 	positionalArgs []string,
 	configPath string,
-) (identifier, source string) {
+) (string, string) {
 	if strings.TrimSpace(accountFlag) != "" {
 		return strings.TrimSpace(accountFlag), "explicit"
 	}
