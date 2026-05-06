@@ -106,7 +106,7 @@ func TestNewAnalyzeCmd_SingleSymbol(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewAnalyzeCmd(testClient(t, srv), &buf)
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "AAPL")
 	require.NoError(t, err)
 
@@ -159,7 +159,7 @@ func TestNewAnalyzeCmd_MultiSymbol(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewAnalyzeCmd(testClient(t, srv), &buf)
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "AAPL", "NVDA")
 	require.NoError(t, err)
 
@@ -211,7 +211,7 @@ func TestNewAnalyzeCmd_PartialFailure_TAFails(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewAnalyzeCmd(testClient(t, srv), &buf)
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "AAPL", "INVALID")
 	require.NoError(t, err)
 

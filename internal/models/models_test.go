@@ -74,44 +74,6 @@ func TestQuoteEquityJSONRoundTrip(t *testing.T) {
 	assert.Equal(t, description, *unmarshaled.Reference.Description)
 }
 
-// TestCandleJSONRoundTrip verifies that Candle can be marshaled and unmarshaled correctly.
-func TestCandleJSONRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	open := 150.00
-	high := 151.50
-	low := 149.75
-	closePrice := 150.50
-	volume := int64(1000000)
-	datetime := int64(1640000000000)
-
-	original := &Candle{
-		Open:     &open,
-		High:     &high,
-		Low:      &low,
-		Close:    &closePrice,
-		Volume:   &volume,
-		Datetime: &datetime,
-	}
-
-	// Marshal to JSON.
-	jsonData, err := json.Marshal(original)
-	require.NoError(t, err)
-
-	// Unmarshal back to struct.
-	unmarshaled := &Candle{}
-	err = json.Unmarshal(jsonData, unmarshaled)
-	require.NoError(t, err)
-
-	// Verify fields match.
-	assert.InDelta(t, open, *unmarshaled.Open, 0.001)
-	assert.InDelta(t, high, *unmarshaled.High, 0.001)
-	assert.InDelta(t, low, *unmarshaled.Low, 0.001)
-	assert.InDelta(t, closePrice, *unmarshaled.Close, 0.001)
-	assert.Equal(t, volume, *unmarshaled.Volume)
-	assert.Equal(t, datetime, *unmarshaled.Datetime)
-}
-
 // TestPositionJSONRoundTrip verifies that Position can be marshaled and unmarshaled correctly.
 func TestPositionJSONRoundTrip(t *testing.T) {
 	t.Parallel()
@@ -1028,57 +990,6 @@ func TestNilFieldsOmittedInJSON(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(data), `"symbol":"AAPL"`)
 	assert.NotContains(t, string(data), "null")
-}
-
-// TestCandleListJSONRoundTrip verifies the CandleList wrapper (existing Candle
-// test only covers the inner struct).
-func TestCandleListJSONRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	input := `{
-		"symbol": "AAPL",
-		"empty": false,
-		"previousClose": 174.50,
-		"previousCloseDate": 1745193600000,
-		"candles": [
-			{
-				"open": 175.00,
-				"high": 176.50,
-				"low": 174.75,
-				"close": 176.00,
-				"volume": 12000000,
-				"datetime": 1745280000000
-			},
-			{
-				"open": 176.00,
-				"high": 177.25,
-				"low": 175.50,
-				"close": 175.80,
-				"volume": 10000000,
-				"datetime": 1745366400000
-			}
-		]
-	}`
-
-	var cl CandleList
-	err := json.Unmarshal([]byte(input), &cl)
-	require.NoError(t, err)
-
-	assert.Equal(t, "AAPL", *cl.Symbol)
-	assert.InDelta(t, 174.50, *cl.PreviousClose, 0.001)
-	assert.False(t, *cl.Empty)
-	require.Len(t, cl.Candles, 2)
-	assert.InDelta(t, 175.0, *cl.Candles[0].Open, 0.001)
-	assert.InDelta(t, 176.0, *cl.Candles[1].Open, 0.001)
-
-	// Round-trip.
-	data, err := json.Marshal(cl)
-	require.NoError(t, err)
-	var cl2 CandleList
-	err = json.Unmarshal(data, &cl2)
-	require.NoError(t, err)
-	assert.Equal(t, *cl.Symbol, *cl2.Symbol)
-	assert.Len(t, cl2.Candles, 2)
 }
 
 // TestOrderToRequest verifies that Order (response) converts correctly to OrderRequest (submission).

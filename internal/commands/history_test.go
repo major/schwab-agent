@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 )
 
@@ -24,7 +25,7 @@ func TestNewHistoryCmd_Get_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cmd := NewHistoryCmd(testClient(t, srv), &bytes.Buffer{})
+	cmd := NewHistoryCmd(testClientWithMarketData(t, srv), &bytes.Buffer{})
 	_, err := runTestCommand(t, cmd, "get", "AAPL")
 	require.NoError(t, err)
 }
@@ -44,7 +45,7 @@ func TestNewHistoryCmd_Get_WithFlags(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	cmd := NewHistoryCmd(testClient(t, srv), &buf)
+	cmd := NewHistoryCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd,
 		"get",
 		"--period-type", "day",
@@ -72,7 +73,7 @@ func TestNewHistoryCmd_Get_DateRange(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	cmd := NewHistoryCmd(testClient(t, srv), &buf)
+	cmd := NewHistoryCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd,
 		"get",
 		"--from", "1700000000000",
@@ -82,11 +83,85 @@ func TestNewHistoryCmd_Get_DateRange(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestNewHistoryCmd_Get_InvalidNumericFlag(t *testing.T) {
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"symbol":"AAPL","empty":false,"candles":[]}`))
+	}))
+	defer srv.Close()
+
+	cmd := NewHistoryCmd(testClientWithMarketData(t, srv), &bytes.Buffer{})
+	_, err := runTestCommand(t, cmd, "get", "--period", "not-a-number", "AAPL")
+	require.Error(t, err)
+	var valErr *apperr.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	require.ErrorContains(t, err, "invalid period: not-a-number")
+	assert.Zero(t, requestCount, "invalid local flags should fail before calling Schwab")
+}
+
+func TestNewHistoryCmd_Get_InvalidEnumFlag(t *testing.T) {
+	server := jsonServer(`{}`)
+	defer server.Close()
+
+	cmd := NewHistoryCmd(testClientWithMarketData(t, server), &bytes.Buffer{})
+	_, err := runTestCommand(t, cmd, "get", "--period-type", "decade", "AAPL")
+	require.Error(t, err)
+	var valErr *apperr.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.ErrorContains(t, err, "invalid period-type")
+}
+
+func TestNewPriceHistoryParams_InvalidNumericFields(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   priceHistoryParamsInput
+		message string
+	}{
+		{
+			name:    "invalid frequency",
+			input:   priceHistoryParamsInput{Frequency: "daily"},
+			message: "invalid frequency: daily",
+		},
+		{
+			name:    "zero period",
+			input:   priceHistoryParamsInput{Period: "0"},
+			message: "invalid period: 0 (must be > 0)",
+		},
+		{
+			name:    "negative frequency",
+			input:   priceHistoryParamsInput{Frequency: "-1"},
+			message: "invalid frequency: -1 (must be > 0)",
+		},
+		{
+			name:    "invalid from",
+			input:   priceHistoryParamsInput{StartDate: "yesterday"},
+			message: "invalid from: yesterday",
+		},
+		{
+			name:    "invalid to",
+			input:   priceHistoryParamsInput{EndDate: "tomorrow"},
+			message: "invalid to: tomorrow",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newPriceHistoryParams(tt.input)
+			require.Error(t, err)
+			var valErr *apperr.ValidationError
+			require.ErrorAs(t, err, &valErr)
+			assert.ErrorContains(t, err, tt.message)
+		})
+	}
+}
+
 func TestNewHistoryCmd_Get_MissingSymbol(t *testing.T) {
 	server := jsonServer(`{}`)
 	defer server.Close()
 
-	cmd := NewHistoryCmd(testClient(t, server), &bytes.Buffer{})
+	cmd := NewHistoryCmd(testClientWithMarketData(t, server), &bytes.Buffer{})
 	_, err := runTestCommand(t, cmd, "get")
 	require.Error(t, err)
 }
@@ -97,7 +172,7 @@ func TestNewHistoryCmd_Get_ExtraArgs(t *testing.T) {
 
 	// "history get AAPL MSFT" should reject the extra positional arg
 	// since the command only accepts a single symbol.
-	cmd := NewHistoryCmd(testClient(t, server), &bytes.Buffer{})
+	cmd := NewHistoryCmd(testClientWithMarketData(t, server), &bytes.Buffer{})
 	_, err := runTestCommand(t, cmd, "get", "AAPL", "MSFT")
 	require.Error(t, err)
 }
@@ -109,7 +184,7 @@ func TestNewHistoryCmd_Get_APIError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cmd := NewHistoryCmd(testClient(t, srv), &bytes.Buffer{})
+	cmd := NewHistoryCmd(testClientWithMarketData(t, srv), &bytes.Buffer{})
 	_, err := runTestCommand(t, cmd, "get", "AAPL")
 	require.Error(t, err)
 }
@@ -119,7 +194,7 @@ func TestNewHistoryCmd_PriceHistoryAlias(t *testing.T) {
 	srv := jsonServer(`{"symbol":"AAPL","empty":false,"candles":[]}`)
 	defer srv.Close()
 
-	cmd := NewHistoryCmd(testClient(t, srv), &bytes.Buffer{})
+	cmd := NewHistoryCmd(testClientWithMarketData(t, srv), &bytes.Buffer{})
 
 	assert.Contains(t, cmd.Aliases, "price-history")
 }
