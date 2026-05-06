@@ -103,18 +103,24 @@ func TestExchangeCode_Success_UsesBasicAuthAndReturnsTokenFile(t *testing.T) {
 		assert.Equal(t, "application/x-www-form-urlencoded", r.Header.Get("Content-Type"))
 
 		authHeader := r.Header.Get("Authorization")
-		require.True(t, strings.HasPrefix(authHeader, "Basic "))
+		if !assert.True(t, strings.HasPrefix(authHeader, "Basic ")) {
+			return
+		}
 		decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(authHeader, "Basic "))
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		assert.Equal(t, "client-id:client-secret", string(decoded))
 
-		require.NoError(t, r.ParseForm())
+		if !assert.NoError(t, r.ParseForm()) {
+			return
+		}
 		assert.Equal(t, "authorization_code", r.Form.Get("grant_type"))
 		assert.Equal(t, "auth-code-123", r.Form.Get("code"))
 		assert.Equal(t, "https://127.0.0.1:8182", r.Form.Get("redirect_uri"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 			"access_token":  "new-access-token",
 			"token_type":    "Bearer",
 			"expires_in":    1800,
@@ -142,7 +148,7 @@ func TestExchangeCode_Success_UsesBasicAuthAndReturnsTokenFile(t *testing.T) {
 	assert.Equal(t, "Bearer", tokenFile.Token.TokenType)
 	assert.Equal(t, 1800, tokenFile.Token.ExpiresIn)
 	assert.Equal(t, "api", tokenFile.Token.Scope)
-	assert.Equal(t, float64(fixedNow.Unix()+1800), tokenFile.Token.ExpiresAt)
+	assert.InDelta(t, float64(fixedNow.Unix()+1800), tokenFile.Token.ExpiresAt, 0.001)
 }
 
 func TestExchangeCode_Failure_ReturnsAuthCallbackError(t *testing.T) {
@@ -166,20 +172,22 @@ func TestExchangeCode_Failure_ReturnsAuthCallbackError(t *testing.T) {
 	assert.Nil(t, tokenFile)
 	require.Error(t, err)
 	var callbackErr *apperr.AuthCallbackError
-	assert.ErrorAs(t, err, &callbackErr)
+	require.ErrorAs(t, err, &callbackErr)
 	assert.Contains(t, err.Error(), "token exchange failed")
 }
 
 func TestExchangeCode_UsesDerivedTokenURLAndInsecureTLS(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/proxy/v1/oauth/token", r.URL.Path)
-		require.NoError(t, r.ParseForm())
+		if !assert.NoError(t, r.ParseForm()) {
+			return
+		}
 		assert.Equal(t, "authorization_code", r.Form.Get("grant_type"))
 		assert.Equal(t, "derived-code", r.Form.Get("code"))
 		assert.Equal(t, "https://127.0.0.1:8182", r.Form.Get("redirect_uri"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 			"access_token":  "proxy-access-token",
 			"token_type":    "Bearer",
 			"expires_in":    1800,
@@ -243,7 +251,7 @@ func TestStartCallbackServer_StateMismatch_ReturnsAuthCallbackError(t *testing.T
 	assert.Empty(t, result.code)
 	require.Error(t, result.err)
 	var callbackErr *apperr.AuthCallbackError
-	assert.ErrorAs(t, result.err, &callbackErr)
+	require.ErrorAs(t, result.err, &callbackErr)
 	assert.Equal(t, http.StatusBadRequest, statusCode)
 	assert.Contains(t, responseBody, "state mismatch")
 }
@@ -260,12 +268,14 @@ func TestRunLogin_PrintsURLAndSavesToken(t *testing.T) {
 	}
 
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.NoError(t, r.ParseForm())
+		if !assert.NoError(t, r.ParseForm()) {
+			return
+		}
 		assert.Equal(t, "authorization_code", r.Form.Get("grant_type"))
 		assert.Equal(t, "login-code", r.Form.Get("code"))
 		assert.Equal(t, cfg.CallbackURL, r.Form.Get("redirect_uri"))
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 			"access_token":  "saved-access-token",
 			"token_type":    "Bearer",
 			"expires_in":    900,
@@ -317,7 +327,7 @@ func TestValidateCallbackAddr_EdgeCases(t *testing.T) {
 		_, err := validateCallbackAddr("127.0.0.1")
 		require.Error(t, err)
 		var callbackErr *apperr.AuthCallbackError
-		assert.ErrorAs(t, err, &callbackErr)
+		require.ErrorAs(t, err, &callbackErr)
 		assert.Contains(t, err.Error(), "host and port")
 	})
 
@@ -325,7 +335,7 @@ func TestValidateCallbackAddr_EdgeCases(t *testing.T) {
 		_, err := validateCallbackAddr("192.168.1.1:8182")
 		require.Error(t, err)
 		var callbackErr *apperr.AuthCallbackError
-		assert.ErrorAs(t, err, &callbackErr)
+		require.ErrorAs(t, err, &callbackErr)
 		assert.Contains(t, err.Error(), "127.0.0.1")
 	})
 
@@ -354,7 +364,7 @@ func TestStartCallbackServer_MissingCode_ReturnsAuthCallbackError(t *testing.T) 
 	assert.Empty(t, result.code)
 	require.Error(t, result.err)
 	var callbackErr *apperr.AuthCallbackError
-	assert.ErrorAs(t, result.err, &callbackErr)
+	require.ErrorAs(t, result.err, &callbackErr)
 	assert.Contains(t, result.err.Error(), "missing code")
 	assert.Equal(t, http.StatusBadRequest, statusCode)
 	assert.Contains(t, responseBody, "missing code")

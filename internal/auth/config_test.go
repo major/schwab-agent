@@ -60,7 +60,7 @@ func TestLoadConfig_MissingFile_ReturnsValidationError(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "SCHWAB_CLIENT_ID")
 	assert.Contains(t, err.Error(), "SCHWAB_CLIENT_SECRET")
 }
@@ -233,7 +233,7 @@ func TestLoadConfig_InvalidBaseURLInsecureEnv_ReturnsValidationError(t *testing.
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "SCHWAB_BASE_URL_INSECURE")
 }
 
@@ -254,7 +254,7 @@ func TestLoadConfig_InvalidBaseURL_ReturnsValidationError(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "base_url")
 }
 
@@ -300,7 +300,7 @@ func TestLoadConfig_MissingClientID_ReturnsValidationError(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "SCHWAB_CLIENT_ID")
 	assert.Contains(t, err.Error(), "config file")
 }
@@ -326,7 +326,7 @@ func TestLoadConfig_MissingClientSecret_ReturnsValidationError(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "SCHWAB_CLIENT_SECRET")
 	assert.Contains(t, err.Error(), "config file")
 }
@@ -350,7 +350,7 @@ func TestLoadConfig_BothMissing_ReturnsValidationError(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 }
 
 func TestLoadConfig_EnvVarPriority(t *testing.T) {

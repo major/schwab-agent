@@ -36,7 +36,7 @@ func TestBuildVerticalOrderBullCallOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeVertical, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 0.50, *order.Price)
+	assert.InEpsilon(t, 0.50, *order.Price, 1e-9)
 	assert.Equal(t, models.DurationDay, order.Duration)
 	assert.Equal(t, models.SessionNormal, order.Session)
 
@@ -45,20 +45,20 @@ func TestBuildVerticalOrderBullCallOpen(t *testing.T) {
 
 	longLeg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuyToOpen, longLeg.Instruction)
-	assert.Equal(t, 1.0, longLeg.Quantity)
+	assert.InEpsilon(t, 1.0, longLeg.Quantity, 1e-9)
 	assert.Equal(t, models.AssetTypeOption, longLeg.Instrument.AssetType)
 	assert.Equal(t, "F     260618C00012000", longLeg.Instrument.Symbol)
 	require.NotNil(t, longLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *longLeg.Instrument.PutCall)
 	require.NotNil(t, longLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 12.0, *longLeg.Instrument.OptionStrikePrice)
+	assert.InEpsilon(t, 12.0, *longLeg.Instrument.OptionStrikePrice, 1e-9)
 
 	shortLeg := order.OrderLegCollection[1]
 	assert.Equal(t, models.InstructionSellToOpen, shortLeg.Instruction)
-	assert.Equal(t, 1.0, shortLeg.Quantity)
+	assert.InEpsilon(t, 1.0, shortLeg.Quantity, 1e-9)
 	assert.Equal(t, "F     260618C00014000", shortLeg.Instrument.Symbol)
 	require.NotNil(t, shortLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 14.0, *shortLeg.Instrument.OptionStrikePrice)
+	assert.InEpsilon(t, 14.0, *shortLeg.Instrument.OptionStrikePrice, 1e-9)
 }
 
 // TestBuildButterflyOrderLongOpen verifies a long butterfly uses long wings and a short body.
@@ -79,7 +79,7 @@ func TestBuildButterflyOrderLongOpen(t *testing.T) {
 	require.Len(t, order.OrderLegCollection, 3)
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
-	assert.Equal(t, 2.0, order.OrderLegCollection[1].Quantity)
+	assert.InEpsilon(t, 2.0, order.OrderLegCollection[1].Quantity, 1e-9)
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[2].Instruction)
 }
 
@@ -132,7 +132,7 @@ func TestBuildBackRatioOrderOpen(t *testing.T) {
 	require.Len(t, order.OrderLegCollection, 2)
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[0].Instruction)
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[1].Instruction)
-	assert.Equal(t, 2.0, order.OrderLegCollection[1].Quantity)
+	assert.InEpsilon(t, 2.0, order.OrderLegCollection[1].Quantity, 1e-9)
 }
 
 // TestBuildVerticalRollOrder verifies closing and opening vertical legs are ordered clearly.
@@ -343,7 +343,7 @@ func TestBuildIronCondorOrderOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeIronCondor, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 1.50, *order.Price)
+	assert.InEpsilon(t, 1.50, *order.Price, 1e-9)
 
 	// Verify 4 legs in correct order.
 	require.Len(t, order.OrderLegCollection, 4)
@@ -426,7 +426,7 @@ func TestBuildStraddleOrderLongOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeStraddle, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 1.50, *order.Price)
+	assert.InEpsilon(t, 1.50, *order.Price, 1e-9)
 	assert.Equal(t, models.DurationDay, order.Duration)
 	assert.Equal(t, models.SessionNormal, order.Session)
 
@@ -435,7 +435,7 @@ func TestBuildStraddleOrderLongOpen(t *testing.T) {
 
 	callLeg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuyToOpen, callLeg.Instruction)
-	assert.Equal(t, 1.0, callLeg.Quantity)
+	assert.InEpsilon(t, 1.0, callLeg.Quantity, 1e-9)
 	assert.Equal(t, models.AssetTypeOption, callLeg.Instrument.AssetType)
 	assert.Equal(t, "F     260618C00012000", callLeg.Instrument.Symbol)
 	require.NotNil(t, callLeg.Instrument.PutCall)
@@ -443,7 +443,7 @@ func TestBuildStraddleOrderLongOpen(t *testing.T) {
 
 	putLeg := order.OrderLegCollection[1]
 	assert.Equal(t, models.InstructionBuyToOpen, putLeg.Instruction)
-	assert.Equal(t, 1.0, putLeg.Quantity)
+	assert.InEpsilon(t, 1.0, putLeg.Quantity, 1e-9)
 	assert.Equal(t, "F     260618P00012000", putLeg.Instrument.Symbol)
 	require.NotNil(t, putLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallPut, *putLeg.Instrument.PutCall)
@@ -541,7 +541,7 @@ func TestBuildStrangleOrderLongOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeStrangle, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 0.80, *order.Price)
+	assert.InEpsilon(t, 0.80, *order.Price, 1e-9)
 
 	// Assert two legs with different strikes, both BUY_TO_OPEN.
 	require.Len(t, order.OrderLegCollection, 2)
@@ -652,7 +652,7 @@ func TestBuildCoveredCallOrder(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeCovered, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 12.00, *order.Price)
+	assert.InEpsilon(t, 12.00, *order.Price, 1e-9)
 	assert.Equal(t, models.DurationDay, order.Duration)
 	assert.Equal(t, models.SessionNormal, order.Session)
 
@@ -661,19 +661,19 @@ func TestBuildCoveredCallOrder(t *testing.T) {
 
 	equityLeg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuy, equityLeg.Instruction)
-	assert.Equal(t, 100.0, equityLeg.Quantity, "1 contract = 100 shares")
+	assert.InEpsilon(t, 100.0, equityLeg.Quantity, 1e-9, "1 contract = 100 shares")
 	assert.Equal(t, models.AssetTypeEquity, equityLeg.Instrument.AssetType)
 	assert.Equal(t, "F", equityLeg.Instrument.Symbol)
 
 	optionLeg := order.OrderLegCollection[1]
 	assert.Equal(t, models.InstructionSellToOpen, optionLeg.Instruction)
-	assert.Equal(t, 1.0, optionLeg.Quantity)
+	assert.InEpsilon(t, 1.0, optionLeg.Quantity, 1e-9)
 	assert.Equal(t, models.AssetTypeOption, optionLeg.Instrument.AssetType)
 	assert.Equal(t, "F     260618C00014000", optionLeg.Instrument.Symbol)
 	require.NotNil(t, optionLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *optionLeg.Instrument.PutCall)
 	require.NotNil(t, optionLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 14.0, *optionLeg.Instrument.OptionStrikePrice)
+	assert.InEpsilon(t, 14.0, *optionLeg.Instrument.OptionStrikePrice, 1e-9)
 }
 
 // TestBuildCoveredCallOrderMultipleContracts verifies quantity scaling (2 contracts = 200 shares).
@@ -692,8 +692,8 @@ func TestBuildCoveredCallOrderMultipleContracts(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, order.OrderLegCollection, 2)
-	assert.Equal(t, 200.0, order.OrderLegCollection[0].Quantity, "2 contracts = 200 shares")
-	assert.Equal(t, 2.0, order.OrderLegCollection[1].Quantity)
+	assert.InEpsilon(t, 200.0, order.OrderLegCollection[0].Quantity, 1e-9, "2 contracts = 200 shares")
+	assert.InEpsilon(t, 2.0, order.OrderLegCollection[1].Quantity, 1e-9)
 }
 
 // TestBuildCoveredCallOrderCustomDurationSession verifies non-default duration and session.
@@ -744,7 +744,7 @@ func TestBuildCalendarOrderOpenCall(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeCalendar, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 2.50, *order.Price)
+	assert.InEpsilon(t, 2.50, *order.Price, 1e-9)
 	assert.Equal(t, models.DurationDay, order.Duration)
 	assert.Equal(t, models.SessionNormal, order.Session)
 
@@ -753,23 +753,23 @@ func TestBuildCalendarOrderOpenCall(t *testing.T) {
 
 	farLeg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuyToOpen, farLeg.Instruction)
-	assert.Equal(t, 1.0, farLeg.Quantity)
+	assert.InEpsilon(t, 1.0, farLeg.Quantity, 1e-9)
 	assert.Equal(t, models.AssetTypeOption, farLeg.Instrument.AssetType)
 	require.NotNil(t, farLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *farLeg.Instrument.PutCall)
 	require.NotNil(t, farLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 150.0, *farLeg.Instrument.OptionStrikePrice)
+	assert.InEpsilon(t, 150.0, *farLeg.Instrument.OptionStrikePrice, 1e-9)
 	// Far leg uses the far expiration.
 	assert.Contains(t, farLeg.Instrument.Symbol, "260717")
 
 	nearLeg := order.OrderLegCollection[1]
 	assert.Equal(t, models.InstructionSellToOpen, nearLeg.Instruction)
-	assert.Equal(t, 1.0, nearLeg.Quantity)
+	assert.InEpsilon(t, 1.0, nearLeg.Quantity, 1e-9)
 	assert.Equal(t, models.AssetTypeOption, nearLeg.Instrument.AssetType)
 	require.NotNil(t, nearLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *nearLeg.Instrument.PutCall)
 	require.NotNil(t, nearLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 150.0, *nearLeg.Instrument.OptionStrikePrice)
+	assert.InEpsilon(t, 150.0, *nearLeg.Instrument.OptionStrikePrice, 1e-9)
 	// Near leg uses the near expiration.
 	assert.Contains(t, nearLeg.Instrument.Symbol, "260619")
 }
@@ -803,8 +803,8 @@ func TestBuildCalendarOrderOpenPut(t *testing.T) {
 	assert.Equal(t, models.PutCallPut, *order.OrderLegCollection[1].Instrument.PutCall)
 
 	// Quantity should match.
-	assert.Equal(t, 2.0, order.OrderLegCollection[0].Quantity)
-	assert.Equal(t, 2.0, order.OrderLegCollection[1].Quantity)
+	assert.InEpsilon(t, 2.0, order.OrderLegCollection[0].Quantity, 1e-9)
+	assert.InEpsilon(t, 2.0, order.OrderLegCollection[1].Quantity, 1e-9)
 }
 
 // TestBuildCalendarOrderClose verifies closing a calendar spread uses close instructions.
@@ -886,7 +886,7 @@ func TestBuildDiagonalOrderOpenCall(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeDiagonal, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 3.00, *order.Price)
+	assert.InEpsilon(t, 3.00, *order.Price, 1e-9)
 	assert.Equal(t, models.DurationDay, order.Duration)
 	assert.Equal(t, models.SessionNormal, order.Session)
 
@@ -895,22 +895,22 @@ func TestBuildDiagonalOrderOpenCall(t *testing.T) {
 
 	farLeg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuyToOpen, farLeg.Instruction)
-	assert.Equal(t, 1.0, farLeg.Quantity)
+	assert.InEpsilon(t, 1.0, farLeg.Quantity, 1e-9)
 	assert.Equal(t, models.AssetTypeOption, farLeg.Instrument.AssetType)
 	require.NotNil(t, farLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *farLeg.Instrument.PutCall)
 	require.NotNil(t, farLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 155.0, *farLeg.Instrument.OptionStrikePrice)
+	assert.InEpsilon(t, 155.0, *farLeg.Instrument.OptionStrikePrice, 1e-9)
 	assert.Contains(t, farLeg.Instrument.Symbol, "260717")
 
 	nearLeg := order.OrderLegCollection[1]
 	assert.Equal(t, models.InstructionSellToOpen, nearLeg.Instruction)
-	assert.Equal(t, 1.0, nearLeg.Quantity)
+	assert.InEpsilon(t, 1.0, nearLeg.Quantity, 1e-9)
 	assert.Equal(t, models.AssetTypeOption, nearLeg.Instrument.AssetType)
 	require.NotNil(t, nearLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *nearLeg.Instrument.PutCall)
 	require.NotNil(t, nearLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 150.0, *nearLeg.Instrument.OptionStrikePrice)
+	assert.InEpsilon(t, 150.0, *nearLeg.Instrument.OptionStrikePrice, 1e-9)
 	assert.Contains(t, nearLeg.Instrument.Symbol, "260619")
 }
 
@@ -945,12 +945,12 @@ func TestBuildDiagonalOrderOpenPut(t *testing.T) {
 
 	// Far leg (bought) at FarStrike, near leg (sold) at NearStrike.
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
-	assert.Equal(t, 150.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.InEpsilon(t, 150.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice, 1e-9)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
-	assert.Equal(t, 155.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.InEpsilon(t, 155.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice, 1e-9)
 
-	assert.Equal(t, 3.0, order.OrderLegCollection[0].Quantity)
-	assert.Equal(t, 3.0, order.OrderLegCollection[1].Quantity)
+	assert.InEpsilon(t, 3.0, order.OrderLegCollection[0].Quantity, 1e-9)
+	assert.InEpsilon(t, 3.0, order.OrderLegCollection[1].Quantity, 1e-9)
 }
 
 // TestBuildDiagonalOrderClose verifies closing a diagonal spread uses close instructions.
@@ -1005,7 +1005,7 @@ func TestBuildCollarOrderOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeCollarWithStock, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 150.00, *order.Price)
+	assert.InEpsilon(t, 150.00, *order.Price, 1e-9)
 	assert.Equal(t, models.DurationDay, order.Duration)
 	assert.Equal(t, models.SessionNormal, order.Session)
 
@@ -1015,31 +1015,31 @@ func TestBuildCollarOrderOpen(t *testing.T) {
 	// Leg 1: BUY equity shares (1 contract = 100 shares).
 	equityLeg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuy, equityLeg.Instruction)
-	assert.Equal(t, 100.0, equityLeg.Quantity, "1 contract = 100 shares")
+	assert.InEpsilon(t, 100.0, equityLeg.Quantity, 1e-9, "1 contract = 100 shares")
 	assert.Equal(t, models.AssetTypeEquity, equityLeg.Instrument.AssetType)
 	assert.Equal(t, "AAPL", equityLeg.Instrument.Symbol)
 
 	// Leg 2: BUY_TO_OPEN put (protective put).
 	putLeg := order.OrderLegCollection[1]
 	assert.Equal(t, models.InstructionBuyToOpen, putLeg.Instruction)
-	assert.Equal(t, 1.0, putLeg.Quantity)
+	assert.InEpsilon(t, 1.0, putLeg.Quantity, 1e-9)
 	assert.Equal(t, models.AssetTypeOption, putLeg.Instrument.AssetType)
 	require.NotNil(t, putLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallPut, *putLeg.Instrument.PutCall)
 	require.NotNil(t, putLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 140.0, *putLeg.Instrument.OptionStrikePrice)
+	assert.InEpsilon(t, 140.0, *putLeg.Instrument.OptionStrikePrice, 1e-9)
 	assert.Contains(t, putLeg.Instrument.Symbol, "260619")
 	assert.Contains(t, putLeg.Instrument.Symbol, "P00140000")
 
 	// Leg 3: SELL_TO_OPEN call (covered call).
 	callLeg := order.OrderLegCollection[2]
 	assert.Equal(t, models.InstructionSellToOpen, callLeg.Instruction)
-	assert.Equal(t, 1.0, callLeg.Quantity)
+	assert.InEpsilon(t, 1.0, callLeg.Quantity, 1e-9)
 	assert.Equal(t, models.AssetTypeOption, callLeg.Instrument.AssetType)
 	require.NotNil(t, callLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *callLeg.Instrument.PutCall)
 	require.NotNil(t, callLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 160.0, *callLeg.Instrument.OptionStrikePrice)
+	assert.InEpsilon(t, 160.0, *callLeg.Instrument.OptionStrikePrice, 1e-9)
 	assert.Contains(t, callLeg.Instrument.Symbol, "260619")
 	assert.Contains(t, callLeg.Instrument.Symbol, "C00160000")
 }
@@ -1088,9 +1088,9 @@ func TestBuildCollarOrderQuantityScaling(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, order.OrderLegCollection, 3)
-	assert.Equal(t, 500.0, order.OrderLegCollection[0].Quantity, "5 contracts = 500 shares")
-	assert.Equal(t, 5.0, order.OrderLegCollection[1].Quantity)
-	assert.Equal(t, 5.0, order.OrderLegCollection[2].Quantity)
+	assert.InEpsilon(t, 500.0, order.OrderLegCollection[0].Quantity, 1e-9, "5 contracts = 500 shares")
+	assert.InEpsilon(t, 5.0, order.OrderLegCollection[1].Quantity, 1e-9)
+	assert.InEpsilon(t, 5.0, order.OrderLegCollection[2].Quantity, 1e-9)
 }
 
 // TestBuildCollarOrderCustomDurationSession verifies non-default overrides.

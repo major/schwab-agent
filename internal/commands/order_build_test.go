@@ -101,7 +101,7 @@ func TestOrderBuildEquity(t *testing.T) {
 
 			leg := legs[0].(map[string]any)
 			assert.Equal(t, tt.wantAction, leg["instruction"])
-			assert.Equal(t, tt.wantQuantity, leg["quantity"])
+			assert.InDelta(t, tt.wantQuantity, leg["quantity"], 0.001)
 
 			instrument := leg["instrument"].(map[string]any)
 			assert.Equal(t, tt.wantSymbol, instrument["symbol"])
@@ -146,13 +146,13 @@ func TestOrderBuildOption(t *testing.T) {
 
 	leg := legs[0].(map[string]any)
 	assert.Equal(t, "BUY_TO_OPEN", leg["instruction"])
-	assert.Equal(t, 1.0, leg["quantity"])
+	assert.InDelta(t, 1.0, leg["quantity"], 0.001)
 
 	instrument := leg["instrument"].(map[string]any)
 	assert.Equal(t, "OPTION", instrument["assetType"])
 	assert.Equal(t, "AAPL", instrument["underlyingSymbol"])
 	assert.Equal(t, "CALL", instrument["putCall"])
-	assert.Equal(t, 200.0, instrument["optionStrikePrice"])
+	assert.InDelta(t, 200.0, instrument["optionStrikePrice"], 0.001)
 }
 
 // TestOrderBuildBracket verifies the bracket build subcommand produces triggered order JSON

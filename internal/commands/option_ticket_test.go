@@ -104,15 +104,15 @@ func TestNewOptionCmdTicketGet(t *testing.T) {
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.Equal(t, "AAPL", envelope.Data.Symbol)
 	assert.Equal(t, "2026-01-16", envelope.Data.Expiration)
-	assert.Equal(t, 200.0, envelope.Data.Strike)
+	assert.InDelta(t, 200.0, envelope.Data.Strike, 0.001)
 	assert.Equal(t, "CALL", envelope.Data.PutCall)
 	assert.Equal(t, "AAPL  260116C00200000", envelope.Data.OCCSymbol)
-	assert.Equal(t, 199.50, envelope.Data.UnderlyingQuote.Quote.LastPrice)
-	assert.Equal(t, 199.50, envelope.Data.Chain.UnderlyingPrice)
+	assert.InDelta(t, 199.50, envelope.Data.UnderlyingQuote.Quote.LastPrice, 0.001)
+	assert.InDelta(t, 199.50, envelope.Data.Chain.UnderlyingPrice, 0.001)
 	assert.Equal(t, 1, envelope.Data.Chain.NumberOfContracts)
 	require.Len(t, envelope.Data.Contracts, 1)
 	assert.Equal(t, "AAPL  260116C00200000", envelope.Data.Contracts[0].Symbol)
-	assert.Equal(t, 12.375, envelope.Data.Contracts[0].Mark)
+	assert.InDelta(t, 12.375, envelope.Data.Contracts[0].Mark, 0.001)
 }
 
 func TestNewOptionCmdTicketGetMissingContract(t *testing.T) {

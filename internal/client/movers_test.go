@@ -46,7 +46,7 @@ func TestMovers_Success(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -57,7 +57,7 @@ func TestMovers_Success(t *testing.T) {
 	require.NotNil(t, result)
 	require.Len(t, result.Screeners, 2)
 	assert.Equal(t, "AAPL", *result.Screeners[0].Symbol)
-	assert.Equal(t, 2.50, *result.Screeners[0].NetChange)
+	assert.InDelta(t, 2.50, *result.Screeners[0].NetChange, 0.001)
 	assert.Equal(t, "NVDA", *result.Screeners[1].Symbol)
 }
 
@@ -69,7 +69,7 @@ func TestMovers_WithParams(t *testing.T) {
 		assert.Equal(t, "5", q.Get("frequency"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.ScreenerResponse{}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.ScreenerResponse{}))
 	}))
 	defer srv.Close()
 
@@ -90,7 +90,7 @@ func TestMovers_NoOptionalParams(t *testing.T) {
 		assert.Empty(t, r.URL.RawQuery)
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.ScreenerResponse{}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.ScreenerResponse{}))
 	}))
 	defer srv.Close()
 
@@ -104,7 +104,7 @@ func TestMovers_NoOptionalParams(t *testing.T) {
 func TestMovers_EmptyScreeners(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.ScreenerResponse{Screeners: []models.Screener{}}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.ScreenerResponse{Screeners: []models.Screener{}}))
 	}))
 	defer srv.Close()
 

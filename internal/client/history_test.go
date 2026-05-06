@@ -43,7 +43,7 @@ func TestPriceHistory_Success(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -55,8 +55,8 @@ func TestPriceHistory_Success(t *testing.T) {
 	assert.Equal(t, "AAPL", *result.Symbol)
 	assert.False(t, *result.Empty)
 	require.Len(t, result.Candles, 2)
-	assert.Equal(t, 148.00, *result.Candles[0].Open)
-	assert.Equal(t, 150.25, *result.Candles[0].Close)
+	assert.InDelta(t, 148.00, *result.Candles[0].Open, 0.001)
+	assert.InDelta(t, 150.25, *result.Candles[0].Close, 0.001)
 	assert.Equal(t, int64(45000000), *result.Candles[0].Volume)
 }
 
@@ -72,7 +72,7 @@ func TestPriceHistory_AllParams(t *testing.T) {
 		assert.Equal(t, "1700100000000", q.Get("endDate"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.CandleList{Symbol: new("AAPL")}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.CandleList{Symbol: new("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -101,7 +101,7 @@ func TestPriceHistory_DateParams(t *testing.T) {
 		assert.Empty(t, q.Get("period"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.CandleList{Symbol: new("AAPL")}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.CandleList{Symbol: new("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -123,7 +123,7 @@ func TestPriceHistory_EmptyCandles(t *testing.T) {
 			Empty:   new(true),
 			Candles: []models.Candle{},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 

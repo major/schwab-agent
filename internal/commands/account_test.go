@@ -29,12 +29,12 @@ func accountMockServer(t *testing.T, routes map[string]any) *httptest.Server {
 		resp, ok := routes[r.URL.Path]
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
-			require.NoError(t, json.NewEncoder(w).Encode(map[string]string{"error": "not found"}))
+			assert.NoError(t, json.NewEncoder(w).Encode(map[string]string{"error": "not found"}))
 
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(resp))
+		assert.NoError(t, json.NewEncoder(w).Encode(resp))
 	}))
 }
 
@@ -404,10 +404,10 @@ func TestNewAccountCmd_Summary_WithPositionsFlag(t *testing.T) {
 	assert.Equal(t, "AAPL", position["symbol"])
 	assert.Equal(t, "EQUITY", position["assetType"])
 	assert.Equal(t, "Apple Inc", position["description"])
-	assert.Equal(t, 10.0, position["quantity"])
-	assert.Equal(t, 1000.0, position["totalCostBasis"])
-	assert.Equal(t, 200.0, position["unrealizedPnL"])
-	assert.Equal(t, 20.0, position["unrealizedPnLPct"])
+	assert.InDelta(t, 10.0, position["quantity"], 0.001)
+	assert.InDelta(t, 1000.0, position["totalCostBasis"], 0.001)
+	assert.InDelta(t, 200.0, position["unrealizedPnL"], 0.001)
+	assert.InDelta(t, 20.0, position["unrealizedPnLPct"], 0.001)
 
 	second, ok := accountList[1].(map[string]any)
 	require.True(t, ok)
@@ -498,8 +498,8 @@ func TestNewAccountCmd_Summary_PreferencesFailure_StillReturnsPositions(t *testi
 	require.Len(t, positions, 1)
 	position, ok := positions[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, 5.0, position["quantity"])
-	assert.Equal(t, -10.0, position["unrealizedPnL"])
+	assert.InDelta(t, 5.0, position["quantity"], 0.001)
+	assert.InDelta(t, -10.0, position["unrealizedPnL"], 0.001)
 }
 
 func TestNewAccountCmd_Summary_PreferencesFailure_StillReturnsHashes(t *testing.T) {
@@ -1122,7 +1122,7 @@ func TestNewAccountCmd_NoSubcommand(t *testing.T) {
 	// Assert
 	require.Error(t, err)
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "requires a subcommand")
 }
 
@@ -1207,7 +1207,7 @@ func TestResolveAccount_NicknameCollisionListsCandidates(t *testing.T) {
 	require.Error(t, err)
 	assert.Empty(t, account)
 	var accountErr *apperr.AccountNotFoundError
-	assert.ErrorAs(t, err, &accountErr)
+	require.ErrorAs(t, err, &accountErr)
 	assert.Contains(t, err.Error(), "multiple accounts match nickname")
 	assert.Contains(t, err.Error(), "ABCDEF1234567890")
 	assert.Contains(t, err.Error(), "FEDCBA0987654321")
@@ -1234,7 +1234,7 @@ func TestResolveAccount_NoMatchListsAvailableAccounts(t *testing.T) {
 	require.Error(t, err)
 	assert.Empty(t, account)
 	var accountErr *apperr.AccountNotFoundError
-	assert.ErrorAs(t, err, &accountErr)
+	require.ErrorAs(t, err, &accountErr)
 	assert.Contains(t, err.Error(), "Account 'Joint Taxable' not found")
 	assert.Contains(t, err.Error(), "IRA (hash: ABCDEF1234567890)")
 	assert.Contains(t, err.Error(), "Taxable (hash: FEDCBA0987654321)")
@@ -1570,7 +1570,7 @@ func TestResolveAccountDetailed(t *testing.T) {
 			if tt.expectError {
 				require.Error(t, err)
 				var accountErr *apperr.AccountNotFoundError
-				assert.ErrorAs(t, err, &accountErr)
+				require.ErrorAs(t, err, &accountErr)
 				assert.Empty(t, account)
 
 				return
@@ -1894,7 +1894,7 @@ func TestAccountResolveCmd(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				var notFound *apperr.AccountNotFoundError
-				assert.True(t, errors.As(err, &notFound), "expected AccountNotFoundError, got %T", err)
+				assert.ErrorAs(t, err, &notFound)
 
 				return
 			}

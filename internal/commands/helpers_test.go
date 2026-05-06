@@ -294,7 +294,7 @@ func TestDefineCobraFlags(t *testing.T) {
 		// Assert defaults are applied before Cobra executes so handlers can read opts directly.
 		assert.Equal(t, "AAPL", opts.Symbol)
 		assert.Equal(t, 3, opts.Count)
-		assert.Equal(t, 1.25, opts.Price)
+		assert.InDelta(t, 1.25, opts.Price, 0.001)
 		assert.True(t, opts.Enabled)
 		assert.Equal(t, models.DurationDay, opts.Duration)
 		require.NotNil(t, cmd.Flags().Lookup("duration"))
@@ -330,7 +330,7 @@ func TestDefineCobraFlags(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "MSFT", opts.Symbol)
 		assert.Equal(t, 7, opts.Count)
-		assert.Equal(t, 2.50, opts.Price)
+		assert.InDelta(t, 2.50, opts.Price, 0.001)
 		assert.False(t, opts.Enabled)
 		assert.Equal(t, []string{"quote", "fundamental"}, opts.Fields)
 		assert.Equal(t, models.DurationGoodTillCancel, opts.Duration)

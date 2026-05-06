@@ -180,7 +180,7 @@ func TestErrorChainPreservation(t *testing.T) {
 	underlying := errors.New("root cause")
 	err := NewAuthRequiredError("auth required", underlying)
 
-	assert.ErrorIs(t, err, underlying)
+	require.ErrorIs(t, err, underlying)
 	assert.ErrorIs(t, err.Unwrap(), underlying)
 }
 

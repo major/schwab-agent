@@ -151,7 +151,7 @@ func TestNewAuthCmd_RefreshCallsRefresh(t *testing.T) {
 			called = true
 			assert.Equal(t, "client-id", cfg.ClientID)
 			assert.Equal(t, originalToken.Token.RefreshToken, tf.Token.RefreshToken)
-			assert.Equal(t, "", endpoint)
+			assert.Empty(t, endpoint)
 
 			return &auth.TokenFile{
 				CreationTimestamp: tf.CreationTimestamp,

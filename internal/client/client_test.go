@@ -68,7 +68,7 @@ func TestDoGet_BearerTokenInHeader(t *testing.T) {
 		assert.Equal(t, http.MethodGet, r.Method)
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 1}))
+		assert.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 1}))
 	}))
 	defer srv.Close()
 
@@ -87,7 +87,7 @@ func TestDoGet_WithQueryParams(t *testing.T) {
 		assert.Equal(t, "quote", r.URL.Query().Get("fields"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "AAPL", Value: 150}))
+		assert.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "AAPL", Value: 150}))
 	}))
 	defer srv.Close()
 
@@ -113,7 +113,7 @@ func TestDoGet_SpecialCharsInQueryParams(t *testing.T) {
 		assert.Equal(t, "a&b=c", r.URL.Query().Get("tricky"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "BRK B", Value: 300}))
+		assert.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "BRK B", Value: 300}))
 	}))
 	defer srv.Close()
 
@@ -148,13 +148,15 @@ func TestDoPost_JSONBody(t *testing.T) {
 
 		var body testRequestBody
 		err := json.NewDecoder(r.Body).Decode(&body)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		assert.Equal(t, "AAPL", body.Symbol)
 		assert.Equal(t, 10, body.Quantity)
-		assert.Equal(t, 150.50, body.Price)
+		assert.InDelta(t, 150.50, body.Price, 0.001)
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "order-123", Value: 1}))
+		assert.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "order-123", Value: 1}))
 	}))
 	defer srv.Close()
 
@@ -303,7 +305,7 @@ func TestDoGet_ContentTypeHeaders(t *testing.T) {
 		assert.Empty(t, r.Header.Get("Content-Type"), "GET requests must not set Content-Type")
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 1}))
+		assert.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 1}))
 	}))
 	defer srv.Close()
 
@@ -319,7 +321,7 @@ func TestDoRequest_PathConcatenation(t *testing.T) {
 		assert.Equal(t, "/v1/accounts/123/orders", r.URL.Path)
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "order", Value: 1}))
+		assert.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "order", Value: 1}))
 	}))
 	defer srv.Close()
 
@@ -363,7 +365,7 @@ func TestDoRequest_TokenUpdatedDirectly(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedAuth = r.Header.Get("Authorization")
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 1}))
+		assert.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 1}))
 	}))
 	defer srv.Close()
 
@@ -423,7 +425,7 @@ func TestDoRequest_UserAgentHeader(t *testing.T) {
 		assert.Equal(t, "schwab-agent/dev", r.Header.Get("User-Agent"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 1}))
+		assert.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 1}))
 	}))
 	defer srv.Close()
 
@@ -439,7 +441,7 @@ func TestDoRequest_CustomUserAgent(t *testing.T) {
 		assert.Equal(t, "schwab-agent/1.2.3", r.Header.Get("User-Agent"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 1}))
+		assert.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 1}))
 	}))
 	defer srv.Close()
 
@@ -475,7 +477,7 @@ func TestDoRequest_JSONContentTypeWithCharset_Succeeds(t *testing.T) {
 	// the Content-Type check doesn't reject valid JSON with charset params.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		require.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 42}))
+		assert.NoError(t, json.NewEncoder(w).Encode(testResponse{Name: "ok", Value: 42}))
 	}))
 	defer srv.Close()
 

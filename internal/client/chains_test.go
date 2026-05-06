@@ -27,7 +27,7 @@ func TestOptionChain_Success(t *testing.T) {
 			UnderlyingPrice: new(150.25),
 			IsDelayed:       new(false),
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -38,7 +38,7 @@ func TestOptionChain_Success(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, "AAPL", *result.Symbol)
 	assert.Equal(t, "SUCCESS", *result.Status)
-	assert.Equal(t, 150.25, *result.UnderlyingPrice)
+	assert.InDelta(t, 150.25, *result.UnderlyingPrice, 0.001)
 }
 
 func TestOptionChain_AllParams(t *testing.T) {
@@ -52,7 +52,7 @@ func TestOptionChain_AllParams(t *testing.T) {
 		assert.Equal(t, "2025-06-30", q.Get("toDate"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: new("AAPL")}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: new("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -84,7 +84,7 @@ func TestOptionChain_AdvancedParams(t *testing.T) {
 		assert.Equal(t, "45", q.Get("daysToExpiration"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: new("AAPL")}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: new("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -125,7 +125,7 @@ func TestOptionChain_EmptyParams(t *testing.T) {
 		assert.Empty(t, q.Get("daysToExpiration"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: new("AAPL")}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.OptionChain{Symbol: new("AAPL")}))
 	}))
 	defer srv.Close()
 
@@ -154,7 +154,7 @@ func TestOptionChain_WithCallExpDateMap(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -166,7 +166,7 @@ func TestOptionChain_WithCallExpDateMap(t *testing.T) {
 	require.NotNil(t, result.CallExpDateMap)
 	contracts := result.CallExpDateMap["2025-06-20:30"]["150.0"]
 	require.Len(t, contracts, 1)
-	assert.Equal(t, 150.0, *contracts[0].StrikePrice)
+	assert.InDelta(t, 150.0, *contracts[0].StrikePrice, 0.001)
 }
 
 func TestExpirationChainForSymbol_Success(t *testing.T) {
@@ -183,7 +183,7 @@ func TestExpirationChainForSymbol_Success(t *testing.T) {
 				{ExpirationDate: "2025-09-19"},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -201,7 +201,7 @@ func TestExpirationChainForSymbol_Success(t *testing.T) {
 func TestExpirationChainForSymbol_EmptyList(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(ExpirationChain{}))
+		assert.NoError(t, json.NewEncoder(w).Encode(ExpirationChain{}))
 	}))
 	defer srv.Close()
 

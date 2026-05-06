@@ -159,7 +159,7 @@ func writeTestAccountMetadataResponses(t *testing.T, w http.ResponseWriter, path
 				`{"accounts":[{"accountNumber":"12345678","nickName":"My IRA","type":"MARGIN","primaryAccount":true}]}`,
 			),
 		)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		return true
 	default:
 		return false
@@ -232,7 +232,7 @@ func TestOrderPreviewIncludesAccountMetadata(t *testing.T) {
 		if r.Method == http.MethodPost &&
 			r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/previewOrder" {
 			w.Header().Set("Content-Type", "application/json")
-			require.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{OrderID: &orderID}))
+			assert.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{OrderID: &orderID}))
 			return
 		}
 
@@ -379,11 +379,13 @@ func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 		assert.Equal(t, "/trader/v1/accounts/hash123/previewOrder", r.URL.Path)
 
 		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		requestBodies = append(requestBodies, string(body))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
+		assert.NoError(t, json.NewEncoder(w).Encode(previewResponse))
 	}))
 	defer server.Close()
 
@@ -434,7 +436,7 @@ func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 			envelope := decodeEnvelope(t, stdout)
 			data, ok := envelope.Data.(map[string]any)
 			require.True(t, ok)
-			assert.Equal(t, float64(4242), data["orderId"])
+			assert.InDelta(t, float64(4242), data["orderId"], 0.001)
 		})
 	}
 
@@ -503,11 +505,13 @@ func TestNewOrderCmdPreviewSpecAcceptsTriggerOrders(t *testing.T) {
 		assert.Equal(t, "/trader/v1/accounts/hash123/previewOrder", r.URL.Path)
 
 		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		requestBodies = append(requestBodies, string(body))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{OrderID: &orderID}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{OrderID: &orderID}))
 	}))
 	defer server.Close()
 
@@ -556,7 +560,7 @@ func TestNewOrderCmdPreviewSpecAcceptsTriggerOrders(t *testing.T) {
 			envelope := decodeEnvelope(t, stdout)
 			data, ok := envelope.Data.(map[string]any)
 			require.True(t, ok)
-			assert.Equal(t, float64(4244), data["orderId"])
+			assert.InDelta(t, float64(4244), data["orderId"], 0.001)
 		})
 	}
 
@@ -584,11 +588,13 @@ func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
 		assert.Equal(t, "/trader/v1/accounts/hash123/previewOrder", r.URL.Path)
 
 		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		requestBodies = append(requestBodies, requestRecord{Path: r.URL.Path, Body: string(body)})
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
+		assert.NoError(t, json.NewEncoder(w).Encode(previewResponse))
 	}))
 	defer server.Close()
 
@@ -720,7 +726,7 @@ func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
 			envelope := decodeEnvelope(t, stdout)
 			data, ok := envelope.Data.(map[string]any)
 			require.True(t, ok)
-			assert.Equal(t, float64(4243), data["orderId"])
+			assert.InDelta(t, float64(4243), data["orderId"], 0.001)
 			require.Contains(t, data, "builtOrder")
 			require.Contains(t, data, "preview")
 
@@ -757,7 +763,7 @@ func TestNewOrderCmdBuildEquityOutputsRequestJSON(t *testing.T) {
 	assert.Equal(t, models.DurationGoodTillCancel, order.Duration)
 	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 185.25, *order.Price)
+	assert.InDelta(t, 185.25, *order.Price, 0.001)
 	require.Len(t, order.OrderLegCollection, 1)
 	assert.Equal(t, "AAPL", order.OrderLegCollection[0].Instrument.Symbol)
 	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
@@ -945,8 +951,12 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/default-hash/orders":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/default-hash/orders/67890")
 			w.WriteHeader(http.StatusCreated)
@@ -980,7 +990,7 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 
 	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
 	require.NotNil(t, received.Price)
-	assert.Equal(t, 185.25, *received.Price)
+	assert.InDelta(t, 185.25, *received.Price, 0.001)
 	require.Len(t, received.OrderLegCollection, 1)
 	assert.Equal(t, "AAPL", received.OrderLegCollection[0].Instrument.Symbol)
 	assert.Equal(t, models.InstructionBuy, received.OrderLegCollection[0].Instruction)
@@ -989,7 +999,7 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "place", data["action"])
-	assert.Equal(t, float64(67890), data["orderId"])
+	assert.InDelta(t, float64(67890), data["orderId"], 0.001)
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "QUEUED", data["orderStatus"])
 	submittedOrder, ok := data["submittedOrder"].(map[string]any)
@@ -997,7 +1007,7 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 	assert.Equal(t, "LIMIT", submittedOrder["orderType"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(67890), order["orderId"])
+	assert.InDelta(t, float64(67890), order["orderId"], 0.001)
 	assert.Equal(t, "QUEUED", order["status"])
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
@@ -1010,8 +1020,12 @@ func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/hash123/orders":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/24680")
 			w.WriteHeader(http.StatusCreated)
@@ -1046,7 +1060,7 @@ func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "place", data["action"])
-	assert.Equal(t, float64(24680), data["orderId"])
+	assert.InDelta(t, float64(24680), data["orderId"], 0.001)
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "QUEUED", data["orderStatus"])
 	submittedOrder, ok := data["submittedOrder"].(map[string]any)
@@ -1054,7 +1068,7 @@ func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 	assert.Equal(t, "MARKET", submittedOrder["orderType"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(24680), order["orderId"])
+	assert.InDelta(t, float64(24680), order["orderId"], 0.001)
 	assert.Equal(t, "QUEUED", order["status"])
 }
 
@@ -1068,15 +1082,23 @@ func TestNewOrderCmdPreviewSaveAndPlaceFromPreview(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/hash123/previewOrder":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &previewedOrder))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &previewedOrder)) {
+				return
+			}
 
 			w.Header().Set("Content-Type", "application/json")
-			require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
+			assert.NoError(t, json.NewEncoder(w).Encode(previewResponse))
 		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/hash123/orders":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &placedOrder))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &placedOrder)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/13579")
 			w.WriteHeader(http.StatusCreated)
@@ -1127,7 +1149,7 @@ func TestNewOrderCmdPreviewSaveAndPlaceFromPreview(t *testing.T) {
 	placeData, ok := placeEnvelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "place", placeData["action"])
-	assert.Equal(t, float64(13579), placeData["orderId"])
+	assert.InDelta(t, float64(13579), placeData["orderId"], 0.001)
 	assert.Equal(t, digest, placeData["previewDigest"])
 	assert.Equal(t, "verified", placeData["verificationState"])
 }
@@ -1197,7 +1219,7 @@ func TestNewOrderCmdPlaceNoLocationReturnsPartialSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "place", data["action"])
-	assert.Equal(t, float64(0), data["orderId"])
+	assert.InDelta(t, float64(0), data["orderId"], 0.001)
 	assert.Equal(t, "unverified", data["verificationState"])
 	verificationFailures, ok := data["verificationFailures"].([]any)
 	require.True(t, ok)
@@ -1322,7 +1344,7 @@ func TestNewOrderCmdPreviewNotBlockedByMutableGuard(t *testing.T) {
 	previewResponse := models.PreviewOrder{OrderID: &orderID}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
+		assert.NoError(t, json.NewEncoder(w).Encode(previewResponse))
 	}))
 	defer server.Close()
 
@@ -1362,13 +1384,13 @@ func TestNewOrderCmdBuildOCOOutputsRequestJSON(t *testing.T) {
 	takeProfit := order.ChildOrderStrategies[0]
 	assert.Equal(t, models.OrderTypeLimit, takeProfit.OrderType)
 	require.NotNil(t, takeProfit.Price)
-	assert.Equal(t, 160.0, *takeProfit.Price)
+	assert.InDelta(t, 160.0, *takeProfit.Price, 0.001)
 	assert.Equal(t, models.InstructionSell, takeProfit.OrderLegCollection[0].Instruction)
 
 	stopLoss := order.ChildOrderStrategies[1]
 	assert.Equal(t, models.OrderTypeStop, stopLoss.OrderType)
 	require.NotNil(t, stopLoss.StopPrice)
-	assert.Equal(t, 140.0, *stopLoss.StopPrice)
+	assert.InDelta(t, 140.0, *stopLoss.StopPrice, 0.001)
 }
 
 func TestNewOrderCmdBuildOCOSingleExit(t *testing.T) {
@@ -1392,7 +1414,7 @@ func TestNewOrderCmdBuildOCOSingleExit(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeStop, order.OrderType)
 	require.NotNil(t, order.StopPrice)
-	assert.Equal(t, 140.0, *order.StopPrice)
+	assert.InDelta(t, 140.0, *order.StopPrice, 0.001)
 	assert.Empty(t, order.ChildOrderStrategies)
 }
 
@@ -1404,8 +1426,12 @@ func TestNewOrderCmdPlaceOCOPipeline(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/default-hash/orders":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/default-hash/orders/55555")
 			w.WriteHeader(http.StatusCreated)
@@ -1442,10 +1468,10 @@ func TestNewOrderCmdPlaceOCOPipeline(t *testing.T) {
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(55555), data["orderId"])
+	assert.InDelta(t, float64(55555), data["orderId"], 0.001)
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(55555), order["orderId"])
+	assert.InDelta(t, float64(55555), order["orderId"], 0.001)
 }
 
 // --- Spread build tests (iron condor, vertical, strangle, straddle, covered call) ---
@@ -1483,7 +1509,7 @@ func TestNewOrderCmdBuildIronCondorOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeIronCondor, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 2.50, *order.Price)
+	assert.InDelta(t, 2.50, *order.Price, 0.001)
 	assert.Equal(t, models.DurationDay, order.Duration)
 	assert.Equal(t, models.SessionNormal, order.Session)
 
@@ -1494,25 +1520,25 @@ func TestNewOrderCmdBuildIronCondorOpen(t *testing.T) {
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
 	assert.Equal(t, models.PutCallPut, *order.OrderLegCollection[0].Instrument.PutCall)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
-	assert.Equal(t, 400.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 400.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice, 0.001)
 
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
-	assert.Equal(t, 410.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 410.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice, 0.001)
 
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[2].Instruction)
 	require.NotNil(t, order.OrderLegCollection[2].Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[2].Instrument.PutCall)
 	require.NotNil(t, order.OrderLegCollection[2].Instrument.OptionStrikePrice)
-	assert.Equal(t, 420.0, *order.OrderLegCollection[2].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 420.0, *order.OrderLegCollection[2].Instrument.OptionStrikePrice, 0.001)
 
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[3].Instruction)
 	require.NotNil(t, order.OrderLegCollection[3].Instrument.OptionStrikePrice)
-	assert.Equal(t, 430.0, *order.OrderLegCollection[3].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 430.0, *order.OrderLegCollection[3].Instrument.OptionStrikePrice, 0.001)
 
 	// All legs should have the same quantity.
 	for i, leg := range order.OrderLegCollection {
-		assert.Equal(t, 5.0, leg.Quantity, "leg %d quantity", i)
+		assert.InDelta(t, 5.0, leg.Quantity, 0.001, "leg %d quantity", i)
 	}
 }
 
@@ -1572,17 +1598,17 @@ func TestNewOrderCmdBuildVerticalCallDebit(t *testing.T) {
 	assert.Equal(t, models.DurationGoodTillCancel, order.Duration)
 	assert.Equal(t, models.SessionAM, order.Session)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 4.00, *order.Price)
+	assert.InDelta(t, 4.00, *order.Price, 0.001)
 
 	require.Len(t, order.OrderLegCollection, 2)
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 3.0, order.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 3.0, order.OrderLegCollection[0].Quantity, 0.001)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
-	assert.Equal(t, 180.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 180.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice, 0.001)
 
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
-	assert.Equal(t, 190.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 190.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice, 0.001)
 }
 
 func TestNewOrderCmdBuildVerticalPutCredit(t *testing.T) {
@@ -1640,7 +1666,7 @@ func TestNewOrderCmdBuildStrangleBuyOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeStrangle, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 15.00, *order.Price)
+	assert.InDelta(t, 15.00, *order.Price, 0.001)
 
 	require.Len(t, order.OrderLegCollection, 2)
 
@@ -1649,14 +1675,14 @@ func TestNewOrderCmdBuildStrangleBuyOpen(t *testing.T) {
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[0].Instrument.PutCall)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
-	assert.Equal(t, 300.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 300.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice, 0.001)
 
 	// Leg 1: put at 250.
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[1].Instruction)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.PutCall)
 	assert.Equal(t, models.PutCallPut, *order.OrderLegCollection[1].Instrument.PutCall)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
-	assert.Equal(t, 250.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 250.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice, 0.001)
 }
 
 func TestNewOrderCmdBuildStrangleSellOpen(t *testing.T) {
@@ -1705,7 +1731,7 @@ func TestNewOrderCmdBuildStraddleBuyOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeStraddle, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 20.00, *order.Price)
+	assert.InDelta(t, 20.00, *order.Price, 0.001)
 
 	// Both legs at same strike, both BUY_TO_OPEN, one call + one put.
 	require.Len(t, order.OrderLegCollection, 2)
@@ -1714,16 +1740,16 @@ func TestNewOrderCmdBuildStraddleBuyOpen(t *testing.T) {
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[0].Instrument.PutCall)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
-	assert.Equal(t, 130.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 130.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice, 0.001)
 
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[1].Instruction)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.PutCall)
 	assert.Equal(t, models.PutCallPut, *order.OrderLegCollection[1].Instrument.PutCall)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
-	assert.Equal(t, 130.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 130.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice, 0.001)
 
 	for i, leg := range order.OrderLegCollection {
-		assert.Equal(t, 4.0, leg.Quantity, "leg %d quantity", i)
+		assert.InDelta(t, 4.0, leg.Quantity, 0.001, "leg %d quantity", i)
 	}
 }
 
@@ -1770,7 +1796,7 @@ func TestNewOrderCmdBuildCoveredCallOutputsRequestJSON(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeCovered, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 12.50, *order.Price)
+	assert.InDelta(t, 12.50, *order.Price, 0.001)
 
 	// Two legs: equity BUY + option SELL_TO_OPEN.
 	require.Len(t, order.OrderLegCollection, 2)
@@ -1778,19 +1804,19 @@ func TestNewOrderCmdBuildCoveredCallOutputsRequestJSON(t *testing.T) {
 	// Equity leg: 2 contracts = 200 shares.
 	equityLeg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuy, equityLeg.Instruction)
-	assert.Equal(t, 200.0, equityLeg.Quantity)
+	assert.InDelta(t, 200.0, equityLeg.Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeEquity, equityLeg.Instrument.AssetType)
 	assert.Equal(t, "F", equityLeg.Instrument.Symbol)
 
 	// Option leg: SELL_TO_OPEN call.
 	optionLeg := order.OrderLegCollection[1]
 	assert.Equal(t, models.InstructionSellToOpen, optionLeg.Instruction)
-	assert.Equal(t, 2.0, optionLeg.Quantity)
+	assert.InDelta(t, 2.0, optionLeg.Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeOption, optionLeg.Instrument.AssetType)
 	require.NotNil(t, optionLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *optionLeg.Instrument.PutCall)
 	require.NotNil(t, optionLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 14.0, *optionLeg.Instrument.OptionStrikePrice)
+	assert.InDelta(t, 14.0, *optionLeg.Instrument.OptionStrikePrice, 0.001)
 }
 
 func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
@@ -2281,7 +2307,7 @@ func TestNewOrderCmdListAllAccounts(t *testing.T) {
 			{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":222,"status":"FILLED","orderLegCollection":[{"instruction":"SELL","quantity":5,"instrument":{"assetType":"EQUITY","symbol":"MSFT"}}]},
 			{"session":"NORMAL","duration":"DAY","orderType":"LIMIT","orderStrategyType":"SINGLE","orderId":333,"status":"QUEUED","orderLegCollection":[{"instruction":"BUY","quantity":20,"instrument":{"assetType":"EQUITY","symbol":"GOOG"}}]}
 		]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2302,12 +2328,12 @@ func TestNewOrderCmdListAllAccounts(t *testing.T) {
 
 	first, ok := orders[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(111), first["orderId"])
+	assert.InDelta(t, float64(111), first["orderId"], 0.001)
 	assert.Equal(t, "WORKING", first["status"])
 
 	second, ok := orders[1].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(333), second["orderId"])
+	assert.InDelta(t, float64(333), second["orderId"], 0.001)
 	assert.Equal(t, "QUEUED", second["status"])
 }
 
@@ -2325,7 +2351,7 @@ func TestNewOrderCmdListWithAccount(t *testing.T) {
 				`[{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":54321,"status":"QUEUED","orderLegCollection":[{"instruction":"SELL","quantity":5,"instrument":{"assetType":"EQUITY","symbol":"MSFT"}}]}]`,
 			),
 		)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2345,7 +2371,7 @@ func TestNewOrderCmdListWithAccount(t *testing.T) {
 	require.Len(t, orders, 1)
 	order, ok := orders[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(54321), order["orderId"])
+	assert.InDelta(t, float64(54321), order["orderId"], 0.001)
 	assert.Equal(t, "QUEUED", order["status"])
 }
 
@@ -2362,7 +2388,7 @@ func TestNewOrderCmdListWithFilters(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write([]byte(`[]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2415,14 +2441,14 @@ func TestNewOrderCmdListMultipleStatuses(t *testing.T) {
 					`[{"session":"NORMAL","duration":"DAY","orderType":"LIMIT","orderStrategyType":"SINGLE","orderId":111,"status":"WORKING","orderLegCollection":[{"instruction":"BUY","quantity":10,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}]`,
 				),
 			)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		case "FILLED":
 			_, err := w.Write(
 				[]byte(
 					`[{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":222,"status":"FILLED","orderLegCollection":[{"instruction":"SELL","quantity":5,"instrument":{"assetType":"EQUITY","symbol":"MSFT"}}]}]`,
 				),
 			)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		default:
 			assert.Failf(t, "unexpected status filter", "got status %q", status)
 		}
@@ -2458,12 +2484,12 @@ func TestNewOrderCmdListMultipleStatuses(t *testing.T) {
 
 	first, ok := orders[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(111), first["orderId"])
+	assert.InDelta(t, float64(111), first["orderId"], 0.001)
 	assert.Equal(t, "WORKING", first["status"])
 
 	second, ok := orders[1].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(222), second["orderId"])
+	assert.InDelta(t, float64(222), second["orderId"], 0.001)
 	assert.Equal(t, "FILLED", second["status"])
 }
 
@@ -2479,7 +2505,7 @@ func TestNewOrderCmdListCommaSeparatedStatuses(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write([]byte(`[]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2546,7 +2572,7 @@ func TestNewOrderCmdListDefaultFiltersTerminalStatuses(t *testing.T) {
 			{"orderId":7,"status":"QUEUED"},
 			{"orderId":8,"status":"PENDING_ACTIVATION"}
 		]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2569,7 +2595,7 @@ func TestNewOrderCmdListDefaultFiltersTerminalStatuses(t *testing.T) {
 	for i, order := range orders {
 		o, orderOK := order.(map[string]any)
 		require.True(t, orderOK)
-		assert.Equal(t, expectedIDs[i], o["orderId"])
+		assert.InDelta(t, expectedIDs[i], o["orderId"], 0.001)
 	}
 }
 
@@ -2587,7 +2613,7 @@ func TestNewOrderCmdListStatusAllDisablesFiltering(t *testing.T) {
 			{"orderId":2,"status":"FILLED"},
 			{"orderId":3,"status":"CANCELED"}
 		]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2615,9 +2641,13 @@ func TestNewOrderCmdListRecentIncludesTerminalStatuses(t *testing.T) {
 		assert.Empty(t, r.URL.Query().Get("status"), "recent with no explicit status should request all activity")
 
 		from := r.URL.Query().Get("fromEnteredTime")
-		require.NotEmpty(t, from)
+		if !assert.NotEmpty(t, from) {
+			return
+		}
 		parsedFrom, err := time.Parse(time.RFC3339, from)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		assert.WithinDuration(t, time.Now().UTC().Add(-24*time.Hour), parsedFrom, 2*time.Second)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -2626,7 +2656,7 @@ func TestNewOrderCmdListRecentIncludesTerminalStatuses(t *testing.T) {
 			{"orderId":2,"status":"CANCELED"},
 			{"orderId":3,"status":"WORKING"}
 		]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2654,7 +2684,7 @@ func TestNewOrderCmdListExplicitStatusBypassesDefault(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write([]byte(`[{"orderId":1,"status":"FILLED"},{"orderId":2,"status":"FILLED"}]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2685,7 +2715,7 @@ func TestNewOrderCmdListNilStatusIncludedByDefault(t *testing.T) {
 			{"orderId":1},
 			{"orderId":2,"status":"FILLED"}
 		]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2705,7 +2735,7 @@ func TestNewOrderCmdListNilStatusIncludedByDefault(t *testing.T) {
 	require.Len(t, orders, 1)
 	o, ok := orders[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1), o["orderId"])
+	assert.InDelta(t, float64(1), o["orderId"], 0.001)
 }
 
 func TestNewOrderCmdGetSuccess(t *testing.T) {
@@ -2729,7 +2759,7 @@ func TestNewOrderCmdGetSuccess(t *testing.T) {
 					`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":12345,"status":"FILLED","orderLegCollection":[{"instruction":"BUY","quantity":10,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}`,
 				),
 			)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		default:
 			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
@@ -2750,7 +2780,7 @@ func TestNewOrderCmdGetSuccess(t *testing.T) {
 	require.True(t, ok)
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(12345), order["orderId"])
+	assert.InDelta(t, float64(12345), order["orderId"], 0.001)
 	assert.Equal(t, "FILLED", order["status"])
 }
 
@@ -2775,7 +2805,7 @@ func TestNewOrderCmdGetOrderIDFlagSuccess(t *testing.T) {
 					`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":1234567890,"status":"FILLED"}`,
 				),
 			)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		default:
 			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
@@ -2796,7 +2826,7 @@ func TestNewOrderCmdGetOrderIDFlagSuccess(t *testing.T) {
 	require.True(t, ok)
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1234567890), order["orderId"])
+	assert.InDelta(t, float64(1234567890), order["orderId"], 0.001)
 }
 
 func TestNewOrderCmdGetOrderIDFlagWinsOverPositional(t *testing.T) {
@@ -2820,7 +2850,7 @@ func TestNewOrderCmdGetOrderIDFlagWinsOverPositional(t *testing.T) {
 					`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":1234567890,"status":"FILLED"}`,
 				),
 			)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		default:
 			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
@@ -2841,7 +2871,7 @@ func TestNewOrderCmdGetOrderIDFlagWinsOverPositional(t *testing.T) {
 	require.True(t, ok)
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1234567890), order["orderId"])
+	assert.InDelta(t, float64(1234567890), order["orderId"], 0.001)
 }
 
 func TestNewOrderCmdGetNoAccount(t *testing.T) {
@@ -2923,13 +2953,13 @@ func TestNewOrderCmdCancelSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "cancel", data["action"])
-	assert.Equal(t, float64(12345), data["orderId"])
+	assert.InDelta(t, float64(12345), data["orderId"], 0.001)
 	assert.Equal(t, true, data["canceled"])
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "CANCELED", data["orderStatus"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(12345), order["orderId"])
+	assert.InDelta(t, float64(12345), order["orderId"], 0.001)
 	assert.Equal(t, "CANCELED", order["status"])
 }
 
@@ -2962,13 +2992,13 @@ func TestNewOrderCmdCancelOrderIDFlagSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "cancel", data["action"])
-	assert.Equal(t, float64(1234567890), data["orderId"])
+	assert.InDelta(t, float64(1234567890), data["orderId"], 0.001)
 	assert.Equal(t, true, data["canceled"])
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "CANCELED", data["orderStatus"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1234567890), order["orderId"])
+	assert.InDelta(t, float64(1234567890), order["orderId"], 0.001)
 	assert.Equal(t, "CANCELED", order["status"])
 }
 
@@ -2998,7 +3028,7 @@ func TestNewOrderCmdCancelGetFailureReturnsPartialSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "cancel", data["action"])
-	assert.Equal(t, float64(12345), data["orderId"])
+	assert.InDelta(t, float64(12345), data["orderId"], 0.001)
 	assert.Equal(t, true, data["canceled"])
 	assert.Equal(t, "unverified", data["verificationState"])
 	verificationFailures, ok := data["verificationFailures"].([]any)
@@ -3061,8 +3091,12 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
 			w.WriteHeader(http.StatusOK)
@@ -3100,7 +3134,7 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
 	require.NotNil(t, received.Price)
-	assert.Equal(t, 185.25, *received.Price)
+	assert.InDelta(t, 185.25, *received.Price, 0.001)
 	require.Len(t, received.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionBuy, received.OrderLegCollection[0].Instruction)
 	assert.Equal(t, "AAPL", received.OrderLegCollection[0].Instrument.Symbol)
@@ -3109,8 +3143,8 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "replace", data["action"])
-	assert.Equal(t, float64(67890), data["orderId"])
-	assert.Equal(t, float64(12345), data["originalOrderId"])
+	assert.InDelta(t, float64(67890), data["orderId"], 0.001)
+	assert.InDelta(t, float64(12345), data["originalOrderId"], 0.001)
 	assert.Equal(t, true, data["replaced"])
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "QUEUED", data["orderStatus"])
@@ -3120,11 +3154,11 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 	assert.Equal(t, "LIMIT", submittedOrder["orderType"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(67890), order["orderId"])
+	assert.InDelta(t, float64(67890), order["orderId"], 0.001)
 	assert.Equal(t, "QUEUED", order["status"])
 	originalOrder, ok := data["originalOrder"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(12345), originalOrder["orderId"])
+	assert.InDelta(t, float64(12345), originalOrder["orderId"], 0.001)
 	assert.Equal(t, "REPLACED", originalOrder["status"])
 }
 
@@ -3171,19 +3205,19 @@ func TestNewOrderCmdReplaceOrderIDFlagSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "replace", data["action"])
-	assert.Equal(t, float64(1234567890), data["orderId"])
-	assert.Equal(t, float64(1234567890), data["originalOrderId"])
+	assert.InDelta(t, float64(1234567890), data["orderId"], 0.001)
+	assert.InDelta(t, float64(1234567890), data["originalOrderId"], 0.001)
 	assert.Equal(t, true, data["replaced"])
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "REPLACED", data["orderStatus"])
 	assert.Equal(t, "REPLACED", data["originalOrderStatus"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1234567890), order["orderId"])
+	assert.InDelta(t, float64(1234567890), order["orderId"], 0.001)
 	assert.Equal(t, "REPLACED", order["status"])
 	originalOrder, ok := data["originalOrder"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1234567890), originalOrder["orderId"])
+	assert.InDelta(t, float64(1234567890), originalOrder["orderId"], 0.001)
 }
 
 func TestNewOrderCmdReplaceOriginalStatusMismatchReturnsPartialSuccess(t *testing.T) {
@@ -3312,8 +3346,12 @@ func TestOrderReplaceEquityFlagAliases(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
 			w.WriteHeader(http.StatusOK)
@@ -3359,8 +3397,12 @@ func TestOrderReplaceOptionSuccess(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
 			w.WriteHeader(http.StatusOK)
@@ -3404,7 +3446,7 @@ func TestOrderReplaceOptionSuccess(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
 	require.NotNil(t, received.Price)
-	assert.Equal(t, 5.00, *received.Price)
+	assert.InDelta(t, 5.00, *received.Price, 0.001)
 	require.Len(t, received.OrderLegCollection, 1)
 	leg := received.OrderLegCollection[0]
 	assert.Equal(t, models.AssetTypeOption, leg.Instrument.AssetType)
@@ -3415,7 +3457,7 @@ func TestOrderReplaceOptionSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "replace", data["action"])
-	assert.Equal(t, float64(67890), data["orderId"])
+	assert.InDelta(t, float64(67890), data["orderId"], 0.001)
 	assert.Equal(t, true, data["replaced"])
 }
 
@@ -3603,11 +3645,11 @@ func TestNewOrderCmdBuildOptionOutputsRequestJSON(t *testing.T) {
 	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
 	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 3.50, *order.Price)
+	assert.InDelta(t, 3.50, *order.Price, 0.001)
 	require.Len(t, order.OrderLegCollection, 1)
 	leg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuyToOpen, leg.Instruction)
-	assert.Equal(t, 5.0, leg.Quantity)
+	assert.InDelta(t, 5.0, leg.Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeOption, leg.Instrument.AssetType)
 	wantOCC := orderbuilder.BuildOCCSymbol("AAPL", testFutureExpTime, 185, "CALL")
 	assert.Equal(t, wantOCC, leg.Instrument.Symbol)
@@ -3618,7 +3660,7 @@ func TestNewOrderCmdBuildOptionOutputsRequestJSON(t *testing.T) {
 	require.NotNil(t, leg.Instrument.OptionExpirationDate)
 	assert.Equal(t, testFutureExpDate, *leg.Instrument.OptionExpirationDate)
 	require.NotNil(t, leg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 185.0, *leg.Instrument.OptionStrikePrice)
+	assert.InDelta(t, 185.0, *leg.Instrument.OptionStrikePrice, 0.001)
 }
 
 func TestNewOrderCmdBuildBracketOutputsRequestJSON(t *testing.T) {
@@ -3648,7 +3690,7 @@ func TestNewOrderCmdBuildBracketOutputsRequestJSON(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 185.0, *order.Price)
+	assert.InDelta(t, 185.0, *order.Price, 0.001)
 	require.Len(t, order.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
 	require.Len(t, order.ChildOrderStrategies, 1)
@@ -3658,12 +3700,12 @@ func TestNewOrderCmdBuildBracketOutputsRequestJSON(t *testing.T) {
 	takeProfit := order.ChildOrderStrategies[0].ChildOrderStrategies[0]
 	assert.Equal(t, models.OrderTypeLimit, takeProfit.OrderType)
 	require.NotNil(t, takeProfit.Price)
-	assert.Equal(t, 195.0, *takeProfit.Price)
+	assert.InDelta(t, 195.0, *takeProfit.Price, 0.001)
 
 	stopLoss := order.ChildOrderStrategies[0].ChildOrderStrategies[1]
 	assert.Equal(t, models.OrderTypeStop, stopLoss.OrderType)
 	require.NotNil(t, stopLoss.StopPrice)
-	assert.Equal(t, 175.0, *stopLoss.StopPrice)
+	assert.InDelta(t, 175.0, *stopLoss.StopPrice, 0.001)
 }
 
 func TestParseInstruction_ErrorPaths(t *testing.T) {
@@ -3802,8 +3844,12 @@ func TestNewOrderCmdReplaceInfersLimitFromPrice(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
 			w.WriteHeader(http.StatusOK)
@@ -3838,7 +3884,7 @@ func TestNewOrderCmdReplaceInfersLimitFromPrice(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
 	require.NotNil(t, received.Price)
-	assert.Equal(t, 194.16, *received.Price)
+	assert.InDelta(t, 194.16, *received.Price, 0.001)
 
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
@@ -3859,8 +3905,12 @@ func TestOrderReplaceOptionInfersLimitFromPrice(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
 			w.WriteHeader(http.StatusOK)
@@ -3904,7 +3954,7 @@ func TestOrderReplaceOptionInfersLimitFromPrice(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
 	require.NotNil(t, received.Price)
-	assert.Equal(t, 6.50, *received.Price)
+	assert.InDelta(t, 6.50, *received.Price, 0.001)
 
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
@@ -3979,7 +4029,7 @@ func TestNewOrderCmdBuildFTSInlineJSON(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 150.0, *order.Price)
+	assert.InDelta(t, 150.0, *order.Price, 0.001)
 	require.Len(t, order.OrderLegCollection, 1)
 	assert.Equal(t, "AAPL", order.OrderLegCollection[0].Instrument.Symbol)
 	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
@@ -3990,7 +4040,7 @@ func TestNewOrderCmdBuildFTSInlineJSON(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeSingle, child.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeLimit, child.OrderType)
 	require.NotNil(t, child.Price)
-	assert.Equal(t, 160.0, *child.Price)
+	assert.InDelta(t, 160.0, *child.Price, 0.001)
 	require.Len(t, child.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionSell, child.OrderLegCollection[0].Instruction)
 }
@@ -4340,7 +4390,7 @@ func TestNewOrderCmdBuildCalendarCallOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeCalendar, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 2.50, *order.Price)
+	assert.InDelta(t, 2.50, *order.Price, 0.001)
 	assert.Equal(t, models.DurationDay, order.Duration)
 
 	require.Len(t, order.OrderLegCollection, 2)
@@ -4349,7 +4399,7 @@ func TestNewOrderCmdBuildCalendarCallOpen(t *testing.T) {
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[0].Instrument.PutCall)
-	assert.Equal(t, 1.0, order.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 1.0, order.OrderLegCollection[0].Quantity, 0.001)
 
 	// Leg 1: near-dated call (sold).
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
@@ -4414,22 +4464,22 @@ func TestNewOrderCmdBuildDiagonalCallOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeDiagonal, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 3.00, *order.Price)
+	assert.InDelta(t, 3.00, *order.Price, 0.001)
 
 	require.Len(t, order.OrderLegCollection, 2)
 
 	// Leg 0: far-dated call at 160 (bought).
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 2.0, order.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 2.0, order.OrderLegCollection[0].Quantity, 0.001)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
-	assert.Equal(t, 160.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 160.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice, 0.001)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[0].Instrument.PutCall)
 
 	// Leg 1: near-dated call at 150 (sold).
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
-	assert.Equal(t, 150.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 150.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice, 0.001)
 }
 
 func TestNewOrderCmdBuildDiagonalPutOpen(t *testing.T) {
@@ -4482,7 +4532,7 @@ func TestNewOrderCmdBuildCollarOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeCollarWithStock, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 450.0, *order.Price)
+	assert.InDelta(t, 450.0, *order.Price, 0.001)
 
 	// 3 legs: equity, protective put, covered call.
 	require.Len(t, order.OrderLegCollection, 3)
@@ -4490,7 +4540,7 @@ func TestNewOrderCmdBuildCollarOpen(t *testing.T) {
 	// Leg 0: equity BUY, 300 shares (3 contracts * 100).
 	equityLeg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuy, equityLeg.Instruction)
-	assert.Equal(t, 300.0, equityLeg.Quantity)
+	assert.InDelta(t, 300.0, equityLeg.Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeEquity, equityLeg.Instrument.AssetType)
 
 	// Leg 1: protective put BUY_TO_OPEN.
@@ -4499,7 +4549,7 @@ func TestNewOrderCmdBuildCollarOpen(t *testing.T) {
 	require.NotNil(t, putLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallPut, *putLeg.Instrument.PutCall)
 	require.NotNil(t, putLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 140.0, *putLeg.Instrument.OptionStrikePrice)
+	assert.InDelta(t, 140.0, *putLeg.Instrument.OptionStrikePrice, 0.001)
 
 	// Leg 2: covered call SELL_TO_OPEN.
 	callLeg := order.OrderLegCollection[2]
@@ -4507,7 +4557,7 @@ func TestNewOrderCmdBuildCollarOpen(t *testing.T) {
 	require.NotNil(t, callLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *callLeg.Instrument.PutCall)
 	require.NotNil(t, callLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 160.0, *callLeg.Instrument.OptionStrikePrice)
+	assert.InDelta(t, 160.0, *callLeg.Instrument.OptionStrikePrice, 0.001)
 }
 
 func TestNewOrderCmdBuildCollarClose(t *testing.T) {
@@ -4629,11 +4679,11 @@ func TestOrderGetIncludesAccountMetadata(t *testing.T) {
 		resp, ok := routes[r.URL.Path]
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
-			require.NoError(t, json.NewEncoder(w).Encode(map[string]string{"error": "not found"}))
+			assert.NoError(t, json.NewEncoder(w).Encode(map[string]string{"error": "not found"}))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(resp))
+		assert.NoError(t, json.NewEncoder(w).Encode(resp))
 	}))
 	defer server.Close()
 

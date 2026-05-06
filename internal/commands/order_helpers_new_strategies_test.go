@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -113,7 +112,7 @@ func TestParseNewOptionStrategyParamsHappyPaths(t *testing.T) {
 		assert.Equal(t, models.PutCallCall, params.PutCall)
 		assert.True(t, params.Buy)
 		assert.True(t, params.Open)
-		assert.Equal(t, 2.0, params.Quantity)
+		assert.InDelta(t, 2.0, params.Quantity, 0.001)
 	})
 
 	t.Run("back-ratio put close credit", func(t *testing.T) {
@@ -129,7 +128,7 @@ func TestParseNewOptionStrategyParamsHappyPaths(t *testing.T) {
 		assert.Equal(t, models.PutCallPut, params.PutCall)
 		assert.False(t, params.Open)
 		assert.True(t, params.Credit)
-		assert.Equal(t, 3.0, params.LongRatio)
+		assert.InDelta(t, 3.0, params.LongRatio, 0.001)
 	})
 
 	t.Run("vertical-roll put debit", func(t *testing.T) {
@@ -328,9 +327,10 @@ func TestParseNewOptionStrategyParamsErrors(t *testing.T) {
 			err := testCase.parse()
 
 			require.Error(t, err)
-			assert.True(
+			assert.Contains(
 				t,
-				strings.Contains(err.Error(), testCase.message),
+				err.Error(),
+				testCase.message,
 				"expected %q in %q",
 				testCase.message,
 				err.Error(),

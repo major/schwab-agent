@@ -110,7 +110,7 @@ func TestBuyWithStopBuild(t *testing.T) {
 			assert.Equal(t, "TRIGGER", order["orderStrategyType"])
 			assert.Equal(t, "DAY", order["duration"])
 			if tt.wantPrice {
-				assert.Equal(t, 150.0, order["price"])
+				assert.InDelta(t, 150.0, order["price"], 0.001)
 			} else {
 				assert.NotContains(t, order, "price")
 			}
@@ -121,7 +121,7 @@ func TestBuyWithStopBuild(t *testing.T) {
 
 			entryLeg := legs[0].(map[string]any)
 			assert.Equal(t, "BUY", entryLeg["instruction"])
-			assert.Equal(t, 10.0, entryLeg["quantity"])
+			assert.InDelta(t, 10.0, entryLeg["quantity"], 0.001)
 
 			children, ok := order["childOrderStrategies"].([]any)
 			require.True(t, ok, "buy-with-stop should have childOrderStrategies")

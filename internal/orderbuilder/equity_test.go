@@ -31,7 +31,7 @@ func TestBuildEquityOrderAppliesDefaultsAndMarketFields(t *testing.T) {
 	assert.Nil(t, order.StopPrice)
 	require.Len(t, order.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 100.0, order.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 100.0, order.OrderLegCollection[0].Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeEquity, order.OrderLegCollection[0].Instrument.AssetType)
 	assert.Equal(t, "AAPL", order.OrderLegCollection[0].Instrument.Symbol)
 }
@@ -51,7 +51,7 @@ func TestBuildEquityOrderSetsLimitPrice(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, order)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 212.34, *order.Price)
+	assert.InDelta(t, 212.34, *order.Price, 0.001)
 	assert.Nil(t, order.StopPrice)
 	assert.Equal(t, models.DurationGoodTillCancel, order.Duration)
 	assert.Equal(t, models.SessionAM, order.Session)
@@ -71,7 +71,7 @@ func TestBuildEquityOrderSetsStopPrice(t *testing.T) {
 	require.NotNil(t, order)
 	assert.Nil(t, order.Price)
 	require.NotNil(t, order.StopPrice)
-	assert.Equal(t, 199.99, *order.StopPrice)
+	assert.InDelta(t, 199.99, *order.StopPrice, 0.001)
 }
 
 // TestBuildEquityOrderSetsLimitAndStopPrice verifies stop limit orders set both price fields.
@@ -88,9 +88,9 @@ func TestBuildEquityOrderSetsLimitAndStopPrice(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, order)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 198.50, *order.Price)
+	assert.InDelta(t, 198.50, *order.Price, 0.001)
 	require.NotNil(t, order.StopPrice)
-	assert.Equal(t, 199.25, *order.StopPrice)
+	assert.InDelta(t, 199.25, *order.StopPrice, 0.001)
 }
 
 // TestBuildEquityOrderSetsTrailingStopFields verifies trailing stop orders set
@@ -113,7 +113,7 @@ func TestBuildEquityOrderSetsTrailingStopFields(t *testing.T) {
 
 	// Trailing stop fields must be set.
 	require.NotNil(t, order.StopPriceOffset)
-	assert.Equal(t, 2.50, *order.StopPriceOffset)
+	assert.InDelta(t, 2.50, *order.StopPriceOffset, 0.001)
 	require.NotNil(t, order.StopPriceLinkBasis)
 	assert.Equal(t, models.StopPriceLinkBasisLast, *order.StopPriceLinkBasis)
 	require.NotNil(t, order.StopPriceLinkType)
@@ -147,7 +147,7 @@ func TestBuildEquityOrderSetsTrailingStopWithActivationPrice(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, order)
 	require.NotNil(t, order.ActivationPrice)
-	assert.Equal(t, 150.00, *order.ActivationPrice)
+	assert.InDelta(t, 150.00, *order.ActivationPrice, 0.001)
 }
 
 // TestBuildEquityOrderSetsTrailingStopLimitFields verifies trailing stop limit
@@ -172,12 +172,12 @@ func TestBuildEquityOrderSetsTrailingStopLimitFields(t *testing.T) {
 	// Price offset must be set for trailing stop limit (Schwab uses priceOffset,
 	// not price, for the limit component of trailing stop limit orders).
 	require.NotNil(t, order.PriceOffset)
-	assert.Equal(t, 195.00, *order.PriceOffset)
+	assert.InDelta(t, 195.00, *order.PriceOffset, 0.001)
 	assert.Nil(t, order.Price)
 
 	// Trailing stop fields must be set.
 	require.NotNil(t, order.StopPriceOffset)
-	assert.Equal(t, 3.00, *order.StopPriceOffset)
+	assert.InDelta(t, 3.00, *order.StopPriceOffset, 0.001)
 	require.NotNil(t, order.StopPriceLinkBasis)
 	assert.Equal(t, models.StopPriceLinkBasisMark, *order.StopPriceLinkBasis)
 	require.NotNil(t, order.StopPriceLinkType)
@@ -350,7 +350,7 @@ func TestBuildEquityOrderSetsLimitOnClosePrice(t *testing.T) {
 	require.NotNil(t, order)
 	assert.Equal(t, models.OrderTypeLimitOnClose, order.OrderType)
 	require.NotNil(t, order.Price, "LOC orders must set Price")
-	assert.Equal(t, 450.25, *order.Price)
+	assert.InDelta(t, 450.25, *order.Price, 0.001)
 	assert.Nil(t, order.StopPrice, "LOC orders should not set StopPrice")
 }
 

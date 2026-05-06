@@ -90,7 +90,7 @@ func TestNewSymbolCmdBuild(t *testing.T) {
 			require.True(t, ok)
 			assert.Equal(t, tt.wantSymbol, data["symbol"])
 			assert.Equal(t, tt.wantPutCall, data["put_call"])
-			assert.Equal(t, tt.wantStrike, data["strike"])
+			assert.InDelta(t, tt.wantStrike, data["strike"], 0.001)
 			assert.NotEmpty(t, env.Metadata.Timestamp)
 		})
 	}
@@ -213,7 +213,7 @@ func TestNewSymbolCmdParse(t *testing.T) {
 			assert.Equal(t, tt.wantUnderlying, data["underlying"])
 			assert.Equal(t, tt.wantExpiration, data["expiration"])
 			assert.Equal(t, tt.wantPutCall, data["put_call"])
-			assert.Equal(t, tt.wantStrike, data["strike"])
+			assert.InDelta(t, tt.wantStrike, data["strike"], 0.001)
 			assert.NotEmpty(t, env.Metadata.Timestamp)
 		})
 	}
@@ -291,6 +291,6 @@ func TestNewSymbolCmdParseRoundTrip(t *testing.T) {
 	assert.Equal(t, "TSLA", parseData["underlying"])
 	assert.Equal(t, "2026-01-16", parseData["expiration"])
 	assert.Equal(t, "PUT", parseData["put_call"])
-	assert.Equal(t, 275.5, parseData["strike"])
+	assert.InDelta(t, 275.5, parseData["strike"], 0.001)
 	assert.Equal(t, symbol, parseData["symbol"])
 }

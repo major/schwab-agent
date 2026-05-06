@@ -75,8 +75,8 @@ func TestPositionListSingleAccount(t *testing.T) {
 	assert.Equal(t, "12345", pos["accountNumber"])
 	assert.Equal(t, "HASH123", pos["accountHash"])
 	assert.Equal(t, "My IRA", pos["accountNickName"])
-	assert.Equal(t, 15000.0, pos["totalCostBasis"]) // 150 * 100
-	assert.Equal(t, 1000.0, pos["unrealizedPnL"])   // longOpenProfitLoss only
+	assert.InDelta(t, 15000.0, pos["totalCostBasis"], 0.001) // 150 * 100
+	assert.InDelta(t, 1000.0, pos["unrealizedPnL"], 0.001)   // longOpenProfitLoss only
 
 	// Verify instrument came through.
 	inst, ok := pos["instrument"].(map[string]any)
@@ -213,7 +213,7 @@ func TestPositionListAllAccounts(t *testing.T) {
 	// Third position: short TSLA in account 22222
 	pos2 := positions[2].(map[string]any)
 	assert.Equal(t, "22222", pos2["accountNumber"])
-	assert.Equal(t, -500.0, pos2["unrealizedPnL"])
+	assert.InDelta(t, -500.0, pos2["unrealizedPnL"], 0.001)
 
 	inst2, ok := pos2["instrument"].(map[string]any)
 	require.True(t, ok)
@@ -348,7 +348,7 @@ func TestPositionListRequestsPositionsField(t *testing.T) {
 			capturedFields = r.URL.Query().Get("fields")
 
 			w.Header().Set("Content-Type", "application/json")
-			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"securitiesAccount": map[string]any{
 					"type":          "MARGIN",
 					"accountNumber": "12345",
@@ -356,7 +356,7 @@ func TestPositionListRequestsPositionsField(t *testing.T) {
 			}))
 		case "/trader/v1/userPreference":
 			w.Header().Set("Content-Type", "application/json")
-			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"accounts": []any{}}))
+			assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{"accounts": []any{}}))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -418,14 +418,14 @@ func TestPositionListComputedFieldsInOutput(t *testing.T) {
 	pos, ok := positions[0].(map[string]any)
 	require.True(t, ok, "expected position to be map[string]any")
 
-	assert.Equal(t, 15000.0, pos["totalCostBasis"])                   // 150 * 100
-	assert.Equal(t, 1500.0, pos["unrealizedPnL"])                     // longOpenProfitLoss
+	assert.InDelta(t, 15000.0, pos["totalCostBasis"], 0.001)          // 150 * 100
+	assert.InDelta(t, 1500.0, pos["unrealizedPnL"], 0.001)            // longOpenProfitLoss
 	assert.InDelta(t, 10.0, pos["unrealizedPnLPct"].(float64), 0.001) // 1500/15000*100
 
 	// Original API fields should still be present.
-	assert.Equal(t, 100.0, pos["longQuantity"])
-	assert.Equal(t, 150.0, pos["averagePrice"])
-	assert.Equal(t, 16500.0, pos["marketValue"])
+	assert.InDelta(t, 100.0, pos["longQuantity"], 0.001)
+	assert.InDelta(t, 150.0, pos["averagePrice"], 0.001)
+	assert.InDelta(t, 16500.0, pos["marketValue"], 0.001)
 }
 
 func TestPositionListFiltersSymbolsAndSortsByValue(t *testing.T) {
@@ -554,9 +554,9 @@ func TestPositionListFiltersPnLAndSortsAscending(t *testing.T) {
 	positions := positionListFromEnvelope(t, env.Data)
 	require.Len(t, positions, 2)
 	assert.Equal(t, "TSLA", positionSymbol(t, positions[0]))
-	assert.Equal(t, -500.0, positions[0]["unrealizedPnL"])
+	assert.InDelta(t, -500.0, positions[0]["unrealizedPnL"], 0.001)
 	assert.Equal(t, "MSFT", positionSymbol(t, positions[1]))
-	assert.Equal(t, -250.0, positions[1]["unrealizedPnL"])
+	assert.InDelta(t, -250.0, positions[1]["unrealizedPnL"], 0.001)
 }
 
 func TestPositionListRejectsInvalidPnLRange(t *testing.T) {
@@ -622,10 +622,10 @@ func TestComputePositionFields(t *testing.T) {
 		computePositionFields(&entry)
 
 		require.NotNil(t, entry.TotalCostBasis)
-		assert.Equal(t, 15000.0, *entry.TotalCostBasis)
+		assert.InDelta(t, 15000.0, *entry.TotalCostBasis, 0.001)
 
 		require.NotNil(t, entry.UnrealizedPnL)
-		assert.Equal(t, 1000.0, *entry.UnrealizedPnL)
+		assert.InDelta(t, 1000.0, *entry.UnrealizedPnL, 0.001)
 
 		require.NotNil(t, entry.UnrealizedPnLPct)
 		assert.InDelta(t, 6.6667, *entry.UnrealizedPnLPct, 0.001)
@@ -642,10 +642,10 @@ func TestComputePositionFields(t *testing.T) {
 		computePositionFields(&entry)
 
 		require.NotNil(t, entry.TotalCostBasis)
-		assert.Equal(t, 3000.0, *entry.TotalCostBasis)
+		assert.InDelta(t, 3000.0, *entry.TotalCostBasis, 0.001)
 
 		require.NotNil(t, entry.UnrealizedPnL)
-		assert.Equal(t, -500.0, *entry.UnrealizedPnL)
+		assert.InDelta(t, -500.0, *entry.UnrealizedPnL, 0.001)
 
 		require.NotNil(t, entry.UnrealizedPnLPct)
 		assert.InDelta(t, -16.6667, *entry.UnrealizedPnLPct, 0.001)
@@ -664,10 +664,10 @@ func TestComputePositionFields(t *testing.T) {
 		computePositionFields(&entry)
 
 		require.NotNil(t, entry.TotalCostBasis)
-		assert.Equal(t, 6000.0, *entry.TotalCostBasis) // 100 * (50 + 10)
+		assert.InDelta(t, 6000.0, *entry.TotalCostBasis, 0.001) // 100 * (50 + 10)
 
 		require.NotNil(t, entry.UnrealizedPnL)
-		assert.Equal(t, 300.0, *entry.UnrealizedPnL) // 500 + (-200)
+		assert.InDelta(t, 300.0, *entry.UnrealizedPnL, 0.001) // 500 + (-200)
 
 		require.NotNil(t, entry.UnrealizedPnLPct)
 		assert.InDelta(t, 5.0, *entry.UnrealizedPnLPct, 0.001) // 300/6000*100
@@ -684,7 +684,7 @@ func TestComputePositionFields(t *testing.T) {
 
 		assert.Nil(t, entry.TotalCostBasis)
 		require.NotNil(t, entry.UnrealizedPnL)
-		assert.Equal(t, 500.0, *entry.UnrealizedPnL)
+		assert.InDelta(t, 500.0, *entry.UnrealizedPnL, 0.001)
 		// No P&L pct because no cost basis.
 		assert.Nil(t, entry.UnrealizedPnLPct)
 	})
@@ -711,7 +711,7 @@ func TestComputePositionFields(t *testing.T) {
 		computePositionFields(&entry)
 
 		require.NotNil(t, entry.TotalCostBasis)
-		assert.Equal(t, 15000.0, *entry.TotalCostBasis)
+		assert.InDelta(t, 15000.0, *entry.TotalCostBasis, 0.001)
 		assert.Nil(t, entry.UnrealizedPnL)
 		assert.Nil(t, entry.UnrealizedPnLPct)
 	})

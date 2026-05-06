@@ -133,7 +133,7 @@ func TestParseOCCSymbol(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.underlying, result.Underlying)
 			assert.Equal(t, tt.putCall, result.PutCall)
-			assert.Equal(t, tt.strike, result.Strike)
+			assert.InDelta(t, tt.strike, result.Strike, 0.001)
 			assert.Equal(t, tt.symbol, result.Symbol)
 			assert.Equal(t, tt.wantYear, result.Expiration.Year())
 			assert.Equal(t, tt.wantMonth, result.Expiration.Month())
@@ -248,7 +248,7 @@ func TestParseOCCSymbolRoundTrip(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.underlying, parsed.Underlying)
 			assert.Equal(t, tt.putCall, parsed.PutCall)
-			assert.Equal(t, tt.strike, parsed.Strike)
+			assert.InDelta(t, tt.strike, parsed.Strike, 0.001)
 			assert.Equal(t, tt.expiration.Year(), parsed.Expiration.Year())
 			assert.Equal(t, tt.expiration.Month(), parsed.Expiration.Month())
 			assert.Equal(t, tt.expiration.Day(), parsed.Expiration.Day())
@@ -281,7 +281,7 @@ func TestBuildOptionOrderAppliesDefaults(t *testing.T) {
 
 	leg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuyToOpen, leg.Instruction)
-	assert.Equal(t, 1.0, leg.Quantity)
+	assert.InDelta(t, 1.0, leg.Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeOption, leg.Instrument.AssetType)
 	assert.Equal(t, "AAPL  250620C00200000", leg.Instrument.Symbol)
 	require.NotNil(t, leg.Instrument.PutCall)
@@ -291,9 +291,9 @@ func TestBuildOptionOrderAppliesDefaults(t *testing.T) {
 	require.NotNil(t, leg.Instrument.OptionExpirationDate)
 	assert.Equal(t, "2025-06-20", *leg.Instrument.OptionExpirationDate)
 	require.NotNil(t, leg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 200.0, *leg.Instrument.OptionStrikePrice)
+	assert.InEpsilon(t, 200.0, *leg.Instrument.OptionStrikePrice, 1e-9)
 	require.NotNil(t, leg.Instrument.OptionMultiplier)
-	assert.Equal(t, 100.0, *leg.Instrument.OptionMultiplier)
+	assert.InEpsilon(t, 100.0, *leg.Instrument.OptionMultiplier, 1e-9)
 }
 
 // TestBuildOptionOrderSetsLimitPrice verifies limit option orders set the limit price.
@@ -314,7 +314,7 @@ func TestBuildOptionOrderSetsLimitPrice(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, order)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 3.25, *order.Price)
+	assert.InEpsilon(t, 3.25, *order.Price, 1e-9)
 	assert.Equal(t, models.DurationGoodTillCancel, order.Duration)
 	assert.Equal(t, models.SessionPM, order.Session)
 	assert.Equal(t, "SPY   251219P00450500", order.OrderLegCollection[0].Instrument.Symbol)

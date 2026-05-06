@@ -49,7 +49,7 @@ func TestHistoricalVolatility_ConstantPrices(t *testing.T) {
 	assert.Zero(t, result.MinVol)
 	assert.Zero(t, result.MaxVol)
 	assert.Zero(t, result.MeanVol)
-	assert.Equal(t, 100.0, result.PercentileRank)
+	assert.InDelta(t, 100.0, result.PercentileRank, 0.001)
 }
 
 func TestHistoricalVolatility_InvalidPeriod(t *testing.T) {
@@ -84,9 +84,9 @@ func TestHistoricalVolatility_MinimumData(t *testing.T) {
 	require.NotNil(t, result)
 	assert.GreaterOrEqual(t, result.DailyVol, 0.0)
 	assert.GreaterOrEqual(t, result.AnnualizedVol, 0.0)
-	assert.Equal(t, result.MinVol, result.MaxVol)
-	assert.Equal(t, result.MaxVol, result.MeanVol)
-	assert.Equal(t, 100.0, result.PercentileRank)
+	assert.InDelta(t, result.MinVol, result.MaxVol, 0.001)
+	assert.InDelta(t, result.MaxVol, result.MeanVol, 0.001)
+	assert.InDelta(t, 100.0, result.PercentileRank, 0.001)
 }
 
 func TestClassifyRegime(t *testing.T) {
@@ -137,7 +137,7 @@ func TestPercentileRank(t *testing.T) {
 	result := percentileRank(series, 0.03)
 
 	// Assert
-	assert.Equal(t, 60.0, result)
+	assert.InDelta(t, 60.0, result, 0.001)
 }
 
 func TestPercentileRank_EmptySeries(t *testing.T) {

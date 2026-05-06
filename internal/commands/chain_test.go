@@ -180,7 +180,7 @@ func TestNewChainCmd(t *testing.T) {
 		require.Error(t, err)
 
 		var valErr *apperr.ValidationError
-		assert.ErrorAs(t, err, &valErr)
+		require.ErrorAs(t, err, &valErr)
 		assert.Contains(t, valErr.Error(), "requires a subcommand")
 	})
 }

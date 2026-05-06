@@ -199,7 +199,7 @@ func TestNewMarketCmd_NoSubcommand(t *testing.T) {
 	// Assert
 	require.Error(t, err)
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "requires a subcommand")
 	assert.Contains(t, err.Error(), "hours")
 	assert.Contains(t, err.Error(), "movers")

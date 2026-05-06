@@ -359,7 +359,7 @@ func TestBeforeHook_RefreshesExpiredToken(t *testing.T) {
 	refreshed, loadErr := auth.LoadToken(tokenPath)
 	require.NoError(t, loadErr)
 	assert.Equal(t, "fresh-access-token", refreshed.Token.AccessToken)
-	assert.True(t, refreshed.Token.ExpiresAt > float64(time.Now().Unix()))
+	assert.Greater(t, refreshed.Token.ExpiresAt, float64(time.Now().Unix()))
 }
 
 func TestBeforeHook_UsesConfiguredProxyForRefreshAndAPIRequests(t *testing.T) {
@@ -425,7 +425,7 @@ func TestBeforeHook_UsesConfiguredProxyForRefreshAndAPIRequests(t *testing.T) {
 	refreshed, loadErr := auth.LoadToken(tokenPath)
 	require.NoError(t, loadErr)
 	assert.Equal(t, "fresh-access-token", refreshed.Token.AccessToken)
-	assert.True(t, refreshed.Token.ExpiresAt > float64(time.Now().Unix()))
+	assert.Greater(t, refreshed.Token.ExpiresAt, float64(time.Now().Unix()))
 }
 
 func freshToken() *auth.TokenFile {

@@ -482,7 +482,7 @@ func TestWritePartialMultipleErrors(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &envelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, 3, len(envelope.Errors))
+	assert.Len(t, envelope.Errors, 3)
 	assert.Equal(t, errs, envelope.Errors)
 }
 

@@ -888,7 +888,9 @@ func TestTAATR_MultipleSymbolsReturnsSymbolMap(t *testing.T) {
 		requestCount++
 		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
 		symbol := r.URL.Query().Get("symbol")
-		require.Contains(t, []string{"AAPL", "MSFT"}, symbol)
+		if !assert.Contains(t, []string{"AAPL", "MSFT"}, symbol) {
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(mockCandleListJSON(symbol, 60)))
@@ -1460,7 +1462,7 @@ func TestMustParseFloat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := mustParseFloat(tt.in)
-			assert.Equal(t, tt.want, got)
+			assert.InDelta(t, tt.want, got, 0.001)
 		})
 	}
 }

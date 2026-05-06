@@ -90,5 +90,5 @@ func TestExpectedMove_MultiplierAboveOne(t *testing.T) {
 
 func TestExpectedMove_DefaultMultiplier(t *testing.T) {
 	// Arrange & Act & Assert
-	assert.Equal(t, 0.85, DefaultMultiplier)
+	assert.InDelta(t, 0.85, DefaultMultiplier, 0.001)
 }

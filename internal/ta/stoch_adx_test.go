@@ -27,7 +27,7 @@ func TestStochastic_ValidRange(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.NotEmpty(t, slowK)
-	assert.Equal(t, len(slowK), len(slowD), "slowK and slowD must have same length")
+	assert.Len(t, slowD, len(slowK), "slowK and slowD must have same length")
 	for _, v := range slowK {
 		assert.GreaterOrEqual(t, v, 0.0)
 		assert.LessOrEqual(t, v, 100.0)
@@ -86,8 +86,8 @@ func TestADX_ThreeAlignedSlices(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.NotEmpty(t, adx)
-	assert.Equal(t, len(adx), len(plusDI), "adx and plusDI must have same length")
-	assert.Equal(t, len(adx), len(minusDI), "adx and minusDI must have same length")
+	assert.Len(t, plusDI, len(adx), "adx and plusDI must have same length")
+	assert.Len(t, minusDI, len(adx), "adx and minusDI must have same length")
 	for _, v := range adx {
 		assert.GreaterOrEqual(t, v, 0.0)
 		assert.LessOrEqual(t, v, 100.0)
@@ -129,7 +129,7 @@ func TestStochastic_InvalidSmoothK(t *testing.T) {
 	_, _, err := Stochastic(highs, lows, closes, 14, 0, 3)
 	require.Error(t, err)
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "all periods must be > 0")
 }
 
@@ -140,6 +140,6 @@ func TestStochastic_InvalidDPeriod(t *testing.T) {
 	_, _, err := Stochastic(highs, lows, closes, 14, 3, 0)
 	require.Error(t, err)
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "all periods must be > 0")
 }

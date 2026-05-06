@@ -49,7 +49,7 @@ func TestLoadToken_MissingFile_ReturnsAuthRequiredError(t *testing.T) {
 	require.Error(t, err)
 
 	var authReqErr *apperr.AuthRequiredError
-	assert.ErrorAs(t, err, &authReqErr)
+	require.ErrorAs(t, err, &authReqErr)
 	assert.Contains(t, err.Error(), "token file not found")
 }
 
@@ -75,7 +75,7 @@ func TestLoadToken_ValidFile_ReturnsTokenFile(t *testing.T) {
 	assert.Equal(t, tf.Token.AccessToken, loaded.Token.AccessToken)
 	assert.Equal(t, tf.Token.RefreshToken, loaded.Token.RefreshToken)
 	assert.Equal(t, tf.Token.ExpiresIn, loaded.Token.ExpiresIn)
-	assert.Equal(t, tf.Token.ExpiresAt, loaded.Token.ExpiresAt)
+	assert.InDelta(t, tf.Token.ExpiresAt, loaded.Token.ExpiresAt, 0.001)
 	assert.Equal(t, tf.Token.Scope, loaded.Token.Scope)
 	assert.Equal(t, tf.Token.TokenType, loaded.Token.TokenType)
 }
@@ -341,19 +341,25 @@ func TestRefreshAccessToken_Success_ReturnsNewTokenFile(t *testing.T) {
 
 		// Verify Basic Auth
 		authHeader := r.Header.Get("Authorization")
-		require.True(t, strings.HasPrefix(authHeader, "Basic "))
+		if !assert.True(t, strings.HasPrefix(authHeader, "Basic ")) {
+			return
+		}
 		decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(authHeader, "Basic "))
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		assert.Equal(t, "test-client:test-secret", string(decoded))
 
 		// Verify body
-		require.NoError(t, r.ParseForm())
+		if !assert.NoError(t, r.ParseForm()) {
+			return
+		}
 		assert.Equal(t, "refresh_token", r.Form.Get("grant_type"))
 		assert.Equal(t, "test-refresh-token", r.Form.Get("refresh_token"))
 
 		// Return new token
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 			"access_token":  "new-access-token",
 			"token_type":    "Bearer",
 			"expires_in":    1800,
@@ -394,12 +400,14 @@ func TestRefreshAccessToken_Success_ReturnsNewTokenFile(t *testing.T) {
 func TestRefreshAccessToken_UsesDerivedTokenURLAndInsecureTLS(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/proxy/v1/oauth/token", r.URL.Path)
-		require.NoError(t, r.ParseForm())
+		if !assert.NoError(t, r.ParseForm()) {
+			return
+		}
 		assert.Equal(t, "refresh_token", r.Form.Get("grant_type"))
 		assert.Equal(t, "test-refresh-token", r.Form.Get("refresh_token"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 			"access_token":  "derived-access-token",
 			"token_type":    "Bearer",
 			"expires_in":    1800,
@@ -429,7 +437,7 @@ func TestRefreshAccessToken_PreservesCreationTimestamp(t *testing.T) {
 	// Arrange
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 			"access_token":  "refreshed-token",
 			"token_type":    "Bearer",
 			"expires_in":    1800,
@@ -457,7 +465,7 @@ func TestRefreshAccessToken_InvalidGrant_ReturnsAuthExpiredError(t *testing.T) {
 	// Arrange
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]string{
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]string{
 			"error": "invalid_grant",
 		}))
 	}))
@@ -474,7 +482,7 @@ func TestRefreshAccessToken_InvalidGrant_ReturnsAuthExpiredError(t *testing.T) {
 	require.Error(t, err)
 
 	var authExpErr *apperr.AuthExpiredError
-	assert.ErrorAs(t, err, &authExpErr)
+	require.ErrorAs(t, err, &authExpErr)
 	assert.Contains(t, err.Error(), "refresh token expired")
 }
 
@@ -536,7 +544,7 @@ func TestRefreshAccessToken_OtherHTTPError_ReturnsGenericError(t *testing.T) {
 	// Arrange: non-invalid_grant 400 response
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]string{
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]string{
 			"error": "invalid_client",
 		}))
 	}))

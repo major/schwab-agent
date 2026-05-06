@@ -57,7 +57,7 @@ func TestListOrders_Success(t *testing.T) {
 				Status:            &status,
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -77,7 +77,7 @@ func TestListOrders_WithParams(t *testing.T) {
 		assert.Equal(t, "2024-12-31T23:59:59.000Z", r.URL.Query().Get("toEnteredTime"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode([]models.Order{}))
+		assert.NoError(t, json.NewEncoder(w).Encode([]models.Order{}))
 	}))
 	defer srv.Close()
 
@@ -114,7 +114,7 @@ func TestListOrders_MultipleStatuses(t *testing.T) {
 				OrderType:         models.OrderTypeLimit,
 				OrderStrategyType: models.OrderStrategyTypeSingle,
 			}}
-			require.NoError(t, json.NewEncoder(w).Encode(response))
+			assert.NoError(t, json.NewEncoder(w).Encode(response))
 		case "FILLED":
 			response := []models.Order{{
 				OrderID:           &filledID,
@@ -122,7 +122,7 @@ func TestListOrders_MultipleStatuses(t *testing.T) {
 				OrderType:         models.OrderTypeMarket,
 				OrderStrategyType: models.OrderStrategyTypeSingle,
 			}}
-			require.NoError(t, json.NewEncoder(w).Encode(response))
+			assert.NoError(t, json.NewEncoder(w).Encode(response))
 		default:
 			assert.Failf(t, "unexpected status filter", "got status %q", status)
 		}
@@ -157,7 +157,7 @@ func TestListOrders_MultipleStatuses_Dedup(t *testing.T) {
 			OrderType:         models.OrderTypeLimit,
 			OrderStrategyType: models.OrderStrategyTypeSingle,
 		}}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -193,7 +193,7 @@ func TestAllOrders_Success(t *testing.T) {
 				Status:            &status,
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -224,7 +224,7 @@ func TestGetOrder_Success(t *testing.T) {
 			OrderID:           &orderID,
 			Status:            &status,
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -245,12 +245,18 @@ func TestPlaceOrder_Success(t *testing.T) {
 
 		// Verify request body is correctly serialized.
 		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		var req models.OrderRequest
-		require.NoError(t, json.Unmarshal(body, &req))
+		if !assert.NoError(t, json.Unmarshal(body, &req)) {
+			return
+		}
 		assert.Equal(t, models.OrderTypeMarket, req.OrderType)
 		assert.Equal(t, models.SessionNormal, req.Session)
-		require.Len(t, req.OrderLegCollection, 1)
+		if !assert.Len(t, req.OrderLegCollection, 1) {
+			return
+		}
 		assert.Equal(t, "AAPL", req.OrderLegCollection[0].Instrument.Symbol)
 		assert.Equal(t, models.InstructionBuy, req.OrderLegCollection[0].Instruction)
 
@@ -356,9 +362,13 @@ func TestPreviewOrder_Success(t *testing.T) {
 
 		// Verify request body matches the order format.
 		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		var req models.OrderRequest
-		require.NoError(t, json.Unmarshal(body, &req))
+		if !assert.NoError(t, json.Unmarshal(body, &req)) {
+			return
+		}
 		assert.Equal(t, models.OrderTypeMarket, req.OrderType)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -375,7 +385,7 @@ func TestPreviewOrder_Success(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -388,7 +398,7 @@ func TestPreviewOrder_Success(t *testing.T) {
 	require.NotNil(t, result.CommissionAndFee.Commission)
 	require.Len(t, result.CommissionAndFee.Commission.CommissionLegs, 1)
 	require.Len(t, result.CommissionAndFee.Commission.CommissionLegs[0].CommissionValues, 1)
-	assert.Equal(t, 0.65, *result.CommissionAndFee.Commission.CommissionLegs[0].CommissionValues[0].Value)
+	assert.InDelta(t, 0.65, *result.CommissionAndFee.Commission.CommissionLegs[0].CommissionValues[0].Value, 0.001)
 }
 
 func TestReplaceOrder_Success(t *testing.T) {
@@ -399,11 +409,17 @@ func TestReplaceOrder_Success(t *testing.T) {
 
 		// Verify the replacement body is sent.
 		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		var req models.OrderRequest
-		require.NoError(t, json.Unmarshal(body, &req))
+		if !assert.NoError(t, json.Unmarshal(body, &req)) {
+			return
+		}
 		assert.Equal(t, models.OrderTypeMarket, req.OrderType)
-		require.Len(t, req.OrderLegCollection, 1)
+		if !assert.Len(t, req.OrderLegCollection, 1) {
+			return
+		}
 		assert.Equal(t, "AAPL", req.OrderLegCollection[0].Instrument.Symbol)
 
 		w.Header().Set("Location", "/trader/v1/accounts/abc123/orders/67890")
