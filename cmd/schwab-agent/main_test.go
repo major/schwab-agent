@@ -446,7 +446,6 @@ func TestIntegration_ValidToken_QuoteGet(t *testing.T) {
 
 	configPath := filepath.Join(tmpDir, "schwab-agent", "config.json")
 	tokenPath := filepath.Join(tmpDir, "schwab-agent", "token.json")
-	writeTestConfig(t, configPath)
 	writeTestToken(t, tokenPath, freshToken())
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -457,14 +456,14 @@ func TestIntegration_ValidToken_QuoteGet(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write(
 				[]byte(
-					`{"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","bidPrice":150.0,"askPrice":151.0,"lastPrice":150.5,"totalVolume":1000000}}`,
+					`{"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","quote":{"bidPrice":150.0,"askPrice":151.0,"lastPrice":150.5,"totalVolume":1000000}}}`,
 				),
 			)
 		case r.URL.Path == "/marketdata/v1/quotes" && r.URL.Query().Get("symbols") == "AAPL":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write(
 				[]byte(
-					`{"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","bidPrice":150.0,"askPrice":151.0,"lastPrice":150.5,"totalVolume":1000000}}`,
+					`{"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","quote":{"bidPrice":150.0,"askPrice":151.0,"lastPrice":150.5,"totalVolume":1000000}}}`,
 				),
 			)
 		default:
@@ -472,6 +471,12 @@ func TestIntegration_ValidToken_QuoteGet(t *testing.T) {
 		}
 	}))
 	defer server.Close()
+	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
+		ClientID:     "test-client",
+		ClientSecret: "test-secret",
+		BaseURL:      server.URL,
+		CallbackURL:  "https://127.0.0.1:8182",
+	}))
 
 	deps := commands.DefaultRootDeps()
 	deps.NewClient = func(token string, _ ...client.Option) *client.Client {
@@ -493,6 +498,8 @@ func TestIntegration_ValidToken_QuoteGet(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, stdout, `"data"`)
 	assert.Contains(t, stdout, `"AAPL"`)
+	assert.Contains(t, stdout, `"quote"`)
+	assert.Contains(t, stdout, `"lastPrice":150.5`)
 }
 
 func TestUnknownCommand_SuggestsClosestMatch(t *testing.T) {
