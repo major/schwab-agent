@@ -134,3 +134,18 @@ func TestExpirationChainForSymbolPreservesExpirationDateOutput(t *testing.T) {
 	require.Len(t, result.ExpirationList, 1)
 	assert.Equal(t, "2026-01-16", result.ExpirationList[0].ExpirationDate)
 }
+
+func TestOptionChainQueryParamsOmitsZeroValues(t *testing.T) {
+	params := optionChainQueryParams(&marketdata.OptionChainParams{Symbol: "AAPL"})
+
+	assert.Equal(t, map[string]string{"symbol": "AAPL"}, params)
+	assert.Nil(t, optionChainQueryParams(nil))
+}
+
+func TestExpirationDateUnmarshalPrefersExpirationDate(t *testing.T) {
+	var expiration ExpirationDate
+	err := json.Unmarshal([]byte(`{"expirationDate":"2026-01-16","expiration":"2026-02-20"}`), &expiration)
+
+	require.NoError(t, err)
+	assert.Equal(t, "2026-01-16", expiration.ExpirationDate)
+}

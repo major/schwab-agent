@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/major/schwab-go/schwab/marketdata"
+
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -186,4 +188,102 @@ func TestNewChainCmd(t *testing.T) {
 		require.ErrorAs(t, err, &valErr)
 		assert.Contains(t, valErr.Error(), "requires a subcommand")
 	})
+}
+
+func TestOptionChainParams(t *testing.T) {
+	t.Run("all flags", func(t *testing.T) {
+		opts := &chainGetOpts{
+			Type:                   chainContractType(marketdata.OptionChainContractTypeCall),
+			StrikeCount:            "10",
+			Strategy:               chainStrategy(marketdata.OptionChainStrategyAnalytical),
+			FromDate:               "2024-01-01",
+			ToDate:                 "2024-12-31",
+			IncludeUnderlyingQuote: true,
+			Interval:               "5.0",
+			Strike:                 "150.0",
+			StrikeRange:            strikeRange(marketdata.OptionChainRangeNearTheMoney),
+			Volatility:             "30.5",
+			UnderlyingPrice:        "148.50",
+			InterestRate:           "-1.25",
+			DaysToExpiration:       "45",
+		}
+
+		params, err := optionChainParams("AAPL", opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, "AAPL", params.Symbol)
+		assert.Equal(t, marketdata.OptionChainContractTypeCall, params.ContractType)
+		assert.Equal(t, 10, params.StrikeCount)
+		assert.True(t, params.IncludeUnderlyingQuote)
+		assert.Equal(t, marketdata.OptionChainStrategyAnalytical, params.Strategy)
+		assert.InDelta(t, 5.0, params.Interval, 0.001)
+		assert.InDelta(t, 150.0, params.Strike, 0.001)
+		assert.Equal(t, marketdata.OptionChainRangeNearTheMoney, params.Range)
+		assert.Equal(t, "2024-01-01", params.FromDate)
+		assert.Equal(t, "2024-12-31", params.ToDate)
+		assert.InDelta(t, 30.5, params.Volatility, 0.001)
+		assert.InDelta(t, 148.50, params.UnderlyingPrice, 0.001)
+		assert.InDelta(t, -1.25, params.InterestRate, 0.001)
+		assert.Equal(t, 45, params.DaysToExpiration)
+	})
+
+	t.Run("empty opts only set symbol", func(t *testing.T) {
+		params, err := optionChainParams("MSFT", &chainGetOpts{})
+		require.NoError(t, err)
+
+		assert.Equal(t, "MSFT", params.Symbol)
+		assert.Empty(t, params.ContractType)
+		assert.Zero(t, params.StrikeCount)
+		assert.Zero(t, params.Interval)
+		assert.Zero(t, params.InterestRate)
+	})
+}
+
+func TestOptionChainParamsValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		opts chainGetOpts
+	}{
+		{
+			name: "invalid strike count",
+			opts: chainGetOpts{StrikeCount: "not-a-number"},
+		},
+		{
+			name: "invalid interval",
+			opts: chainGetOpts{Interval: "not-a-number"},
+		},
+		{
+			name: "negative interval",
+			opts: chainGetOpts{Interval: "-1"},
+		},
+		{
+			name: "negative strike",
+			opts: chainGetOpts{Strike: "-1"},
+		},
+		{
+			name: "negative volatility",
+			opts: chainGetOpts{Volatility: "-1"},
+		},
+		{
+			name: "negative underlying price",
+			opts: chainGetOpts{UnderlyingPrice: "-1"},
+		},
+		{
+			name: "invalid interest rate",
+			opts: chainGetOpts{InterestRate: "not-a-number"},
+		},
+		{
+			name: "invalid days to expiration",
+			opts: chainGetOpts{DaysToExpiration: "not-a-number"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := optionChainParams("AAPL", &tt.opts)
+			require.Error(t, err)
+			var valErr *apperr.ValidationError
+			require.ErrorAs(t, err, &valErr)
+		})
+	}
 }

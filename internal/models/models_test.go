@@ -103,6 +103,134 @@ func TestPositionJSONRoundTrip(t *testing.T) {
 	assert.InDelta(t, averagePrice, *unmarshaled.AveragePrice, 0.001)
 }
 
+// TestOptionChainJSONCompatibility verifies that the local chain model keeps the
+// Schwab field names exposed by this CLI before the schwab-go request migration.
+func TestOptionChainJSONCompatibility(t *testing.T) {
+	t.Parallel()
+
+	input := []byte(`{
+		"symbol":"AAPL",
+		"status":"SUCCESS",
+		"underlyingPrice":150.25,
+		"numberOfContracts":1,
+		"callExpDateMap":{
+			"2024-01-19:30":{
+				"150.0":[{
+					"putCall":"CALL",
+					"symbol":"AAPL  240119C00150000",
+					"bid":1.20,
+					"ask":1.30,
+					"last":1.25,
+					"mark":1.25,
+					"strikePrice":150.0,
+					"expirationDate":"2024-01-19",
+					"inTheMoney":true,
+					"mini":false,
+					"nonStandard":false,
+					"pennyPilot":true
+				}]
+			}
+		}
+	}`)
+
+	var chain OptionChain
+	require.NoError(t, json.Unmarshal(input, &chain))
+
+	require.NotNil(t, chain.Symbol)
+	assert.Equal(t, "AAPL", *chain.Symbol)
+	require.NotNil(t, chain.NumberOfContracts)
+	assert.Equal(t, 1, *chain.NumberOfContracts)
+	require.NotNil(t, chain.UnderlyingPrice)
+	assert.InDelta(t, 150.25, *chain.UnderlyingPrice, 0.001)
+
+	contracts := chain.CallExpDateMap["2024-01-19:30"]["150.0"]
+	require.Len(t, contracts, 1)
+	contract := contracts[0]
+	require.NotNil(t, contract.Bid)
+	assert.InDelta(t, 1.20, *contract.Bid, 0.001)
+	require.NotNil(t, contract.Ask)
+	assert.InDelta(t, 1.30, *contract.Ask, 0.001)
+	require.NotNil(t, contract.Mark)
+	assert.InDelta(t, 1.25, *contract.Mark, 0.001)
+	require.NotNil(t, contract.InTheMoney)
+	assert.True(t, *contract.InTheMoney)
+	require.NotNil(t, contract.PennyPilot)
+	assert.True(t, *contract.PennyPilot)
+
+	encoded, err := json.Marshal(&chain)
+	require.NoError(t, err)
+	assert.Contains(t, string(encoded), `"bid":1.2`)
+	assert.Contains(t, string(encoded), `"mark":1.25`)
+	assert.Contains(t, string(encoded), `"inTheMoney":true`)
+	assert.NotContains(t, string(encoded), "bidPrice")
+}
+
+// TestOptionContractUnmarshalSchwabGoFallbackFields verifies that fixtures using
+// schwab-go v0.1.x response field names still populate the local stable fields.
+func TestOptionContractUnmarshalSchwabGoFallbackFields(t *testing.T) {
+	t.Parallel()
+
+	input := []byte(`{
+		"bidPrice":1.10,
+		"askPrice":1.20,
+		"lastPrice":1.15,
+		"markPrice":1.16,
+		"isInTheMoney":true,
+		"isMini":true,
+		"isNonStandard":true,
+		"isPennyPilot":false
+	}`)
+
+	var contract OptionContract
+	require.NoError(t, json.Unmarshal(input, &contract))
+
+	require.NotNil(t, contract.Bid)
+	assert.InDelta(t, 1.10, *contract.Bid, 0.001)
+	require.NotNil(t, contract.Ask)
+	assert.InDelta(t, 1.20, *contract.Ask, 0.001)
+	require.NotNil(t, contract.Last)
+	assert.InDelta(t, 1.15, *contract.Last, 0.001)
+	require.NotNil(t, contract.Mark)
+	assert.InDelta(t, 1.16, *contract.Mark, 0.001)
+	require.NotNil(t, contract.InTheMoney)
+	assert.True(t, *contract.InTheMoney)
+	require.NotNil(t, contract.Mini)
+	assert.True(t, *contract.Mini)
+	require.NotNil(t, contract.NonStandard)
+	assert.True(t, *contract.NonStandard)
+	require.NotNil(t, contract.PennyPilot)
+	assert.False(t, *contract.PennyPilot)
+}
+
+// TestOptionContractUnmarshalPrefersLiveFields verifies that observed Schwab
+// fields win when both the local and schwab-go field names are present.
+func TestOptionContractUnmarshalPrefersLiveFields(t *testing.T) {
+	t.Parallel()
+
+	input := []byte(`{
+		"bid":1.10,
+		"bidPrice":9.99,
+		"ask":1.20,
+		"askPrice":9.99,
+		"inTheMoney":false,
+		"isInTheMoney":true,
+		"pennyPilot":true,
+		"isPennyPilot":false
+	}`)
+
+	var contract OptionContract
+	require.NoError(t, json.Unmarshal(input, &contract))
+
+	require.NotNil(t, contract.Bid)
+	assert.InDelta(t, 1.10, *contract.Bid, 0.001)
+	require.NotNil(t, contract.Ask)
+	assert.InDelta(t, 1.20, *contract.Ask, 0.001)
+	require.NotNil(t, contract.InTheMoney)
+	assert.False(t, *contract.InTheMoney)
+	require.NotNil(t, contract.PennyPilot)
+	assert.True(t, *contract.PennyPilot)
+}
+
 // --- SchwabTime tests ---
 
 // TestSchwabTimeUnmarshalJSON verifies that SchwabTime handles both RFC3339
