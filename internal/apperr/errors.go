@@ -21,6 +21,18 @@ type SchwabError struct {
 	details string
 }
 
+// NewSchwabError creates a new SchwabError wrapping the given cause.
+func NewSchwabError(message string, cause error, opts ...ErrorOption) *SchwabError {
+	e := &SchwabError{
+		Message: message,
+		Cause:   cause,
+	}
+	for _, o := range opts {
+		o(e)
+	}
+	return e
+}
+
 // Details returns the human-readable hint or remediation message, if any.
 func (e *SchwabError) Details() string {
 	return e.details
@@ -260,18 +272,6 @@ func NewOrderBuildError(message string, cause error, opts ...ErrorOption) *Order
 // ExitCode returns the process exit code for this error type.
 func (e *OrderBuildError) ExitCode() int {
 	return 1
-}
-
-// NewSchwabError creates a new SchwabError wrapping the given cause.
-func NewSchwabError(message string, cause error, opts ...ErrorOption) *SchwabError {
-	e := &SchwabError{
-		Message: message,
-		Cause:   cause,
-	}
-	for _, o := range opts {
-		o(e)
-	}
-	return e
 }
 
 // exitCoder is an interface for types that can provide an exit code.
