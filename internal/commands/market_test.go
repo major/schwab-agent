@@ -20,12 +20,16 @@ import (
 
 // testClientWithMarketData creates a *client.Ref with both the internal client
 // and a schwab-go marketdata.Client pointing at the given httptest server.
+// Use this for market commands that are backed by schwab-go.
 func testClientWithMarketData(t *testing.T, server *httptest.Server) *client.Ref {
 	t.Helper()
 	ref := testClient(t, server)
 	ref.MarketData = marketdata.NewClient(
 		schwab.WithToken("test-token"),
-		schwab.WithBaseURL(server.URL),
+		// Production root wiring configures schwab-go with the marketdata base
+		// path already included, so mirror that here instead of testing a
+		// package-internal route relative to the httptest root.
+		schwab.WithBaseURL(server.URL+"/marketdata/v1"),
 	)
 	return ref
 }
@@ -34,7 +38,7 @@ func TestNewMarketCmd_Hours_AllMarkets(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/markets", r.URL.Path)
+		assert.Equal(t, "/marketdata/v1/markets", r.URL.Path)
 		// The API requires a "markets" query param; our command sends all by default.
 		assert.NotEmpty(t, r.URL.Query().Get("markets"))
 
@@ -51,9 +55,22 @@ func TestNewMarketCmd_Hours_AllMarkets(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	var envelope output.Envelope
+	var envelope testEnvelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
-	assert.NotNil(t, envelope.Data)
+	assert.JSONEq(t, `{
+		"equity": {
+			"EQ": {
+				"date": "2024-01-15",
+				"marketType": "EQUITY",
+				"exchange": "",
+				"category": "",
+				"product": "",
+				"productName": "",
+				"isOpen": true,
+				"sessionHours": null
+			}
+		}
+	}`, string(envelope.Data))
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
@@ -61,7 +78,7 @@ func TestNewMarketCmd_Hours_SpecificMarket(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/markets/equity", r.URL.Path)
+		assert.Equal(t, "/marketdata/v1/markets/equity", r.URL.Path)
 
 		w.Header().Set("Content-Type", "application/json")
 		// Single-market endpoint returns the same doubly-nested structure.
@@ -76,9 +93,22 @@ func TestNewMarketCmd_Hours_SpecificMarket(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	var envelope output.Envelope
+	var envelope testEnvelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
-	assert.NotNil(t, envelope.Data)
+	assert.JSONEq(t, `{
+		"equity": {
+			"EQ": {
+				"date": "2024-01-15",
+				"marketType": "EQUITY",
+				"exchange": "",
+				"category": "",
+				"product": "",
+				"productName": "",
+				"isOpen": true,
+				"sessionHours": null
+			}
+		}
+	}`, string(envelope.Data))
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
@@ -97,6 +127,9 @@ func TestNewMarketCmd_Hours_APIError(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
 }
 
 func TestNewMarketCmd_Hours_SpecificMarketAPIError(t *testing.T) {
@@ -114,6 +147,9 @@ func TestNewMarketCmd_Hours_SpecificMarketAPIError(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
 }
 
 func TestNewMarketCmd_Movers_Success(t *testing.T) {
