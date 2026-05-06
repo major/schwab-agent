@@ -80,7 +80,7 @@ func (cfg *Config) TLSConfig() *tls.Config {
 		return nil
 	}
 	return &tls.Config{
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: true, //nolint:gosec // base_url_insecure is an explicit opt-in for local self-signed proxies.
 	}
 }
 
@@ -208,6 +208,7 @@ func SaveConfig(configPath string, cfg *Config) error {
 	}
 
 	// Marshal config to JSON
+	//nolint:gosec // G117: config files intentionally store client_secret with 0600 permissions.
 	data, err := json.MarshalIndent(
 		cfg,
 		"",

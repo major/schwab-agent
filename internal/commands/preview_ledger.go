@@ -89,6 +89,7 @@ func saveOrderPreview(
 	// MkdirAll only applies the requested mode when it creates a directory.
 	// Tighten existing directories too, because preview files contain exact order
 	// payloads and the command help promises private ledger storage.
+	//nolint:gosec // G302: directories need execute bits; 0700 keeps the ledger private.
 	if err := os.Chmod(
 		ledgerDir,
 		0o700,
