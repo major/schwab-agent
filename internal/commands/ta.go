@@ -1069,7 +1069,14 @@ slow=26, signal=9.`,
 func buildMACDOutput(ctx context.Context, c *client.Ref, opts *macdOpts, symbol string) (macdOutput, error) {
 	// MACD layers slow EMA + signal EMA; 2x the combined period provides convergence.
 	interval := string(opts.Interval)
-	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, (opts.Slow+opts.Signal)*2, indicatorNameMACD)
+	candles, timestamps, err := fetchAndValidateCandles(
+		ctx,
+		c,
+		symbol,
+		interval,
+		(opts.Slow+opts.Signal)*2,
+		indicatorNameMACD,
+	)
 	if err != nil {
 		return macdOutput{}, err
 	}

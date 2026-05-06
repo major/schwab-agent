@@ -145,7 +145,11 @@ func buildOptionTicket(
 		return nil, newValidationError("strike must be greater than zero")
 	}
 
-	quote, err := c.Quote(ctx, symbol, client.QuoteParams{Fields: []string{quoteFieldQuote, quoteFieldFundamental, quoteFieldReference}})
+	quote, err := c.Quote(
+		ctx,
+		symbol,
+		client.QuoteParams{Fields: []string{quoteFieldQuote, quoteFieldFundamental, quoteFieldReference}},
+	)
 	if err != nil {
 		return nil, err
 	}

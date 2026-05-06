@@ -332,7 +332,13 @@ contract at a different strike. Combines elements of vertical and calendar sprea
 		"Build a butterfly spread order request",
 		func() *butterflyBuildOpts { return &butterflyBuildOpts{} },
 		func(cmd *cobra.Command, opts *butterflyBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{flagCall, flagPut}, []string{flagBuy, flagSell}, []string{flagOpen, flagClose})
+			defineAndConstrain(
+				cmd,
+				opts,
+				[]string{flagCall, flagPut},
+				[]string{flagBuy, flagSell},
+				[]string{flagOpen, flagClose},
+			)
 		},
 		parseButterflyParams,
 		orderbuilder.ValidateButterflyOrder,
@@ -349,7 +355,13 @@ butterfly with long wings and two short body contracts.`
 		"Build a condor spread order request",
 		func() *condorBuildOpts { return &condorBuildOpts{} },
 		func(cmd *cobra.Command, opts *condorBuildOpts) {
-			defineAndConstrain(cmd, opts, []string{flagCall, flagPut}, []string{flagBuy, flagSell}, []string{flagOpen, flagClose})
+			defineAndConstrain(
+				cmd,
+				opts,
+				[]string{flagCall, flagPut},
+				[]string{flagBuy, flagSell},
+				[]string{flagOpen, flagClose},
+			)
 		},
 		parseCondorParams,
 		orderbuilder.ValidateCondorOrder,
