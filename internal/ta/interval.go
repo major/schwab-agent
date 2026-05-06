@@ -140,19 +140,27 @@ func IntervalToHistoryParams(
 	case interval1Min:
 		days := max(1, ceilDiv(requiredCandles, regularSessionMinutesPerDay))
 		days = nextValidPeriod(days, validDayPeriods())
-		return historyPeriodTypeDay, strconv.Itoa(days), historyFrequencyTypeMinute, strconv.Itoa(minutesPer1MinInterval), nil
+		period := strconv.Itoa(days)
+		frequency := strconv.Itoa(minutesPer1MinInterval)
+		return historyPeriodTypeDay, period, historyFrequencyTypeMinute, frequency, nil
 	case interval5Min:
 		days := max(1, ceilDiv(requiredCandles, regularSessionMinutesPerDay/minutesPer5MinInterval))
 		days = nextValidPeriod(days, validDayPeriods())
-		return historyPeriodTypeDay, strconv.Itoa(days), historyFrequencyTypeMinute, strconv.Itoa(minutesPer5MinInterval), nil
+		period := strconv.Itoa(days)
+		frequency := strconv.Itoa(minutesPer5MinInterval)
+		return historyPeriodTypeDay, period, historyFrequencyTypeMinute, frequency, nil
 	case interval15Min:
 		days := max(1, ceilDiv(requiredCandles, regularSessionMinutesPerDay/minutesPer15MinInterval))
 		days = nextValidPeriod(days, validDayPeriods())
-		return historyPeriodTypeDay, strconv.Itoa(days), historyFrequencyTypeMinute, strconv.Itoa(minutesPer15MinInterval), nil
+		period := strconv.Itoa(days)
+		frequency := strconv.Itoa(minutesPer15MinInterval)
+		return historyPeriodTypeDay, period, historyFrequencyTypeMinute, frequency, nil
 	case interval30Min:
 		days := max(1, ceilDiv(requiredCandles, regularSessionMinutesPerDay/minutesPer30MinInterval))
 		days = nextValidPeriod(days, validDayPeriods())
-		return historyPeriodTypeDay, strconv.Itoa(days), historyFrequencyTypeMinute, strconv.Itoa(minutesPer30MinInterval), nil
+		period := strconv.Itoa(days)
+		frequency := strconv.Itoa(minutesPer30MinInterval)
+		return historyPeriodTypeDay, period, historyFrequencyTypeMinute, frequency, nil
 	default:
 		return "", "", "", "", apperr.NewValidationError(
 			"unsupported interval: "+interval,

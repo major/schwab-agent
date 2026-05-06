@@ -1154,7 +1154,14 @@ data with Wilder smoothing. Default period is 14.`,
 func buildATROutput(ctx context.Context, c *client.Ref, opts *atrOpts, symbol string) (taOutput, error) {
 	// ATR uses Wilder smoothing; 3x period provides convergence stability.
 	interval := string(opts.Interval)
-	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.Period*atrConvergenceMultiplier, "atr")
+	candles, timestamps, err := fetchAndValidateCandles(
+		ctx,
+		c,
+		symbol,
+		interval,
+		opts.Period*atrConvergenceMultiplier,
+		"atr",
+	)
 	if err != nil {
 		return taOutput{}, err
 	}
@@ -1329,7 +1336,14 @@ plus_di, and minus_di for directional bias. Default period is 14.`,
 func buildADXOutput(ctx context.Context, c *client.Ref, opts *adxOpts, symbol string) (adxOutput, error) {
 	// ADX double-smooths (DI pass + ADX pass); 4x period ensures both converge.
 	interval := string(opts.Interval)
-	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.Period*adxConvergenceMultiplier, "adx")
+	candles, timestamps, err := fetchAndValidateCandles(
+		ctx,
+		c,
+		symbol,
+		interval,
+		opts.Period*adxConvergenceMultiplier,
+		"adx",
+	)
 	if err != nil {
 		return adxOutput{}, err
 	}
