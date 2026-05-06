@@ -15,7 +15,6 @@ import (
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
-	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 	"github.com/major/schwab-agent/internal/ta"
 )
@@ -1513,13 +1512,14 @@ func buildExpectedMoveOutput(
 ) (expectedMoveOutput, error) {
 	// Expected Move needs the underlying quote and near-the-money contracts in one response.
 	// Keep this to a single chain call so the underlying snapshot and option prices stay aligned.
-	chain, err := c.OptionChain(ctx, symbol, &client.ChainParams{
-		ContractType:           "ALL",
-		IncludeUnderlyingQuote: annotationValueTrue,
-		StrikeRange:            "NTM",
+	chain, err := c.MarketData.GetOptionChain(ctx, &marketdata.OptionChainParams{
+		Symbol:                 symbol,
+		ContractType:           marketdata.OptionChainContractTypeAll,
+		IncludeUnderlyingQuote: true,
+		Range:                  marketdata.OptionChainRangeNearTheMoney,
 	})
 	if err != nil {
-		return expectedMoveOutput{}, err
+		return expectedMoveOutput{}, mapSchwabGoError(err)
 	}
 
 	if chain.Underlying == nil {
@@ -1589,20 +1589,20 @@ func buildExpectedMoveOutput(
 	}, nil
 }
 
-func expectedMoveUnderlyingPrice(chain *models.OptionChain, symbol string) (float64, error) {
+func expectedMoveUnderlyingPrice(chain *marketdata.OptionChain, symbol string) (float64, error) {
 	switch {
-	case chain.Underlying.Mark != nil:
-		return *chain.Underlying.Mark, nil
-	case chain.Underlying.Last != nil:
-		return *chain.Underlying.Last, nil
-	case chain.UnderlyingPrice != nil:
-		return *chain.UnderlyingPrice, nil
+	case chain.Underlying.Mark > 0:
+		return chain.Underlying.Mark, nil
+	case chain.Underlying.Last > 0:
+		return chain.Underlying.Last, nil
+	case chain.UnderlyingPrice > 0:
+		return chain.UnderlyingPrice, nil
 	default:
 		return 0, fmt.Errorf("unable to determine underlying price for %s", symbol)
 	}
 }
 
-func expectedMoveExpiration(chain *models.OptionChain, symbol string, targetDTE int) (string, error) {
+func expectedMoveExpiration(chain *marketdata.OptionChain, symbol string, targetDTE int) (string, error) {
 	if len(chain.CallExpDateMap) == 0 {
 		return "", fmt.Errorf("no options available for %s", symbol)
 	}
@@ -1633,7 +1633,7 @@ func expectedMoveExpiration(chain *models.OptionChain, symbol string, targetDTE 
 	return selectedExpKey, nil
 }
 
-func expectedMoveATMStrike(callStrikes map[string][]*models.OptionContract, underlyingPrice float64) string {
+func expectedMoveATMStrike(callStrikes map[string][]marketdata.OptionContract, underlyingPrice float64) string {
 	atmStrikeKey := ""
 	bestStrikeDiff := -1.0
 	for strikeKey := range callStrikes {
@@ -1653,12 +1653,14 @@ func expectedMoveATMStrike(callStrikes map[string][]*models.OptionContract, unde
 	return atmStrikeKey
 }
 
-func contractPrice(contract *models.OptionContract, symbol, strike, putCall string) (float64, error) {
-	if contract.Mark != nil {
-		return *contract.Mark, nil
+func contractPrice(contract marketdata.OptionContract, symbol, strike, putCall string) (float64, error) {
+	// schwab-go models option prices as values, so an omitted mark decodes to 0.
+	// Fall back to the midpoint when mark is absent/zero to preserve the old pointer-based behavior.
+	if contract.MarkPrice > 0 {
+		return contract.MarkPrice, nil
 	}
-	if contract.Bid != nil && contract.Ask != nil {
-		return (*contract.Bid + *contract.Ask) / quoteMidpointDivisor, nil
+	if contract.BidPrice > 0 && contract.AskPrice > 0 {
+		return (contract.BidPrice + contract.AskPrice) / quoteMidpointDivisor, nil
 	}
 
 	return 0, fmt.Errorf("unable to determine %s price for %s at strike %s", putCall, symbol, strike)

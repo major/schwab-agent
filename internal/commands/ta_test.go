@@ -130,16 +130,16 @@ func mockOptionChainJSON(symbol string) string {
 		"underlyingPrice": 150.0,
 		"callExpDateMap": {
 			"2025-06-20:30": {
-				"148.0": [{"mark": 7.0, "bid": 6.9, "ask": 7.1, "strikePrice": 148.0, "daysToExpiration": 30, "inTheMoney": true}],
-				"150.0": [{"mark": 5.0, "bid": 4.9, "ask": 5.1, "strikePrice": 150.0, "daysToExpiration": 30, "inTheMoney": false}],
-				"152.0": [{"mark": 3.0, "bid": 2.9, "ask": 3.1, "strikePrice": 152.0, "daysToExpiration": 30, "inTheMoney": false}]
+				"148.0": [{"markPrice": 7.0, "bidPrice": 6.9, "askPrice": 7.1, "strikePrice": 148.0, "daysToExpiration": 30, "inTheMoney": true}],
+				"150.0": [{"markPrice": 5.0, "bidPrice": 4.9, "askPrice": 5.1, "strikePrice": 150.0, "daysToExpiration": 30, "inTheMoney": false}],
+				"152.0": [{"markPrice": 3.0, "bidPrice": 2.9, "askPrice": 3.1, "strikePrice": 152.0, "daysToExpiration": 30, "inTheMoney": false}]
 			}
 		},
 		"putExpDateMap": {
 			"2025-06-20:30": {
-				"148.0": [{"mark": 2.5, "bid": 2.4, "ask": 2.6, "strikePrice": 148.0, "daysToExpiration": 30, "inTheMoney": false}],
-				"150.0": [{"mark": 4.5, "bid": 4.4, "ask": 4.6, "strikePrice": 150.0, "daysToExpiration": 30, "inTheMoney": false}],
-				"152.0": [{"mark": 6.5, "bid": 6.4, "ask": 6.6, "strikePrice": 152.0, "daysToExpiration": 30, "inTheMoney": true}]
+				"148.0": [{"markPrice": 2.5, "bidPrice": 2.4, "askPrice": 2.6, "strikePrice": 148.0, "daysToExpiration": 30, "inTheMoney": false}],
+				"150.0": [{"markPrice": 4.5, "bidPrice": 4.4, "askPrice": 4.6, "strikePrice": 150.0, "daysToExpiration": 30, "inTheMoney": false}],
+				"152.0": [{"markPrice": 6.5, "bidPrice": 6.4, "askPrice": 6.6, "strikePrice": 152.0, "daysToExpiration": 30, "inTheMoney": true}]
 			}
 		}
 	}`, symbol)
@@ -153,18 +153,18 @@ func mockOptionChainTwoDTEJSON(symbol string) string {
 		"underlyingPrice": 150.0,
 		"callExpDateMap": {
 			"2025-06-20:30": {
-				"150.0": [{"mark": 5.0, "bid": 4.9, "ask": 5.1, "strikePrice": 150.0, "daysToExpiration": 30}]
+				"150.0": [{"markPrice": 5.0, "bidPrice": 4.9, "askPrice": 5.1, "strikePrice": 150.0, "daysToExpiration": 30}]
 			},
 			"2025-07-18:60": {
-				"150.0": [{"mark": 7.0, "bid": 6.9, "ask": 7.1, "strikePrice": 150.0, "daysToExpiration": 60}]
+				"150.0": [{"markPrice": 7.0, "bidPrice": 6.9, "askPrice": 7.1, "strikePrice": 150.0, "daysToExpiration": 60}]
 			}
 		},
 		"putExpDateMap": {
 			"2025-06-20:30": {
-				"150.0": [{"mark": 4.5, "bid": 4.4, "ask": 4.6, "strikePrice": 150.0, "daysToExpiration": 30}]
+				"150.0": [{"markPrice": 4.5, "bidPrice": 4.4, "askPrice": 4.6, "strikePrice": 150.0, "daysToExpiration": 30}]
 			},
 			"2025-07-18:60": {
-				"150.0": [{"mark": 6.5, "bid": 6.4, "ask": 6.6, "strikePrice": 150.0, "daysToExpiration": 60}]
+				"150.0": [{"markPrice": 6.5, "bidPrice": 6.4, "askPrice": 6.6, "strikePrice": 150.0, "daysToExpiration": 60}]
 			}
 		}
 	}`, symbol)
@@ -178,12 +178,12 @@ func mockOptionChainNilMarkJSON(symbol string) string {
 		"underlyingPrice": 150.0,
 		"callExpDateMap": {
 			"2025-06-20:30": {
-				"150.0": [{"bid": 4.9, "ask": 5.1, "strikePrice": 150.0, "daysToExpiration": 30}]
+				"150.0": [{"bidPrice": 4.9, "askPrice": 5.1, "strikePrice": 150.0, "daysToExpiration": 30}]
 			}
 		},
 		"putExpDateMap": {
 			"2025-06-20:30": {
-				"150.0": [{"bid": 4.4, "ask": 4.6, "strikePrice": 150.0, "daysToExpiration": 30}]
+				"150.0": [{"bidPrice": 4.4, "askPrice": 4.6, "strikePrice": 150.0, "daysToExpiration": 30}]
 			}
 		}
 	}`, symbol)
@@ -205,6 +205,11 @@ func optionChainHandler(t *testing.T, body string) http.Handler {
 	t.Helper()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Contains(t, r.URL.Path, "/marketdata/v1/chains")
+		query := r.URL.Query()
+		assert.Equal(t, "AAPL", query.Get("symbol"))
+		assert.Equal(t, "ALL", query.Get("contractType"))
+		assert.Equal(t, "true", query.Get("includeUnderlyingQuote"))
+		assert.Equal(t, "NTM", query.Get("range"))
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(body))
 	})
