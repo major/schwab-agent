@@ -63,18 +63,6 @@ type AccountsInstrument struct {
 
 // MarginBalance represents margin account balance information.
 type MarginBalance struct {
-	marginBalanceFields
-}
-
-// MarginInitialBalance represents initial balance for margin accounts.
-type MarginInitialBalance struct {
-	marginBalanceFields
-}
-
-// marginBalanceFields holds the fields Schwab returns for both current and
-// initial margin balances. Anonymous embedding keeps every JSON field and
-// promoted Go field name unchanged while avoiding two copies of the same schema.
-type marginBalanceFields struct {
 	ClosingTradesPL                  *float64 `json:"closingTradesPL,omitempty"`
 	FutureOptionBuyingPower          *float64 `json:"futureOptionBuyingPower,omitempty"`
 	NetLiquidatingValue              *float64 `json:"netLiquidatingValue,omitempty"`
@@ -117,6 +105,11 @@ type marginBalanceFields struct {
 	MarginBalance                    *float64 `json:"marginBalance,omitempty"`
 	CashDebitCallValue               *float64 `json:"cashDebitCallValue,omitempty"`
 }
+
+// MarginInitialBalance represents initial balance for margin accounts. Schwab
+// returns the same field set for current and initial margin balances, so keep a
+// distinct named type without duplicating the schema body.
+type MarginInitialBalance MarginBalance
 
 // CashBalance represents cash account balance information.
 type CashBalance struct {
