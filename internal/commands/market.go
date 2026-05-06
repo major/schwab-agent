@@ -2,11 +2,14 @@ package commands
 
 import (
 	"io"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
+	"github.com/major/schwab-go/schwab/marketdata"
+
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
-	"github.com/major/schwab-agent/internal/models"
 	"github.com/major/schwab-agent/internal/output"
 )
 
@@ -18,7 +21,7 @@ func allMarkets() []string {
 
 // moversData wraps the movers response.
 type moversData struct {
-	Movers *models.ScreenerResponse `json:"movers"`
+	Movers *marketdata.MoverResponse `json:"movers"`
 }
 
 // marketMoversOpts holds the options for the market movers subcommand.
@@ -107,14 +110,24 @@ names (e.g. '$SPX').`,
 				return err
 			}
 
-			params := client.MoversParams{
-				Sort:      string(opts.Sort),
-				Frequency: string(opts.Frequency),
+			sort := marketdata.MoverSort(string(opts.Sort))
+
+			// schwab-go accepts *int for frequency: nil omits it from the
+			// query string, non-nil sends the value (including 0).
+			var freq *int
+			if cmd.Flags().Changed("frequency") {
+				f, err := strconv.Atoi(string(opts.Frequency))
+				if err != nil {
+					return apperr.NewValidationError(
+						"invalid frequency: "+string(opts.Frequency), err,
+					)
+				}
+				freq = &f
 			}
 
-			result, err := c.Movers(cmd.Context(), index, params)
+			result, err := c.MarketData.GetMovers(cmd.Context(), index, sort, freq)
 			if err != nil {
-				return err
+				return mapSchwabGoError(err)
 			}
 
 			return output.WriteSuccess(w, moversData{Movers: result}, output.NewMetadata())

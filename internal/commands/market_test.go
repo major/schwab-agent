@@ -10,9 +10,26 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	schwab "github.com/major/schwab-go/schwab"
+	"github.com/major/schwab-go/schwab/marketdata"
+
 	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/output"
 )
+
+// testClientWithMarketData creates a *client.Ref with both the internal client
+// and a schwab-go marketdata.Client pointing at the given httptest server.
+// Use this for movers tests; hours tests use testClient.
+func testClientWithMarketData(t *testing.T, server *httptest.Server) *client.Ref {
+	t.Helper()
+	ref := testClient(t, server)
+	ref.MarketData = marketdata.NewClient(
+		schwab.WithToken("test-token"),
+		schwab.WithBaseURL(server.URL),
+	)
+	return ref
+}
 
 func TestNewMarketCmd_Hours_AllMarkets(t *testing.T) {
 	// Arrange
@@ -104,16 +121,21 @@ func TestNewMarketCmd_Movers_Success(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Contains(t, r.URL.Path, "/marketdata/v1/movers/")
+		assert.Contains(t, r.URL.Path, "/movers/")
 
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"screeners":[{"description":"AAPL","totalVolume":1000000}]}`))
+		// schwab-go MoverResponse shape: screeners array with full Screener fields.
+		resp := `{"screeners":[{"symbol":"AAPL","description":"Apple Inc",` +
+			`"direction":"up","last":150.0,"change":2.5,` +
+			`"netPercentChange":1.69,"marketShare":0.05,` +
+			`"totalVolume":1000000,"trades":5000}]}`
+		_, _ = w.Write([]byte(resp))
 	}))
 	defer srv.Close()
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "movers", "$SPX")
 
 	// Assert
@@ -138,7 +160,7 @@ func TestNewMarketCmd_Movers_WithFlags(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd,
 		"movers",
 		"--sort", "VOLUME",
@@ -154,13 +176,13 @@ func TestNewMarketCmd_Movers_WithFlags(t *testing.T) {
 }
 
 func TestNewMarketCmd_Movers_MissingIndex(t *testing.T) {
-	// Arrange
+	// Arrange - requireArg fires before the API call, so the server is never hit.
 	server := jsonServer(`{}`)
 	defer server.Close()
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClient(t, server), &buf)
+	cmd := NewMarketCmd(testClientWithMarketData(t, server), &buf)
 	_, err := runTestCommand(t, cmd, "movers")
 
 	// Assert
@@ -179,11 +201,35 @@ func TestNewMarketCmd_Movers_APIError(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "movers", "$SPX")
 
 	// Assert
 	require.Error(t, err)
+}
+
+func TestNewMarketCmd_Movers_FrequencyZero(t *testing.T) {
+	// Arrange - verify that --frequency 0 sends frequency=0 in the query string
+	// rather than being omitted. schwab-go uses *int so nil omits and non-nil sends.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		assert.Equal(t, "0", q.Get("frequency"))
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"screeners":[]}`))
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "movers", "--frequency", "0", "$SPX")
+
+	// Assert
+	require.NoError(t, err)
+	var envelope output.Envelope
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+	assert.NotNil(t, envelope.Data)
 }
 
 func TestNewMarketCmd_NoSubcommand(t *testing.T) {
