@@ -20,6 +20,14 @@ type RootDeps struct {
 	TokenRefreshEndpoint func(*auth.Config) string
 }
 
+type rootAuthConfig struct {
+	DefaultConfigPath string
+	DefaultTokenPath  string
+	Version           string
+	Deps              RootDeps
+	Ref               *client.Ref
+}
+
 // DefaultRootDeps returns the production dependency set for root auth setup.
 func DefaultRootDeps() RootDeps {
 	return RootDeps{
@@ -49,88 +57,13 @@ func NewRootCmd(
 		SilenceErrors:              true,
 		SilenceUsage:               true,
 		SuggestionsMinimumDistance: 2,
-		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			if hasSkipAuthAnnotation(cmd) {
-				return nil
-			}
-
-			verbose, err := cmd.Flags().GetBool("verbose")
-			if err != nil {
-				return err
-			}
-			if verbose {
-				logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
-				slog.SetDefault(logger)
-			}
-
-			resolvedConfigPath, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			if resolvedConfigPath == "" {
-				resolvedConfigPath = defaultConfigPath
-			}
-
-			resolvedTokenPath, err := cmd.Flags().GetString("token")
-			if err != nil {
-				return err
-			}
-			if resolvedTokenPath == "" {
-				resolvedTokenPath = defaultTokenPath
-			}
-
-			cfg, err := auth.LoadConfig(resolvedConfigPath)
-			if err != nil {
-				// Preserve main.go's distinction between missing credentials and
-				// other config validation failures so exit codes stay compatible.
-				if !errors.Is(err, auth.ErrMissingCredentials) {
-					return err
-				}
-
-				return apperr.NewAuthRequiredError(
-					"Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file",
-					err,
-					apperr.WithDetails("Run `schwab-agent auth login` to authenticate"),
-				)
-			}
-
-			token, err := auth.LoadToken(resolvedTokenPath)
-			if err != nil {
-				return apperr.NewAuthRequiredError(
-					"No authentication token found",
-					err,
-					apperr.WithDetails("Run `schwab-agent auth login` to authenticate"),
-				)
-			}
-
-			if auth.IsRefreshTokenStale(token) {
-				return apperr.NewAuthExpiredError(
-					"refresh token expired",
-					nil,
-					apperr.WithDetails("Run `schwab-agent auth login` to re-authenticate"),
-				)
-			}
-
-			if auth.IsAccessTokenExpired(token) {
-				refreshed, err := auth.RefreshAccessToken(cfg, token, deps.TokenRefreshEndpoint(cfg))
-				if err != nil {
-					return fmt.Errorf("refreshing access token: %w", err)
-				}
-				if err := auth.SaveToken(resolvedTokenPath, refreshed); err != nil {
-					return fmt.Errorf("saving refreshed token to %s: %w", resolvedTokenPath, err)
-				}
-				token = refreshed
-			}
-
-			clientOptions := []client.Option{
-				client.WithUserAgent("schwab-agent/" + version),
-				client.WithBaseURL(cfg.APIBaseURL()),
-				client.WithTLSConfig(cfg.TLSConfig()),
-			}
-
-			ref.Client = deps.NewClient(token.Token.AccessToken, clientOptions...)
-			return nil
-		},
+		PersistentPreRunE: rootAuthConfig{
+			DefaultConfigPath: defaultConfigPath,
+			DefaultTokenPath:  defaultTokenPath,
+			Version:           version,
+			Deps:              deps,
+			Ref:               ref,
+		}.preRun,
 		PersistentPostRunE: func(_ *cobra.Command, _ []string) error {
 			if ref.Client != nil {
 				ref.Close()
@@ -154,6 +87,117 @@ func NewRootCmd(
 	)
 
 	return root
+}
+
+func (cfg rootAuthConfig) preRun(cmd *cobra.Command, _ []string) error {
+	if hasSkipAuthAnnotation(cmd) {
+		return nil
+	}
+
+	if err := enableVerboseLogging(cmd); err != nil {
+		return err
+	}
+
+	resolvedConfigPath, resolvedTokenPath, err := cfg.authPaths(cmd)
+	if err != nil {
+		return err
+	}
+
+	authConfig, token, err := loadAuthFiles(resolvedConfigPath, resolvedTokenPath)
+	if err != nil {
+		return err
+	}
+
+	if auth.IsRefreshTokenStale(token) {
+		return apperr.NewAuthExpiredError(
+			"refresh token expired",
+			nil,
+			apperr.WithDetails("Run `schwab-agent auth login` to re-authenticate"),
+		)
+	}
+
+	if auth.IsAccessTokenExpired(token) {
+		refreshed, err := auth.RefreshAccessToken(authConfig, token, cfg.Deps.TokenRefreshEndpoint(authConfig))
+		if err != nil {
+			return fmt.Errorf("refreshing access token: %w", err)
+		}
+		if err := auth.SaveToken(resolvedTokenPath, refreshed); err != nil {
+			return fmt.Errorf("saving refreshed token to %s: %w", resolvedTokenPath, err)
+		}
+		token = refreshed
+	}
+
+	cfg.Ref.Client = cfg.Deps.NewClient(token.Token.AccessToken, rootClientOptions(authConfig, cfg.Version)...)
+	return nil
+}
+
+func enableVerboseLogging(cmd *cobra.Command) error {
+	verbose, err := cmd.Flags().GetBool("verbose")
+	if err != nil {
+		return err
+	}
+	if verbose {
+		logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
+		slog.SetDefault(logger)
+	}
+
+	return nil
+}
+
+func (cfg rootAuthConfig) authPaths(cmd *cobra.Command) (string, string, error) {
+	configPath, err := cmd.Flags().GetString("config")
+	if err != nil {
+		return "", "", err
+	}
+	if configPath == "" {
+		configPath = cfg.DefaultConfigPath
+	}
+
+	tokenPath, err := cmd.Flags().GetString("token")
+	if err != nil {
+		return "", "", err
+	}
+	if tokenPath == "" {
+		tokenPath = cfg.DefaultTokenPath
+	}
+
+	return configPath, tokenPath, nil
+}
+
+func loadAuthFiles(configPath, tokenPath string) (*auth.Config, *auth.TokenFile, error) {
+	cfg, err := auth.LoadConfig(configPath)
+	if err != nil {
+		// Preserve main.go's distinction between missing credentials and other config
+		// validation failures so exit codes stay compatible.
+		if !errors.Is(err, auth.ErrMissingCredentials) {
+			return nil, nil, err
+		}
+
+		return nil, nil, apperr.NewAuthRequiredError(
+			"Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file",
+			err,
+			apperr.WithDetails("Run `schwab-agent auth login` to authenticate"),
+		)
+	}
+
+	token, err := auth.LoadToken(tokenPath)
+	if err != nil {
+		return nil, nil, apperr.NewAuthRequiredError(
+			"No authentication token found",
+			err,
+			apperr.WithDetails("Run `schwab-agent auth login` to authenticate"),
+		)
+	}
+
+	return cfg, token, nil
+}
+
+func rootClientOptions(cfg *auth.Config, version string) []client.Option {
+	return []client.Option{
+		client.WithUserAgent("schwab-agent/" + version),
+		client.WithBaseURL(cfg.APIBaseURL()),
+		client.WithTLSConfig(cfg.TLSConfig()),
+	}
 }
 
 // completeRootDeps fills omitted dependencies with production defaults.

@@ -84,6 +84,14 @@ option, bracket, OCO, and multi-leg option strategies.`,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
+	cmd.AddCommand(orderBuildCoreCommands(w)...)
+	cmd.AddCommand(orderBuildStrategyCommands(w)...)
+	cmd.AddCommand(newBuildFTSCmd(w))
+
+	return cmd
+}
+
+func orderBuildCoreCommands(w io.Writer) []*cobra.Command {
 	equityBuild := makeCobraBuildOrderCommand(
 		w,
 		"equity",
@@ -151,6 +159,20 @@ one exit fills, the other is canceled. At least one of --take-profit or
 	ocoBuild.Example = `  schwab-agent order build oco --symbol AAPL --action SELL --quantity 100 --take-profit 160 --stop-loss 140
   schwab-agent order build oco --symbol TSLA --action BUY --quantity 10 --stop-loss 250`
 
+	return []*cobra.Command{equityBuild, optionBuild, bracketBuild, ocoBuild, newBuyWithStopBuildCmd(w)}
+}
+
+func orderBuildStrategyCommands(w io.Writer) []*cobra.Command {
+	commands := orderBuildDirectionalStrategyCommands(w)
+	return append(commands, orderBuildComplexStrategyCommands(w)...)
+}
+
+func orderBuildDirectionalStrategyCommands(w io.Writer) []*cobra.Command {
+	commands := orderBuildVerticalStrategyCommands(w)
+	return append(commands, orderBuildCombinationStrategyCommands(w)...)
+}
+
+func orderBuildVerticalStrategyCommands(w io.Writer) []*cobra.Command {
 	verticalBuild := makeCobraBuildOrderCommand(
 		w,
 		"vertical",
@@ -206,6 +228,10 @@ put at the same strike price and expiration. Use --buy for long straddles
 	straddleBuild.Example = `  schwab-agent order build straddle --underlying F --expiration 2026-06-18 --strike 12 --buy --open --quantity 1 --price 1.50
   schwab-agent order build straddle --underlying F --expiration 2026-06-18 --strike 12 --sell --open --quantity 1 --price 1.50`
 
+	return []*cobra.Command{verticalBuild, ironCondorBuild, straddleBuild}
+}
+
+func orderBuildCombinationStrategyCommands(w io.Writer) []*cobra.Command {
 	strangleBuild := makeCobraBuildOrderCommand(
 		w,
 		"strangle",
@@ -257,6 +283,15 @@ protective long put, and a covered short call. Limits downside risk while
 capping upside. Quantity 1 means 100 shares plus 1 put and 1 call contract.`
 	collarBuild.Example = `  schwab-agent order build collar --underlying F --put-strike 10 --call-strike 14 --expiration 2026-06-18 --quantity 1 --open --price 12.00`
 
+	return []*cobra.Command{strangleBuild, coveredCallBuild, collarBuild}
+}
+
+func orderBuildComplexStrategyCommands(w io.Writer) []*cobra.Command {
+	commands := orderBuildCalendarStrategyCommands(w)
+	return append(commands, orderBuildRollStrategyCommands(w)...)
+}
+
+func orderBuildCalendarStrategyCommands(w io.Writer) []*cobra.Command {
 	calendarBuild := makeCobraBuildOrderCommand(
 		w,
 		"calendar",
@@ -325,6 +360,10 @@ strikes: lower wing, lower-middle short, upper-middle short, upper wing. Buying
 opens a long condor; selling opens the inverse short condor.`
 	condorBuild.Example = `  schwab-agent order build condor --underlying F --expiration 2026-06-18 --lower-strike 10 --lower-middle-strike 12 --upper-middle-strike 14 --upper-strike 16 --call --buy --open --quantity 1 --price 0.75`
 
+	return []*cobra.Command{calendarBuild, diagonalBuild, butterflyBuild, condorBuild}
+}
+
+func orderBuildRollStrategyCommands(w io.Writer) []*cobra.Command {
 	verticalRollBuild := makeCobraBuildOrderCommand(
 		w,
 		"vertical-roll",
@@ -382,15 +421,9 @@ and near short put/call legs. The near expiration must come before the far
 expiration, and strikes must keep the put side below the call side.`
 	doubleDiagonalBuild.Example = `  schwab-agent order build double-diagonal --underlying F --near-expiration 2026-06-18 --far-expiration 2026-07-17 --put-far-strike 9 --put-near-strike 10 --call-near-strike 14 --call-far-strike 15 --open --quantity 1 --price 0.80`
 
-	cmd.AddCommand(
-		equityBuild, optionBuild, bracketBuild, ocoBuild, newBuyWithStopBuildCmd(w),
-		verticalBuild, ironCondorBuild, straddleBuild, strangleBuild,
-		coveredCallBuild, collarBuild, calendarBuild, diagonalBuild,
-		butterflyBuild, condorBuild, verticalRollBuild, backRatioBuild, doubleDiagonalBuild,
-		newBuildFTSCmd(w),
-	)
-
-	return cmd
+	return []*cobra.Command{
+		verticalRollBuild, backRatioBuild, doubleDiagonalBuild,
+	}
 }
 
 // newBuildFTSCmd creates the "order build fts" subcommand.

@@ -142,6 +142,47 @@ type dashboardOutput struct {
 	Values     []map[string]any    `json:"values"`
 }
 
+type dashboardInputs struct {
+	Candles    []models.Candle
+	Timestamps []string
+	Opens      []float64
+	Highs      []float64
+	Lows       []float64
+	Closes     []float64
+	Volumes    []float64
+}
+
+type dashboardSeries struct {
+	SMA21       []float64
+	SMA50       []float64
+	SMA200      []float64
+	RSI14       []float64
+	MACD        []float64
+	MACDSignal  []float64
+	MACDHist    []float64
+	ATR14       []float64
+	BBandsUpper []float64
+	BBandsMid   []float64
+	BBandsLower []float64
+	AvgVolume20 []float64
+}
+
+const (
+	dashboardSMAFastPeriod    = 21
+	dashboardSMAMediumPeriod  = 50
+	dashboardSMALongPeriod    = 200
+	dashboardRSIPeriod        = 14
+	dashboardMACDFastPeriod   = 12
+	dashboardMACDSlowPeriod   = 26
+	dashboardMACDSignalPeriod = 9
+	dashboardATRPeriod        = 14
+	dashboardBBandsPeriod     = 20
+	dashboardBBandsStdDev     = 2.0
+	dashboardVolumePeriod     = 20
+	dashboardRangePeriod      = 20
+	dashboardLongRangePeriod  = 252
+)
+
 // taOutput is the common envelope for single-value time series indicators (SMA, EMA, RSI, etc.).
 // Values use map[string]any because the value key name is the indicator name itself (dynamic).
 type taOutput struct {
@@ -558,168 +599,17 @@ func buildTADashboard(
 	symbol, interval string,
 	points int,
 ) (dashboardOutput, error) {
-	const (
-		smaFastPeriod    = 21
-		smaMediumPeriod  = 50
-		smaLongPeriod    = 200
-		rsiPeriod        = 14
-		macdFastPeriod   = 12
-		macdSlowPeriod   = 26
-		macdSignalPeriod = 9
-		atrPeriod        = 14
-		bbandsPeriod     = 20
-		bbandsStdDev     = 2.0
-		volumePeriod     = 20
-		rangePeriod      = 20
-		longRangePeriod  = 252
-	)
-
-	requestedRows := 1
-	if points > 0 {
-		requestedRows = points
-	}
-	dashboardMinCandles := longRangePeriod + requestedRows - 1
-
-	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, dashboardMinCandles, "dashboard")
+	inputs, err := fetchDashboardInputs(ctx, c, symbol, interval, points)
 	if err != nil {
 		return dashboardOutput{}, err
 	}
-
-	opens, err := ta.ExtractOpen(candles)
+	series, err := buildDashboardSeries(inputs)
 	if err != nil {
 		return dashboardOutput{}, err
 	}
-	highs, err := ta.ExtractHigh(candles)
+	rows, err := buildDashboardRows(inputs, series)
 	if err != nil {
 		return dashboardOutput{}, err
-	}
-	lows, err := ta.ExtractLow(candles)
-	if err != nil {
-		return dashboardOutput{}, err
-	}
-	closes, err := ta.ExtractClose(candles)
-	if err != nil {
-		return dashboardOutput{}, err
-	}
-	volumes, err := ta.ExtractVolume(candles)
-	if err != nil {
-		return dashboardOutput{}, err
-	}
-
-	sma21, err := ta.SMA(closes, smaFastPeriod)
-	if err != nil {
-		return dashboardOutput{}, err
-	}
-	sma50, err := ta.SMA(closes, smaMediumPeriod)
-	if err != nil {
-		return dashboardOutput{}, err
-	}
-	sma200, err := ta.SMA(closes, smaLongPeriod)
-	if err != nil {
-		return dashboardOutput{}, err
-	}
-	rsi14, err := ta.RSI(closes, rsiPeriod)
-	if err != nil {
-		return dashboardOutput{}, err
-	}
-	macdVals, macdSignalVals, macdHistVals, err := ta.MACD(closes, macdFastPeriod, macdSlowPeriod, macdSignalPeriod)
-	if err != nil {
-		return dashboardOutput{}, err
-	}
-	atr14, err := ta.ATR(highs, lows, closes, atrPeriod)
-	if err != nil {
-		return dashboardOutput{}, err
-	}
-	bbandsUpper, bbandsMiddle, bbandsLower, err := ta.BBands(closes, bbandsPeriod, bbandsStdDev)
-	if err != nil {
-		return dashboardOutput{}, err
-	}
-	avgVolume20, err := ta.SMA(volumes, volumePeriod)
-	if err != nil {
-		return dashboardOutput{}, err
-	}
-
-	// The series begins where the 252-candle range is complete. SMA 200 becomes
-	// available earlier, but labeling partial windows as range_252_* would mislead
-	// agents about long-range highs and lows.
-	baseStart := longRangePeriod - 1
-	rowCount := len(candles) - baseStart
-	rows := make([]map[string]any, rowCount)
-	for i := range rowCount {
-		candleIndex := baseStart + i
-		rows[i] = map[string]any{
-			"datetime": timestamps[candleIndex],
-			"open":     opens[candleIndex],
-			"high":     highs[candleIndex],
-			"low":      lows[candleIndex],
-			"close":    closes[candleIndex],
-			"volume":   volumes[candleIndex],
-		}
-	}
-
-	for key, values := range map[string][]float64{
-		"sma_21":         sma21,
-		"sma_50":         sma50,
-		"sma_200":        sma200,
-		"rsi_14":         rsi14,
-		"macd":           macdVals,
-		"macd_signal":    macdSignalVals,
-		"macd_histogram": macdHistVals,
-		"atr_14":         atr14,
-		"bbands_upper":   bbandsUpper,
-		"bbands_middle":  bbandsMiddle,
-		"bbands_lower":   bbandsLower,
-		"avg_volume_20":  avgVolume20,
-	} {
-		if err := addTailAlignedFloat(rows, key, values); err != nil {
-			return dashboardOutput{}, err
-		}
-	}
-
-	for i := range rows {
-		closePrice, err := dashboardRowFloat(rows[i], "close")
-		if err != nil {
-			return dashboardOutput{}, err
-		}
-		atrValue, err := dashboardRowFloat(rows[i], "atr_14")
-		if err != nil {
-			return dashboardOutput{}, err
-		}
-		avgVolume, err := dashboardRowFloat(rows[i], "avg_volume_20")
-		if err != nil {
-			return dashboardOutput{}, err
-		}
-		volume, err := dashboardRowFloat(rows[i], "volume")
-		if err != nil {
-			return dashboardOutput{}, err
-		}
-		sma21Value, err := dashboardRowFloat(rows[i], "sma_21")
-		if err != nil {
-			return dashboardOutput{}, err
-		}
-		sma50Value, err := dashboardRowFloat(rows[i], "sma_50")
-		if err != nil {
-			return dashboardOutput{}, err
-		}
-		sma200Value, err := dashboardRowFloat(rows[i], "sma_200")
-		if err != nil {
-			return dashboardOutput{}, err
-		}
-		candleIndex := baseStart + i
-		rangeHigh20, rangeLow20 := highLowWindow(highs, lows, candleIndex, rangePeriod)
-		rangeHigh252, rangeLow252 := highLowWindow(highs, lows, candleIndex, longRangePeriod)
-
-		rows[i]["atr_percent"] = percentOf(atrValue, closePrice)
-		rows[i]["relative_volume"] = ratio(volume, avgVolume)
-		rows[i]["range_20_high"] = rangeHigh20
-		rows[i]["range_20_low"] = rangeLow20
-		rows[i]["range_252_high"] = rangeHigh252
-		rows[i]["range_252_low"] = rangeLow252
-		rows[i]["distance_from_sma_21_percent"] = percentChange(closePrice, sma21Value)
-		rows[i]["distance_from_sma_50_percent"] = percentChange(closePrice, sma50Value)
-		rows[i]["distance_from_sma_200_percent"] = percentChange(closePrice, sma200Value)
-		rows[i]["distance_from_range_20_high_percent"] = percentChange(closePrice, rangeHigh20)
-		rows[i]["distance_from_range_252_high_percent"] = percentChange(closePrice, rangeHigh252)
 	}
 
 	latest := cloneDashboardRow(rows[len(rows)-1])
@@ -727,29 +617,220 @@ func buildTADashboard(
 	if err != nil {
 		return dashboardOutput{}, err
 	}
-	data := dashboardOutput{
+	return newDashboardOutput(symbol, interval, points, latest, signals, rows), nil
+}
+
+func fetchDashboardInputs(ctx context.Context, c *client.Ref, symbol, interval string, points int) (dashboardInputs, error) {
+	requestedRows := 1
+	if points > 0 {
+		requestedRows = points
+	}
+	minCandles := dashboardLongRangePeriod + requestedRows - 1
+
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, minCandles, "dashboard")
+	if err != nil {
+		return dashboardInputs{}, err
+	}
+
+	inputs := dashboardInputs{Candles: candles, Timestamps: timestamps}
+	if inputs.Opens, err = ta.ExtractOpen(candles); err != nil {
+		return dashboardInputs{}, err
+	}
+	if inputs.Highs, err = ta.ExtractHigh(candles); err != nil {
+		return dashboardInputs{}, err
+	}
+	if inputs.Lows, err = ta.ExtractLow(candles); err != nil {
+		return dashboardInputs{}, err
+	}
+	if inputs.Closes, err = ta.ExtractClose(candles); err != nil {
+		return dashboardInputs{}, err
+	}
+	if inputs.Volumes, err = ta.ExtractVolume(candles); err != nil {
+		return dashboardInputs{}, err
+	}
+
+	return inputs, nil
+}
+
+func buildDashboardSeries(inputs dashboardInputs) (dashboardSeries, error) {
+	series := dashboardSeries{}
+	var err error
+	if series.SMA21, err = ta.SMA(inputs.Closes, dashboardSMAFastPeriod); err != nil {
+		return dashboardSeries{}, err
+	}
+	if series.SMA50, err = ta.SMA(inputs.Closes, dashboardSMAMediumPeriod); err != nil {
+		return dashboardSeries{}, err
+	}
+	if series.SMA200, err = ta.SMA(inputs.Closes, dashboardSMALongPeriod); err != nil {
+		return dashboardSeries{}, err
+	}
+	if series.RSI14, err = ta.RSI(inputs.Closes, dashboardRSIPeriod); err != nil {
+		return dashboardSeries{}, err
+	}
+	series.MACD, series.MACDSignal, series.MACDHist, err = ta.MACD(
+		inputs.Closes,
+		dashboardMACDFastPeriod,
+		dashboardMACDSlowPeriod,
+		dashboardMACDSignalPeriod,
+	)
+	if err != nil {
+		return dashboardSeries{}, err
+	}
+	if series.ATR14, err = ta.ATR(inputs.Highs, inputs.Lows, inputs.Closes, dashboardATRPeriod); err != nil {
+		return dashboardSeries{}, err
+	}
+	series.BBandsUpper, series.BBandsMid, series.BBandsLower, err = ta.BBands(
+		inputs.Closes,
+		dashboardBBandsPeriod,
+		dashboardBBandsStdDev,
+	)
+	if err != nil {
+		return dashboardSeries{}, err
+	}
+	if series.AvgVolume20, err = ta.SMA(inputs.Volumes, dashboardVolumePeriod); err != nil {
+		return dashboardSeries{}, err
+	}
+
+	return series, nil
+}
+
+func buildDashboardRows(inputs dashboardInputs, series dashboardSeries) ([]map[string]any, error) {
+	baseStart := dashboardLongRangePeriod - 1
+	rows := dashboardBaseRows(inputs, baseStart)
+	if err := addDashboardSeries(rows, series); err != nil {
+		return nil, err
+	}
+	if err := addDashboardDerivedFields(rows, inputs, baseStart); err != nil {
+		return nil, err
+	}
+
+	return rows, nil
+}
+
+func newDashboardOutput(
+	symbol, interval string,
+	points int,
+	latest, signals map[string]any,
+	rows []map[string]any,
+) dashboardOutput {
+	return dashboardOutput{
 		Indicator: "dashboard",
 		Symbol:    symbol,
 		Interval:  interval,
 		Parameters: dashboardParameters{
-			SMAPeriods:   []int{smaFastPeriod, smaMediumPeriod, smaLongPeriod},
-			RSIPeriod:    rsiPeriod,
-			MACDFast:     macdFastPeriod,
-			MACDSlow:     macdSlowPeriod,
-			MACDSignal:   macdSignalPeriod,
-			ATRPeriod:    atrPeriod,
-			BBandsPeriod: bbandsPeriod,
-			BBandsStdDev: bbandsStdDev,
-			VolumePeriod: volumePeriod,
-			RangePeriod:  rangePeriod,
-			LongRange:    longRangePeriod,
+			SMAPeriods:   []int{dashboardSMAFastPeriod, dashboardSMAMediumPeriod, dashboardSMALongPeriod},
+			RSIPeriod:    dashboardRSIPeriod,
+			MACDFast:     dashboardMACDFastPeriod,
+			MACDSlow:     dashboardMACDSlowPeriod,
+			MACDSignal:   dashboardMACDSignalPeriod,
+			ATRPeriod:    dashboardATRPeriod,
+			BBandsPeriod: dashboardBBandsPeriod,
+			BBandsStdDev: dashboardBBandsStdDev,
+			VolumePeriod: dashboardVolumePeriod,
+			RangePeriod:  dashboardRangePeriod,
+			LongRange:    dashboardLongRangePeriod,
 		},
 		Latest:  latest,
 		Signals: signals,
 		Values:  limitDashboardRows(rows, points),
 	}
+}
 
-	return data, nil
+func dashboardBaseRows(inputs dashboardInputs, baseStart int) []map[string]any {
+	rowCount := len(inputs.Candles) - baseStart
+	rows := make([]map[string]any, rowCount)
+	for i := range rowCount {
+		candleIndex := baseStart + i
+		rows[i] = map[string]any{
+			"datetime": inputs.Timestamps[candleIndex],
+			"open":     inputs.Opens[candleIndex],
+			"high":     inputs.Highs[candleIndex],
+			"low":      inputs.Lows[candleIndex],
+			"close":    inputs.Closes[candleIndex],
+			"volume":   inputs.Volumes[candleIndex],
+		}
+	}
+
+	return rows
+}
+
+func addDashboardSeries(rows []map[string]any, series dashboardSeries) error {
+	for key, values := range map[string][]float64{
+		"sma_21":         series.SMA21,
+		"sma_50":         series.SMA50,
+		"sma_200":        series.SMA200,
+		"rsi_14":         series.RSI14,
+		"macd":           series.MACD,
+		"macd_signal":    series.MACDSignal,
+		"macd_histogram": series.MACDHist,
+		"atr_14":         series.ATR14,
+		"bbands_upper":   series.BBandsUpper,
+		"bbands_middle":  series.BBandsMid,
+		"bbands_lower":   series.BBandsLower,
+		"avg_volume_20":  series.AvgVolume20,
+	} {
+		if err := addTailAlignedFloat(rows, key, values); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func addDashboardDerivedFields(rows []map[string]any, inputs dashboardInputs, baseStart int) error {
+	for i := range rows {
+		if err := addDashboardDerivedRow(rows[i], inputs, baseStart+i); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func addDashboardDerivedRow(row map[string]any, inputs dashboardInputs, candleIndex int) error {
+	closePrice, err := dashboardRowFloat(row, "close")
+	if err != nil {
+		return err
+	}
+	atrValue, err := dashboardRowFloat(row, "atr_14")
+	if err != nil {
+		return err
+	}
+	avgVolume, err := dashboardRowFloat(row, "avg_volume_20")
+	if err != nil {
+		return err
+	}
+	volume, err := dashboardRowFloat(row, "volume")
+	if err != nil {
+		return err
+	}
+	sma21Value, err := dashboardRowFloat(row, "sma_21")
+	if err != nil {
+		return err
+	}
+	sma50Value, err := dashboardRowFloat(row, "sma_50")
+	if err != nil {
+		return err
+	}
+	sma200Value, err := dashboardRowFloat(row, "sma_200")
+	if err != nil {
+		return err
+	}
+
+	rangeHigh20, rangeLow20 := highLowWindow(inputs.Highs, inputs.Lows, candleIndex, dashboardRangePeriod)
+	rangeHigh252, rangeLow252 := highLowWindow(inputs.Highs, inputs.Lows, candleIndex, dashboardLongRangePeriod)
+	row["atr_percent"] = percentOf(atrValue, closePrice)
+	row["relative_volume"] = ratio(volume, avgVolume)
+	row["range_20_high"] = rangeHigh20
+	row["range_20_low"] = rangeLow20
+	row["range_252_high"] = rangeHigh252
+	row["range_252_low"] = rangeLow252
+	row["distance_from_sma_21_percent"] = percentChange(closePrice, sma21Value)
+	row["distance_from_sma_50_percent"] = percentChange(closePrice, sma50Value)
+	row["distance_from_sma_200_percent"] = percentChange(closePrice, sma200Value)
+	row["distance_from_range_20_high_percent"] = percentChange(closePrice, rangeHigh20)
+	row["distance_from_range_252_high_percent"] = percentChange(closePrice, rangeHigh252)
+	return nil
 }
 
 func addTailAlignedFloat(rows []map[string]any, key string, values []float64) error {
@@ -1404,43 +1485,13 @@ func buildExpectedMoveOutput(
 		return expectedMoveOutput{}, fmt.Errorf("no underlying data available for %s", symbol)
 	}
 
-	var underlyingPrice float64
-	switch {
-	case chain.Underlying.Mark != nil:
-		underlyingPrice = *chain.Underlying.Mark
-	case chain.Underlying.Last != nil:
-		underlyingPrice = *chain.Underlying.Last
-	case chain.UnderlyingPrice != nil:
-		underlyingPrice = *chain.UnderlyingPrice
-	default:
-		return expectedMoveOutput{}, fmt.Errorf("unable to determine underlying price for %s", symbol)
+	underlyingPrice, err := expectedMoveUnderlyingPrice(chain, symbol)
+	if err != nil {
+		return expectedMoveOutput{}, err
 	}
-
-	if len(chain.CallExpDateMap) == 0 {
-		return expectedMoveOutput{}, fmt.Errorf("no options available for %s", symbol)
-	}
-
-	selectedExpKey := ""
-	bestDiff := -1
-	for expKey := range chain.CallExpDateMap {
-		parts := strings.Split(expKey, ":")
-		if len(parts) != 2 {
-			continue
-		}
-
-		dte, err := strconv.Atoi(parts[1])
-		if err != nil {
-			continue
-		}
-
-		diff := int(math.Abs(float64(dte - opts.DTE)))
-		if bestDiff < 0 || diff < bestDiff || (diff == bestDiff && expKey < selectedExpKey) {
-			bestDiff = diff
-			selectedExpKey = expKey
-		}
-	}
-	if selectedExpKey == "" {
-		return expectedMoveOutput{}, fmt.Errorf("no options available for %s", symbol)
+	selectedExpKey, err := expectedMoveExpiration(chain, symbol, opts.DTE)
+	if err != nil {
+		return expectedMoveOutput{}, err
 	}
 
 	expParts := strings.Split(selectedExpKey, ":")
@@ -1452,21 +1503,7 @@ func buildExpectedMoveOutput(
 		return expectedMoveOutput{}, fmt.Errorf("no options available for %s at expiration %s", symbol, expDate)
 	}
 
-	atmStrikeKey := ""
-	bestStrikeDiff := -1.0
-	for strikeKey := range callStrikes {
-		strike, err := strconv.ParseFloat(strikeKey, 64)
-		if err != nil {
-			continue
-		}
-
-		diff := math.Abs(strike - underlyingPrice)
-		if bestStrikeDiff < 0 || diff < bestStrikeDiff ||
-			(diff == bestStrikeDiff && strike < mustParseFloat(atmStrikeKey)) {
-			bestStrikeDiff = diff
-			atmStrikeKey = strikeKey
-		}
-	}
+	atmStrikeKey := expectedMoveATMStrike(callStrikes, underlyingPrice)
 	if atmStrikeKey == "" {
 		return expectedMoveOutput{}, fmt.Errorf("no strikes available for %s at expiration %s", symbol, expDate)
 	}
@@ -1509,6 +1546,70 @@ func buildExpectedMoveOutput(
 		Upper2x:         result.Upper2x,
 		Lower2x:         result.Lower2x,
 	}, nil
+}
+
+func expectedMoveUnderlyingPrice(chain *models.OptionChain, symbol string) (float64, error) {
+	switch {
+	case chain.Underlying.Mark != nil:
+		return *chain.Underlying.Mark, nil
+	case chain.Underlying.Last != nil:
+		return *chain.Underlying.Last, nil
+	case chain.UnderlyingPrice != nil:
+		return *chain.UnderlyingPrice, nil
+	default:
+		return 0, fmt.Errorf("unable to determine underlying price for %s", symbol)
+	}
+}
+
+func expectedMoveExpiration(chain *models.OptionChain, symbol string, targetDTE int) (string, error) {
+	if len(chain.CallExpDateMap) == 0 {
+		return "", fmt.Errorf("no options available for %s", symbol)
+	}
+
+	selectedExpKey := ""
+	bestDiff := -1
+	for expKey := range chain.CallExpDateMap {
+		parts := strings.Split(expKey, ":")
+		if len(parts) != 2 {
+			continue
+		}
+
+		dte, err := strconv.Atoi(parts[1])
+		if err != nil {
+			continue
+		}
+
+		diff := int(math.Abs(float64(dte - targetDTE)))
+		if bestDiff < 0 || diff < bestDiff || (diff == bestDiff && expKey < selectedExpKey) {
+			bestDiff = diff
+			selectedExpKey = expKey
+		}
+	}
+	if selectedExpKey == "" {
+		return "", fmt.Errorf("no options available for %s", symbol)
+	}
+
+	return selectedExpKey, nil
+}
+
+func expectedMoveATMStrike(callStrikes map[string][]*models.OptionContract, underlyingPrice float64) string {
+	atmStrikeKey := ""
+	bestStrikeDiff := -1.0
+	for strikeKey := range callStrikes {
+		strike, err := strconv.ParseFloat(strikeKey, 64)
+		if err != nil {
+			continue
+		}
+
+		diff := math.Abs(strike - underlyingPrice)
+		if bestStrikeDiff < 0 || diff < bestStrikeDiff ||
+			(diff == bestStrikeDiff && strike < mustParseFloat(atmStrikeKey)) {
+			bestStrikeDiff = diff
+			atmStrikeKey = strikeKey
+		}
+	}
+
+	return atmStrikeKey
 }
 
 func contractPrice(contract *models.OptionContract, symbol, strike, putCall string) (float64, error) {

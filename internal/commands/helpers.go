@@ -271,23 +271,51 @@ func validateCobraOptions(ctx context.Context, opts any) error {
 
 func cobraEnumValues(value any) ([]string, map[string]string) {
 	switch value.(type) {
+	case *models.Instruction,
+		*models.OrderType,
+		*models.Duration,
+		*models.Session,
+		*models.StopPriceLinkBasis,
+		*models.StopPriceLinkType,
+		*models.StopType,
+		*models.SpecialInstruction,
+		*models.RequestedDestination,
+		*models.PriceLinkBasis,
+		*models.PriceLinkType:
+		return modelEnumValues(value)
+	case *orderStatusFilter,
+		*chainContractType,
+		*chainStrategy,
+		*strikeRange,
+		*historyPeriodType,
+		*historyFrequencyType,
+		*historyFrequency,
+		*instrumentProjection,
+		*moversSort,
+		*moversFrequency,
+		*positionSort,
+		*taInterval:
+		return commandEnumValues(value)
+	default:
+		return nil, nil
+	}
+}
+
+func modelEnumValues(value any) ([]string, map[string]string) {
+	switch value.(type) {
 	case *models.Instruction:
 		return enumStrings(validInstructions), nil
 	case *models.OrderType:
-		return enumStrings(
-				validOrderTypes,
-			), map[string]string{
-				"MOC": string(models.OrderTypeMarketOnClose),
-				"LOC": string(models.OrderTypeLimitOnClose),
-			}
+		return enumStrings(validOrderTypes), map[string]string{
+			"MOC": string(models.OrderTypeMarketOnClose),
+			"LOC": string(models.OrderTypeLimitOnClose),
+		}
 	case *models.Duration:
-		return enumStrings(
-				validDurations,
-			), map[string]string{
-				"GTC": string(models.DurationGoodTillCancel),
-				"FOK": string(models.DurationFillOrKill),
-				"IOC": string(models.DurationImmediateOrCancel),
-			}
+		return enumStrings(validDurations), map[string]string{
+			"GTC": string(models.DurationGoodTillCancel),
+			"FOK": string(models.DurationFillOrKill),
+			"IOC": string(models.DurationImmediateOrCancel),
+		}
 	case *models.Session:
 		return enumStrings(validSessions), nil
 	case *models.StopPriceLinkBasis:
@@ -304,6 +332,34 @@ func cobraEnumValues(value any) ([]string, map[string]string) {
 		return enumStrings(validPriceLinkBases), nil
 	case *models.PriceLinkType:
 		return enumStrings(validPriceLinkTypes), nil
+	default:
+		return nil, nil
+	}
+}
+
+func commandEnumValues(value any) ([]string, map[string]string) {
+	switch value.(type) {
+	case *orderStatusFilter,
+		*chainContractType,
+		*chainStrategy,
+		*strikeRange:
+		return tradingEnumValues(value)
+	case *historyPeriodType,
+		*historyFrequencyType,
+		*historyFrequency,
+		*instrumentProjection,
+		*moversSort,
+		*moversFrequency,
+		*positionSort,
+		*taInterval:
+		return marketEnumValues(value)
+	default:
+		return nil, nil
+	}
+}
+
+func tradingEnumValues(value any) ([]string, map[string]string) {
+	switch value.(type) {
 	case *orderStatusFilter:
 		return enumStrings(validOrderStatusFilters), nil
 	case *chainContractType:
@@ -337,6 +393,13 @@ func cobraEnumValues(value any) ([]string, map[string]string) {
 				strikeRangeAll,
 			},
 		), nil
+	default:
+		return nil, nil
+	}
+}
+
+func marketEnumValues(value any) ([]string, map[string]string) {
+	switch value.(type) {
 	case *historyPeriodType:
 		return enumStrings(
 			[]historyPeriodType{
