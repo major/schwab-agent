@@ -62,17 +62,21 @@ Duration aliases GTC, FOK, and IOC are accepted.`,
 	return cmd
 }
 
-// terminalOrderStatuses are order statuses that represent completed/final states.
-// Orders in these statuses are filtered out by default to show only actionable
-// orders. Use --status all to include them.
-//
-//nolint:exhaustive // Non-terminal statuses intentionally use the map zero value.
-var terminalOrderStatuses = map[models.OrderStatus]bool{
-	models.OrderStatusFilled:   true,
-	models.OrderStatusCanceled: true,
-	models.OrderStatusRejected: true,
-	models.OrderStatusExpired:  true,
-	models.OrderStatusReplaced: true,
+// isTerminalOrderStatus reports whether an order status represents a
+// completed/final state. Orders in these statuses are filtered out by default to
+// show only actionable orders. Use --status all to include them.
+func isTerminalOrderStatus(status models.OrderStatus) bool {
+	//nolint:exhaustive // Non-terminal statuses intentionally fall through to false.
+	switch status {
+	case models.OrderStatusFilled,
+		models.OrderStatusCanceled,
+		models.OrderStatusRejected,
+		models.OrderStatusExpired,
+		models.OrderStatusReplaced:
+		return true
+	default:
+		return false
+	}
 }
 
 // filterNonTerminalOrders returns only orders whose status is not terminal.
@@ -80,7 +84,7 @@ var terminalOrderStatuses = map[models.OrderStatus]bool{
 func filterNonTerminalOrders(orders []models.Order) []models.Order {
 	filtered := make([]models.Order, 0, len(orders))
 	for i := range orders {
-		if orders[i].Status == nil || !terminalOrderStatuses[*orders[i].Status] {
+		if orders[i].Status == nil || !isTerminalOrderStatus(*orders[i].Status) {
 			filtered = append(filtered, orders[i])
 		}
 	}

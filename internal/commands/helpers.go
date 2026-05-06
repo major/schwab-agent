@@ -304,34 +304,34 @@ func cobraEnumValues(value any) ([]string, map[string]string) {
 func modelEnumValues(value any) ([]string, map[string]string) {
 	switch value.(type) {
 	case *models.Instruction:
-		return enumStrings(validInstructions), nil
+		return enumStrings(validInstructions()), nil
 	case *models.OrderType:
-		return enumStrings(validOrderTypes), map[string]string{
+		return enumStrings(validOrderTypes()), map[string]string{
 			"MOC": string(models.OrderTypeMarketOnClose),
 			"LOC": string(models.OrderTypeLimitOnClose),
 		}
 	case *models.Duration:
-		return enumStrings(validDurations), map[string]string{
+		return enumStrings(validDurations()), map[string]string{
 			"GTC": string(models.DurationGoodTillCancel),
 			"FOK": string(models.DurationFillOrKill),
 			"IOC": string(models.DurationImmediateOrCancel),
 		}
 	case *models.Session:
-		return enumStrings(validSessions), nil
+		return enumStrings(validSessions()), nil
 	case *models.StopPriceLinkBasis:
-		return enumStrings(validStopPriceLinkBases), nil
+		return enumStrings(validStopPriceLinkBases()), nil
 	case *models.StopPriceLinkType:
-		return enumStrings(validStopPriceLinkTypes), nil
+		return enumStrings(validStopPriceLinkTypes()), nil
 	case *models.StopType:
-		return enumStrings(validStopTypes), nil
+		return enumStrings(validStopTypes()), nil
 	case *models.SpecialInstruction:
-		return enumStrings(validSpecialInstructions), nil
+		return enumStrings(validSpecialInstructions()), nil
 	case *models.RequestedDestination:
-		return enumStrings(validDestinations), nil
+		return enumStrings(validDestinations()), nil
 	case *models.PriceLinkBasis:
-		return enumStrings(validPriceLinkBases), nil
+		return enumStrings(validPriceLinkBases()), nil
 	case *models.PriceLinkType:
-		return enumStrings(validPriceLinkTypes), nil
+		return enumStrings(validPriceLinkTypes()), nil
 	default:
 		return nil, nil
 	}
@@ -361,7 +361,7 @@ func commandEnumValues(value any) ([]string, map[string]string) {
 func tradingEnumValues(value any) ([]string, map[string]string) {
 	switch value.(type) {
 	case *orderStatusFilter:
-		return enumStrings(validOrderStatusFilters), nil
+		return enumStrings(validOrderStatusFilters()), nil
 	case *chainContractType:
 		return enumStrings([]chainContractType{chainContractTypeCall, chainContractTypePut, chainContractTypeAll}), nil
 	case *chainStrategy:

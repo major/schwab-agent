@@ -610,13 +610,23 @@ func positionSymbol(t *testing.T, position map[string]any) string {
 	return symbol
 }
 
+func testFloatPtr(v float64) *float64 {
+	value := v
+	return &value
+}
+
+func testStringPtr(v string) *string {
+	value := v
+	return &value
+}
+
 func TestComputePositionFields(t *testing.T) {
 	t.Run("long position with P&L", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice:       &testFloat150,
-				LongQuantity:       &testFloat100,
-				LongOpenProfitLoss: &testFloat1000,
+				AveragePrice:       testFloatPtr(150),
+				LongQuantity:       testFloatPtr(100),
+				LongOpenProfitLoss: testFloatPtr(1000),
 			},
 		}
 		computePositionFields(&entry)
@@ -634,9 +644,9 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("short position with P&L", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice:        &testFloat300,
-				ShortQuantity:       &testFloat10,
-				ShortOpenProfitLoss: &testFloatNeg500,
+				AveragePrice:        testFloatPtr(300),
+				ShortQuantity:       testFloatPtr(10),
+				ShortOpenProfitLoss: testFloatPtr(-500),
 			},
 		}
 		computePositionFields(&entry)
@@ -654,11 +664,11 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("both long and short P&L", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice:        &testFloat100,
-				LongQuantity:        &testFloat50,
-				ShortQuantity:       &testFloat10,
-				LongOpenProfitLoss:  &testFloat500,
-				ShortOpenProfitLoss: &testFloatNeg200,
+				AveragePrice:        testFloatPtr(100),
+				LongQuantity:        testFloatPtr(50),
+				ShortQuantity:       testFloatPtr(10),
+				LongOpenProfitLoss:  testFloatPtr(500),
+				ShortOpenProfitLoss: testFloatPtr(-200),
 			},
 		}
 		computePositionFields(&entry)
@@ -676,8 +686,8 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("nil averagePrice skips cost basis", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				LongQuantity:       &testFloat100,
-				LongOpenProfitLoss: &testFloat500,
+				LongQuantity:       testFloatPtr(100),
+				LongOpenProfitLoss: testFloatPtr(500),
 			},
 		}
 		computePositionFields(&entry)
@@ -692,7 +702,7 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("zero quantity skips cost basis", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice: &testFloat150,
+				AveragePrice: testFloatPtr(150),
 				// No quantity fields set (both nil, default to 0).
 			},
 		}
@@ -704,8 +714,8 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("no P&L fields", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice: &testFloat150,
-				LongQuantity: &testFloat100,
+				AveragePrice: testFloatPtr(150),
+				LongQuantity: testFloatPtr(100),
 			},
 		}
 		computePositionFields(&entry)
@@ -726,40 +736,20 @@ func TestComputePositionFields(t *testing.T) {
 	})
 }
 
-var (
-	testFloat5      = 5.0
-	testFloat10     = 10.0
-	testFloat50     = 50.0
-	testFloat100    = 100.0
-	testFloat150    = 150.0
-	testFloat200    = 200.0
-	testFloat300    = 300.0
-	testFloat500    = 500.0
-	testFloat1000   = 1000.0
-	testFloatNeg200 = -200.0
-	testFloatNeg500 = -500.0
-
-	testString11111   = "11111"
-	testString22222   = "22222"
-	testStringAAPL    = "AAPL"
-	testStringTSLA    = "TSLA"
-	testStringTrading = "Trading"
-)
-
 func TestFlattenAccountPositions(t *testing.T) {
 	accounts := []models.Account{
 		{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				AccountNumber: &testString11111,
+				AccountNumber: testStringPtr("11111"),
 				Positions: []models.Position{
 					{
-						LongQuantity: &testFloat100,
-						AveragePrice: &testFloat50,
-						Instrument:   &models.AccountsInstrument{Symbol: &testStringAAPL},
+						LongQuantity: testFloatPtr(100),
+						AveragePrice: testFloatPtr(50),
+						Instrument:   &models.AccountsInstrument{Symbol: testStringPtr("AAPL")},
 					},
 				},
 			},
-			NickName: &testStringTrading,
+			NickName: testStringPtr("Trading"),
 		},
 		{
 			// Account with no SecuritiesAccount: should be skipped.
@@ -767,12 +757,12 @@ func TestFlattenAccountPositions(t *testing.T) {
 		},
 		{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				AccountNumber: &testString22222,
+				AccountNumber: testStringPtr("22222"),
 				Positions: []models.Position{
 					{
-						ShortQuantity: &testFloat5,
-						AveragePrice:  &testFloat200,
-						Instrument:    &models.AccountsInstrument{Symbol: &testStringTSLA},
+						ShortQuantity: testFloatPtr(5),
+						AveragePrice:  testFloatPtr(200),
+						Instrument:    &models.AccountsInstrument{Symbol: testStringPtr("TSLA")},
 					},
 				},
 			},

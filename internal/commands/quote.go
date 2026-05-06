@@ -14,15 +14,23 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-// validQuoteFields lists the allowed values for the --fields flag.
-// The Schwab API accepts these field groups to control which data
-// sections are returned in the quote response.
-var validQuoteFields = map[string]bool{
-	"quote":       true,
-	"fundamental": true,
-	"extended":    true,
-	"reference":   true,
-	"regular":     true,
+const (
+	quoteFieldExtended    = "extended"
+	quoteFieldFundamental = "fundamental"
+	quoteFieldQuote       = "quote"
+	quoteFieldReference   = "reference"
+	quoteFieldRegular     = "regular"
+)
+
+// isValidQuoteField reports whether field names one of the Schwab API field
+// groups accepted by --fields.
+func isValidQuoteField(field string) bool {
+	switch field {
+	case quoteFieldQuote, quoteFieldFundamental, quoteFieldExtended, quoteFieldReference, quoteFieldRegular:
+		return true
+	default:
+		return false
+	}
 }
 
 // NewQuoteCmd returns the Cobra command for stock quote operations.
@@ -65,7 +73,7 @@ func (o *quoteGetOpts) Validate(_ context.Context) []error {
 				continue
 			}
 			lower := strings.ToLower(trimmed)
-			if !validQuoteFields[lower] {
+			if !isValidQuoteField(lower) {
 				errs = append(errs, fmt.Errorf("%s", invalidQuoteFieldMessage(trimmed, lower)))
 			}
 		}
@@ -218,9 +226,12 @@ func buildCobraQuoteParams(opts *quoteGetOpts) client.QuoteParams {
 // sortedQuoteFieldNames returns the valid field names sorted alphabetically,
 // joined as a comma-separated string for use in error messages.
 func sortedQuoteFieldNames() string {
-	names := make([]string, 0, len(validQuoteFields))
-	for k := range validQuoteFields {
-		names = append(names, k)
+	names := []string{
+		quoteFieldQuote,
+		quoteFieldFundamental,
+		quoteFieldExtended,
+		quoteFieldReference,
+		quoteFieldRegular,
 	}
 	slices.Sort(names)
 	return strings.Join(names, ", ")

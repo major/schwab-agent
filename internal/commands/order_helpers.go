@@ -299,11 +299,9 @@ type doubleDiagonalBuildOpts struct {
 	Session        models.Session  `flag:"session"          flagdescr:"Trading session"                                                 flaggroup:"order"`
 }
 
-// Valid enum values for CLI flag parsing. Each slice corresponds to one enum
-// type in the models package and is used by the generic parseEnum/requireEnum
-// helpers in helpers.go.
-var (
-	validInstructions = []models.Instruction{
+// validInstructions returns the allowed instruction enum values for CLI flag parsing.
+func validInstructions() []models.Instruction {
+	return []models.Instruction{
 		models.InstructionBuy,
 		models.InstructionSell,
 		models.InstructionBuyToCover,
@@ -315,8 +313,11 @@ var (
 		models.InstructionExchange,
 		models.InstructionSellShortExempt,
 	}
+}
 
-	validOrderTypes = []models.OrderType{
+// validOrderTypes returns the allowed order type enum values for CLI flag parsing.
+func validOrderTypes() []models.OrderType {
+	return []models.OrderType{
 		models.OrderTypeMarket,
 		models.OrderTypeLimit,
 		models.OrderTypeStop,
@@ -329,8 +330,11 @@ var (
 		models.OrderTypeNetCredit,
 		models.OrderTypeNetZero,
 	}
+}
 
-	validDurations = []models.Duration{
+// validDurations returns the allowed duration enum values for CLI flag parsing.
+func validDurations() []models.Duration {
+	return []models.Duration{
 		models.DurationDay,
 		models.DurationGoodTillCancel,
 		models.DurationFillOrKill,
@@ -339,15 +343,21 @@ var (
 		models.DurationEndOfMonth,
 		models.DurationNextEndOfMonth,
 	}
+}
 
-	validSessions = []models.Session{
+// validSessions returns the allowed session enum values for CLI flag parsing.
+func validSessions() []models.Session {
+	return []models.Session{
 		models.SessionNormal,
 		models.SessionAM,
 		models.SessionPM,
 		models.SessionSeamless,
 	}
+}
 
-	validStopPriceLinkBases = []models.StopPriceLinkBasis{
+// validStopPriceLinkBases returns the allowed stop price link basis enum values for CLI flag parsing.
+func validStopPriceLinkBases() []models.StopPriceLinkBasis {
+	return []models.StopPriceLinkBasis{
 		models.StopPriceLinkBasisManual,
 		models.StopPriceLinkBasisBase,
 		models.StopPriceLinkBasisTrigger,
@@ -358,28 +368,40 @@ var (
 		models.StopPriceLinkBasisMark,
 		models.StopPriceLinkBasisAverage,
 	}
+}
 
-	validStopPriceLinkTypes = []models.StopPriceLinkType{
+// validStopPriceLinkTypes returns the allowed stop price link type enum values for CLI flag parsing.
+func validStopPriceLinkTypes() []models.StopPriceLinkType {
+	return []models.StopPriceLinkType{
 		models.StopPriceLinkTypeValue,
 		models.StopPriceLinkTypePercent,
 		models.StopPriceLinkTypeTick,
 	}
+}
 
-	validStopTypes = []models.StopType{
+// validStopTypes returns the allowed stop type enum values for CLI flag parsing.
+func validStopTypes() []models.StopType {
+	return []models.StopType{
 		models.StopTypeStandard,
 		models.StopTypeBid,
 		models.StopTypeAsk,
 		models.StopTypeLast,
 		models.StopTypeMark,
 	}
+}
 
-	validSpecialInstructions = []models.SpecialInstruction{
+// validSpecialInstructions returns the allowed special instruction enum values for CLI flag parsing.
+func validSpecialInstructions() []models.SpecialInstruction {
+	return []models.SpecialInstruction{
 		models.SpecialInstructionAllOrNone,
 		models.SpecialInstructionDoNotReduce,
 		models.SpecialInstructionAllOrNoneDoNotReduce,
 	}
+}
 
-	validDestinations = []models.RequestedDestination{
+// validDestinations returns the allowed requested destination enum values for CLI flag parsing.
+func validDestinations() []models.RequestedDestination {
+	return []models.RequestedDestination{
 		models.RequestedDestinationINET,
 		models.RequestedDestinationECNArca,
 		models.RequestedDestinationCBOE,
@@ -393,8 +415,11 @@ var (
 		models.RequestedDestinationC2,
 		models.RequestedDestinationAUTO,
 	}
+}
 
-	validPriceLinkBases = []models.PriceLinkBasis{
+// validPriceLinkBases returns the allowed price link basis enum values for CLI flag parsing.
+func validPriceLinkBases() []models.PriceLinkBasis {
+	return []models.PriceLinkBasis{
 		models.PriceLinkBasisManual,
 		models.PriceLinkBasisBase,
 		models.PriceLinkBasisTrigger,
@@ -405,14 +430,20 @@ var (
 		models.PriceLinkBasisMark,
 		models.PriceLinkBasisAverage,
 	}
+}
 
-	validPriceLinkTypes = []models.PriceLinkType{
+// validPriceLinkTypes returns the allowed price link type enum values for CLI flag parsing.
+func validPriceLinkTypes() []models.PriceLinkType {
+	return []models.PriceLinkType{
 		models.PriceLinkTypeValue,
 		models.PriceLinkTypePercent,
 		models.PriceLinkTypeTick,
 	}
+}
 
-	validOrderStatusFilters = []orderStatusFilter{
+// validOrderStatusFilters returns the allowed order status filter values for CLI flag parsing.
+func validOrderStatusFilters() []orderStatusFilter {
+	return []orderStatusFilter{
 		orderStatusFilterAll,
 		orderStatusFilter(models.OrderStatusAwaitingParentOrder),
 		orderStatusFilter(models.OrderStatusAwaitingCondition),
@@ -436,7 +467,7 @@ var (
 		orderStatusFilter(models.OrderStatusPendingRecall),
 		orderStatusFilter(models.OrderStatusUnknown),
 	}
-)
+}
 
 // normalizeOrderType preserves legacy CLI aliases after flag validation,
 // ensuring order builders receive canonical API enum values.
@@ -492,7 +523,7 @@ func defaultStopType(value models.StopType) models.StopType {
 }
 
 func validateOrderStatusFilter(raw string) error {
-	for _, valid := range validOrderStatusFilters {
+	for _, valid := range validOrderStatusFilters() {
 		if strings.EqualFold(raw, string(valid)) {
 			return nil
 		}
@@ -503,7 +534,7 @@ func validateOrderStatusFilter(raw string) error {
 
 // parseInstruction converts CLI input to an instruction enum.
 func parseInstruction(raw string) (models.Instruction, error) {
-	return requireEnum(raw, validInstructions, "action")
+	return requireEnum(raw, validInstructions(), "action")
 }
 
 // parseOrderType converts CLI input to an order type enum.
@@ -519,7 +550,7 @@ func parseOrderType(raw string, fallback models.OrderType) (models.OrderType, er
 		return models.OrderTypeLimitOnClose, nil
 	}
 
-	return parseEnum(raw, validOrderTypes, fallback, "type")
+	return parseEnum(raw, validOrderTypes(), fallback, "type")
 }
 
 // parseDuration converts CLI input to a duration enum for focused unit tests and
@@ -536,7 +567,7 @@ func parseDuration(raw string) (models.Duration, error) {
 		return models.DurationImmediateOrCancel, nil
 	}
 
-	return parseEnum(raw, validDurations, "", "duration")
+	return parseEnum(raw, validDurations(), "", "duration")
 }
 
 // requireMutableEnabled checks that mutable operations are explicitly enabled in config.

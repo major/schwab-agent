@@ -10,9 +10,11 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-// allMarkets is the full list of Schwab market types, used as the default
+// allMarkets returns the full list of Schwab market types, used as the default
 // when no specific markets are requested.
-var allMarkets = []string{"equity", "option", "bond", "future", "forex"}
+func allMarkets() []string {
+	return []string{"equity", "option", "bond", "future", "forex"}
+}
 
 // moversData wraps the movers response.
 type moversData struct {
@@ -57,7 +59,7 @@ more market names to filter.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			markets := args
 			if len(markets) == 0 {
-				markets = allMarkets
+				markets = allMarkets()
 			}
 
 			// Use the single-market endpoint when exactly one market

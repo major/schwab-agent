@@ -84,7 +84,7 @@ func TestParseNewOptionStrategyParamsHappyPaths(t *testing.T) {
 		t.Parallel()
 
 		params, err := parseButterflyParams(&butterflyBuildOpts{
-			Underlying: " F ", Expiration: testFutureExpDate,
+			Underlying: " F ", Expiration: testFutureExpDate(),
 			LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14,
 			Put: true, Sell: true, Close: true, Quantity: 1, Price: 0.45,
 			Duration: models.DurationGoodTillCancel, Session: models.SessionPM,
@@ -103,7 +103,7 @@ func TestParseNewOptionStrategyParamsHappyPaths(t *testing.T) {
 		t.Parallel()
 
 		params, err := parseCondorParams(&condorBuildOpts{
-			Underlying: "F", Expiration: testFutureExpDate,
+			Underlying: "F", Expiration: testFutureExpDate(),
 			LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16,
 			Call: true, Buy: true, Open: true, Quantity: 2, Price: 0.75,
 		}, nil)
@@ -119,7 +119,7 @@ func TestParseNewOptionStrategyParamsHappyPaths(t *testing.T) {
 		t.Parallel()
 
 		params, err := parseBackRatioParams(&backRatioBuildOpts{
-			Underlying: "F", Expiration: testFutureExpDate,
+			Underlying: "F", Expiration: testFutureExpDate(),
 			ShortStrike: 14, LongStrike: 12,
 			Put: true, Close: true, Credit: true, Quantity: 1, LongRatio: 3, Price: 0.10,
 		}, nil)
@@ -136,8 +136,8 @@ func TestParseNewOptionStrategyParamsHappyPaths(t *testing.T) {
 
 		params, err := parseVerticalRollParams(&verticalRollBuildOpts{
 			Underlying:       "F",
-			CloseExpiration:  testFutureExpDate,
-			OpenExpiration:   testFutureExpTime.AddDate(0, 1, 0).Format("2006-01-02"),
+			CloseExpiration:  testFutureExpDate(),
+			OpenExpiration:   testFutureExpTime().AddDate(0, 1, 0).Format("2006-01-02"),
 			CloseLongStrike:  14,
 			CloseShortStrike: 12,
 			OpenLongStrike:   13,
@@ -158,8 +158,8 @@ func TestParseNewOptionStrategyParamsHappyPaths(t *testing.T) {
 
 		params, err := parseDoubleDiagonalParams(&doubleDiagonalBuildOpts{
 			Underlying:     "F",
-			NearExpiration: testFutureExpDate,
-			FarExpiration:  testFutureExpTime.AddDate(0, 1, 0).Format("2006-01-02"),
+			NearExpiration: testFutureExpDate(),
+			FarExpiration:  testFutureExpTime().AddDate(0, 1, 0).Format("2006-01-02"),
 			PutFarStrike:   9,
 			PutNearStrike:  10,
 			CallNearStrike: 14,
@@ -189,7 +189,7 @@ func TestParseNewOptionStrategyParamsErrors(t *testing.T) {
 			name: "butterfly missing call put",
 			parse: func() error {
 				_, err := parseButterflyParams(
-					&butterflyBuildOpts{Buy: true, Open: true, Expiration: testFutureExpDate},
+					&butterflyBuildOpts{Buy: true, Open: true, Expiration: testFutureExpDate()},
 					nil,
 				)
 				return err
@@ -200,7 +200,7 @@ func TestParseNewOptionStrategyParamsErrors(t *testing.T) {
 			name: "butterfly missing buy sell",
 			parse: func() error {
 				_, err := parseButterflyParams(
-					&butterflyBuildOpts{Call: true, Open: true, Expiration: testFutureExpDate},
+					&butterflyBuildOpts{Call: true, Open: true, Expiration: testFutureExpDate()},
 					nil,
 				)
 				return err
@@ -210,7 +210,10 @@ func TestParseNewOptionStrategyParamsErrors(t *testing.T) {
 		{
 			name: "condor missing open close",
 			parse: func() error {
-				_, err := parseCondorParams(&condorBuildOpts{Call: true, Buy: true, Expiration: testFutureExpDate}, nil)
+				_, err := parseCondorParams(
+					&condorBuildOpts{Call: true, Buy: true, Expiration: testFutureExpDate()},
+					nil,
+				)
 				return err
 			},
 			message: "exactly one of --open or --close is required",
@@ -230,7 +233,7 @@ func TestParseNewOptionStrategyParamsErrors(t *testing.T) {
 			name: "back-ratio missing debit credit",
 			parse: func() error {
 				_, err := parseBackRatioParams(
-					&backRatioBuildOpts{Call: true, Open: true, Expiration: testFutureExpDate},
+					&backRatioBuildOpts{Call: true, Open: true, Expiration: testFutureExpDate()},
 					nil,
 				)
 				return err
@@ -264,7 +267,7 @@ func TestParseNewOptionStrategyParamsErrors(t *testing.T) {
 						Call:            true,
 						Debit:           true,
 						CloseExpiration: "bad",
-						OpenExpiration:  testFutureExpDate,
+						OpenExpiration:  testFutureExpDate(),
 					},
 					nil,
 				)
@@ -279,7 +282,7 @@ func TestParseNewOptionStrategyParamsErrors(t *testing.T) {
 					&verticalRollBuildOpts{
 						Call:            true,
 						Debit:           true,
-						CloseExpiration: testFutureExpDate,
+						CloseExpiration: testFutureExpDate(),
 						OpenExpiration:  "bad",
 					},
 					nil,
@@ -291,7 +294,7 @@ func TestParseNewOptionStrategyParamsErrors(t *testing.T) {
 		{
 			name: "double-diagonal missing open close",
 			parse: func() error {
-				_, err := parseDoubleDiagonalParams(&doubleDiagonalBuildOpts{NearExpiration: testFutureExpDate}, nil)
+				_, err := parseDoubleDiagonalParams(&doubleDiagonalBuildOpts{NearExpiration: testFutureExpDate()}, nil)
 				return err
 			},
 			message: "exactly one of --open or --close is required",
@@ -300,7 +303,7 @@ func TestParseNewOptionStrategyParamsErrors(t *testing.T) {
 			name: "double-diagonal invalid near expiration",
 			parse: func() error {
 				_, err := parseDoubleDiagonalParams(
-					&doubleDiagonalBuildOpts{Open: true, NearExpiration: "bad", FarExpiration: testFutureExpDate},
+					&doubleDiagonalBuildOpts{Open: true, NearExpiration: "bad", FarExpiration: testFutureExpDate()},
 					nil,
 				)
 				return err
@@ -311,7 +314,7 @@ func TestParseNewOptionStrategyParamsErrors(t *testing.T) {
 			name: "double-diagonal invalid far expiration",
 			parse: func() error {
 				_, err := parseDoubleDiagonalParams(
-					&doubleDiagonalBuildOpts{Open: true, NearExpiration: testFutureExpDate, FarExpiration: "bad"},
+					&doubleDiagonalBuildOpts{Open: true, NearExpiration: testFutureExpDate(), FarExpiration: "bad"},
 					nil,
 				)
 				return err

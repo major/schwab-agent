@@ -30,10 +30,14 @@ const (
 
 // validYearPeriods lists the period values the Schwab API documents for periodType "year".
 // Sending values not in this list may be silently rejected or misinterpreted.
-var validYearPeriods = []int{1, 2, 3, 5, 10, 15, 20}
+func validYearPeriods() []int {
+	return []int{1, 2, 3, 5, 10, 15, 20}
+}
 
 // validDayPeriods lists the period values the Schwab API documents for periodType "day".
-var validDayPeriods = []int{1, 2, 3, 4, 5, 10}
+func validDayPeriods() []int {
+	return []int{1, 2, 3, 4, 5, 10}
+}
 
 // ceilDiv returns the ceiling of a/b for positive integers.
 func ceilDiv(a, b int) int {
@@ -108,27 +112,27 @@ func IntervalToHistoryParams(
 		// callers that need a complete 252-candle trading-year window request 2
 		// years, while smaller daily indicators still use the minimum 1-year fetch.
 		years := max(1, ceilDiv(requiredCandles+dailyLookbackSafetyCandles, tradingDaysPerYear))
-		years = nextValidPeriod(years, validYearPeriods)
+		years = nextValidPeriod(years, validYearPeriods())
 		return "year", strconv.Itoa(years), "daily", "1", nil
 	case "weekly":
 		years := max(1, ceilDiv(requiredCandles, weeksPerYear))
-		years = nextValidPeriod(years, validYearPeriods)
+		years = nextValidPeriod(years, validYearPeriods())
 		return "year", strconv.Itoa(years), "weekly", "1", nil
 	case "1min":
 		days := max(1, ceilDiv(requiredCandles, regularSessionMinutesPerDay))
-		days = nextValidPeriod(days, validDayPeriods)
+		days = nextValidPeriod(days, validDayPeriods())
 		return "day", strconv.Itoa(days), "minute", "1", nil
 	case "5min":
 		days := max(1, ceilDiv(requiredCandles, regularSessionMinutesPerDay/5))
-		days = nextValidPeriod(days, validDayPeriods)
+		days = nextValidPeriod(days, validDayPeriods())
 		return "day", strconv.Itoa(days), "minute", "5", nil
 	case "15min":
 		days := max(1, ceilDiv(requiredCandles, regularSessionMinutesPerDay/15))
-		days = nextValidPeriod(days, validDayPeriods)
+		days = nextValidPeriod(days, validDayPeriods())
 		return "day", strconv.Itoa(days), "minute", "15", nil
 	case "30min":
 		days := max(1, ceilDiv(requiredCandles, regularSessionMinutesPerDay/30))
-		days = nextValidPeriod(days, validDayPeriods)
+		days = nextValidPeriod(days, validDayPeriods())
 		return "day", strconv.Itoa(days), "minute", "30", nil
 	default:
 		return "", "", "", "", apperr.NewValidationError(

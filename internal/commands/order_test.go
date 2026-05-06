@@ -23,13 +23,17 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-// testFutureExpTime is a future expiration date for option tests. Computed once
-// at package init so all tests use a consistent value. Using AddDate(0, 1, 0)
-// ensures the date stays valid regardless of when the test suite runs.
-var testFutureExpTime = time.Now().UTC().AddDate(0, 1, 0)
+// testFutureExpTime returns a future expiration date for option tests. Using
+// AddDate(0, 1, 0) ensures the date stays valid regardless of when the test
+// suite runs.
+func testFutureExpTime() time.Time {
+	return time.Now().UTC().AddDate(0, 1, 0)
+}
 
 // testFutureExpDate is testFutureExpTime formatted as YYYY-MM-DD for CLI flags.
-var testFutureExpDate = testFutureExpTime.Format("2006-01-02")
+func testFutureExpDate() string {
+	return testFutureExpTime().Format("2006-01-02")
+}
 
 // testConfigJSON returns a valid config payload for command tests.
 // The mutable flag defaults to false (mutable operations disabled).
@@ -641,7 +645,7 @@ func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
 				"--underlying",
 				"AAPL",
 				"--expiration",
-				testFutureExpDate,
+				testFutureExpDate(),
 				"--strike",
 				"200",
 				"--call",
@@ -788,7 +792,7 @@ func TestNewOrderCmdBuildNewOptionStrategiesOutputRequestJSON(t *testing.T) {
 				"--underlying",
 				"F",
 				"--expiration",
-				testFutureExpDate,
+				testFutureExpDate(),
 				"--lower-strike",
 				"10",
 				"--middle-strike",
@@ -816,7 +820,7 @@ func TestNewOrderCmdBuildNewOptionStrategiesOutputRequestJSON(t *testing.T) {
 				"--underlying",
 				"F",
 				"--expiration",
-				testFutureExpDate,
+				testFutureExpDate(),
 				"--lower-strike",
 				"10",
 				"--lower-middle-strike",
@@ -846,9 +850,9 @@ func TestNewOrderCmdBuildNewOptionStrategiesOutputRequestJSON(t *testing.T) {
 				"--underlying",
 				"F",
 				"--close-expiration",
-				testFutureExpDate,
+				testFutureExpDate(),
 				"--open-expiration",
-				testFutureExpTime.AddDate(0, 1, 0).Format("2006-01-02"),
+				testFutureExpTime().AddDate(0, 1, 0).Format("2006-01-02"),
 				"--close-long-strike",
 				"12",
 				"--close-short-strike",
@@ -877,7 +881,7 @@ func TestNewOrderCmdBuildNewOptionStrategiesOutputRequestJSON(t *testing.T) {
 				"--underlying",
 				"F",
 				"--expiration",
-				testFutureExpDate,
+				testFutureExpDate(),
 				"--short-strike",
 				"12",
 				"--long-strike",
@@ -903,9 +907,9 @@ func TestNewOrderCmdBuildNewOptionStrategiesOutputRequestJSON(t *testing.T) {
 				"--underlying",
 				"F",
 				"--near-expiration",
-				testFutureExpDate,
+				testFutureExpDate(),
 				"--far-expiration",
-				testFutureExpTime.AddDate(0, 1, 0).Format("2006-01-02"),
+				testFutureExpTime().AddDate(0, 1, 0).Format("2006-01-02"),
 				"--put-far-strike",
 				"9",
 				"--put-near-strike",
@@ -1488,7 +1492,7 @@ func TestNewOrderCmdBuildIronCondorOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "iron-condor",
 		"--underlying", "SPY",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--put-long-strike", "400",
 		"--put-short-strike", "410",
 		"--call-short-strike", "420",
@@ -1549,7 +1553,7 @@ func TestNewOrderCmdBuildIronCondorClose(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "iron-condor",
 		"--underlying", "SPY",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--put-long-strike", "400",
 		"--put-short-strike", "410",
 		"--call-short-strike", "420",
@@ -1579,7 +1583,7 @@ func TestNewOrderCmdBuildVerticalCallDebit(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "vertical",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--long-strike", "180",
 		"--short-strike", "190",
 		"--call",
@@ -1619,7 +1623,7 @@ func TestNewOrderCmdBuildVerticalPutCredit(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "vertical",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--long-strike", "170",
 		"--short-strike", "180",
 		"--put",
@@ -1649,7 +1653,7 @@ func TestNewOrderCmdBuildStrangleBuyOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "strangle",
 		"--underlying", "TSLA",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--call-strike", "300",
 		"--put-strike", "250",
 		"--buy",
@@ -1692,7 +1696,7 @@ func TestNewOrderCmdBuildStrangleSellOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "strangle",
 		"--underlying", "TSLA",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--call-strike", "300",
 		"--put-strike", "250",
 		"--sell",
@@ -1715,7 +1719,7 @@ func TestNewOrderCmdBuildStraddleBuyOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "straddle",
 		"--underlying", "NVDA",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "130",
 		"--buy",
 		"--open",
@@ -1760,7 +1764,7 @@ func TestNewOrderCmdBuildStraddleSellOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "straddle",
 		"--underlying", "NVDA",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "130",
 		"--sell",
 		"--open",
@@ -1782,7 +1786,7 @@ func TestNewOrderCmdBuildCoveredCallOutputsRequestJSON(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "covered-call",
 		"--underlying", "F",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "14",
 		"--quantity", "2",
 		"--price", "12.50",
@@ -1831,7 +1835,7 @@ func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
 			name: "iron-condor defaults",
 			args: []string{
 				"order", "build", "iron-condor",
-				"--underlying", "SPY", "--expiration", testFutureExpDate,
+				"--underlying", "SPY", "--expiration", testFutureExpDate(),
 				"--put-long-strike", "400", "--put-short-strike", "410",
 				"--call-short-strike", "420", "--call-long-strike", "430",
 				"--open", "--quantity", "1", "--price", "1.00",
@@ -1841,7 +1845,7 @@ func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
 			name: "vertical defaults",
 			args: []string{
 				"order", "build", "vertical",
-				"--underlying", "AAPL", "--expiration", testFutureExpDate,
+				"--underlying", "AAPL", "--expiration", testFutureExpDate(),
 				"--long-strike", "180", "--short-strike", "190",
 				"--call", "--open", "--quantity", "1", "--price", "2.00",
 			},
@@ -1850,7 +1854,7 @@ func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
 			name: "strangle defaults",
 			args: []string{
 				"order", "build", "strangle",
-				"--underlying", "TSLA", "--expiration", testFutureExpDate,
+				"--underlying", "TSLA", "--expiration", testFutureExpDate(),
 				"--call-strike", "300", "--put-strike", "250",
 				"--buy", "--open", "--quantity", "1", "--price", "10.00",
 			},
@@ -1859,7 +1863,7 @@ func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
 			name: "straddle defaults",
 			args: []string{
 				"order", "build", "straddle",
-				"--underlying", "NVDA", "--expiration", testFutureExpDate,
+				"--underlying", "NVDA", "--expiration", testFutureExpDate(),
 				"--strike", "130",
 				"--buy", "--open", "--quantity", "1", "--price", "15.00",
 			},
@@ -1868,7 +1872,7 @@ func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
 			name: "covered-call defaults",
 			args: []string{
 				"order", "build", "covered-call",
-				"--underlying", "F", "--expiration", testFutureExpDate,
+				"--underlying", "F", "--expiration", testFutureExpDate(),
 				"--strike", "14", "--quantity", "1", "--price", "12.00",
 			},
 		},
@@ -2202,7 +2206,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "iron-condor missing open/close",
 			args: []string{
 				"order", "build", "iron-condor",
-				"--underlying", "SPY", "--expiration", testFutureExpDate,
+				"--underlying", "SPY", "--expiration", testFutureExpDate(),
 				"--put-long-strike", "400", "--put-short-strike", "410",
 				"--call-short-strike", "420", "--call-long-strike", "430",
 				"--quantity", "1", "--price", "1.00",
@@ -2213,7 +2217,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "vertical missing open/close",
 			args: []string{
 				"order", "build", "vertical",
-				"--underlying", "AAPL", "--expiration", testFutureExpDate,
+				"--underlying", "AAPL", "--expiration", testFutureExpDate(),
 				"--long-strike", "180", "--short-strike", "190",
 				"--call", "--quantity", "1", "--price", "2.00",
 			},
@@ -2224,7 +2228,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "strangle missing buy/sell",
 			args: []string{
 				"order", "build", "strangle",
-				"--underlying", "TSLA", "--expiration", testFutureExpDate,
+				"--underlying", "TSLA", "--expiration", testFutureExpDate(),
 				"--call-strike", "300", "--put-strike", "250",
 				"--open", "--quantity", "1", "--price", "10.00",
 			},
@@ -2234,7 +2238,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "straddle missing buy/sell",
 			args: []string{
 				"order", "build", "straddle",
-				"--underlying", "NVDA", "--expiration", testFutureExpDate,
+				"--underlying", "NVDA", "--expiration", testFutureExpDate(),
 				"--strike", "130",
 				"--open", "--quantity", "1", "--price", "15.00",
 			},
@@ -2245,7 +2249,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "vertical missing call/put",
 			args: []string{
 				"order", "build", "vertical",
-				"--underlying", "AAPL", "--expiration", testFutureExpDate,
+				"--underlying", "AAPL", "--expiration", testFutureExpDate(),
 				"--long-strike", "180", "--short-strike", "190",
 				"--open", "--quantity", "1", "--price", "2.00",
 			},
@@ -2256,7 +2260,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "strangle invalid duration",
 			args: []string{
 				"order", "build", "strangle",
-				"--underlying", "TSLA", "--expiration", testFutureExpDate,
+				"--underlying", "TSLA", "--expiration", testFutureExpDate(),
 				"--call-strike", "300", "--put-strike", "250",
 				"--buy", "--open", "--quantity", "1", "--price", "10.00",
 				"--duration", "FOREVER",
@@ -2268,7 +2272,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "straddle invalid session",
 			args: []string{
 				"order", "build", "straddle",
-				"--underlying", "NVDA", "--expiration", testFutureExpDate,
+				"--underlying", "NVDA", "--expiration", testFutureExpDate(),
 				"--strike", "130",
 				"--buy", "--open", "--quantity", "1", "--price", "15.00",
 				"--session", "AFTERHOURS",
@@ -3412,7 +3416,7 @@ func TestOrderReplaceOptionSuccess(t *testing.T) {
 				w,
 				67890,
 				models.OrderStatusQueued,
-				"AAPL  "+testFutureExpTime.Format("060102")+"C00200000",
+				"AAPL  "+testFutureExpTime().Format("060102")+"C00200000",
 			)
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "AAPL")
@@ -3433,7 +3437,7 @@ func TestOrderReplaceOptionSuccess(t *testing.T) {
 		"",
 		"order", "replace", "option", "12345",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "200",
 		"--call",
 		"--instruction", "BUY_TO_OPEN",
@@ -3451,7 +3455,7 @@ func TestOrderReplaceOptionSuccess(t *testing.T) {
 	leg := received.OrderLegCollection[0]
 	assert.Equal(t, models.AssetTypeOption, leg.Instrument.AssetType)
 	assert.Equal(t, models.InstructionBuyToOpen, leg.Instruction)
-	assert.Equal(t, "AAPL  "+testFutureExpTime.Format("060102")+"C00200000", leg.Instrument.Symbol)
+	assert.Equal(t, "AAPL  "+testFutureExpTime().Format("060102")+"C00200000", leg.Instrument.Symbol)
 
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
@@ -3474,7 +3478,7 @@ func TestOrderReplaceOptionAliasValidation(t *testing.T) {
 			args: []string{
 				"order", "replace", "option", "12345",
 				"--underlying", "AAPL",
-				"--expiration", testFutureExpDate,
+				"--expiration", testFutureExpDate(),
 				"--strike", "200",
 				"--call",
 				"--instruction", "BOGUS",
@@ -3489,7 +3493,7 @@ func TestOrderReplaceOptionAliasValidation(t *testing.T) {
 			args: []string{
 				"order", "replace", "option", "12345",
 				"--underlying", "AAPL",
-				"--expiration", testFutureExpDate,
+				"--expiration", testFutureExpDate(),
 				"--strike", "200",
 				"--call",
 				"--instruction", "BUY_TO_OPEN",
@@ -3525,7 +3529,7 @@ func TestOrderReplaceOptionCallPutMutuallyExclusive(t *testing.T) {
 		"",
 		"order", "replace", "option", "12345",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "200",
 		"--call",
 		"--put",
@@ -3550,7 +3554,7 @@ func TestOrderReplaceOptionMutableGuard(t *testing.T) {
 		"",
 		"order", "replace", "option", "12345",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "200",
 		"--call",
 		"--action", "BUY_TO_OPEN",
@@ -3628,7 +3632,7 @@ func TestNewOrderCmdBuildOptionOutputsRequestJSON(t *testing.T) {
 		"",
 		"order", "build", "option",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "185",
 		"--call",
 		"--action", "BUY_TO_OPEN",
@@ -3651,14 +3655,14 @@ func TestNewOrderCmdBuildOptionOutputsRequestJSON(t *testing.T) {
 	assert.Equal(t, models.InstructionBuyToOpen, leg.Instruction)
 	assert.InDelta(t, 5.0, leg.Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeOption, leg.Instrument.AssetType)
-	wantOCC := orderbuilder.BuildOCCSymbol("AAPL", testFutureExpTime, 185, "CALL")
+	wantOCC := orderbuilder.BuildOCCSymbol("AAPL", testFutureExpTime(), 185, "CALL")
 	assert.Equal(t, wantOCC, leg.Instrument.Symbol)
 	require.NotNil(t, leg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *leg.Instrument.PutCall)
 	require.NotNil(t, leg.Instrument.UnderlyingSymbol)
 	assert.Equal(t, "AAPL", *leg.Instrument.UnderlyingSymbol)
 	require.NotNil(t, leg.Instrument.OptionExpirationDate)
-	assert.Equal(t, testFutureExpDate, *leg.Instrument.OptionExpirationDate)
+	assert.Equal(t, testFutureExpDate(), *leg.Instrument.OptionExpirationDate)
 	require.NotNil(t, leg.Instrument.OptionStrikePrice)
 	assert.InDelta(t, 185.0, *leg.Instrument.OptionStrikePrice, 0.001)
 }
@@ -3920,7 +3924,7 @@ func TestOrderReplaceOptionInfersLimitFromPrice(t *testing.T) {
 				w,
 				67890,
 				models.OrderStatusQueued,
-				"AAPL  "+testFutureExpTime.Format("060102")+"C00200000",
+				"AAPL  "+testFutureExpTime().Format("060102")+"C00200000",
 			)
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "AAPL")
@@ -3942,7 +3946,7 @@ func TestOrderReplaceOptionInfersLimitFromPrice(t *testing.T) {
 		"",
 		"order", "replace", "option", "12345",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "200",
 		"--call",
 		"--action", "BUY_TO_OPEN",
@@ -4364,7 +4368,9 @@ func TestParseDuration(t *testing.T) {
 
 // farExpDate is testFutureExpTime + 30 days, formatted as YYYY-MM-DD.
 // Calendar and diagonal spreads need two different expirations.
-var farExpDate = testFutureExpTime.AddDate(0, 0, 30).Format("2006-01-02")
+func farExpDate() string {
+	return testFutureExpTime().AddDate(0, 0, 30).Format("2006-01-02")
+}
 
 func TestNewOrderCmdBuildCalendarCallOpen(t *testing.T) {
 	t.Parallel()
@@ -4374,8 +4380,8 @@ func TestNewOrderCmdBuildCalendarCallOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "calendar",
 		"--underlying", "AAPL",
-		"--near-expiration", testFutureExpDate,
-		"--far-expiration", farExpDate,
+		"--near-expiration", testFutureExpDate(),
+		"--far-expiration", farExpDate(),
 		"--strike", "150",
 		"--call",
 		"--open",
@@ -4415,8 +4421,8 @@ func TestNewOrderCmdBuildCalendarPutClose(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "calendar",
 		"--underlying", "AAPL",
-		"--near-expiration", testFutureExpDate,
-		"--far-expiration", farExpDate,
+		"--near-expiration", testFutureExpDate(),
+		"--far-expiration", farExpDate(),
 		"--strike", "150",
 		"--put",
 		"--close",
@@ -4448,8 +4454,8 @@ func TestNewOrderCmdBuildDiagonalCallOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "diagonal",
 		"--underlying", "AAPL",
-		"--near-expiration", testFutureExpDate,
-		"--far-expiration", farExpDate,
+		"--near-expiration", testFutureExpDate(),
+		"--far-expiration", farExpDate(),
 		"--near-strike", "150",
 		"--far-strike", "160",
 		"--call",
@@ -4489,8 +4495,8 @@ func TestNewOrderCmdBuildDiagonalPutOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "diagonal",
 		"--underlying", "AAPL",
-		"--near-expiration", testFutureExpDate,
-		"--far-expiration", farExpDate,
+		"--near-expiration", testFutureExpDate(),
+		"--far-expiration", farExpDate(),
 		"--near-strike", "150",
 		"--far-strike", "140",
 		"--put",
@@ -4520,7 +4526,7 @@ func TestNewOrderCmdBuildCollarOpen(t *testing.T) {
 		"--underlying", "AAPL",
 		"--put-strike", "140",
 		"--call-strike", "160",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--quantity", "3",
 		"--price", "450",
 		"--open",
@@ -4570,7 +4576,7 @@ func TestNewOrderCmdBuildCollarClose(t *testing.T) {
 		"--underlying", "AAPL",
 		"--put-strike", "140",
 		"--call-strike", "160",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--quantity", "2",
 		"--price", "300",
 		"--close",
@@ -4596,7 +4602,7 @@ func TestNewOrderCmdBuildCalendarInvalidDate(t *testing.T) {
 		"order", "build", "calendar",
 		"--underlying", "AAPL",
 		"--near-expiration", "not-a-date",
-		"--far-expiration", farExpDate,
+		"--far-expiration", farExpDate(),
 		"--strike", "150",
 		"--call",
 		"--open",
@@ -4618,7 +4624,7 @@ func TestNewOrderCmdBuildDiagonalInvalidDate(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "diagonal",
 		"--underlying", "AAPL",
-		"--near-expiration", testFutureExpDate,
+		"--near-expiration", testFutureExpDate(),
 		"--far-expiration", "bad-date",
 		"--near-strike", "150",
 		"--far-strike", "160",
