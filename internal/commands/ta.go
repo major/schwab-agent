@@ -620,7 +620,12 @@ func buildTADashboard(
 	return newDashboardOutput(symbol, interval, points, latest, signals, rows), nil
 }
 
-func fetchDashboardInputs(ctx context.Context, c *client.Ref, symbol, interval string, points int) (dashboardInputs, error) {
+func fetchDashboardInputs(
+	ctx context.Context,
+	c *client.Ref,
+	symbol, interval string,
+	points int,
+) (dashboardInputs, error) {
 	requestedRows := 1
 	if points > 0 {
 		requestedRows = points

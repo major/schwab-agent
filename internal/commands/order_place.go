@@ -354,7 +354,9 @@ func runOrderPlaceSpec(
 	previewDigest := strings.TrimSpace(opts.FromPreview)
 	fromPreviewProvided := previewDigest != ""
 	if specProvided == fromPreviewProvided {
-		return newValidationError("provide exactly one of --spec or --from-preview for `order place` without a subcommand")
+		return newValidationError(
+			"provide exactly one of --spec or --from-preview for `order place` without a subcommand",
+		)
 	}
 
 	configFlag, err := effectiveConfigFlag(cmd, configPath)
