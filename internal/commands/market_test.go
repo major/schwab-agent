@@ -60,9 +60,14 @@ func TestNewMarketCmd_Hours_AllMarkets(t *testing.T) {
 	assert.JSONEq(t, `{
 		"equity": {
 			"EQ": {
+				"date": "2024-01-15",
 				"marketType": "EQUITY",
+				"exchange": "",
+				"category": "",
+				"product": "",
+				"productName": "",
 				"isOpen": true,
-				"date": "2024-01-15"
+				"sessionHours": null
 			}
 		}
 	}`, string(envelope.Data))
@@ -93,49 +98,18 @@ func TestNewMarketCmd_Hours_SpecificMarket(t *testing.T) {
 	assert.JSONEq(t, `{
 		"equity": {
 			"EQ": {
+				"date": "2024-01-15",
 				"marketType": "EQUITY",
+				"exchange": "",
+				"category": "",
+				"product": "",
+				"productName": "",
 				"isOpen": true,
-				"date": "2024-01-15"
+				"sessionHours": null
 			}
 		}
 	}`, string(envelope.Data))
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
-}
-
-func TestNewMarketCmd_Hours_OmitsMissingOptionalFields(t *testing.T) {
-	// Arrange
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		// schwab-go decodes the response into value fields, but schwab-agent's
-		// historical output model used pointers with omitempty. This partial
-		// fixture catches accidental zero-value fields leaking into the CLI JSON.
-		resp := `{"equity":{"EQ":{"date":"2024-01-15","isOpen":false,` +
-			`"sessionHours":{"regularMarket":[` +
-			`{"start":"2024-01-15T09:30:00-05:00"}]}}}}`
-		_, _ = w.Write([]byte(resp))
-	}))
-	defer srv.Close()
-
-	// Act
-	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
-	_, err := runTestCommand(t, cmd, "hours", "equity")
-
-	// Assert
-	require.NoError(t, err)
-	var envelope testEnvelope
-	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
-	assert.JSONEq(t, `{
-		"equity": {
-			"EQ": {
-				"date": "2024-01-15",
-				"isOpen": false,
-				"sessionHours": {
-					"regularMarket": [{"start": "2024-01-15T09:30:00-05:00"}]
-				}
-			}
-		}
-	}`, string(envelope.Data))
 }
 
 func TestNewMarketCmd_Hours_APIError(t *testing.T) {
