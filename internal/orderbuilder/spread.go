@@ -129,38 +129,14 @@ func BuildIronCondorOrder(params *IronCondorParams) (*models.OrderRequest, error
 		orderType = models.OrderTypeNetDebit
 	}
 
-	order := &models.OrderRequest{
-		Session:                  cmp.Or(params.Session, models.SessionNormal),
-		Duration:                 cmp.Or(params.Duration, models.DurationDay),
-		OrderType:                orderType,
-		ComplexOrderStrategyType: &complexType,
-		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    new(params.Price),
-		OrderLegCollection: []models.OrderLegCollection{
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.Expiration,
-				Strike: params.PutLongStrike, PutCall: models.PutCallPut,
-				Instruction: longInstruction, Quantity: params.Quantity,
-			}),
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.Expiration,
-				Strike: params.PutShortStrike, PutCall: models.PutCallPut,
-				Instruction: shortInstruction, Quantity: params.Quantity,
-			}),
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.Expiration,
-				Strike: params.CallShortStrike, PutCall: models.PutCallCall,
-				Instruction: shortInstruction, Quantity: params.Quantity,
-			}),
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.Expiration,
-				Strike: params.CallLongStrike, PutCall: models.PutCallCall,
-				Instruction: longInstruction, Quantity: params.Quantity,
-			}),
-		},
-	}
+	legs := buildOptionLegs(
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.PutLongStrike, PutCall: models.PutCallPut, Instruction: longInstruction, Quantity: params.Quantity},
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.PutShortStrike, PutCall: models.PutCallPut, Instruction: shortInstruction, Quantity: params.Quantity},
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.CallShortStrike, PutCall: models.PutCallCall, Instruction: shortInstruction, Quantity: params.Quantity},
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.CallLongStrike, PutCall: models.PutCallCall, Instruction: longInstruction, Quantity: params.Quantity},
+	)
 
-	return order, nil
+	return buildSpreadOrder(params.Session, params.Duration, orderType, complexType, params.Price, legs), nil
 }
 
 // ButterflyParams holds parameters for building a same-expiration butterfly.
@@ -408,38 +384,14 @@ func BuildDoubleDiagonalOrder(params *DoubleDiagonalParams) (*models.OrderReques
 		orderType = models.OrderTypeNetCredit
 	}
 
-	order := &models.OrderRequest{
-		Session:                  cmp.Or(params.Session, models.SessionNormal),
-		Duration:                 cmp.Or(params.Duration, models.DurationDay),
-		OrderType:                orderType,
-		ComplexOrderStrategyType: &complexType,
-		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    new(params.Price),
-		OrderLegCollection: []models.OrderLegCollection{
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.FarExpiration,
-				Strike: params.PutFarStrike, PutCall: models.PutCallPut,
-				Instruction: longInstruction, Quantity: params.Quantity,
-			}),
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.NearExpiration,
-				Strike: params.PutNearStrike, PutCall: models.PutCallPut,
-				Instruction: shortInstruction, Quantity: params.Quantity,
-			}),
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.NearExpiration,
-				Strike: params.CallNearStrike, PutCall: models.PutCallCall,
-				Instruction: shortInstruction, Quantity: params.Quantity,
-			}),
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.FarExpiration,
-				Strike: params.CallFarStrike, PutCall: models.PutCallCall,
-				Instruction: longInstruction, Quantity: params.Quantity,
-			}),
-		},
-	}
+	legs := buildOptionLegs(
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.FarExpiration, Strike: params.PutFarStrike, PutCall: models.PutCallPut, Instruction: longInstruction, Quantity: params.Quantity},
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.NearExpiration, Strike: params.PutNearStrike, PutCall: models.PutCallPut, Instruction: shortInstruction, Quantity: params.Quantity},
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.NearExpiration, Strike: params.CallNearStrike, PutCall: models.PutCallCall, Instruction: shortInstruction, Quantity: params.Quantity},
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.FarExpiration, Strike: params.CallFarStrike, PutCall: models.PutCallCall, Instruction: longInstruction, Quantity: params.Quantity},
+	)
 
-	return order, nil
+	return buildSpreadOrder(params.Session, params.Duration, orderType, complexType, params.Price, legs), nil
 }
 
 // directionalSpreadInstructions returns outside and inside leg instructions for
@@ -488,28 +440,12 @@ func BuildStraddleOrder(params *StraddleParams) (*models.OrderRequest, error) {
 	orderType := symmetricOrderType(params.Buy)
 	complexType := models.ComplexOrderStrategyTypeStraddle
 
-	order := &models.OrderRequest{
-		Session:                  cmp.Or(params.Session, models.SessionNormal),
-		Duration:                 cmp.Or(params.Duration, models.DurationDay),
-		OrderType:                orderType,
-		ComplexOrderStrategyType: &complexType,
-		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    new(params.Price),
-		OrderLegCollection: []models.OrderLegCollection{
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.Expiration,
-				Strike: params.Strike, PutCall: models.PutCallCall,
-				Instruction: instruction, Quantity: params.Quantity,
-			}),
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.Expiration,
-				Strike: params.Strike, PutCall: models.PutCallPut,
-				Instruction: instruction, Quantity: params.Quantity,
-			}),
-		},
-	}
+	legs := buildOptionLegs(
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.Strike, PutCall: models.PutCallCall, Instruction: instruction, Quantity: params.Quantity},
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.Strike, PutCall: models.PutCallPut, Instruction: instruction, Quantity: params.Quantity},
+	)
 
-	return order, nil
+	return buildSpreadOrder(params.Session, params.Duration, orderType, complexType, params.Price, legs), nil
 }
 
 // StrangleParams holds parameters for building a strangle order.
@@ -539,28 +475,12 @@ func BuildStrangleOrder(params *StrangleParams) (*models.OrderRequest, error) {
 	orderType := symmetricOrderType(params.Buy)
 	complexType := models.ComplexOrderStrategyTypeStrangle
 
-	order := &models.OrderRequest{
-		Session:                  cmp.Or(params.Session, models.SessionNormal),
-		Duration:                 cmp.Or(params.Duration, models.DurationDay),
-		OrderType:                orderType,
-		ComplexOrderStrategyType: &complexType,
-		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    new(params.Price),
-		OrderLegCollection: []models.OrderLegCollection{
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.Expiration,
-				Strike: params.CallStrike, PutCall: models.PutCallCall,
-				Instruction: instruction, Quantity: params.Quantity,
-			}),
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.Expiration,
-				Strike: params.PutStrike, PutCall: models.PutCallPut,
-				Instruction: instruction, Quantity: params.Quantity,
-			}),
-		},
-	}
+	legs := buildOptionLegs(
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.CallStrike, PutCall: models.PutCallCall, Instruction: instruction, Quantity: params.Quantity},
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.PutStrike, PutCall: models.PutCallPut, Instruction: instruction, Quantity: params.Quantity},
+	)
 
-	return order, nil
+	return buildSpreadOrder(params.Session, params.Duration, orderType, complexType, params.Price, legs), nil
 }
 
 // symmetricInstruction returns the instruction for strategies where both legs
@@ -671,30 +591,14 @@ func BuildCalendarOrder(params *CalendarParams) (*models.OrderRequest, error) {
 		orderType = models.OrderTypeNetCredit
 	}
 
-	order := &models.OrderRequest{
-		Session:                  cmp.Or(params.Session, models.SessionNormal),
-		Duration:                 cmp.Or(params.Duration, models.DurationDay),
-		OrderType:                orderType,
-		ComplexOrderStrategyType: &complexType,
-		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    new(params.Price),
-		OrderLegCollection: []models.OrderLegCollection{
-			// Far leg (bought when opening) listed first for consistency
-			// with how Schwab displays calendar spreads.
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.FarExpiration,
-				Strike: params.Strike, PutCall: params.PutCall,
-				Instruction: longInstruction, Quantity: params.Quantity,
-			}),
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.NearExpiration,
-				Strike: params.Strike, PutCall: params.PutCall,
-				Instruction: shortInstruction, Quantity: params.Quantity,
-			}),
-		},
-	}
+	// Far leg (bought when opening) listed first for consistency with how Schwab
+	// displays calendar spreads.
+	legs := buildOptionLegs(
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.FarExpiration, Strike: params.Strike, PutCall: params.PutCall, Instruction: longInstruction, Quantity: params.Quantity},
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.NearExpiration, Strike: params.Strike, PutCall: params.PutCall, Instruction: shortInstruction, Quantity: params.Quantity},
+	)
 
-	return order, nil
+	return buildSpreadOrder(params.Session, params.Duration, orderType, complexType, params.Price, legs), nil
 }
 
 // DiagonalParams holds parameters for building a diagonal spread order.
@@ -733,29 +637,13 @@ func BuildDiagonalOrder(params *DiagonalParams) (*models.OrderRequest, error) {
 		orderType = models.OrderTypeNetCredit
 	}
 
-	order := &models.OrderRequest{
-		Session:                  cmp.Or(params.Session, models.SessionNormal),
-		Duration:                 cmp.Or(params.Duration, models.DurationDay),
-		OrderType:                orderType,
-		ComplexOrderStrategyType: &complexType,
-		OrderStrategyType:        models.OrderStrategyTypeSingle,
-		Price:                    new(params.Price),
-		OrderLegCollection: []models.OrderLegCollection{
-			// Far leg (bought when opening) listed first.
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.FarExpiration,
-				Strike: params.FarStrike, PutCall: params.PutCall,
-				Instruction: longInstruction, Quantity: params.Quantity,
-			}),
-			buildOptionLeg(&optionLegParams{
-				Underlying: params.Underlying, Expiration: params.NearExpiration,
-				Strike: params.NearStrike, PutCall: params.PutCall,
-				Instruction: shortInstruction, Quantity: params.Quantity,
-			}),
-		},
-	}
+	// Far leg (bought when opening) listed first.
+	legs := buildOptionLegs(
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.FarExpiration, Strike: params.FarStrike, PutCall: params.PutCall, Instruction: longInstruction, Quantity: params.Quantity},
+		&optionLegParams{Underlying: params.Underlying, Expiration: params.NearExpiration, Strike: params.NearStrike, PutCall: params.PutCall, Instruction: shortInstruction, Quantity: params.Quantity},
+	)
 
-	return order, nil
+	return buildSpreadOrder(params.Session, params.Duration, orderType, complexType, params.Price, legs), nil
 }
 
 // CollarParams holds parameters for building a collar-with-stock order.
@@ -846,6 +734,38 @@ type optionLegParams struct {
 	PutCall     models.PutCall
 	Instruction models.Instruction
 	Quantity    float64
+}
+
+// buildSpreadOrder applies the common Schwab envelope fields shared by spread
+// strategies. Callers still own leg order and pricing semantics by passing a
+// pre-built leg slice and explicit order type.
+func buildSpreadOrder(
+	session models.Session,
+	duration models.Duration,
+	orderType models.OrderType,
+	complexType models.ComplexOrderStrategyType,
+	price float64,
+	legs []models.OrderLegCollection,
+) *models.OrderRequest {
+	return &models.OrderRequest{
+		Session:                  cmp.Or(session, models.SessionNormal),
+		Duration:                 cmp.Or(duration, models.DurationDay),
+		OrderType:                orderType,
+		ComplexOrderStrategyType: &complexType,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		Price:                    new(price),
+		OrderLegCollection:       legs,
+	}
+}
+
+// buildOptionLegs converts leg parameters in caller-provided order so payload leg
+// ordering stays exactly where each strategy documents it.
+func buildOptionLegs(params ...*optionLegParams) []models.OrderLegCollection {
+	legs := make([]models.OrderLegCollection, 0, len(params))
+	for _, p := range params {
+		legs = append(legs, buildOptionLeg(p))
+	}
+	return legs
 }
 
 // buildOptionLeg constructs a single option leg with full OCC symbol and instrument
