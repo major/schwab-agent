@@ -678,10 +678,34 @@ func buildTADashboard(
 	}
 
 	for i := range rows {
-		closePrice := rows[i]["close"].(float64)
-		atrValue := rows[i]["atr_14"].(float64)
-		avgVolume := rows[i]["avg_volume_20"].(float64)
-		volume := rows[i]["volume"].(float64)
+		closePrice, err := dashboardRowFloat(rows[i], "close")
+		if err != nil {
+			return dashboardOutput{}, err
+		}
+		atrValue, err := dashboardRowFloat(rows[i], "atr_14")
+		if err != nil {
+			return dashboardOutput{}, err
+		}
+		avgVolume, err := dashboardRowFloat(rows[i], "avg_volume_20")
+		if err != nil {
+			return dashboardOutput{}, err
+		}
+		volume, err := dashboardRowFloat(rows[i], "volume")
+		if err != nil {
+			return dashboardOutput{}, err
+		}
+		sma21Value, err := dashboardRowFloat(rows[i], "sma_21")
+		if err != nil {
+			return dashboardOutput{}, err
+		}
+		sma50Value, err := dashboardRowFloat(rows[i], "sma_50")
+		if err != nil {
+			return dashboardOutput{}, err
+		}
+		sma200Value, err := dashboardRowFloat(rows[i], "sma_200")
+		if err != nil {
+			return dashboardOutput{}, err
+		}
 		candleIndex := baseStart + i
 		rangeHigh20, rangeLow20 := highLowWindow(highs, lows, candleIndex, rangePeriod)
 		rangeHigh252, rangeLow252 := highLowWindow(highs, lows, candleIndex, longRangePeriod)
@@ -692,14 +716,18 @@ func buildTADashboard(
 		rows[i]["range_20_low"] = rangeLow20
 		rows[i]["range_252_high"] = rangeHigh252
 		rows[i]["range_252_low"] = rangeLow252
-		rows[i]["distance_from_sma_21_percent"] = percentChange(closePrice, rows[i]["sma_21"].(float64))
-		rows[i]["distance_from_sma_50_percent"] = percentChange(closePrice, rows[i]["sma_50"].(float64))
-		rows[i]["distance_from_sma_200_percent"] = percentChange(closePrice, rows[i]["sma_200"].(float64))
+		rows[i]["distance_from_sma_21_percent"] = percentChange(closePrice, sma21Value)
+		rows[i]["distance_from_sma_50_percent"] = percentChange(closePrice, sma50Value)
+		rows[i]["distance_from_sma_200_percent"] = percentChange(closePrice, sma200Value)
 		rows[i]["distance_from_range_20_high_percent"] = percentChange(closePrice, rangeHigh20)
 		rows[i]["distance_from_range_252_high_percent"] = percentChange(closePrice, rangeHigh252)
 	}
 
 	latest := cloneDashboardRow(rows[len(rows)-1])
+	signals, err := dashboardSignals(latest)
+	if err != nil {
+		return dashboardOutput{}, err
+	}
 	data := dashboardOutput{
 		Indicator: "dashboard",
 		Symbol:    symbol,
@@ -718,7 +746,7 @@ func buildTADashboard(
 			LongRange:    longRangePeriod,
 		},
 		Latest:  latest,
-		Signals: dashboardSignals(latest),
+		Signals: signals,
 		Values:  limitDashboardRows(rows, points),
 	}
 
@@ -822,15 +850,56 @@ func ratio(value, base float64) float64 {
 	return value / base
 }
 
-func dashboardSignals(latest map[string]any) map[string]any {
-	closePrice := latest["close"].(float64)
-	sma21 := latest["sma_21"].(float64)
-	sma50 := latest["sma_50"].(float64)
-	sma200 := latest["sma_200"].(float64)
-	rsi14 := latest["rsi_14"].(float64)
-	macdHist := latest["macd_histogram"].(float64)
-	atrPercent := latest["atr_percent"].(float64)
-	relativeVolume := latest["relative_volume"].(float64)
+func dashboardRowFloat(row map[string]any, key string) (float64, error) {
+	value, ok := row[key]
+	if !ok {
+		return 0, apperr.NewValidationError(fmt.Sprintf("dashboard row missing %s", key), nil)
+	}
+
+	floatValue, ok := value.(float64)
+	if !ok {
+		return 0, apperr.NewValidationError(
+			fmt.Sprintf("dashboard %s value has type %T, want float64", key, value),
+			nil,
+		)
+	}
+
+	return floatValue, nil
+}
+
+func dashboardSignals(latest map[string]any) (map[string]any, error) {
+	closePrice, err := dashboardRowFloat(latest, "close")
+	if err != nil {
+		return nil, err
+	}
+	sma21, err := dashboardRowFloat(latest, "sma_21")
+	if err != nil {
+		return nil, err
+	}
+	sma50, err := dashboardRowFloat(latest, "sma_50")
+	if err != nil {
+		return nil, err
+	}
+	sma200, err := dashboardRowFloat(latest, "sma_200")
+	if err != nil {
+		return nil, err
+	}
+	rsi14, err := dashboardRowFloat(latest, "rsi_14")
+	if err != nil {
+		return nil, err
+	}
+	macdHist, err := dashboardRowFloat(latest, "macd_histogram")
+	if err != nil {
+		return nil, err
+	}
+	atrPercent, err := dashboardRowFloat(latest, "atr_percent")
+	if err != nil {
+		return nil, err
+	}
+	relativeVolume, err := dashboardRowFloat(latest, "relative_volume")
+	if err != nil {
+		return nil, err
+	}
 
 	return map[string]any{
 		"trend":                   trendSignal(closePrice, sma21, sma50, sma200),
@@ -845,7 +914,7 @@ func dashboardSignals(latest map[string]any) map[string]any {
 		"rsi_overbought":          rsi14 >= 70,
 		"rsi_oversold":            rsi14 <= 30,
 		"macd_histogram_positive": macdHist > 0,
-	}
+	}, nil
 }
 
 func trendSignal(closePrice, sma21, sma50, sma200 float64) string {

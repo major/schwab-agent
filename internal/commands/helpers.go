@@ -201,7 +201,11 @@ func registerCobraFlag(flags *pflag.FlagSet, name, short, usage string, field re
 	switch field.Kind() {
 	case reflect.String:
 		if field.Type() == reflect.TypeFor[string]() {
-			flags.StringVarP(field.Addr().Interface().(*string), name, short, field.String(), usage)
+			value, ok := field.Addr().Interface().(*string)
+			if !ok {
+				panic(fmt.Sprintf("unsupported string flag %s type %s", name, field.Type()))
+			}
+			flags.StringVarP(value, name, short, field.String(), usage)
 			return
 		}
 
@@ -212,14 +216,30 @@ func registerCobraFlag(flags *pflag.FlagSet, name, short, usage string, field re
 			flags.Lookup(name).Annotations = map[string][]string{flagEnumAnnotation: valid}
 		}
 	case reflect.Bool:
-		flags.BoolVarP(field.Addr().Interface().(*bool), name, short, field.Bool(), usage)
+		value, ok := field.Addr().Interface().(*bool)
+		if !ok {
+			panic(fmt.Sprintf("unsupported bool flag %s type %s", name, field.Type()))
+		}
+		flags.BoolVarP(value, name, short, field.Bool(), usage)
 	case reflect.Int:
-		flags.IntVarP(field.Addr().Interface().(*int), name, short, int(field.Int()), usage)
+		value, ok := field.Addr().Interface().(*int)
+		if !ok {
+			panic(fmt.Sprintf("unsupported int flag %s type %s", name, field.Type()))
+		}
+		flags.IntVarP(value, name, short, int(field.Int()), usage)
 	case reflect.Float64:
-		flags.Float64VarP(field.Addr().Interface().(*float64), name, short, field.Float(), usage)
+		value, ok := field.Addr().Interface().(*float64)
+		if !ok {
+			panic(fmt.Sprintf("unsupported float64 flag %s type %s", name, field.Type()))
+		}
+		flags.Float64VarP(value, name, short, field.Float(), usage)
 	case reflect.Slice:
 		if field.Type().Elem().Kind() == reflect.String {
-			flags.StringArrayVarP(field.Addr().Interface().(*[]string), name, short, nil, usage)
+			value, ok := field.Addr().Interface().(*[]string)
+			if !ok {
+				panic(fmt.Sprintf("unsupported string slice flag %s type %s", name, field.Type()))
+			}
+			flags.StringArrayVarP(value, name, short, nil, usage)
 			return
 		}
 		panic(fmt.Sprintf("unsupported slice flag %s type %s", name, field.Type()))
