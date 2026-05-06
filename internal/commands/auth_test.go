@@ -235,8 +235,8 @@ func TestNewAuthCmd_LoginAutoSetsDefaultAccount(t *testing.T) {
 			defer response.Body.Close()
 
 			var token auth.TokenData
-			if err := json.NewDecoder(response.Body).Decode(&token); err != nil {
-				return err
+			if decodeErr := json.NewDecoder(response.Body).Decode(&token); decodeErr != nil {
+				return decodeErr
 			}
 
 			token.ExpiresAt = float64(expiresAt)

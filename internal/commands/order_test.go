@@ -550,8 +550,8 @@ func TestNewOrderCmdPreviewSpecAcceptsTriggerOrders(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "preview", "--spec", testCase.spec)
-			require.NoError(t, err)
+			stdout, runErr := runOrderCommand(t, cliClient, configPath, "", "order", "preview", "--spec", testCase.spec)
+			require.NoError(t, runErr)
 
 			envelope := decodeEnvelope(t, stdout)
 			data, ok := envelope.Data.(map[string]any)
@@ -2567,8 +2567,8 @@ func TestNewOrderCmdListDefaultFiltersTerminalStatuses(t *testing.T) {
 
 	expectedIDs := []float64{1, 7, 8}
 	for i, order := range orders {
-		o, ok := order.(map[string]any)
-		require.True(t, ok)
+		o, orderOK := order.(map[string]any)
+		require.True(t, orderOK)
 		assert.Equal(t, expectedIDs[i], o["orderId"])
 	}
 }

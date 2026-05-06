@@ -244,14 +244,14 @@ it is automatically set as the default.`,
 			var loginOutput strings.Builder
 			openBrowser := !opts.NoBrowser
 
-			if err := deps.RunLogin(
+			if loginErr := deps.RunLogin(
 				loginConfig,
 				resolvedTokenPath,
 				deps.OAuthTokenEndpoint(),
 				openBrowser,
 				&loginOutput,
-			); err != nil {
-				return err
+			); loginErr != nil {
+				return loginErr
 			}
 
 			tokenFile, err := auth.LoadToken(resolvedTokenPath)
@@ -271,8 +271,8 @@ it is automatically set as the default.`,
 			if len(accounts) == 1 {
 				defaultAccount = accounts[0].HashValue
 
-				if err := auth.SetDefaultAccount(resolvedConfigPath, defaultAccount); err != nil {
-					return err
+				if setDefaultErr := auth.SetDefaultAccount(resolvedConfigPath, defaultAccount); setDefaultErr != nil {
+					return setDefaultErr
 				}
 
 				autoSetDefault = true
@@ -360,8 +360,8 @@ a valid refresh token (not expired). If the refresh token is stale (older than
 				return err
 			}
 
-			if err := auth.SaveToken(resolvedTokenPath, refreshedToken); err != nil {
-				return err
+			if saveErr := auth.SaveToken(resolvedTokenPath, refreshedToken); saveErr != nil {
+				return saveErr
 			}
 
 			return output.WriteSuccess(w, authRefreshData{

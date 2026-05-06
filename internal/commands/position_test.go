@@ -591,8 +591,8 @@ func positionListFromEnvelope(t *testing.T, data any) []map[string]any {
 
 	positions := make([]map[string]any, 0, len(positionsRaw))
 	for _, raw := range positionsRaw {
-		position, ok := raw.(map[string]any)
-		require.True(t, ok, "expected position to be map[string]any")
+		position, positionOK := raw.(map[string]any)
+		require.True(t, positionOK, "expected position to be map[string]any")
 		positions = append(positions, position)
 	}
 

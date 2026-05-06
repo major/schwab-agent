@@ -49,8 +49,8 @@ func LoadToken(tokenPath string) (*TokenFile, error) {
 	}
 
 	var tf TokenFile
-	if err := json.Unmarshal(data, &tf); err != nil {
-		return nil, fmt.Errorf("failed to parse token file: %w", err)
+	if unmarshalErr := json.Unmarshal(data, &tf); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to parse token file: %w", unmarshalErr)
 	}
 
 	return &tf, nil
@@ -69,8 +69,8 @@ func SaveToken(tokenPath string, tf *TokenFile) error {
 		return fmt.Errorf("failed to marshal token: %w", err)
 	}
 
-	if err := os.WriteFile(tokenPath, data, 0o600); err != nil {
-		return fmt.Errorf("failed to write token file: %w", err)
+	if writeErr := os.WriteFile(tokenPath, data, 0o600); writeErr != nil {
+		return fmt.Errorf("failed to write token file: %w", writeErr)
 	}
 
 	return nil
@@ -130,8 +130,8 @@ func RefreshAccessToken(cfg *Config, tf *TokenFile, endpoint string) (*TokenFile
 
 	// Parse new token data
 	var newToken TokenData
-	if err := json.Unmarshal(resp.Bytes(), &newToken); err != nil {
-		return nil, fmt.Errorf("failed to parse token response: %w", err)
+	if unmarshalErr := json.Unmarshal(resp.Bytes(), &newToken); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to parse token response: %w", unmarshalErr)
 	}
 
 	// Compute ExpiresAt: exchange time + expires_in

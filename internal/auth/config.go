@@ -142,8 +142,8 @@ func LoadConfig(configPath string) (*Config, error) {
 		// File doesn't exist, start with empty config
 	} else {
 		// File exists, parse it
-		if err := json.Unmarshal(data, cfg); err != nil {
-			return nil, fmt.Errorf("failed to parse config file: %w", err)
+		if unmarshalErr := json.Unmarshal(data, cfg); unmarshalErr != nil {
+			return nil, fmt.Errorf("failed to parse config file: %w", unmarshalErr)
 		}
 	}
 
@@ -165,11 +165,11 @@ func LoadConfig(configPath string) (*Config, error) {
 	}
 
 	if rawBaseURLInsecure, ok := os.LookupEnv("SCHWAB_BASE_URL_INSECURE"); ok {
-		baseURLInsecure, err := strconv.ParseBool(strings.TrimSpace(rawBaseURLInsecure))
-		if err != nil {
+		baseURLInsecure, parseErr := strconv.ParseBool(strings.TrimSpace(rawBaseURLInsecure))
+		if parseErr != nil {
 			return nil, apperr.NewValidationError(
 				"Invalid SCHWAB_BASE_URL_INSECURE: expected true or false",
-				err,
+				parseErr,
 			)
 		}
 
@@ -219,8 +219,8 @@ func SaveConfig(configPath string, cfg *Config) error {
 	}
 
 	// Write file with 0600 permissions
-	if err := os.WriteFile(configPath, data, 0o600); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
+	if writeErr := os.WriteFile(configPath, data, 0o600); writeErr != nil {
+		return fmt.Errorf("failed to write config file: %w", writeErr)
 	}
 
 	return nil

@@ -585,7 +585,7 @@ func parseSpecOrder(cmd *cobra.Command, spec string) (*models.OrderRequest, erro
 	}
 
 	var order models.OrderRequest
-	if err := json.Unmarshal(raw, &order); err != nil {
+	if unmarshalErr := json.Unmarshal(raw, &order); unmarshalErr != nil {
 		return nil, newValidationError("spec must contain valid JSON")
 	}
 

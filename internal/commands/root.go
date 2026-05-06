@@ -117,12 +117,12 @@ func (cfg rootAuthConfig) preRun(cmd *cobra.Command, _ []string) error {
 	}
 
 	if auth.IsAccessTokenExpired(token) {
-		refreshed, err := auth.RefreshAccessToken(authConfig, token, cfg.Deps.TokenRefreshEndpoint(authConfig))
-		if err != nil {
-			return fmt.Errorf("refreshing access token: %w", err)
+		refreshed, refreshErr := auth.RefreshAccessToken(authConfig, token, cfg.Deps.TokenRefreshEndpoint(authConfig))
+		if refreshErr != nil {
+			return fmt.Errorf("refreshing access token: %w", refreshErr)
 		}
-		if err := auth.SaveToken(resolvedTokenPath, refreshed); err != nil {
-			return fmt.Errorf("saving refreshed token to %s: %w", resolvedTokenPath, err)
+		if saveErr := auth.SaveToken(resolvedTokenPath, refreshed); saveErr != nil {
+			return fmt.Errorf("saving refreshed token to %s: %w", resolvedTokenPath, saveErr)
 		}
 		token = refreshed
 	}

@@ -235,9 +235,9 @@ func resolveOrderPlacePreviewPayload(
 		return nil, err
 	}
 	if strings.TrimSpace(accountFlag) != "" {
-		acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configPath, nil)
-		if err != nil {
-			return nil, err
+		acct, resolveErr := resolveAccountDetailed(cmd.Context(), c, accountFlag, configPath, nil)
+		if resolveErr != nil {
+			return nil, resolveErr
 		}
 		if acct.Hash != entry.Account {
 			return nil, newValidationError("--account does not match the account bound to the preview digest")
@@ -363,16 +363,16 @@ func runOrderPlaceSpec(
 	if err != nil {
 		return err
 	}
-	if err := requireMutableEnabled(configFlag); err != nil {
-		return err
+	if mutableErr := requireMutableEnabled(configFlag); mutableErr != nil {
+		return mutableErr
 	}
 
 	payload, err := resolveOrderPlacePayload(cmd, c, configFlag, opts)
 	if err != nil {
 		return err
 	}
-	if err := orderbuilder.ValidateOrderRequest(payload.Order); err != nil {
-		return err
+	if validateErr := orderbuilder.ValidateOrderRequest(payload.Order); validateErr != nil {
+		return validateErr
 	}
 
 	response, err := c.PlaceOrder(cmd.Context(), payload.Account, payload.Order)
@@ -521,8 +521,8 @@ func makeCobraPlaceOrderCommand[O any, P any](
 				configFlag = configPath
 			}
 
-			if err := requireMutableEnabled(configFlag); err != nil {
-				return err
+			if mutableErr := requireMutableEnabled(configFlag); mutableErr != nil {
+				return mutableErr
 			}
 
 			accountFlag, err := cmd.Flags().GetString("account")
@@ -540,8 +540,8 @@ func makeCobraPlaceOrderCommand[O any, P any](
 				return err
 			}
 
-			if err := validate(params); err != nil {
-				return err
+			if validateErr := validate(params); validateErr != nil {
+				return validateErr
 			}
 
 			order, err := build(params)
@@ -629,8 +629,8 @@ func runOrderPreviewSpec(
 	if err != nil {
 		return err
 	}
-	if err := orderbuilder.ValidateOrderRequest(order); err != nil {
-		return err
+	if validateErr := orderbuilder.ValidateOrderRequest(order); validateErr != nil {
+		return validateErr
 	}
 
 	preview, err := c.PreviewOrder(cmd.Context(), acct.Hash, order)
@@ -775,8 +775,8 @@ func makeCobraPreviewOrderCommand[O any, P any](
 				return err
 			}
 
-			if err := validate(params); err != nil {
-				return err
+			if validateErr := validate(params); validateErr != nil {
+				return validateErr
 			}
 
 			order, err := build(params)
@@ -831,8 +831,8 @@ config flag. The order ID can be passed as a positional argument or with
 				configFlag = configPath
 			}
 
-			if err := requireMutableEnabled(configFlag); err != nil {
-				return err
+			if mutableErr := requireMutableEnabled(configFlag); mutableErr != nil {
+				return mutableErr
 			}
 
 			orderID, err := parseRequiredOrderID(opts.OrderID, args)
@@ -850,8 +850,8 @@ config flag. The order ID can be passed as a positional argument or with
 				return err
 			}
 
-			if err := c.CancelOrder(cmd.Context(), acct.Hash, orderID); err != nil {
-				return err
+			if cancelErr := c.CancelOrder(cmd.Context(), acct.Hash, orderID); cancelErr != nil {
+				return cancelErr
 			}
 
 			data, errs := fetchOrderActionData(cmd, c, acct.Hash, "cancel", orderID, nil)
@@ -907,8 +907,8 @@ original order status becomes REPLACED after the new order is created.`,
 				configFlag = configPath
 			}
 
-			if err := requireMutableEnabled(configFlag); err != nil {
-				return err
+			if mutableErr := requireMutableEnabled(configFlag); mutableErr != nil {
+				return mutableErr
 			}
 
 			orderID, err := parseRequiredOrderID(opts.OrderID, args)
@@ -931,8 +931,8 @@ original order status becomes REPLACED after the new order is created.`,
 				return err
 			}
 
-			if err := orderbuilder.ValidateEquityOrder(params); err != nil {
-				return err
+			if validateErr := orderbuilder.ValidateEquityOrder(params); validateErr != nil {
+				return validateErr
 			}
 
 			order, err := orderbuilder.BuildEquityOrder(params)
@@ -1002,8 +1002,8 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 				configFlag = configPath
 			}
 
-			if err := requireMutableEnabled(configFlag); err != nil {
-				return err
+			if mutableErr := requireMutableEnabled(configFlag); mutableErr != nil {
+				return mutableErr
 			}
 
 			orderID, err := parseRequiredOrderID(opts.OrderID, args)
@@ -1037,8 +1037,8 @@ contract is built from --underlying, --expiration, --strike, and exactly one of
 				return err
 			}
 
-			if err := orderbuilder.ValidateOptionOrder(params); err != nil {
-				return err
+			if validateErr := orderbuilder.ValidateOptionOrder(params); validateErr != nil {
+				return validateErr
 			}
 
 			order, err := orderbuilder.BuildOptionOrder(params)

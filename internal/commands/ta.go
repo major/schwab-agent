@@ -541,9 +541,9 @@ func computeSimpleTAOutput(
 
 	valuesByPeriod := make(map[int][]float64, len(periods))
 	for _, p := range periods {
-		values, err := cfg.compute(closes, p)
-		if err != nil {
-			return nil, err
+		values, computeErr := cfg.compute(closes, p)
+		if computeErr != nil {
+			return nil, computeErr
 		}
 		valuesByPeriod[p] = values
 	}
@@ -1667,8 +1667,8 @@ func fetchAndValidateCandles(
 		return nil, nil, err
 	}
 
-	if err := ta.ValidateMinCandles(result.Candles, requiredCandles, indicator); err != nil {
-		return nil, nil, err
+	if validateErr := ta.ValidateMinCandles(result.Candles, requiredCandles, indicator); validateErr != nil {
+		return nil, nil, validateErr
 	}
 
 	timestamps := ta.ExtractTimestamps(result.Candles)

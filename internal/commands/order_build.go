@@ -49,8 +49,8 @@ func makeCobraBuildOrderCommand[O any, P any](
 				return err
 			}
 
-			if err := validate(params); err != nil {
-				return err
+			if validateErr := validate(params); validateErr != nil {
+				return validateErr
 			}
 
 			order, err := build(params)
@@ -462,18 +462,18 @@ triggered. Both --primary and --secondary accept inline JSON, @file, or
 			}
 
 			var primary models.OrderRequest
-			if err := json.Unmarshal(primaryData, &primary); err != nil {
-				return newValidationError("invalid primary order JSON: " + err.Error())
+			if unmarshalErr := json.Unmarshal(primaryData, &primary); unmarshalErr != nil {
+				return newValidationError("invalid primary order JSON: " + unmarshalErr.Error())
 			}
 
 			var secondary models.OrderRequest
-			if err := json.Unmarshal(secondaryData, &secondary); err != nil {
-				return newValidationError("invalid secondary order JSON: " + err.Error())
+			if unmarshalErr := json.Unmarshal(secondaryData, &secondary); unmarshalErr != nil {
+				return newValidationError("invalid secondary order JSON: " + unmarshalErr.Error())
 			}
 
 			params := orderbuilder.FTSParams{Primary: primary, Secondary: secondary}
-			if err := orderbuilder.ValidateFTSOrder(&params); err != nil {
-				return err
+			if validateErr := orderbuilder.ValidateFTSOrder(&params); validateErr != nil {
+				return validateErr
 			}
 
 			result, err := orderbuilder.BuildFTSOrder(&params)

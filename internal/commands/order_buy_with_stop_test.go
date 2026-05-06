@@ -130,8 +130,8 @@ func TestBuyWithStopBuild(t *testing.T) {
 			child := children[0].(map[string]any)
 			if tt.wantOCOChildren {
 				assert.Equal(t, "OCO", child["orderStrategyType"])
-				exits, ok := child["childOrderStrategies"].([]any)
-				require.True(t, ok, "take-profit plus stop-loss should create OCO exits")
+				exits, exitsOK := child["childOrderStrategies"].([]any)
+				require.True(t, exitsOK, "take-profit plus stop-loss should create OCO exits")
 				require.Len(t, exits, 2)
 				for _, exit := range exits {
 					exitOrder := exit.(map[string]any)

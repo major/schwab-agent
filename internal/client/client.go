@@ -172,8 +172,8 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 	// cryptic json.Unmarshal error instead of a clear diagnostic.
 	ct := resp.Header().Get("Content-Type")
 	if ct != "" {
-		mediaType, _, err := mime.ParseMediaType(ct)
-		if err == nil && mediaType != "application/json" {
+		mediaType, _, parseErr := mime.ParseMediaType(ct)
+		if parseErr == nil && mediaType != "application/json" {
 			// Show a body preview so the caller can see what came back
 			// (e.g., an HTML maintenance page or a proxy error).
 			preview := resp.String()
@@ -184,8 +184,8 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 		}
 	}
 
-	if err := json.Unmarshal(respBody, result); err != nil {
-		return fmt.Errorf("decode response: %w", err)
+	if unmarshalErr := json.Unmarshal(respBody, result); unmarshalErr != nil {
+		return fmt.Errorf("decode response: %w", unmarshalErr)
 	}
 
 	return nil

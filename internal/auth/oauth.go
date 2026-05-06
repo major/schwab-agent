@@ -105,8 +105,8 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*Toke
 	}
 
 	var token TokenData
-	if err := json.Unmarshal(resp.Bytes(), &token); err != nil {
-		return nil, apperr.NewAuthCallbackError("failed to parse token exchange response", err)
+	if unmarshalErr := json.Unmarshal(resp.Bytes(), &token); unmarshalErr != nil {
+		return nil, apperr.NewAuthCallbackError("failed to parse token exchange response", unmarshalErr)
 	}
 
 	nowUnix := now.Unix()
@@ -149,13 +149,13 @@ func RunLogin(cfg *Config, tokenPath, tokenEndpoint string, openBrowser bool, w 
 
 	if openBrowser {
 		logger.Info("Opening browser for Schwab login")
-		if err := browser.OpenURL(authURL); err != nil {
-			return apperr.NewAuthCallbackError("failed to open browser", err)
+		if openErr := browser.OpenURL(authURL); openErr != nil {
+			return apperr.NewAuthCallbackError("failed to open browser", openErr)
 		}
 	} else {
 		logger.Info("Open this URL to authenticate", "url", authURL)
-		if _, err := fmt.Fprintln(w, authURL); err != nil {
-			return fmt.Errorf("failed to write authorization URL: %w", err)
+		if _, writeErr := fmt.Fprintln(w, authURL); writeErr != nil {
+			return fmt.Errorf("failed to write authorization URL: %w", writeErr)
 		}
 	}
 
@@ -171,8 +171,8 @@ func RunLogin(cfg *Config, tokenPath, tokenEndpoint string, openBrowser bool, w 
 		return err
 	}
 
-	if err := SaveToken(tokenPath, tokenFile); err != nil {
-		return fmt.Errorf("failed to save token: %w", err)
+	if saveErr := SaveToken(tokenPath, tokenFile); saveErr != nil {
+		return fmt.Errorf("failed to save token: %w", saveErr)
 	}
 
 	logger.Info("Saved OAuth token", "path", tokenPath)
