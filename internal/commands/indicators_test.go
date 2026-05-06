@@ -103,7 +103,7 @@ func TestNewIndicatorsCmd_ValidEnvelope(t *testing.T) {
 
 func TestNewIndicatorsCmd_IntervalFlag(t *testing.T) {
 	// Arrange
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(mockCandleListJSON("NVDA", 252)))
 	}))

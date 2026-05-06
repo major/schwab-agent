@@ -60,7 +60,7 @@ contract type. No API call or authentication required. Output is JSON with the
 constructed symbol and its components.`,
 		Example: `  schwab-agent symbol build --underlying AAPL --expiration 2025-06-20 --strike 200 --call
   schwab-agent symbol build --underlying TSLA --expiration 2025-12-19 --strike 350.50 --put`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
@@ -102,7 +102,7 @@ func newSymbolParseCmd(w io.Writer) *cobra.Command {
 price, and contract type components. No API call or authentication required.`,
 		Example: `  schwab-agent symbol parse "AAPL  250620C00200000"`,
 		Args:    cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			symbol := args[0]
 			components, err := orderbuilder.ParseOCCSymbol(symbol)
 			if err != nil {

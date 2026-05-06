@@ -147,7 +147,7 @@ func TestExchangeCode_Success_UsesBasicAuthAndReturnsTokenFile(t *testing.T) {
 
 func TestExchangeCode_Failure_ReturnsAuthCallbackError(t *testing.T) {
 	// Arrange
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"error":"invalid_request"}`))
 	}))

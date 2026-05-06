@@ -47,7 +47,7 @@ func TestNewClient_WithBaseURL(t *testing.T) {
 	assert.Equal(t, "https://custom.api.com", c.baseURL)
 }
 
-func TestNewClient_WithTLSConfig(t *testing.T) {
+func TestNewClient_WithTLSConfig(_ *testing.T) {
 	// Use a non-nil TLS config to verify it's applied
 	tlsCfg := &tls.Config{}
 	c := NewClient("tok", WithTLSConfig(tlsCfg))

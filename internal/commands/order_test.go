@@ -1326,7 +1326,7 @@ func TestNewOrderCmdPreviewNotBlockedByMutableGuard(t *testing.T) {
 
 	orderID := int64(9999)
 	previewResponse := models.PreviewOrder{OrderID: &orderID}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
 	}))
@@ -2540,7 +2540,7 @@ func TestNewOrderCmdListDefaultFiltersTerminalStatuses(t *testing.T) {
 
 	// Arrange - return orders in every terminal status plus one non-terminal.
 	// Default listing (no --status flag) should filter out all terminal ones.
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write([]byte(`[
 			{"orderId":1,"status":"WORKING"},
@@ -2685,7 +2685,7 @@ func TestNewOrderCmdListNilStatusIncludedByDefault(t *testing.T) {
 
 	// Arrange - orders with no status field should be kept (conservative:
 	// don't hide orders with unknown state).
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write([]byte(`[
 			{"orderId":1},
@@ -3555,7 +3555,7 @@ func TestParseRequiredOrderID(t *testing.T) {
 			opts := &orderGetOpts{}
 			cmd := &cobra.Command{
 				Use: "order-test",
-				RunE: func(cmd *cobra.Command, args []string) error {
+				RunE: func(_ *cobra.Command, args []string) error {
 					var err error
 					parsedID, err = parseRequiredOrderID(opts.OrderID, args)
 					return err

@@ -14,7 +14,7 @@ type UserPreferenceAccount struct {
 	Type               *string `json:"type,omitempty"`
 	NickName           *string `json:"nickName,omitempty"`
 	AccountColor       *string `json:"accountColor,omitempty"`
-	DisplayAcctId      *string `json:"displayAcctId,omitempty"`
+	DisplayAcctID      *string `json:"displayAcctId,omitempty"`
 	AutoPositionEffect *bool   `json:"autoPositionEffect,omitempty"`
 }
 

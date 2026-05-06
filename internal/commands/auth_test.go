@@ -219,7 +219,7 @@ func TestNewAuthCmd_LoginAutoSetsDefaultAccount(t *testing.T) {
 		NewAccountClient: func(token string, _ *auth.Config) accountNumbersClient {
 			return client.NewClient(token, client.WithBaseURL(server.URL))
 		},
-		RunLogin: func(cfg *auth.Config, targetTokenPath string, tokenEndpoint string, openBrowser bool, w io.Writer) error {
+		RunLogin: func(_ *auth.Config, targetTokenPath string, tokenEndpoint string, openBrowser bool, w io.Writer) error {
 			assert.False(t, openBrowser)
 			_, err := fmt.Fprintln(w, "https://example.com/authorize")
 			require.NoError(t, err)
