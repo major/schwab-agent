@@ -19,6 +19,8 @@ const (
 	aaplQuoteEntryResponse  = aaplQuoteEntryPrefix + `}`
 	multiQuoteEntryResponse = aaplQuoteEntryPrefix +
 		`,"MSFT":{"assetMainType":"EQUITY","symbol":"MSFT","quote":{"lastPrice":400.0}}}`
+	multiQuoteEntryWithNullResponse = `{"AAPL":null,` +
+		`"MSFT":{"assetMainType":"EQUITY","symbol":"MSFT","quote":{"lastPrice":400.0}}}`
 	amznCallQuoteEntryResponse = `{"AMZN  260515C00270000":` +
 		`{"assetMainType":"OPTION","symbol":"AMZN  260515C00270000",` +
 		`"quote":{"lastPrice":5.50}}}`
@@ -112,6 +114,39 @@ func TestNewQuoteGetPartialSuccess(t *testing.T) {
 
 	require.Len(t, envelope.Errors, 1)
 	assert.Contains(t, envelope.Errors[0], "INVALID")
+
+	assert.Equal(t, 2, envelope.Metadata.Requested)
+	assert.Equal(t, 1, envelope.Metadata.Returned)
+	assert.NotEmpty(t, envelope.Metadata.Timestamp)
+}
+
+func TestNewQuoteGetPartialSuccessFiltersNullQuotes(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/marketdata/v1/quotes" {
+			// Schwab-go currently decodes a JSON null entry as an empty QuoteEntry.
+			// Treat that as missing and keep partial data free of empty quote rows.
+			_, _ = w.Write([]byte(multiQuoteEntryWithNullResponse))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	var buf bytes.Buffer
+	cmd := NewQuoteCmd(testClientWithMarketData(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "get", "AAPL", "MSFT")
+	require.NoError(t, err)
+
+	var envelope output.Envelope
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok)
+	assert.NotContains(t, data, "AAPL")
+	assert.Contains(t, data, "MSFT")
+
+	require.Len(t, envelope.Errors, 1)
+	assert.Contains(t, envelope.Errors[0], "AAPL")
 
 	assert.Equal(t, 2, envelope.Metadata.Requested)
 	assert.Equal(t, 1, envelope.Metadata.Returned)
