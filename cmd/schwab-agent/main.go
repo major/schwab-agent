@@ -45,11 +45,8 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 
 	root := commands.BuildCommandTree(w, configPath, tokenPath, version, deps, authDeps)
 
-	commands.InstallDebugOptions(root)
-
-	// Register --instruction/--order-type flag aliases on qualifying commands.
-	// This runs after all first-party persistent flags are installed so aliases
-	// are layered on top of the final Cobra command tree.
+	// Register --instruction/--order-type flag aliases on qualifying order
+	// commands after the command tree is fully built.
 	commands.RegisterOrderFlagAliasesOnTree(root)
 
 	return root
