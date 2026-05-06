@@ -253,8 +253,16 @@ func TestOptionChainParamsValidation(t *testing.T) {
 			opts: chainGetOpts{Interval: "not-a-number"},
 		},
 		{
+			name: "zero interval",
+			opts: chainGetOpts{Interval: "0"},
+		},
+		{
 			name: "negative interval",
 			opts: chainGetOpts{Interval: "-1"},
+		},
+		{
+			name: "zero strike",
+			opts: chainGetOpts{Strike: "0"},
 		},
 		{
 			name: "negative strike",
@@ -271,6 +279,10 @@ func TestOptionChainParamsValidation(t *testing.T) {
 		{
 			name: "invalid interest rate",
 			opts: chainGetOpts{InterestRate: "not-a-number"},
+		},
+		{
+			name: "zero interest rate",
+			opts: chainGetOpts{InterestRate: "0"},
 		},
 		{
 			name: "invalid days to expiration",

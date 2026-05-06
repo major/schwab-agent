@@ -184,12 +184,21 @@ func optionalFloat(raw, flagName string) (float64, error) {
 	if err != nil {
 		return 0, apperr.NewValidationError(fmt.Sprintf("invalid %s: %s", flagName, raw), err)
 	}
+	// schwab-go's option-chain params use zero values to mean "omit this query
+	// parameter." Reject an explicit 0 here so the CLI does not silently drop a
+	// flag the user supplied.
+	if value == 0 {
+		return 0, apperr.NewValidationError(
+			fmt.Sprintf("invalid %s: %s (must be non-zero)", flagName, raw),
+			nil,
+		)
+	}
 	return value, nil
 }
 
 func optionalPositiveFloat(raw, flagName string) (float64, error) {
 	value, err := optionalFloat(raw, flagName)
-	if err != nil || value == 0 {
+	if err != nil || raw == "" {
 		return value, err
 	}
 	if value < 0 {

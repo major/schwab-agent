@@ -112,6 +112,10 @@ func setOptionalQueryBool(q url.Values, name string, value bool) {
 }
 
 func setOptionalQueryFloat(q url.Values, name string, value float64) {
+	// marketdata.OptionChainParams follows schwab-go's zero-value convention:
+	// zero means the optional query parameter is unset. Command parsing rejects
+	// explicit zero values so users do not accidentally supply a flag that gets
+	// omitted here.
 	if value != 0 {
 		q.Set(name, strconv.FormatFloat(value, 'f', -1, 64))
 	}
