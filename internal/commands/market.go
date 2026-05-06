@@ -16,7 +16,13 @@ import (
 // allMarkets returns the full list of Schwab market types, used as the default
 // when no specific markets are requested.
 func allMarkets() []string {
-	return []string{commandUseEquity, commandUseOption, "bond", "future", "forex"}
+	return []string{
+		string(marketdata.MarketIDEquity),
+		string(marketdata.MarketIDOption),
+		string(marketdata.MarketIDBond),
+		string(marketdata.MarketIDFuture),
+		string(marketdata.MarketIDForex),
+	}
 }
 
 // moversData wraps the movers response.
@@ -65,19 +71,20 @@ more market names to filter.`,
 				markets = allMarkets()
 			}
 
-			// Use the single-market endpoint when exactly one market
-			// is requested, and the multi-market endpoint otherwise.
+			// Use the single-market endpoint when exactly one market is requested.
+			// schwab-go takes an optional date argument; the CLI does not expose that
+			// filter, so pass an empty string to preserve the existing behavior.
 			if len(markets) == 1 {
-				result, err := c.Market(cmd.Context(), markets[0])
+				result, err := c.MarketData.GetMarketHoursSingle(cmd.Context(), markets[0], "")
 				if err != nil {
-					return err
+					return mapSchwabGoError(err)
 				}
 				return output.WriteSuccess(w, result, output.NewMetadata())
 			}
 
-			result, err := c.Markets(cmd.Context(), markets)
+			result, err := c.MarketData.GetMarketHours(cmd.Context(), markets, "")
 			if err != nil {
-				return err
+				return mapSchwabGoError(err)
 			}
 			return output.WriteSuccess(w, result, output.NewMetadata())
 		},

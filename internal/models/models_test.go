@@ -818,53 +818,6 @@ func TestQuoteOptionJSONRoundTrip(t *testing.T) {
 	assert.InDelta(t, *q.StrikePrice, *q2.StrikePrice, 0.001)
 }
 
-// TestMarketHoursJSONRoundTrip verifies nested session hours arrays.
-func TestMarketHoursJSONRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	input := `{
-		"marketType": "EQUITY",
-		"product": "equity",
-		"productName": "equity",
-		"isOpen": true,
-		"exchange": "NYSE",
-		"date": "2026-04-21",
-		"sessionHours": {
-			"preMarket": [
-				{"start": "2026-04-21T07:00:00-04:00", "end": "2026-04-21T09:30:00-04:00"}
-			],
-			"regularMarket": [
-				{"start": "2026-04-21T09:30:00-04:00", "end": "2026-04-21T16:00:00-04:00"}
-			],
-			"postMarket": [
-				{"start": "2026-04-21T16:00:00-04:00", "end": "2026-04-21T20:00:00-04:00"}
-			]
-		}
-	}`
-
-	var mh MarketHours
-	err := json.Unmarshal([]byte(input), &mh)
-	require.NoError(t, err)
-
-	assert.Equal(t, "EQUITY", *mh.MarketType)
-	assert.True(t, *mh.IsOpen)
-
-	require.NotNil(t, mh.SessionHours)
-	require.Len(t, mh.SessionHours.PreMarket, 1)
-	require.Len(t, mh.SessionHours.RegularMarket, 1)
-	require.Len(t, mh.SessionHours.PostMarket, 1)
-	assert.Contains(t, *mh.SessionHours.RegularMarket[0].Start, "09:30:00")
-	assert.Contains(t, *mh.SessionHours.RegularMarket[0].End, "16:00:00")
-
-	// Round-trip.
-	data, err := json.Marshal(mh)
-	require.NoError(t, err)
-	var mh2 MarketHours
-	err = json.Unmarshal(data, &mh2)
-	require.NoError(t, err)
-	assert.Equal(t, *mh.MarketType, *mh2.MarketType)
-}
-
 // TestPreviewOrderJSONRoundTrip verifies deeply nested commission/fee structures.
 func TestPreviewOrderJSONRoundTrip(t *testing.T) {
 	t.Parallel()
@@ -966,44 +919,6 @@ func TestPreviewOrderJSONRoundTrip(t *testing.T) {
 	err = json.Unmarshal(data, &preview2)
 	require.NoError(t, err)
 	assert.Equal(t, *preview.OrderID, *preview2.OrderID)
-}
-
-// TestScreenerResponseJSONRoundTrip verifies the movers/screener response.
-func TestScreenerResponseJSONRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	input := `{
-		"screeners": [
-			{
-				"symbol": "AAPL",
-				"description": "Apple Inc",
-				"lastPrice": 175.50,
-				"netChange": 2.50,
-				"netPercentChange": 1.44,
-				"volume": 45000000,
-				"totalVolume": 45000000,
-				"trades": 500000,
-				"marketShare": 12.5
-			}
-		]
-	}`
-
-	var sr ScreenerResponse
-	err := json.Unmarshal([]byte(input), &sr)
-	require.NoError(t, err)
-
-	require.Len(t, sr.Screeners, 1)
-	assert.Equal(t, "AAPL", *sr.Screeners[0].Symbol)
-	assert.InDelta(t, 175.50, *sr.Screeners[0].LastPrice, 0.001)
-	assert.Equal(t, int64(45000000), *sr.Screeners[0].Volume)
-
-	// Round-trip.
-	data, err := json.Marshal(sr)
-	require.NoError(t, err)
-	var sr2 ScreenerResponse
-	err = json.Unmarshal(data, &sr2)
-	require.NoError(t, err)
-	assert.Equal(t, *sr.Screeners[0].Symbol, *sr2.Screeners[0].Symbol)
 }
 
 // TestInstrumentResponseJSONRoundTrip verifies instrument with fundamental data.

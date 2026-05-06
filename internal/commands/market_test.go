@@ -20,7 +20,6 @@ import (
 
 // testClientWithMarketData creates a *client.Ref with both the internal client
 // and a schwab-go marketdata.Client pointing at the given httptest server.
-// Use this for movers tests; hours tests use testClient.
 func testClientWithMarketData(t *testing.T, server *httptest.Server) *client.Ref {
 	t.Helper()
 	ref := testClient(t, server)
@@ -35,7 +34,7 @@ func TestNewMarketCmd_Hours_AllMarkets(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/marketdata/v1/markets", r.URL.Path)
+		assert.Equal(t, "/markets", r.URL.Path)
 		// The API requires a "markets" query param; our command sends all by default.
 		assert.NotEmpty(t, r.URL.Query().Get("markets"))
 
@@ -47,7 +46,7 @@ func TestNewMarketCmd_Hours_AllMarkets(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "hours")
 
 	// Assert
@@ -62,7 +61,7 @@ func TestNewMarketCmd_Hours_SpecificMarket(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/marketdata/v1/markets/equity", r.URL.Path)
+		assert.Equal(t, "/markets/equity", r.URL.Path)
 
 		w.Header().Set("Content-Type", "application/json")
 		// Single-market endpoint returns the same doubly-nested structure.
@@ -72,7 +71,7 @@ func TestNewMarketCmd_Hours_SpecificMarket(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "hours", "equity")
 
 	// Assert
@@ -93,7 +92,7 @@ func TestNewMarketCmd_Hours_APIError(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "hours")
 
 	// Assert
@@ -110,7 +109,7 @@ func TestNewMarketCmd_Hours_SpecificMarketAPIError(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "hours", "invalid")
 
 	// Assert
