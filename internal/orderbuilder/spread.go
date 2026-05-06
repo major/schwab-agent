@@ -130,10 +130,38 @@ func BuildIronCondorOrder(params *IronCondorParams) (*models.OrderRequest, error
 	}
 
 	legs := buildOptionLegs(
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.PutLongStrike, PutCall: models.PutCallPut, Instruction: longInstruction, Quantity: params.Quantity},
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.PutShortStrike, PutCall: models.PutCallPut, Instruction: shortInstruction, Quantity: params.Quantity},
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.CallShortStrike, PutCall: models.PutCallCall, Instruction: shortInstruction, Quantity: params.Quantity},
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.CallLongStrike, PutCall: models.PutCallCall, Instruction: longInstruction, Quantity: params.Quantity},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.Expiration,
+			Strike:      params.PutLongStrike,
+			PutCall:     models.PutCallPut,
+			Instruction: longInstruction,
+			Quantity:    params.Quantity,
+		},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.Expiration,
+			Strike:      params.PutShortStrike,
+			PutCall:     models.PutCallPut,
+			Instruction: shortInstruction,
+			Quantity:    params.Quantity,
+		},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.Expiration,
+			Strike:      params.CallShortStrike,
+			PutCall:     models.PutCallCall,
+			Instruction: shortInstruction,
+			Quantity:    params.Quantity,
+		},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.Expiration,
+			Strike:      params.CallLongStrike,
+			PutCall:     models.PutCallCall,
+			Instruction: longInstruction,
+			Quantity:    params.Quantity,
+		},
 	)
 
 	return buildSpreadOrder(params.Session, params.Duration, orderType, complexType, params.Price, legs), nil
@@ -385,10 +413,38 @@ func BuildDoubleDiagonalOrder(params *DoubleDiagonalParams) (*models.OrderReques
 	}
 
 	legs := buildOptionLegs(
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.FarExpiration, Strike: params.PutFarStrike, PutCall: models.PutCallPut, Instruction: longInstruction, Quantity: params.Quantity},
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.NearExpiration, Strike: params.PutNearStrike, PutCall: models.PutCallPut, Instruction: shortInstruction, Quantity: params.Quantity},
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.NearExpiration, Strike: params.CallNearStrike, PutCall: models.PutCallCall, Instruction: shortInstruction, Quantity: params.Quantity},
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.FarExpiration, Strike: params.CallFarStrike, PutCall: models.PutCallCall, Instruction: longInstruction, Quantity: params.Quantity},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.FarExpiration,
+			Strike:      params.PutFarStrike,
+			PutCall:     models.PutCallPut,
+			Instruction: longInstruction,
+			Quantity:    params.Quantity,
+		},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.NearExpiration,
+			Strike:      params.PutNearStrike,
+			PutCall:     models.PutCallPut,
+			Instruction: shortInstruction,
+			Quantity:    params.Quantity,
+		},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.NearExpiration,
+			Strike:      params.CallNearStrike,
+			PutCall:     models.PutCallCall,
+			Instruction: shortInstruction,
+			Quantity:    params.Quantity,
+		},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.FarExpiration,
+			Strike:      params.CallFarStrike,
+			PutCall:     models.PutCallCall,
+			Instruction: longInstruction,
+			Quantity:    params.Quantity,
+		},
 	)
 
 	return buildSpreadOrder(params.Session, params.Duration, orderType, complexType, params.Price, legs), nil
@@ -441,8 +497,22 @@ func BuildStraddleOrder(params *StraddleParams) (*models.OrderRequest, error) {
 	complexType := models.ComplexOrderStrategyTypeStraddle
 
 	legs := buildOptionLegs(
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.Strike, PutCall: models.PutCallCall, Instruction: instruction, Quantity: params.Quantity},
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.Strike, PutCall: models.PutCallPut, Instruction: instruction, Quantity: params.Quantity},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.Expiration,
+			Strike:      params.Strike,
+			PutCall:     models.PutCallCall,
+			Instruction: instruction,
+			Quantity:    params.Quantity,
+		},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.Expiration,
+			Strike:      params.Strike,
+			PutCall:     models.PutCallPut,
+			Instruction: instruction,
+			Quantity:    params.Quantity,
+		},
 	)
 
 	return buildSpreadOrder(params.Session, params.Duration, orderType, complexType, params.Price, legs), nil
@@ -476,8 +546,22 @@ func BuildStrangleOrder(params *StrangleParams) (*models.OrderRequest, error) {
 	complexType := models.ComplexOrderStrategyTypeStrangle
 
 	legs := buildOptionLegs(
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.CallStrike, PutCall: models.PutCallCall, Instruction: instruction, Quantity: params.Quantity},
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.Expiration, Strike: params.PutStrike, PutCall: models.PutCallPut, Instruction: instruction, Quantity: params.Quantity},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.Expiration,
+			Strike:      params.CallStrike,
+			PutCall:     models.PutCallCall,
+			Instruction: instruction,
+			Quantity:    params.Quantity,
+		},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.Expiration,
+			Strike:      params.PutStrike,
+			PutCall:     models.PutCallPut,
+			Instruction: instruction,
+			Quantity:    params.Quantity,
+		},
 	)
 
 	return buildSpreadOrder(params.Session, params.Duration, orderType, complexType, params.Price, legs), nil
@@ -594,8 +678,22 @@ func BuildCalendarOrder(params *CalendarParams) (*models.OrderRequest, error) {
 	// Far leg (bought when opening) listed first for consistency with how Schwab
 	// displays calendar spreads.
 	legs := buildOptionLegs(
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.FarExpiration, Strike: params.Strike, PutCall: params.PutCall, Instruction: longInstruction, Quantity: params.Quantity},
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.NearExpiration, Strike: params.Strike, PutCall: params.PutCall, Instruction: shortInstruction, Quantity: params.Quantity},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.FarExpiration,
+			Strike:      params.Strike,
+			PutCall:     params.PutCall,
+			Instruction: longInstruction,
+			Quantity:    params.Quantity,
+		},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.NearExpiration,
+			Strike:      params.Strike,
+			PutCall:     params.PutCall,
+			Instruction: shortInstruction,
+			Quantity:    params.Quantity,
+		},
 	)
 
 	return buildSpreadOrder(params.Session, params.Duration, orderType, complexType, params.Price, legs), nil
@@ -639,8 +737,22 @@ func BuildDiagonalOrder(params *DiagonalParams) (*models.OrderRequest, error) {
 
 	// Far leg (bought when opening) listed first.
 	legs := buildOptionLegs(
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.FarExpiration, Strike: params.FarStrike, PutCall: params.PutCall, Instruction: longInstruction, Quantity: params.Quantity},
-		&optionLegParams{Underlying: params.Underlying, Expiration: params.NearExpiration, Strike: params.NearStrike, PutCall: params.PutCall, Instruction: shortInstruction, Quantity: params.Quantity},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.FarExpiration,
+			Strike:      params.FarStrike,
+			PutCall:     params.PutCall,
+			Instruction: longInstruction,
+			Quantity:    params.Quantity,
+		},
+		&optionLegParams{
+			Underlying:  params.Underlying,
+			Expiration:  params.NearExpiration,
+			Strike:      params.NearStrike,
+			PutCall:     params.PutCall,
+			Instruction: shortInstruction,
+			Quantity:    params.Quantity,
+		},
 	)
 
 	return buildSpreadOrder(params.Session, params.Duration, orderType, complexType, params.Price, legs), nil
