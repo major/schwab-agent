@@ -11,3 +11,5 @@ applyTo: "**/*_test.go"
 - Use `t.TempDir()` for file I/O.
 - Keep generated data inline unless there is a clear reason to introduce fixtures.
 - Do not request coverage-only tests when critical behavior is already covered.
+- Do not suggest restructuring tests that already verify the correct behavior.
+- Do not comment on test naming conventions or test organization style.

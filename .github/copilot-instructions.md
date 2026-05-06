@@ -2,7 +2,11 @@
 
 Review this repository as a Go CLI for AI agents that trade through Charles Schwab APIs. The command output contract is JSON-first, safety checks protect real brokerage accounts, and workflow knowledge belongs in command help text plus generated agent docs.
 
-Focus on bugs, security, data loss, broken command contracts, and project conventions. Do not nitpick formatting or style that golangci-lint already handles.
+## Review focus
+
+Flag bugs, security issues, data loss risks, broken command contracts, and correctness problems. These are the only categories worth commenting on.
+
+Do not comment on style, naming choices, comment formatting, missing documentation, or code organization. Automated linters and formatters (golangci-lint, gofmt, goimports) handle style enforcement for this project. Naming and documentation decisions are made by the maintainer during development, not during review.
 
 ## Project invariants
 
