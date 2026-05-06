@@ -52,6 +52,8 @@ func TestBuildOCCSymbol(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tt.want, BuildOCCSymbol(tt.underlying, tt.expiration, tt.strike, tt.putCall))
 		})
 	}
@@ -125,6 +127,8 @@ func TestParseOCCSymbol(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result, err := ParseOCCSymbol(tt.symbol)
 			require.NoError(t, err)
 			assert.Equal(t, tt.underlying, result.Underlying)
@@ -186,6 +190,8 @@ func TestParseOCCSymbolErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result, err := ParseOCCSymbol(tt.symbol)
 			require.Error(t, err)
 			assert.Nil(t, result)
@@ -230,6 +236,8 @@ func TestParseOCCSymbolRoundTrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Arrange
 			symbol := BuildOCCSymbol(tt.underlying, tt.expiration, tt.strike, tt.putCall)
 

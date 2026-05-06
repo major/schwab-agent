@@ -89,6 +89,8 @@ func TestBuildOCCSymbolValid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			symbol, err := buildOCCSymbol(tt.underlying, tt.expiration, tt.strike, tt.call, tt.put)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantSymbol, symbol)
@@ -124,6 +126,8 @@ func TestBuildOCCSymbolInvalidDateFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			symbol, err := buildOCCSymbol("AAPL", tt.expiration, 200, true, false)
 			require.Error(t, err)
 			assert.Empty(t, symbol)

@@ -74,6 +74,8 @@ func TestNewSymbolCmdBuild(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			buf := &bytes.Buffer{}
 			cmd := NewSymbolCmd(buf)
 
@@ -141,6 +143,8 @@ func TestNewSymbolCmdBuildValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			buf := &bytes.Buffer{}
 			cmd := NewSymbolCmd(buf)
 
@@ -191,6 +195,8 @@ func TestNewSymbolCmdParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			buf := &bytes.Buffer{}
 			cmd := NewSymbolCmd(buf)
 
@@ -241,6 +247,8 @@ func TestNewSymbolCmdParseValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			buf := &bytes.Buffer{}
 			cmd := NewSymbolCmd(buf)
 

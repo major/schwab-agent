@@ -370,8 +370,6 @@ func TestFromPreviewIncludesAccountMetadata(t *testing.T) {
 }
 
 func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
-	t.Parallel()
-
 	orderID := int64(4242)
 	previewResponse := models.PreviewOrder{OrderID: &orderID}
 	var requestBodies []string
@@ -447,8 +445,6 @@ func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 }
 
 func TestNewOrderCmdSpecSemanticValidation(t *testing.T) {
-	t.Parallel()
-
 	var requests int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
@@ -500,8 +496,6 @@ func TestNewOrderCmdSpecSemanticValidation(t *testing.T) {
 }
 
 func TestNewOrderCmdPreviewSpecAcceptsTriggerOrders(t *testing.T) {
-	t.Parallel()
-
 	var requestBodies []string
 	orderID := int64(4244)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
