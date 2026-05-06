@@ -611,8 +611,8 @@ type CoveredCallParams struct {
 // The order is always NET_DEBIT since the equity purchase far exceeds the call
 // premium received. Schwab treats this as a COVERED complex order strategy.
 //
-// Leg 1: BUY equity shares (quantity * 100)
-// Leg 2: SELL_TO_OPEN call option (quantity contracts)
+// Leg 1: BUY equity shares (quantity * 100).
+// Leg 2: SELL_TO_OPEN call option (quantity contracts).
 func BuildCoveredCallOrder(params *CoveredCallParams) (*models.OrderRequest, error) {
 	complexType := models.ComplexOrderStrategyTypeCovered
 
