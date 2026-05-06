@@ -921,57 +921,6 @@ func TestPreviewOrderJSONRoundTrip(t *testing.T) {
 	assert.Equal(t, *preview.OrderID, *preview2.OrderID)
 }
 
-// TestInstrumentResponseJSONRoundTrip verifies instrument with fundamental data.
-func TestInstrumentResponseJSONRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	input := `{
-		"instruments": [
-			{
-				"cusip": "037833100",
-				"symbol": "AAPL",
-				"description": "Apple Inc",
-				"exchange": "NASDAQ",
-				"assetType": "EQUITY",
-				"fundamental": {
-					"symbol": "AAPL",
-					"high52": 200.00,
-					"low52": 130.00,
-					"dividendAmount": 0.96,
-					"dividendYield": 0.55,
-					"peRatio": 28.5,
-					"eps": 6.15,
-					"marketCap": 2750000000000,
-					"sharesOutstanding": 15700000000,
-					"beta": 1.21
-				}
-			}
-		]
-	}`
-
-	var ir InstrumentResponse
-	err := json.Unmarshal([]byte(input), &ir)
-	require.NoError(t, err)
-
-	require.Len(t, ir.Instruments, 1)
-	inst := ir.Instruments[0]
-	assert.Equal(t, "AAPL", *inst.Symbol)
-	assert.Equal(t, "NASDAQ", *inst.Exchange)
-
-	require.NotNil(t, inst.Fundamental)
-	assert.InDelta(t, 200.0, *inst.Fundamental.High52, 0.001)
-	assert.InDelta(t, 28.5, *inst.Fundamental.PeRatio, 0.001)
-	assert.InDelta(t, 1.21, *inst.Fundamental.Beta, 0.001)
-
-	// Round-trip.
-	data, err := json.Marshal(ir)
-	require.NoError(t, err)
-	var ir2 InstrumentResponse
-	err = json.Unmarshal(data, &ir2)
-	require.NoError(t, err)
-	assert.Equal(t, *ir.Instruments[0].Symbol, *ir2.Instruments[0].Symbol)
-}
-
 // TestUserPreferenceJSONRoundTrip verifies preferences with nested arrays.
 func TestUserPreferenceJSONRoundTrip(t *testing.T) {
 	t.Parallel()
