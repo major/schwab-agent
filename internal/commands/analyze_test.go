@@ -16,7 +16,7 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-// analyzeServer returns an httptest.Server that handles both quote and
+// analyzeServer returns an [httptest.Server] that handles both quote and
 // price-history requests. quoteBody is keyed by symbol path suffix
 // (e.g., "/marketdata/v1/AAPL/quotes"), and candleBody applies to all
 // price-history requests.
@@ -175,8 +175,8 @@ func TestNewAnalyzeCmd_MultiSymbol(t *testing.T) {
 
 	// Verify each symbol has quote + analysis
 	for _, sym := range []string{"AAPL", "NVDA"} {
-		symbolData, ok := data[sym].(map[string]any)
-		require.True(t, ok, "%s entry should be a map", sym)
+		symbolData, symbolOK := data[sym].(map[string]any)
+		require.True(t, symbolOK, "%s entry should be a map", sym)
 		assert.NotNil(t, symbolData["quote"], "%s quote should be present", sym)
 		assert.NotNil(t, symbolData["analysis"], "%s analysis should be present", sym)
 	}

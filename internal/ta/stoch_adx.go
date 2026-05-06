@@ -17,8 +17,8 @@ import (
 //	dPeriod  (CLI: --d-period)  -> talib slowDPeriod  (period of %D, default 3)
 //	slowKMAType and slowDMAType are hardcoded to 0 (SMA) and not exposed.
 //
-// Returns (slowK, slowD []float64, err error). Both slices are zero-stripped and aligned.
-func Stochastic(highs, lows, closes []float64, kPeriod, smoothK, dPeriod int) (slowK, slowD []float64, err error) {
+// Returns slowK and slowD slices that are zero-stripped and aligned.
+func Stochastic(highs, lows, closes []float64, kPeriod, smoothK, dPeriod int) ([]float64, []float64, error) {
 	if kPeriod <= 0 || smoothK <= 0 || dPeriod <= 0 {
 		return nil, nil, apperr.NewValidationError(
 			"stochastic: all periods must be > 0",
@@ -27,7 +27,12 @@ func Stochastic(highs, lows, closes []float64, kPeriod, smoothK, dPeriod int) (s
 	}
 	if len(highs) != len(lows) || len(highs) != len(closes) {
 		return nil, nil, apperr.NewValidationError(
-			fmt.Sprintf("stochastic: mismatched slice lengths: highs=%d, lows=%d, closes=%d", len(highs), len(lows), len(closes)),
+			fmt.Sprintf(
+				"stochastic: mismatched slice lengths: highs=%d, lows=%d, closes=%d",
+				len(highs),
+				len(lows),
+				len(closes),
+			),
 			nil,
 		)
 	}
@@ -36,8 +41,8 @@ func Stochastic(highs, lows, closes []float64, kPeriod, smoothK, dPeriod int) (s
 	// slowKMAType=0 (SMA), slowDMAType=0 (SMA) - hardcoded per spec
 	rawSlowK, rawSlowD := talib.Stoch(highs, lows, closes, kPeriod, smoothK, 0, dPeriod, 0)
 
-	slowK = StripLeadingZeros(rawSlowK)
-	slowD = StripLeadingZeros(rawSlowD)
+	slowK := StripLeadingZeros(rawSlowK)
+	slowD := StripLeadingZeros(rawSlowD)
 
 	// Align to shortest length
 	minLen := min(len(slowD), len(slowK))
@@ -54,8 +59,8 @@ func Stochastic(highs, lows, closes []float64, kPeriod, smoothK, dPeriod int) (s
 // ADX computes Average Directional Index along with DI+ and DI- companion lines.
 // Requires THREE separate go-talib calls (unlike pandas_ta which returns all from one call).
 //
-// Returns (adx, plusDI, minusDI []float64, err error). All slices stripped and aligned.
-func ADX(highs, lows, closes []float64, period int) (adx, plusDI, minusDI []float64, err error) {
+// Returns ADX, plusDI, and minusDI slices that are stripped and aligned.
+func ADX(highs, lows, closes []float64, period int) ([]float64, []float64, []float64, error) {
 	if period <= 0 {
 		return nil, nil, nil, apperr.NewValidationError(
 			fmt.Sprintf("adx period must be > 0, got %d", period),
@@ -64,7 +69,12 @@ func ADX(highs, lows, closes []float64, period int) (adx, plusDI, minusDI []floa
 	}
 	if len(highs) != len(lows) || len(highs) != len(closes) {
 		return nil, nil, nil, apperr.NewValidationError(
-			fmt.Sprintf("adx: mismatched slice lengths: highs=%d, lows=%d, closes=%d", len(highs), len(lows), len(closes)),
+			fmt.Sprintf(
+				"adx: mismatched slice lengths: highs=%d, lows=%d, closes=%d",
+				len(highs),
+				len(lows),
+				len(closes),
+			),
 			nil,
 		)
 	}
@@ -73,9 +83,9 @@ func ADX(highs, lows, closes []float64, period int) (adx, plusDI, minusDI []floa
 	rawPlusDI := talib.PlusDI(highs, lows, closes, period)
 	rawMinusDI := talib.MinusDI(highs, lows, closes, period)
 
-	adx = StripLeadingZeros(rawADX)
-	plusDI = StripLeadingZeros(rawPlusDI)
-	minusDI = StripLeadingZeros(rawMinusDI)
+	adx := StripLeadingZeros(rawADX)
+	plusDI := StripLeadingZeros(rawPlusDI)
+	minusDI := StripLeadingZeros(rawMinusDI)
 
 	// Align to shortest length
 	minLen := min(len(minusDI), min(len(plusDI), len(adx)))

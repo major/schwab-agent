@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/major/schwab-agent/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/models"
 )
 
 // FuzzParseOCCSymbol verifies that ParseOCCSymbol never panics on arbitrary input.
@@ -64,49 +65,21 @@ func FuzzBuildParseOCCRoundTrip(f *testing.F) {
 	f.Add("A", 2025, 1, 1, 0.001, false)
 
 	f.Fuzz(func(t *testing.T, underlying string, year, month, day int, strike float64, isCall bool) {
-		// Filter out inputs that can't produce valid OCC symbols.
-		// Real ticker symbols are ASCII uppercase letters only.
-		trimmed := strings.TrimSpace(underlying)
-		if trimmed == "" || len(trimmed) > 6 {
+		trimmed, ok := validFuzzUnderlying(underlying)
+		if !ok {
 			return
 		}
 
-		for _, r := range trimmed {
-			if r < 'A' || r > 'Z' {
-				return
-			}
-		}
-
-		// OCC format uses YYMMDD. Go's time.Parse("060102") maps two-digit
-		// years to the range 1969-2068, so years outside 2000-2068 won't
-		// round-trip correctly.
-		if year < 2000 || year > 2068 {
+		expiration, ok := validFuzzExpiration(year, month, day)
+		if !ok {
 			return
 		}
 
-		if month < 1 || month > 12 || day < 1 || day > 31 {
+		if !validFuzzStrike(strike) {
 			return
 		}
 
-		// time.Date normalizes out-of-range days (e.g. Feb 30 → Mar 2).
-		// Skip if the date normalizes to a different month, since that
-		// means the original month/day was invalid.
-		expiration := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
-		if expiration.Month() != time.Month(month) || expiration.Day() != day {
-			return
-		}
-
-		// Strike must be representable as a positive 8-digit integer (strike*1000).
-		// OCC format caps at 99999.999, and values below 0.001 round to zero.
-		if strike < 0.001 || strike > 99999.999 {
-			return
-		}
-
-		putCall := string(models.PutCallCall)
-		if !isCall {
-			putCall = string(models.PutCallPut)
-		}
-
+		putCall := fuzzPutCall(isCall)
 		symbol := BuildOCCSymbol(trimmed, expiration, strike, putCall)
 
 		parsed, err := ParseOCCSymbol(symbol)
@@ -124,4 +97,51 @@ func FuzzBuildParseOCCRoundTrip(f *testing.F) {
 
 		assert.Equal(t, day, parsed.Expiration.Day(), "day mismatch")
 	})
+}
+
+func validFuzzUnderlying(underlying string) (string, bool) {
+	// Filter out inputs that can't produce valid OCC symbols. Real ticker symbols
+	// are ASCII uppercase letters only.
+	trimmed := strings.TrimSpace(underlying)
+	if trimmed == "" || len(trimmed) > 6 {
+		return "", false
+	}
+
+	for _, r := range trimmed {
+		if r < 'A' || r > 'Z' {
+			return "", false
+		}
+	}
+
+	return trimmed, true
+}
+
+func validFuzzExpiration(year, month, day int) (time.Time, bool) {
+	// OCC format uses YYMMDD. Go's time.Parse("060102") maps two-digit years to
+	// the range 1969-2068, so years outside 2000-2068 won't round-trip correctly.
+	if year < 2000 || year > 2068 {
+		return time.Time{}, false
+	}
+	if month < 1 || month > 12 || day < 1 || day > 31 {
+		return time.Time{}, false
+	}
+
+	// time.Date normalizes out-of-range days (e.g. Feb 30 -> Mar 2). Skip if the
+	// date normalizes to a different month, since the original month/day was invalid.
+	expiration := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+	return expiration, expiration.Month() == time.Month(month) && expiration.Day() == day
+}
+
+func validFuzzStrike(strike float64) bool {
+	// Strike must be representable as a positive 8-digit integer (strike*1000).
+	// OCC format caps at 99999.999, and values below 0.001 round to zero.
+	return strike >= 0.001 && strike <= 99999.999
+}
+
+func fuzzPutCall(isCall bool) string {
+	if isCall {
+		return string(models.PutCallCall)
+	}
+
+	return string(models.PutCallPut)
 }

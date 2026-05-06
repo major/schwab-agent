@@ -1,4 +1,3 @@
-// Package commands provides CLI command builders for schwab-agent.
 package commands
 
 import (
@@ -18,12 +17,12 @@ type priceHistoryData struct {
 
 // historyGetOpts holds the options for the history get subcommand.
 type historyGetOpts struct {
-	PeriodType    historyPeriodType    `flag:"period-type" flagdescr:"Period type (day, month, year, ytd)" flaggroup:"period"`
-	Period        string               `flag:"period" flagdescr:"Number of periods" flaggroup:"period"`
+	PeriodType    historyPeriodType    `flag:"period-type"    flagdescr:"Period type (day, month, year, ytd)"             flaggroup:"period"`
+	Period        string               `flag:"period"         flagdescr:"Number of periods"                               flaggroup:"period"`
 	FrequencyType historyFrequencyType `flag:"frequency-type" flagdescr:"Frequency type (minute, daily, weekly, monthly)" flaggroup:"frequency"`
-	Frequency     historyFrequency     `flag:"frequency" flagdescr:"Frequency value" flaggroup:"frequency"`
-	From          string               `flag:"from" flagdescr:"Start date (milliseconds since epoch)" flaggroup:"range"`
-	To            string               `flag:"to" flagdescr:"End date (milliseconds since epoch)" flaggroup:"range"`
+	Frequency     historyFrequency     `flag:"frequency"      flagdescr:"Frequency value"                                 flaggroup:"frequency"`
+	From          string               `flag:"from"           flagdescr:"Start date (milliseconds since epoch)"           flaggroup:"range"`
+	To            string               `flag:"to"             flagdescr:"End date (milliseconds since epoch)"             flaggroup:"range"`
 }
 
 // NewHistoryCmd returns the Cobra command for price history lookups.
@@ -34,7 +33,7 @@ func NewHistoryCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		Short:      "Retrieve price history for a symbol",
 		Aliases:    []string{"price-history"},
 		SuggestFor: []string{"price-history"},
-		GroupID:    "market-data",
+		GroupID:    groupIDMarketData,
 		Args:       cobra.ArbitraryArgs,
 		RunE:       defaultSubcommand(getCmd),
 	}

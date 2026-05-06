@@ -28,7 +28,7 @@ func TestUserPreference_Success(t *testing.T) {
 					Type:               new("MARGIN"),
 					NickName:           new("Main Account"),
 					AccountColor:       new("COLOR_BLUE"),
-					DisplayAcctId:      new("X123"),
+					DisplayAcctID:      new("X123"),
 					AutoPositionEffect: new(true),
 				},
 				{
@@ -37,7 +37,7 @@ func TestUserPreference_Success(t *testing.T) {
 					Type:               new("CASH"),
 					NickName:           new("Savings Account"),
 					AccountColor:       new("COLOR_GREEN"),
-					DisplayAcctId:      new("X456"),
+					DisplayAcctID:      new("X456"),
 					AutoPositionEffect: new(false),
 				},
 			},
@@ -59,7 +59,7 @@ func TestUserPreference_Success(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -88,7 +88,7 @@ func TestUserPreference_EmptyAccounts(t *testing.T) {
 			Offers:       []models.Offer{},
 			StreamerInfo: []models.StreamerInfo{},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -112,7 +112,7 @@ func TestUserPreference_WithMinimalData(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -131,7 +131,7 @@ func TestUserPreference_BearerTokenAuth(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "Bearer my-secret-token", r.Header.Get("Authorization"))
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.UserPreference{}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.UserPreference{}))
 	}))
 	defer srv.Close()
 
@@ -152,7 +152,7 @@ func TestUserPreference_WithComplexStreamerInfo(t *testing.T) {
 					Type:               new("MARGIN"),
 					NickName:           new("Trading Account"),
 					AccountColor:       new("COLOR_RED"),
-					DisplayAcctId:      new("X789"),
+					DisplayAcctID:      new("X789"),
 					AutoPositionEffect: new(true),
 				},
 			},
@@ -173,7 +173,7 @@ func TestUserPreference_WithComplexStreamerInfo(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 

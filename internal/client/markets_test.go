@@ -41,7 +41,7 @@ func TestMarkets_Success(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -60,7 +60,7 @@ func TestMarkets_Success(t *testing.T) {
 func TestMarkets_EmptyResult(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]map[string]models.MarketHours{}))
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]map[string]models.MarketHours{}))
 	}))
 	defer srv.Close()
 
@@ -98,7 +98,7 @@ func TestMarket_Success(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 

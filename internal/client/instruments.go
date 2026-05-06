@@ -14,8 +14,8 @@ import (
 // Returns SymbolNotFoundError on 404.
 func (c *Client) SearchInstruments(ctx context.Context, symbol, projection string) ([]models.Instrument, error) {
 	params := map[string]string{
-		"symbol":     symbol,
-		"projection": projection,
+		queryParamSymbol: symbol,
+		"projection":     projection,
 	}
 	var result models.InstrumentResponse
 	err := c.doGet(ctx, "/marketdata/v1/instruments", params, &result)

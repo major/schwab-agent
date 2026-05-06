@@ -23,13 +23,17 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-// testFutureExpTime is a future expiration date for option tests. Computed once
-// at package init so all tests use a consistent value. Using AddDate(0, 1, 0)
-// ensures the date stays valid regardless of when the test suite runs.
-var testFutureExpTime = time.Now().UTC().AddDate(0, 1, 0)
+// testFutureExpTime returns a future expiration date for option tests. Using
+// AddDate(0, 1, 0) ensures the date stays valid regardless of when the test
+// suite runs.
+func testFutureExpTime() time.Time {
+	return time.Now().UTC().AddDate(0, 1, 0)
+}
 
 // testFutureExpDate is testFutureExpTime formatted as YYYY-MM-DD for CLI flags.
-var testFutureExpDate = testFutureExpTime.Format("2006-01-02")
+func testFutureExpDate() string {
+	return testFutureExpTime().Format("2006-01-02")
+}
 
 // testConfigJSON returns a valid config payload for command tests.
 // The mutable flag defaults to false (mutable operations disabled).
@@ -116,7 +120,13 @@ func mustMarshalJSON(t *testing.T, value any) string {
 }
 
 // writeTestOrderResponse writes a compact order fixture for action command tests.
-func writeTestOrderResponse(t *testing.T, w http.ResponseWriter, orderID int64, status models.OrderStatus, symbol string) {
+func writeTestOrderResponse(
+	t *testing.T,
+	w http.ResponseWriter,
+	orderID int64,
+	status models.OrderStatus,
+	symbol string,
+) {
 	t.Helper()
 
 	w.Header().Set("Content-Type", "application/json")
@@ -148,8 +158,12 @@ func writeTestAccountMetadataResponses(t *testing.T, w http.ResponseWriter, path
 		require.NoError(t, err)
 		return true
 	case "/trader/v1/userPreference":
-		_, err := w.Write([]byte(`{"accounts":[{"accountNumber":"12345678","nickName":"My IRA","type":"MARGIN","primaryAccount":true}]}`))
-		require.NoError(t, err)
+		_, err := w.Write(
+			[]byte(
+				`{"accounts":[{"accountNumber":"12345678","nickName":"My IRA","type":"MARGIN","primaryAccount":true}]}`,
+			),
+		)
+		assert.NoError(t, err)
 		return true
 	default:
 		return false
@@ -157,7 +171,11 @@ func writeTestAccountMetadataResponses(t *testing.T, w http.ResponseWriter, path
 }
 
 // assertTestAccountMetadata verifies every order action/preview account metadata field.
-func assertTestAccountMetadata(t *testing.T, metadata output.Metadata, source string) { //nolint:gocritic // hugeParam: output.Metadata is passed by value intentionally to match the existing API contract.
+func assertTestAccountMetadata(
+	t *testing.T,
+	metadata output.Metadata,
+	source string,
+) {
 	t.Helper()
 
 	assert.Equal(t, "ABCDEF1234567890ABCDEF1234567890", metadata.Account)
@@ -215,9 +233,10 @@ func TestOrderPreviewIncludesAccountMetadata(t *testing.T) {
 			return
 		}
 
-		if r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/previewOrder" {
+		if r.Method == http.MethodPost &&
+			r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/previewOrder" {
 			w.Header().Set("Content-Type", "application/json")
-			require.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{OrderID: &orderID}))
+			assert.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{OrderID: &orderID}))
 			return
 		}
 
@@ -355,8 +374,6 @@ func TestFromPreviewIncludesAccountMetadata(t *testing.T) {
 }
 
 func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
-	t.Parallel()
-
 	orderID := int64(4242)
 	previewResponse := models.PreviewOrder{OrderID: &orderID}
 	var requestBodies []string
@@ -366,11 +383,13 @@ func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 		assert.Equal(t, "/trader/v1/accounts/hash123/previewOrder", r.URL.Path)
 
 		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		requestBodies = append(requestBodies, string(body))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
+		assert.NoError(t, json.NewEncoder(w).Encode(previewResponse))
 	}))
 	defer server.Close()
 
@@ -421,7 +440,7 @@ func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 			envelope := decodeEnvelope(t, stdout)
 			data, ok := envelope.Data.(map[string]any)
 			require.True(t, ok)
-			assert.Equal(t, float64(4242), data["orderId"])
+			assert.InDelta(t, float64(4242), data["orderId"], 0.001)
 		})
 	}
 
@@ -432,8 +451,6 @@ func TestNewOrderCmdPreviewSpecModes(t *testing.T) {
 }
 
 func TestNewOrderCmdSpecSemanticValidation(t *testing.T) {
-	t.Parallel()
-
 	var requests int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
@@ -485,8 +502,6 @@ func TestNewOrderCmdSpecSemanticValidation(t *testing.T) {
 }
 
 func TestNewOrderCmdPreviewSpecAcceptsTriggerOrders(t *testing.T) {
-	t.Parallel()
-
 	var requestBodies []string
 	orderID := int64(4244)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -494,11 +509,13 @@ func TestNewOrderCmdPreviewSpecAcceptsTriggerOrders(t *testing.T) {
 		assert.Equal(t, "/trader/v1/accounts/hash123/previewOrder", r.URL.Path)
 
 		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		requestBodies = append(requestBodies, string(body))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{OrderID: &orderID}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{OrderID: &orderID}))
 	}))
 	defer server.Close()
 
@@ -541,13 +558,13 @@ func TestNewOrderCmdPreviewSpecAcceptsTriggerOrders(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "preview", "--spec", testCase.spec)
-			require.NoError(t, err)
+			stdout, runErr := runOrderCommand(t, cliClient, configPath, "", "order", "preview", "--spec", testCase.spec)
+			require.NoError(t, runErr)
 
 			envelope := decodeEnvelope(t, stdout)
 			data, ok := envelope.Data.(map[string]any)
 			require.True(t, ok)
-			assert.Equal(t, float64(4244), data["orderId"])
+			assert.InDelta(t, float64(4244), data["orderId"], 0.001)
 		})
 	}
 
@@ -575,11 +592,13 @@ func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
 		assert.Equal(t, "/trader/v1/accounts/hash123/previewOrder", r.URL.Path)
 
 		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		requestBodies = append(requestBodies, requestRecord{Path: r.URL.Path, Body: string(body)})
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
+		assert.NoError(t, json.NewEncoder(w).Encode(previewResponse))
 	}))
 	defer server.Close()
 
@@ -593,7 +612,21 @@ func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
 	}{
 		{
 			name: "equity",
-			args: []string{"order", "preview", "equity", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10", "--type", "LIMIT", "--price", "185.25"},
+			args: []string{
+				"order",
+				"preview",
+				"equity",
+				"--symbol",
+				"AAPL",
+				"--action",
+				"BUY",
+				"--quantity",
+				"10",
+				"--type",
+				"LIMIT",
+				"--price",
+				"185.25",
+			},
 			assertBody: func(t *testing.T, order models.OrderRequest) {
 				t.Helper()
 
@@ -605,7 +638,26 @@ func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
 		},
 		{
 			name: "option",
-			args: []string{"order", "preview", "option", "--underlying", "AAPL", "--expiration", testFutureExpDate, "--strike", "200", "--call", "--action", "BUY_TO_OPEN", "--quantity", "1", "--type", "LIMIT", "--price", "5.00"},
+			args: []string{
+				"order",
+				"preview",
+				"option",
+				"--underlying",
+				"AAPL",
+				"--expiration",
+				testFutureExpDate(),
+				"--strike",
+				"200",
+				"--call",
+				"--action",
+				"BUY_TO_OPEN",
+				"--quantity",
+				"1",
+				"--type",
+				"LIMIT",
+				"--price",
+				"5.00",
+			},
 			assertBody: func(t *testing.T, order models.OrderRequest) {
 				t.Helper()
 
@@ -618,7 +670,23 @@ func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
 		},
 		{
 			name: "bracket",
-			args: []string{"order", "preview", "bracket", "--symbol", "NVDA", "--action", "BUY", "--quantity", "10", "--type", "MARKET", "--take-profit", "150", "--stop-loss", "120"},
+			args: []string{
+				"order",
+				"preview",
+				"bracket",
+				"--symbol",
+				"NVDA",
+				"--action",
+				"BUY",
+				"--quantity",
+				"10",
+				"--type",
+				"MARKET",
+				"--take-profit",
+				"150",
+				"--stop-loss",
+				"120",
+			},
 			assertBody: func(t *testing.T, order models.OrderRequest) {
 				t.Helper()
 
@@ -630,7 +698,21 @@ func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
 		},
 		{
 			name: "oco",
-			args: []string{"order", "preview", "oco", "--symbol", "TSLA", "--action", "SELL", "--quantity", "5", "--take-profit", "250", "--stop-loss", "200"},
+			args: []string{
+				"order",
+				"preview",
+				"oco",
+				"--symbol",
+				"TSLA",
+				"--action",
+				"SELL",
+				"--quantity",
+				"5",
+				"--take-profit",
+				"250",
+				"--stop-loss",
+				"200",
+			},
 			assertBody: func(t *testing.T, order models.OrderRequest) {
 				t.Helper()
 
@@ -648,7 +730,7 @@ func TestNewOrderCmdPreviewTypedSubcommands(t *testing.T) {
 			envelope := decodeEnvelope(t, stdout)
 			data, ok := envelope.Data.(map[string]any)
 			require.True(t, ok)
-			assert.Equal(t, float64(4243), data["orderId"])
+			assert.InDelta(t, float64(4243), data["orderId"], 0.001)
 			require.Contains(t, data, "builtOrder")
 			require.Contains(t, data, "preview")
 
@@ -685,7 +767,7 @@ func TestNewOrderCmdBuildEquityOutputsRequestJSON(t *testing.T) {
 	assert.Equal(t, models.DurationGoodTillCancel, order.Duration)
 	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 185.25, *order.Price)
+	assert.InDelta(t, 185.25, *order.Price, 0.001)
 	require.Len(t, order.OrderLegCollection, 1)
 	assert.Equal(t, "AAPL", order.OrderLegCollection[0].Instrument.Symbol)
 	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
@@ -702,29 +784,149 @@ func TestNewOrderCmdBuildNewOptionStrategiesOutputRequestJSON(t *testing.T) {
 		legs        int
 	}{
 		{
-			name:        "butterfly",
-			args:        []string{"order", "build", "butterfly", "--underlying", "F", "--expiration", testFutureExpDate, "--lower-strike", "10", "--middle-strike", "12", "--upper-strike", "14", "--call", "--buy", "--open", "--quantity", "1", "--price", "0.50"},
-			complexType: models.ComplexOrderStrategyTypeButterfly, orderType: models.OrderTypeNetDebit, legs: 3,
+			name: "butterfly",
+			args: []string{
+				"order",
+				"build",
+				"butterfly",
+				"--underlying",
+				"F",
+				"--expiration",
+				testFutureExpDate(),
+				"--lower-strike",
+				"10",
+				"--middle-strike",
+				"12",
+				"--upper-strike",
+				"14",
+				"--call",
+				"--buy",
+				"--open",
+				"--quantity",
+				"1",
+				"--price",
+				"0.50",
+			},
+			complexType: models.ComplexOrderStrategyTypeButterfly,
+			orderType:   models.OrderTypeNetDebit,
+			legs:        3,
 		},
 		{
-			name:        "condor",
-			args:        []string{"order", "build", "condor", "--underlying", "F", "--expiration", testFutureExpDate, "--lower-strike", "10", "--lower-middle-strike", "12", "--upper-middle-strike", "14", "--upper-strike", "16", "--put", "--sell", "--open", "--quantity", "1", "--price", "0.75"},
-			complexType: models.ComplexOrderStrategyTypeCondor, orderType: models.OrderTypeNetCredit, legs: 4,
+			name: "condor",
+			args: []string{
+				"order",
+				"build",
+				"condor",
+				"--underlying",
+				"F",
+				"--expiration",
+				testFutureExpDate(),
+				"--lower-strike",
+				"10",
+				"--lower-middle-strike",
+				"12",
+				"--upper-middle-strike",
+				"14",
+				"--upper-strike",
+				"16",
+				"--put",
+				"--sell",
+				"--open",
+				"--quantity",
+				"1",
+				"--price",
+				"0.75",
+			},
+			complexType: models.ComplexOrderStrategyTypeCondor,
+			orderType:   models.OrderTypeNetCredit,
+			legs:        4,
 		},
 		{
-			name:        "vertical-roll",
-			args:        []string{"order", "build", "vertical-roll", "--underlying", "F", "--close-expiration", testFutureExpDate, "--open-expiration", testFutureExpTime.AddDate(0, 1, 0).Format("2006-01-02"), "--close-long-strike", "12", "--close-short-strike", "14", "--open-long-strike", "13", "--open-short-strike", "15", "--call", "--credit", "--quantity", "1", "--price", "0.25"},
-			complexType: models.ComplexOrderStrategyTypeVerticalRoll, orderType: models.OrderTypeNetCredit, legs: 4,
+			name: "vertical-roll",
+			args: []string{
+				"order",
+				"build",
+				"vertical-roll",
+				"--underlying",
+				"F",
+				"--close-expiration",
+				testFutureExpDate(),
+				"--open-expiration",
+				testFutureExpTime().AddDate(0, 1, 0).Format("2006-01-02"),
+				"--close-long-strike",
+				"12",
+				"--close-short-strike",
+				"14",
+				"--open-long-strike",
+				"13",
+				"--open-short-strike",
+				"15",
+				"--call",
+				"--credit",
+				"--quantity",
+				"1",
+				"--price",
+				"0.25",
+			},
+			complexType: models.ComplexOrderStrategyTypeVerticalRoll,
+			orderType:   models.OrderTypeNetCredit,
+			legs:        4,
 		},
 		{
-			name:        "back-ratio",
-			args:        []string{"order", "build", "back-ratio", "--underlying", "F", "--expiration", testFutureExpDate, "--short-strike", "12", "--long-strike", "14", "--call", "--open", "--quantity", "1", "--debit", "--price", "0.20"},
-			complexType: models.ComplexOrderStrategyTypeBackRatio, orderType: models.OrderTypeNetDebit, legs: 2,
+			name: "back-ratio",
+			args: []string{
+				"order",
+				"build",
+				"back-ratio",
+				"--underlying",
+				"F",
+				"--expiration",
+				testFutureExpDate(),
+				"--short-strike",
+				"12",
+				"--long-strike",
+				"14",
+				"--call",
+				"--open",
+				"--quantity",
+				"1",
+				"--debit",
+				"--price",
+				"0.20",
+			},
+			complexType: models.ComplexOrderStrategyTypeBackRatio,
+			orderType:   models.OrderTypeNetDebit,
+			legs:        2,
 		},
 		{
-			name:        "double-diagonal",
-			args:        []string{"order", "build", "double-diagonal", "--underlying", "F", "--near-expiration", testFutureExpDate, "--far-expiration", testFutureExpTime.AddDate(0, 1, 0).Format("2006-01-02"), "--put-far-strike", "9", "--put-near-strike", "10", "--call-near-strike", "14", "--call-far-strike", "15", "--open", "--quantity", "1", "--price", "0.80"},
-			complexType: models.ComplexOrderStrategyTypeDoubleDiagonal, orderType: models.OrderTypeNetDebit, legs: 4,
+			name: "double-diagonal",
+			args: []string{
+				"order",
+				"build",
+				"double-diagonal",
+				"--underlying",
+				"F",
+				"--near-expiration",
+				testFutureExpDate(),
+				"--far-expiration",
+				testFutureExpTime().AddDate(0, 1, 0).Format("2006-01-02"),
+				"--put-far-strike",
+				"9",
+				"--put-near-strike",
+				"10",
+				"--call-near-strike",
+				"14",
+				"--call-far-strike",
+				"15",
+				"--open",
+				"--quantity",
+				"1",
+				"--price",
+				"0.80",
+			},
+			complexType: models.ComplexOrderStrategyTypeDoubleDiagonal,
+			orderType:   models.OrderTypeNetDebit,
+			legs:        4,
 		},
 	}
 
@@ -753,8 +955,12 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/default-hash/orders":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/default-hash/orders/67890")
 			w.WriteHeader(http.StatusCreated)
@@ -788,7 +994,7 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 
 	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
 	require.NotNil(t, received.Price)
-	assert.Equal(t, 185.25, *received.Price)
+	assert.InDelta(t, 185.25, *received.Price, 0.001)
 	require.Len(t, received.OrderLegCollection, 1)
 	assert.Equal(t, "AAPL", received.OrderLegCollection[0].Instrument.Symbol)
 	assert.Equal(t, models.InstructionBuy, received.OrderLegCollection[0].Instruction)
@@ -797,7 +1003,7 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "place", data["action"])
-	assert.Equal(t, float64(67890), data["orderId"])
+	assert.InDelta(t, float64(67890), data["orderId"], 0.001)
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "QUEUED", data["orderStatus"])
 	submittedOrder, ok := data["submittedOrder"].(map[string]any)
@@ -805,7 +1011,7 @@ func TestNewOrderCmdPlaceEquityPipeline(t *testing.T) {
 	assert.Equal(t, "LIMIT", submittedOrder["orderType"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(67890), order["orderId"])
+	assert.InDelta(t, float64(67890), order["orderId"], 0.001)
 	assert.Equal(t, "QUEUED", order["status"])
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
@@ -818,8 +1024,12 @@ func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/hash123/orders":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/24680")
 			w.WriteHeader(http.StatusCreated)
@@ -854,7 +1064,7 @@ func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "place", data["action"])
-	assert.Equal(t, float64(24680), data["orderId"])
+	assert.InDelta(t, float64(24680), data["orderId"], 0.001)
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "QUEUED", data["orderStatus"])
 	submittedOrder, ok := data["submittedOrder"].(map[string]any)
@@ -862,7 +1072,7 @@ func TestNewOrderCmdPlaceSpecFromFile(t *testing.T) {
 	assert.Equal(t, "MARKET", submittedOrder["orderType"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(24680), order["orderId"])
+	assert.InDelta(t, float64(24680), order["orderId"], 0.001)
 	assert.Equal(t, "QUEUED", order["status"])
 }
 
@@ -876,15 +1086,23 @@ func TestNewOrderCmdPreviewSaveAndPlaceFromPreview(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/hash123/previewOrder":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &previewedOrder))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &previewedOrder)) {
+				return
+			}
 
 			w.Header().Set("Content-Type", "application/json")
-			require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
+			assert.NoError(t, json.NewEncoder(w).Encode(previewResponse))
 		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/hash123/orders":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &placedOrder))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &placedOrder)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/13579")
 			w.WriteHeader(http.StatusCreated)
@@ -935,7 +1153,7 @@ func TestNewOrderCmdPreviewSaveAndPlaceFromPreview(t *testing.T) {
 	placeData, ok := placeEnvelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "place", placeData["action"])
-	assert.Equal(t, float64(13579), placeData["orderId"])
+	assert.InDelta(t, float64(13579), placeData["orderId"], 0.001)
 	assert.Equal(t, digest, placeData["previewDigest"])
 	assert.Equal(t, "verified", placeData["verificationState"])
 }
@@ -989,14 +1207,23 @@ func TestNewOrderCmdPlaceNoLocationReturnsPartialSuccess(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "place", "--spec", mustMarshalJSON(t, orderRequest))
+	stdout, err := runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order",
+		"place",
+		"--spec",
+		mustMarshalJSON(t, orderRequest),
+	)
 	require.NoError(t, err)
 
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "place", data["action"])
-	assert.Equal(t, float64(0), data["orderId"])
+	assert.InDelta(t, float64(0), data["orderId"], 0.001)
 	assert.Equal(t, "unverified", data["verificationState"])
 	verificationFailures, ok := data["verificationFailures"].([]any)
 	require.True(t, ok)
@@ -1059,7 +1286,12 @@ func TestNewOrderCmdMutableGuard(t *testing.T) {
 	}{
 		{
 			name: "place spec blocked without mutable flag",
-			args: []string{"order", "place", "--spec", `{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderLegCollection":[{"instruction":"BUY","quantity":1,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}`},
+			args: []string{
+				"order",
+				"place",
+				"--spec",
+				`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderLegCollection":[{"instruction":"BUY","quantity":1,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}`,
+			},
 		},
 		{
 			name: "place equity blocked without mutable flag",
@@ -1114,9 +1346,9 @@ func TestNewOrderCmdPreviewNotBlockedByMutableGuard(t *testing.T) {
 
 	orderID := int64(9999)
 	previewResponse := models.PreviewOrder{OrderID: &orderID}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(previewResponse))
+		assert.NoError(t, json.NewEncoder(w).Encode(previewResponse))
 	}))
 	defer server.Close()
 
@@ -1156,13 +1388,13 @@ func TestNewOrderCmdBuildOCOOutputsRequestJSON(t *testing.T) {
 	takeProfit := order.ChildOrderStrategies[0]
 	assert.Equal(t, models.OrderTypeLimit, takeProfit.OrderType)
 	require.NotNil(t, takeProfit.Price)
-	assert.Equal(t, 160.0, *takeProfit.Price)
+	assert.InDelta(t, 160.0, *takeProfit.Price, 0.001)
 	assert.Equal(t, models.InstructionSell, takeProfit.OrderLegCollection[0].Instruction)
 
 	stopLoss := order.ChildOrderStrategies[1]
 	assert.Equal(t, models.OrderTypeStop, stopLoss.OrderType)
 	require.NotNil(t, stopLoss.StopPrice)
-	assert.Equal(t, 140.0, *stopLoss.StopPrice)
+	assert.InDelta(t, 140.0, *stopLoss.StopPrice, 0.001)
 }
 
 func TestNewOrderCmdBuildOCOSingleExit(t *testing.T) {
@@ -1186,7 +1418,7 @@ func TestNewOrderCmdBuildOCOSingleExit(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeStop, order.OrderType)
 	require.NotNil(t, order.StopPrice)
-	assert.Equal(t, 140.0, *order.StopPrice)
+	assert.InDelta(t, 140.0, *order.StopPrice, 0.001)
 	assert.Empty(t, order.ChildOrderStrategies)
 }
 
@@ -1198,8 +1430,12 @@ func TestNewOrderCmdPlaceOCOPipeline(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/default-hash/orders":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/default-hash/orders/55555")
 			w.WriteHeader(http.StatusCreated)
@@ -1236,10 +1472,10 @@ func TestNewOrderCmdPlaceOCOPipeline(t *testing.T) {
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(55555), data["orderId"])
+	assert.InDelta(t, float64(55555), data["orderId"], 0.001)
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(55555), order["orderId"])
+	assert.InDelta(t, float64(55555), order["orderId"], 0.001)
 }
 
 // --- Spread build tests (iron condor, vertical, strangle, straddle, covered call) ---
@@ -1256,7 +1492,7 @@ func TestNewOrderCmdBuildIronCondorOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "iron-condor",
 		"--underlying", "SPY",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--put-long-strike", "400",
 		"--put-short-strike", "410",
 		"--call-short-strike", "420",
@@ -1277,7 +1513,7 @@ func TestNewOrderCmdBuildIronCondorOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeIronCondor, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 2.50, *order.Price)
+	assert.InDelta(t, 2.50, *order.Price, 0.001)
 	assert.Equal(t, models.DurationDay, order.Duration)
 	assert.Equal(t, models.SessionNormal, order.Session)
 
@@ -1288,25 +1524,25 @@ func TestNewOrderCmdBuildIronCondorOpen(t *testing.T) {
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
 	assert.Equal(t, models.PutCallPut, *order.OrderLegCollection[0].Instrument.PutCall)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
-	assert.Equal(t, 400.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 400.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice, 0.001)
 
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
-	assert.Equal(t, 410.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 410.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice, 0.001)
 
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[2].Instruction)
 	require.NotNil(t, order.OrderLegCollection[2].Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[2].Instrument.PutCall)
 	require.NotNil(t, order.OrderLegCollection[2].Instrument.OptionStrikePrice)
-	assert.Equal(t, 420.0, *order.OrderLegCollection[2].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 420.0, *order.OrderLegCollection[2].Instrument.OptionStrikePrice, 0.001)
 
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[3].Instruction)
 	require.NotNil(t, order.OrderLegCollection[3].Instrument.OptionStrikePrice)
-	assert.Equal(t, 430.0, *order.OrderLegCollection[3].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 430.0, *order.OrderLegCollection[3].Instrument.OptionStrikePrice, 0.001)
 
 	// All legs should have the same quantity.
 	for i, leg := range order.OrderLegCollection {
-		assert.Equal(t, 5.0, leg.Quantity, "leg %d quantity", i)
+		assert.InDelta(t, 5.0, leg.Quantity, 0.001, "leg %d quantity", i)
 	}
 }
 
@@ -1317,7 +1553,7 @@ func TestNewOrderCmdBuildIronCondorClose(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "iron-condor",
 		"--underlying", "SPY",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--put-long-strike", "400",
 		"--put-short-strike", "410",
 		"--call-short-strike", "420",
@@ -1347,7 +1583,7 @@ func TestNewOrderCmdBuildVerticalCallDebit(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "vertical",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--long-strike", "180",
 		"--short-strike", "190",
 		"--call",
@@ -1366,17 +1602,17 @@ func TestNewOrderCmdBuildVerticalCallDebit(t *testing.T) {
 	assert.Equal(t, models.DurationGoodTillCancel, order.Duration)
 	assert.Equal(t, models.SessionAM, order.Session)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 4.00, *order.Price)
+	assert.InDelta(t, 4.00, *order.Price, 0.001)
 
 	require.Len(t, order.OrderLegCollection, 2)
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 3.0, order.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 3.0, order.OrderLegCollection[0].Quantity, 0.001)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
-	assert.Equal(t, 180.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 180.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice, 0.001)
 
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
-	assert.Equal(t, 190.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 190.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice, 0.001)
 }
 
 func TestNewOrderCmdBuildVerticalPutCredit(t *testing.T) {
@@ -1387,7 +1623,7 @@ func TestNewOrderCmdBuildVerticalPutCredit(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "vertical",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--long-strike", "170",
 		"--short-strike", "180",
 		"--put",
@@ -1417,7 +1653,7 @@ func TestNewOrderCmdBuildStrangleBuyOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "strangle",
 		"--underlying", "TSLA",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--call-strike", "300",
 		"--put-strike", "250",
 		"--buy",
@@ -1434,7 +1670,7 @@ func TestNewOrderCmdBuildStrangleBuyOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeStrangle, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 15.00, *order.Price)
+	assert.InDelta(t, 15.00, *order.Price, 0.001)
 
 	require.Len(t, order.OrderLegCollection, 2)
 
@@ -1443,14 +1679,14 @@ func TestNewOrderCmdBuildStrangleBuyOpen(t *testing.T) {
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[0].Instrument.PutCall)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
-	assert.Equal(t, 300.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 300.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice, 0.001)
 
 	// Leg 1: put at 250.
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[1].Instruction)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.PutCall)
 	assert.Equal(t, models.PutCallPut, *order.OrderLegCollection[1].Instrument.PutCall)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
-	assert.Equal(t, 250.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 250.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice, 0.001)
 }
 
 func TestNewOrderCmdBuildStrangleSellOpen(t *testing.T) {
@@ -1460,7 +1696,7 @@ func TestNewOrderCmdBuildStrangleSellOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "strangle",
 		"--underlying", "TSLA",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--call-strike", "300",
 		"--put-strike", "250",
 		"--sell",
@@ -1483,7 +1719,7 @@ func TestNewOrderCmdBuildStraddleBuyOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "straddle",
 		"--underlying", "NVDA",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "130",
 		"--buy",
 		"--open",
@@ -1499,7 +1735,7 @@ func TestNewOrderCmdBuildStraddleBuyOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeStraddle, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 20.00, *order.Price)
+	assert.InDelta(t, 20.00, *order.Price, 0.001)
 
 	// Both legs at same strike, both BUY_TO_OPEN, one call + one put.
 	require.Len(t, order.OrderLegCollection, 2)
@@ -1508,16 +1744,16 @@ func TestNewOrderCmdBuildStraddleBuyOpen(t *testing.T) {
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[0].Instrument.PutCall)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
-	assert.Equal(t, 130.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 130.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice, 0.001)
 
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[1].Instruction)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.PutCall)
 	assert.Equal(t, models.PutCallPut, *order.OrderLegCollection[1].Instrument.PutCall)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
-	assert.Equal(t, 130.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 130.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice, 0.001)
 
 	for i, leg := range order.OrderLegCollection {
-		assert.Equal(t, 4.0, leg.Quantity, "leg %d quantity", i)
+		assert.InDelta(t, 4.0, leg.Quantity, 0.001, "leg %d quantity", i)
 	}
 }
 
@@ -1528,7 +1764,7 @@ func TestNewOrderCmdBuildStraddleSellOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "straddle",
 		"--underlying", "NVDA",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "130",
 		"--sell",
 		"--open",
@@ -1550,7 +1786,7 @@ func TestNewOrderCmdBuildCoveredCallOutputsRequestJSON(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "covered-call",
 		"--underlying", "F",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "14",
 		"--quantity", "2",
 		"--price", "12.50",
@@ -1564,7 +1800,7 @@ func TestNewOrderCmdBuildCoveredCallOutputsRequestJSON(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeCovered, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 12.50, *order.Price)
+	assert.InDelta(t, 12.50, *order.Price, 0.001)
 
 	// Two legs: equity BUY + option SELL_TO_OPEN.
 	require.Len(t, order.OrderLegCollection, 2)
@@ -1572,19 +1808,19 @@ func TestNewOrderCmdBuildCoveredCallOutputsRequestJSON(t *testing.T) {
 	// Equity leg: 2 contracts = 200 shares.
 	equityLeg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuy, equityLeg.Instruction)
-	assert.Equal(t, 200.0, equityLeg.Quantity)
+	assert.InDelta(t, 200.0, equityLeg.Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeEquity, equityLeg.Instrument.AssetType)
 	assert.Equal(t, "F", equityLeg.Instrument.Symbol)
 
 	// Option leg: SELL_TO_OPEN call.
 	optionLeg := order.OrderLegCollection[1]
 	assert.Equal(t, models.InstructionSellToOpen, optionLeg.Instruction)
-	assert.Equal(t, 2.0, optionLeg.Quantity)
+	assert.InDelta(t, 2.0, optionLeg.Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeOption, optionLeg.Instrument.AssetType)
 	require.NotNil(t, optionLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *optionLeg.Instrument.PutCall)
 	require.NotNil(t, optionLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 14.0, *optionLeg.Instrument.OptionStrikePrice)
+	assert.InDelta(t, 14.0, *optionLeg.Instrument.OptionStrikePrice, 0.001)
 }
 
 func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
@@ -1599,7 +1835,7 @@ func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
 			name: "iron-condor defaults",
 			args: []string{
 				"order", "build", "iron-condor",
-				"--underlying", "SPY", "--expiration", testFutureExpDate,
+				"--underlying", "SPY", "--expiration", testFutureExpDate(),
 				"--put-long-strike", "400", "--put-short-strike", "410",
 				"--call-short-strike", "420", "--call-long-strike", "430",
 				"--open", "--quantity", "1", "--price", "1.00",
@@ -1609,7 +1845,7 @@ func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
 			name: "vertical defaults",
 			args: []string{
 				"order", "build", "vertical",
-				"--underlying", "AAPL", "--expiration", testFutureExpDate,
+				"--underlying", "AAPL", "--expiration", testFutureExpDate(),
 				"--long-strike", "180", "--short-strike", "190",
 				"--call", "--open", "--quantity", "1", "--price", "2.00",
 			},
@@ -1618,7 +1854,7 @@ func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
 			name: "strangle defaults",
 			args: []string{
 				"order", "build", "strangle",
-				"--underlying", "TSLA", "--expiration", testFutureExpDate,
+				"--underlying", "TSLA", "--expiration", testFutureExpDate(),
 				"--call-strike", "300", "--put-strike", "250",
 				"--buy", "--open", "--quantity", "1", "--price", "10.00",
 			},
@@ -1627,7 +1863,7 @@ func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
 			name: "straddle defaults",
 			args: []string{
 				"order", "build", "straddle",
-				"--underlying", "NVDA", "--expiration", testFutureExpDate,
+				"--underlying", "NVDA", "--expiration", testFutureExpDate(),
 				"--strike", "130",
 				"--buy", "--open", "--quantity", "1", "--price", "15.00",
 			},
@@ -1636,7 +1872,7 @@ func TestNewOrderCmdBuildSpreadDefaultDurationSession(t *testing.T) {
 			name: "covered-call defaults",
 			args: []string{
 				"order", "build", "covered-call",
-				"--underlying", "F", "--expiration", testFutureExpDate,
+				"--underlying", "F", "--expiration", testFutureExpDate(),
 				"--strike", "14", "--quantity", "1", "--price", "12.00",
 			},
 		},
@@ -1970,7 +2206,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "iron-condor missing open/close",
 			args: []string{
 				"order", "build", "iron-condor",
-				"--underlying", "SPY", "--expiration", testFutureExpDate,
+				"--underlying", "SPY", "--expiration", testFutureExpDate(),
 				"--put-long-strike", "400", "--put-short-strike", "410",
 				"--call-short-strike", "420", "--call-long-strike", "430",
 				"--quantity", "1", "--price", "1.00",
@@ -1981,7 +2217,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "vertical missing open/close",
 			args: []string{
 				"order", "build", "vertical",
-				"--underlying", "AAPL", "--expiration", testFutureExpDate,
+				"--underlying", "AAPL", "--expiration", testFutureExpDate(),
 				"--long-strike", "180", "--short-strike", "190",
 				"--call", "--quantity", "1", "--price", "2.00",
 			},
@@ -1992,7 +2228,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "strangle missing buy/sell",
 			args: []string{
 				"order", "build", "strangle",
-				"--underlying", "TSLA", "--expiration", testFutureExpDate,
+				"--underlying", "TSLA", "--expiration", testFutureExpDate(),
 				"--call-strike", "300", "--put-strike", "250",
 				"--open", "--quantity", "1", "--price", "10.00",
 			},
@@ -2002,7 +2238,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "straddle missing buy/sell",
 			args: []string{
 				"order", "build", "straddle",
-				"--underlying", "NVDA", "--expiration", testFutureExpDate,
+				"--underlying", "NVDA", "--expiration", testFutureExpDate(),
 				"--strike", "130",
 				"--open", "--quantity", "1", "--price", "15.00",
 			},
@@ -2013,7 +2249,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "vertical missing call/put",
 			args: []string{
 				"order", "build", "vertical",
-				"--underlying", "AAPL", "--expiration", testFutureExpDate,
+				"--underlying", "AAPL", "--expiration", testFutureExpDate(),
 				"--long-strike", "180", "--short-strike", "190",
 				"--open", "--quantity", "1", "--price", "2.00",
 			},
@@ -2024,7 +2260,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "strangle invalid duration",
 			args: []string{
 				"order", "build", "strangle",
-				"--underlying", "TSLA", "--expiration", testFutureExpDate,
+				"--underlying", "TSLA", "--expiration", testFutureExpDate(),
 				"--call-strike", "300", "--put-strike", "250",
 				"--buy", "--open", "--quantity", "1", "--price", "10.00",
 				"--duration", "FOREVER",
@@ -2036,7 +2272,7 @@ func TestNewOrderCmdBuildSpreadParseErrors(t *testing.T) {
 			name: "straddle invalid session",
 			args: []string{
 				"order", "build", "straddle",
-				"--underlying", "NVDA", "--expiration", testFutureExpDate,
+				"--underlying", "NVDA", "--expiration", testFutureExpDate(),
 				"--strike", "130",
 				"--buy", "--open", "--quantity", "1", "--price", "15.00",
 				"--session", "AFTERHOURS",
@@ -2075,7 +2311,7 @@ func TestNewOrderCmdListAllAccounts(t *testing.T) {
 			{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":222,"status":"FILLED","orderLegCollection":[{"instruction":"SELL","quantity":5,"instrument":{"assetType":"EQUITY","symbol":"MSFT"}}]},
 			{"session":"NORMAL","duration":"DAY","orderType":"LIMIT","orderStrategyType":"SINGLE","orderId":333,"status":"QUEUED","orderLegCollection":[{"instruction":"BUY","quantity":20,"instrument":{"assetType":"EQUITY","symbol":"GOOG"}}]}
 		]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2096,12 +2332,12 @@ func TestNewOrderCmdListAllAccounts(t *testing.T) {
 
 	first, ok := orders[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(111), first["orderId"])
+	assert.InDelta(t, float64(111), first["orderId"], 0.001)
 	assert.Equal(t, "WORKING", first["status"])
 
 	second, ok := orders[1].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(333), second["orderId"])
+	assert.InDelta(t, float64(333), second["orderId"], 0.001)
 	assert.Equal(t, "QUEUED", second["status"])
 }
 
@@ -2114,8 +2350,12 @@ func TestNewOrderCmdListWithAccount(t *testing.T) {
 		assert.Equal(t, "/trader/v1/accounts/hash123/orders", r.URL.Path)
 
 		w.Header().Set("Content-Type", "application/json")
-		_, err := w.Write([]byte(`[{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":54321,"status":"QUEUED","orderLegCollection":[{"instruction":"SELL","quantity":5,"instrument":{"assetType":"EQUITY","symbol":"MSFT"}}]}]`))
-		require.NoError(t, err)
+		_, err := w.Write(
+			[]byte(
+				`[{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":54321,"status":"QUEUED","orderLegCollection":[{"instruction":"SELL","quantity":5,"instrument":{"assetType":"EQUITY","symbol":"MSFT"}}]}]`,
+			),
+		)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2135,7 +2375,7 @@ func TestNewOrderCmdListWithAccount(t *testing.T) {
 	require.Len(t, orders, 1)
 	order, ok := orders[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(54321), order["orderId"])
+	assert.InDelta(t, float64(54321), order["orderId"], 0.001)
 	assert.Equal(t, "QUEUED", order["status"])
 }
 
@@ -2152,7 +2392,7 @@ func TestNewOrderCmdListWithFilters(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write([]byte(`[]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2160,7 +2400,20 @@ func TestNewOrderCmdListWithFilters(t *testing.T) {
 	cliClient := testClient(t, server)
 
 	// Act
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "list", "--status", "FILLED", "--from", "2025-01-01T00:00:00Z", "--to", "2025-12-31T00:00:00Z")
+	stdout, err := runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order",
+		"list",
+		"--status",
+		"FILLED",
+		"--from",
+		"2025-01-01T00:00:00Z",
+		"--to",
+		"2025-12-31T00:00:00Z",
+	)
 
 	// Assert
 	require.NoError(t, err)
@@ -2187,11 +2440,19 @@ func TestNewOrderCmdListMultipleStatuses(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch status {
 		case "WORKING":
-			_, err := w.Write([]byte(`[{"session":"NORMAL","duration":"DAY","orderType":"LIMIT","orderStrategyType":"SINGLE","orderId":111,"status":"WORKING","orderLegCollection":[{"instruction":"BUY","quantity":10,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}]`))
-			require.NoError(t, err)
+			_, err := w.Write(
+				[]byte(
+					`[{"session":"NORMAL","duration":"DAY","orderType":"LIMIT","orderStrategyType":"SINGLE","orderId":111,"status":"WORKING","orderLegCollection":[{"instruction":"BUY","quantity":10,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}]`,
+				),
+			)
+			assert.NoError(t, err)
 		case "FILLED":
-			_, err := w.Write([]byte(`[{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":222,"status":"FILLED","orderLegCollection":[{"instruction":"SELL","quantity":5,"instrument":{"assetType":"EQUITY","symbol":"MSFT"}}]}]`))
-			require.NoError(t, err)
+			_, err := w.Write(
+				[]byte(
+					`[{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":222,"status":"FILLED","orderLegCollection":[{"instruction":"SELL","quantity":5,"instrument":{"assetType":"EQUITY","symbol":"MSFT"}}]}]`,
+				),
+			)
+			assert.NoError(t, err)
 		default:
 			assert.Failf(t, "unexpected status filter", "got status %q", status)
 		}
@@ -2202,7 +2463,18 @@ func TestNewOrderCmdListMultipleStatuses(t *testing.T) {
 	cliClient := testClient(t, server)
 
 	// Act
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "list", "--status", "WORKING", "--status", "FILLED")
+	stdout, err := runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order",
+		"list",
+		"--status",
+		"WORKING",
+		"--status",
+		"FILLED",
+	)
 
 	// Assert
 	require.NoError(t, err)
@@ -2216,12 +2488,12 @@ func TestNewOrderCmdListMultipleStatuses(t *testing.T) {
 
 	first, ok := orders[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(111), first["orderId"])
+	assert.InDelta(t, float64(111), first["orderId"], 0.001)
 	assert.Equal(t, "WORKING", first["status"])
 
 	second, ok := orders[1].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(222), second["orderId"])
+	assert.InDelta(t, float64(222), second["orderId"], 0.001)
 	assert.Equal(t, "FILLED", second["status"])
 }
 
@@ -2237,7 +2509,7 @@ func TestNewOrderCmdListCommaSeparatedStatuses(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write([]byte(`[]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2249,7 +2521,12 @@ func TestNewOrderCmdListCommaSeparatedStatuses(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	assert.Equal(t, []string{"WORKING", "FILLED"}, requestStatuses, "comma-separated values should produce separate API calls")
+	assert.Equal(
+		t,
+		[]string{"WORKING", "FILLED"},
+		requestStatuses,
+		"comma-separated values should produce separate API calls",
+	)
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
@@ -2287,7 +2564,7 @@ func TestNewOrderCmdListDefaultFiltersTerminalStatuses(t *testing.T) {
 
 	// Arrange - return orders in every terminal status plus one non-terminal.
 	// Default listing (no --status flag) should filter out all terminal ones.
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write([]byte(`[
 			{"orderId":1,"status":"WORKING"},
@@ -2299,7 +2576,7 @@ func TestNewOrderCmdListDefaultFiltersTerminalStatuses(t *testing.T) {
 			{"orderId":7,"status":"QUEUED"},
 			{"orderId":8,"status":"PENDING_ACTIVATION"}
 		]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2320,9 +2597,9 @@ func TestNewOrderCmdListDefaultFiltersTerminalStatuses(t *testing.T) {
 
 	expectedIDs := []float64{1, 7, 8}
 	for i, order := range orders {
-		o, ok := order.(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, expectedIDs[i], o["orderId"])
+		o, orderOK := order.(map[string]any)
+		require.True(t, orderOK)
+		assert.InDelta(t, expectedIDs[i], o["orderId"], 0.001)
 	}
 }
 
@@ -2340,7 +2617,7 @@ func TestNewOrderCmdListStatusAllDisablesFiltering(t *testing.T) {
 			{"orderId":2,"status":"FILLED"},
 			{"orderId":3,"status":"CANCELED"}
 		]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2368,9 +2645,13 @@ func TestNewOrderCmdListRecentIncludesTerminalStatuses(t *testing.T) {
 		assert.Empty(t, r.URL.Query().Get("status"), "recent with no explicit status should request all activity")
 
 		from := r.URL.Query().Get("fromEnteredTime")
-		require.NotEmpty(t, from)
+		if !assert.NotEmpty(t, from) {
+			return
+		}
 		parsedFrom, err := time.Parse(time.RFC3339, from)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		assert.WithinDuration(t, time.Now().UTC().Add(-24*time.Hour), parsedFrom, 2*time.Second)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -2379,7 +2660,7 @@ func TestNewOrderCmdListRecentIncludesTerminalStatuses(t *testing.T) {
 			{"orderId":2,"status":"CANCELED"},
 			{"orderId":3,"status":"WORKING"}
 		]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2407,7 +2688,7 @@ func TestNewOrderCmdListExplicitStatusBypassesDefault(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write([]byte(`[{"orderId":1,"status":"FILLED"},{"orderId":2,"status":"FILLED"}]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2432,13 +2713,13 @@ func TestNewOrderCmdListNilStatusIncludedByDefault(t *testing.T) {
 
 	// Arrange - orders with no status field should be kept (conservative:
 	// don't hide orders with unknown state).
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write([]byte(`[
 			{"orderId":1},
 			{"orderId":2,"status":"FILLED"}
 		]`))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -2458,7 +2739,7 @@ func TestNewOrderCmdListNilStatusIncludedByDefault(t *testing.T) {
 	require.Len(t, orders, 1)
 	o, ok := orders[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1), o["orderId"])
+	assert.InDelta(t, float64(1), o["orderId"], 0.001)
 }
 
 func TestNewOrderCmdGetSuccess(t *testing.T) {
@@ -2477,8 +2758,12 @@ func TestNewOrderCmdGetSuccess(t *testing.T) {
 			_, _ = w.Write([]byte(`{"accounts":[]}`))
 		case "/trader/v1/accounts/hash123/orders/12345":
 			assert.Equal(t, http.MethodGet, r.Method)
-			_, err := w.Write([]byte(`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":12345,"status":"FILLED","orderLegCollection":[{"instruction":"BUY","quantity":10,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}`))
-			require.NoError(t, err)
+			_, err := w.Write(
+				[]byte(
+					`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":12345,"status":"FILLED","orderLegCollection":[{"instruction":"BUY","quantity":10,"instrument":{"assetType":"EQUITY","symbol":"AAPL"}}]}`,
+				),
+			)
+			assert.NoError(t, err)
 		default:
 			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
@@ -2499,7 +2784,7 @@ func TestNewOrderCmdGetSuccess(t *testing.T) {
 	require.True(t, ok)
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(12345), order["orderId"])
+	assert.InDelta(t, float64(12345), order["orderId"], 0.001)
 	assert.Equal(t, "FILLED", order["status"])
 }
 
@@ -2519,8 +2804,12 @@ func TestNewOrderCmdGetOrderIDFlagSuccess(t *testing.T) {
 			_, _ = w.Write([]byte(`{"accounts":[]}`))
 		case "/trader/v1/accounts/hash123/orders/1234567890":
 			assert.Equal(t, http.MethodGet, r.Method)
-			_, err := w.Write([]byte(`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":1234567890,"status":"FILLED"}`))
-			require.NoError(t, err)
+			_, err := w.Write(
+				[]byte(
+					`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":1234567890,"status":"FILLED"}`,
+				),
+			)
+			assert.NoError(t, err)
 		default:
 			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
@@ -2541,7 +2830,7 @@ func TestNewOrderCmdGetOrderIDFlagSuccess(t *testing.T) {
 	require.True(t, ok)
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1234567890), order["orderId"])
+	assert.InDelta(t, float64(1234567890), order["orderId"], 0.001)
 }
 
 func TestNewOrderCmdGetOrderIDFlagWinsOverPositional(t *testing.T) {
@@ -2560,8 +2849,12 @@ func TestNewOrderCmdGetOrderIDFlagWinsOverPositional(t *testing.T) {
 			_, _ = w.Write([]byte(`{"accounts":[]}`))
 		case "/trader/v1/accounts/hash123/orders/1234567890":
 			assert.Equal(t, http.MethodGet, r.Method)
-			_, err := w.Write([]byte(`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":1234567890,"status":"FILLED"}`))
-			require.NoError(t, err)
+			_, err := w.Write(
+				[]byte(
+					`{"session":"NORMAL","duration":"DAY","orderType":"MARKET","orderStrategyType":"SINGLE","orderId":1234567890,"status":"FILLED"}`,
+				),
+			)
+			assert.NoError(t, err)
 		default:
 			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
@@ -2582,7 +2875,7 @@ func TestNewOrderCmdGetOrderIDFlagWinsOverPositional(t *testing.T) {
 	require.True(t, ok)
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1234567890), order["orderId"])
+	assert.InDelta(t, float64(1234567890), order["orderId"], 0.001)
 }
 
 func TestNewOrderCmdGetNoAccount(t *testing.T) {
@@ -2664,13 +2957,13 @@ func TestNewOrderCmdCancelSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "cancel", data["action"])
-	assert.Equal(t, float64(12345), data["orderId"])
+	assert.InDelta(t, float64(12345), data["orderId"], 0.001)
 	assert.Equal(t, true, data["canceled"])
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "CANCELED", data["orderStatus"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(12345), order["orderId"])
+	assert.InDelta(t, float64(12345), order["orderId"], 0.001)
 	assert.Equal(t, "CANCELED", order["status"])
 }
 
@@ -2703,13 +2996,13 @@ func TestNewOrderCmdCancelOrderIDFlagSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "cancel", data["action"])
-	assert.Equal(t, float64(1234567890), data["orderId"])
+	assert.InDelta(t, float64(1234567890), data["orderId"], 0.001)
 	assert.Equal(t, true, data["canceled"])
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "CANCELED", data["orderStatus"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1234567890), order["orderId"])
+	assert.InDelta(t, float64(1234567890), order["orderId"], 0.001)
 	assert.Equal(t, "CANCELED", order["status"])
 }
 
@@ -2739,7 +3032,7 @@ func TestNewOrderCmdCancelGetFailureReturnsPartialSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "cancel", data["action"])
-	assert.Equal(t, float64(12345), data["orderId"])
+	assert.InDelta(t, float64(12345), data["orderId"], 0.001)
 	assert.Equal(t, true, data["canceled"])
 	assert.Equal(t, "unverified", data["verificationState"])
 	verificationFailures, ok := data["verificationFailures"].([]any)
@@ -2802,8 +3095,12 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
 			w.WriteHeader(http.StatusOK)
@@ -2841,7 +3138,7 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
 	require.NotNil(t, received.Price)
-	assert.Equal(t, 185.25, *received.Price)
+	assert.InDelta(t, 185.25, *received.Price, 0.001)
 	require.Len(t, received.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionBuy, received.OrderLegCollection[0].Instruction)
 	assert.Equal(t, "AAPL", received.OrderLegCollection[0].Instrument.Symbol)
@@ -2850,8 +3147,8 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "replace", data["action"])
-	assert.Equal(t, float64(67890), data["orderId"])
-	assert.Equal(t, float64(12345), data["originalOrderId"])
+	assert.InDelta(t, float64(67890), data["orderId"], 0.001)
+	assert.InDelta(t, float64(12345), data["originalOrderId"], 0.001)
 	assert.Equal(t, true, data["replaced"])
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "QUEUED", data["orderStatus"])
@@ -2861,11 +3158,11 @@ func TestNewOrderCmdReplaceSuccess(t *testing.T) {
 	assert.Equal(t, "LIMIT", submittedOrder["orderType"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(67890), order["orderId"])
+	assert.InDelta(t, float64(67890), order["orderId"], 0.001)
 	assert.Equal(t, "QUEUED", order["status"])
 	originalOrder, ok := data["originalOrder"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(12345), originalOrder["orderId"])
+	assert.InDelta(t, float64(12345), originalOrder["orderId"], 0.001)
 	assert.Equal(t, "REPLACED", originalOrder["status"])
 }
 
@@ -2912,19 +3209,19 @@ func TestNewOrderCmdReplaceOrderIDFlagSuccess(t *testing.T) {
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "replace", data["action"])
-	assert.Equal(t, float64(1234567890), data["orderId"])
-	assert.Equal(t, float64(1234567890), data["originalOrderId"])
+	assert.InDelta(t, float64(1234567890), data["orderId"], 0.001)
+	assert.InDelta(t, float64(1234567890), data["originalOrderId"], 0.001)
 	assert.Equal(t, true, data["replaced"])
 	assert.Equal(t, "verified", data["verificationState"])
 	assert.Equal(t, "REPLACED", data["orderStatus"])
 	assert.Equal(t, "REPLACED", data["originalOrderStatus"])
 	order, ok := data["order"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1234567890), order["orderId"])
+	assert.InDelta(t, float64(1234567890), order["orderId"], 0.001)
 	assert.Equal(t, "REPLACED", order["status"])
 	originalOrder, ok := data["originalOrder"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1234567890), originalOrder["orderId"])
+	assert.InDelta(t, float64(1234567890), originalOrder["orderId"], 0.001)
 }
 
 func TestNewOrderCmdReplaceOriginalStatusMismatchReturnsPartialSuccess(t *testing.T) {
@@ -2949,7 +3246,21 @@ func TestNewOrderCmdReplaceOriginalStatusMismatchReturnsPartialSuccess(t *testin
 	configPath := writeTestConfigMutable(t, "hash123")
 	cliClient := testClient(t, server)
 
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "replace", "12345", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10")
+	stdout, err := runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order",
+		"replace",
+		"12345",
+		"--symbol",
+		"AAPL",
+		"--action",
+		"BUY",
+		"--quantity",
+		"10",
+	)
 	require.NoError(t, err)
 
 	envelope := decodeEnvelope(t, stdout)
@@ -2968,7 +3279,21 @@ func TestNewOrderCmdReplaceMutableDisabled(t *testing.T) {
 	configPath := writeTestConfig(t, "hash123")
 
 	// Act
-	stdout, err := runOrderCommand(t, nil, configPath, "", "order", "replace", "12345", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10")
+	stdout, err := runOrderCommand(
+		t,
+		nil,
+		configPath,
+		"",
+		"order",
+		"replace",
+		"12345",
+		"--symbol",
+		"AAPL",
+		"--action",
+		"BUY",
+		"--quantity",
+		"10",
+	)
 
 	// Assert
 	require.Error(t, err)
@@ -2993,7 +3318,21 @@ func TestNewOrderCmdReplaceAPIError(t *testing.T) {
 	cliClient := testClient(t, server)
 
 	// Act
-	stdout, err := runOrderCommand(t, cliClient, configPath, "", "order", "replace", "12345", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10")
+	stdout, err := runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order",
+		"replace",
+		"12345",
+		"--symbol",
+		"AAPL",
+		"--action",
+		"BUY",
+		"--quantity",
+		"10",
+	)
 
 	// Assert
 	require.Error(t, err)
@@ -3011,8 +3350,12 @@ func TestOrderReplaceEquityFlagAliases(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
 			w.WriteHeader(http.StatusOK)
@@ -3058,13 +3401,23 @@ func TestOrderReplaceOptionSuccess(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
 			w.WriteHeader(http.StatusOK)
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/67890":
-			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "AAPL  "+testFutureExpTime.Format("060102")+"C00200000")
+			writeTestOrderResponse(
+				t,
+				w,
+				67890,
+				models.OrderStatusQueued,
+				"AAPL  "+testFutureExpTime().Format("060102")+"C00200000",
+			)
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "AAPL")
 		default:
@@ -3084,7 +3437,7 @@ func TestOrderReplaceOptionSuccess(t *testing.T) {
 		"",
 		"order", "replace", "option", "12345",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "200",
 		"--call",
 		"--instruction", "BUY_TO_OPEN",
@@ -3097,18 +3450,18 @@ func TestOrderReplaceOptionSuccess(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
 	require.NotNil(t, received.Price)
-	assert.Equal(t, 5.00, *received.Price)
+	assert.InDelta(t, 5.00, *received.Price, 0.001)
 	require.Len(t, received.OrderLegCollection, 1)
 	leg := received.OrderLegCollection[0]
 	assert.Equal(t, models.AssetTypeOption, leg.Instrument.AssetType)
 	assert.Equal(t, models.InstructionBuyToOpen, leg.Instruction)
-	assert.Equal(t, "AAPL  "+testFutureExpTime.Format("060102")+"C00200000", leg.Instrument.Symbol)
+	assert.Equal(t, "AAPL  "+testFutureExpTime().Format("060102")+"C00200000", leg.Instrument.Symbol)
 
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "replace", data["action"])
-	assert.Equal(t, float64(67890), data["orderId"])
+	assert.InDelta(t, float64(67890), data["orderId"], 0.001)
 	assert.Equal(t, true, data["replaced"])
 }
 
@@ -3125,7 +3478,7 @@ func TestOrderReplaceOptionAliasValidation(t *testing.T) {
 			args: []string{
 				"order", "replace", "option", "12345",
 				"--underlying", "AAPL",
-				"--expiration", testFutureExpDate,
+				"--expiration", testFutureExpDate(),
 				"--strike", "200",
 				"--call",
 				"--instruction", "BOGUS",
@@ -3140,7 +3493,7 @@ func TestOrderReplaceOptionAliasValidation(t *testing.T) {
 			args: []string{
 				"order", "replace", "option", "12345",
 				"--underlying", "AAPL",
-				"--expiration", testFutureExpDate,
+				"--expiration", testFutureExpDate(),
 				"--strike", "200",
 				"--call",
 				"--instruction", "BUY_TO_OPEN",
@@ -3176,7 +3529,7 @@ func TestOrderReplaceOptionCallPutMutuallyExclusive(t *testing.T) {
 		"",
 		"order", "replace", "option", "12345",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "200",
 		"--call",
 		"--put",
@@ -3201,7 +3554,7 @@ func TestOrderReplaceOptionMutableGuard(t *testing.T) {
 		"",
 		"order", "replace", "option", "12345",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "200",
 		"--call",
 		"--action", "BUY_TO_OPEN",
@@ -3242,7 +3595,7 @@ func TestParseRequiredOrderID(t *testing.T) {
 			opts := &orderGetOpts{}
 			cmd := &cobra.Command{
 				Use: "order-test",
-				RunE: func(cmd *cobra.Command, args []string) error {
+				RunE: func(_ *cobra.Command, args []string) error {
 					var err error
 					parsedID, err = parseRequiredOrderID(opts.OrderID, args)
 					return err
@@ -3279,7 +3632,7 @@ func TestNewOrderCmdBuildOptionOutputsRequestJSON(t *testing.T) {
 		"",
 		"order", "build", "option",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "185",
 		"--call",
 		"--action", "BUY_TO_OPEN",
@@ -3296,22 +3649,22 @@ func TestNewOrderCmdBuildOptionOutputsRequestJSON(t *testing.T) {
 	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
 	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 3.50, *order.Price)
+	assert.InDelta(t, 3.50, *order.Price, 0.001)
 	require.Len(t, order.OrderLegCollection, 1)
 	leg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuyToOpen, leg.Instruction)
-	assert.Equal(t, 5.0, leg.Quantity)
+	assert.InDelta(t, 5.0, leg.Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeOption, leg.Instrument.AssetType)
-	wantOCC := orderbuilder.BuildOCCSymbol("AAPL", testFutureExpTime, 185, "CALL")
+	wantOCC := orderbuilder.BuildOCCSymbol("AAPL", testFutureExpTime(), 185, "CALL")
 	assert.Equal(t, wantOCC, leg.Instrument.Symbol)
 	require.NotNil(t, leg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *leg.Instrument.PutCall)
 	require.NotNil(t, leg.Instrument.UnderlyingSymbol)
 	assert.Equal(t, "AAPL", *leg.Instrument.UnderlyingSymbol)
 	require.NotNil(t, leg.Instrument.OptionExpirationDate)
-	assert.Equal(t, testFutureExpDate, *leg.Instrument.OptionExpirationDate)
+	assert.Equal(t, testFutureExpDate(), *leg.Instrument.OptionExpirationDate)
 	require.NotNil(t, leg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 185.0, *leg.Instrument.OptionStrikePrice)
+	assert.InDelta(t, 185.0, *leg.Instrument.OptionStrikePrice, 0.001)
 }
 
 func TestNewOrderCmdBuildBracketOutputsRequestJSON(t *testing.T) {
@@ -3341,7 +3694,7 @@ func TestNewOrderCmdBuildBracketOutputsRequestJSON(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 185.0, *order.Price)
+	assert.InDelta(t, 185.0, *order.Price, 0.001)
 	require.Len(t, order.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
 	require.Len(t, order.ChildOrderStrategies, 1)
@@ -3351,12 +3704,12 @@ func TestNewOrderCmdBuildBracketOutputsRequestJSON(t *testing.T) {
 	takeProfit := order.ChildOrderStrategies[0].ChildOrderStrategies[0]
 	assert.Equal(t, models.OrderTypeLimit, takeProfit.OrderType)
 	require.NotNil(t, takeProfit.Price)
-	assert.Equal(t, 195.0, *takeProfit.Price)
+	assert.InDelta(t, 195.0, *takeProfit.Price, 0.001)
 
 	stopLoss := order.ChildOrderStrategies[0].ChildOrderStrategies[1]
 	assert.Equal(t, models.OrderTypeStop, stopLoss.OrderType)
 	require.NotNil(t, stopLoss.StopPrice)
-	assert.Equal(t, 175.0, *stopLoss.StopPrice)
+	assert.InDelta(t, 175.0, *stopLoss.StopPrice, 0.001)
 }
 
 func TestParseInstruction_ErrorPaths(t *testing.T) {
@@ -3495,8 +3848,12 @@ func TestNewOrderCmdReplaceInfersLimitFromPrice(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
 			w.WriteHeader(http.StatusOK)
@@ -3531,7 +3888,7 @@ func TestNewOrderCmdReplaceInfersLimitFromPrice(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
 	require.NotNil(t, received.Price)
-	assert.Equal(t, 194.16, *received.Price)
+	assert.InDelta(t, 194.16, *received.Price, 0.001)
 
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
@@ -3552,13 +3909,23 @@ func TestOrderReplaceOptionInfersLimitFromPrice(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPut && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(body, &received))
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.NoError(t, json.Unmarshal(body, &received)) {
+				return
+			}
 
 			w.Header().Set("Location", "/trader/v1/accounts/hash123/orders/67890")
 			w.WriteHeader(http.StatusOK)
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/67890":
-			writeTestOrderResponse(t, w, 67890, models.OrderStatusQueued, "AAPL  "+testFutureExpTime.Format("060102")+"C00200000")
+			writeTestOrderResponse(
+				t,
+				w,
+				67890,
+				models.OrderStatusQueued,
+				"AAPL  "+testFutureExpTime().Format("060102")+"C00200000",
+			)
 		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123/orders/12345":
 			writeTestOrderResponse(t, w, 12345, models.OrderStatusReplaced, "AAPL")
 		default:
@@ -3579,7 +3946,7 @@ func TestOrderReplaceOptionInfersLimitFromPrice(t *testing.T) {
 		"",
 		"order", "replace", "option", "12345",
 		"--underlying", "AAPL",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--strike", "200",
 		"--call",
 		"--action", "BUY_TO_OPEN",
@@ -3591,7 +3958,7 @@ func TestOrderReplaceOptionInfersLimitFromPrice(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderTypeLimit, received.OrderType)
 	require.NotNil(t, received.Price)
-	assert.Equal(t, 6.50, *received.Price)
+	assert.InDelta(t, 6.50, *received.Price, 0.001)
 
 	envelope := decodeEnvelope(t, stdout)
 	data, ok := envelope.Data.(map[string]any)
@@ -3666,7 +4033,7 @@ func TestNewOrderCmdBuildFTSInlineJSON(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 150.0, *order.Price)
+	assert.InDelta(t, 150.0, *order.Price, 0.001)
 	require.Len(t, order.OrderLegCollection, 1)
 	assert.Equal(t, "AAPL", order.OrderLegCollection[0].Instrument.Symbol)
 	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
@@ -3677,7 +4044,7 @@ func TestNewOrderCmdBuildFTSInlineJSON(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeSingle, child.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeLimit, child.OrderType)
 	require.NotNil(t, child.Price)
-	assert.Equal(t, 160.0, *child.Price)
+	assert.InDelta(t, 160.0, *child.Price, 0.001)
 	require.Len(t, child.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionSell, child.OrderLegCollection[0].Instruction)
 }
@@ -4001,7 +4368,9 @@ func TestParseDuration(t *testing.T) {
 
 // farExpDate is testFutureExpTime + 30 days, formatted as YYYY-MM-DD.
 // Calendar and diagonal spreads need two different expirations.
-var farExpDate = testFutureExpTime.AddDate(0, 0, 30).Format("2006-01-02")
+func farExpDate() string {
+	return testFutureExpTime().AddDate(0, 0, 30).Format("2006-01-02")
+}
 
 func TestNewOrderCmdBuildCalendarCallOpen(t *testing.T) {
 	t.Parallel()
@@ -4011,8 +4380,8 @@ func TestNewOrderCmdBuildCalendarCallOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "calendar",
 		"--underlying", "AAPL",
-		"--near-expiration", testFutureExpDate,
-		"--far-expiration", farExpDate,
+		"--near-expiration", testFutureExpDate(),
+		"--far-expiration", farExpDate(),
 		"--strike", "150",
 		"--call",
 		"--open",
@@ -4027,7 +4396,7 @@ func TestNewOrderCmdBuildCalendarCallOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeCalendar, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 2.50, *order.Price)
+	assert.InDelta(t, 2.50, *order.Price, 0.001)
 	assert.Equal(t, models.DurationDay, order.Duration)
 
 	require.Len(t, order.OrderLegCollection, 2)
@@ -4036,7 +4405,7 @@ func TestNewOrderCmdBuildCalendarCallOpen(t *testing.T) {
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[0].Instrument.PutCall)
-	assert.Equal(t, 1.0, order.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 1.0, order.OrderLegCollection[0].Quantity, 0.001)
 
 	// Leg 1: near-dated call (sold).
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
@@ -4052,8 +4421,8 @@ func TestNewOrderCmdBuildCalendarPutClose(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "calendar",
 		"--underlying", "AAPL",
-		"--near-expiration", testFutureExpDate,
-		"--far-expiration", farExpDate,
+		"--near-expiration", testFutureExpDate(),
+		"--far-expiration", farExpDate(),
 		"--strike", "150",
 		"--put",
 		"--close",
@@ -4085,8 +4454,8 @@ func TestNewOrderCmdBuildDiagonalCallOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "diagonal",
 		"--underlying", "AAPL",
-		"--near-expiration", testFutureExpDate,
-		"--far-expiration", farExpDate,
+		"--near-expiration", testFutureExpDate(),
+		"--far-expiration", farExpDate(),
 		"--near-strike", "150",
 		"--far-strike", "160",
 		"--call",
@@ -4101,22 +4470,22 @@ func TestNewOrderCmdBuildDiagonalCallOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeDiagonal, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 3.00, *order.Price)
+	assert.InDelta(t, 3.00, *order.Price, 0.001)
 
 	require.Len(t, order.OrderLegCollection, 2)
 
 	// Leg 0: far-dated call at 160 (bought).
 	assert.Equal(t, models.InstructionBuyToOpen, order.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 2.0, order.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 2.0, order.OrderLegCollection[0].Quantity, 0.001)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.OptionStrikePrice)
-	assert.Equal(t, 160.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 160.0, *order.OrderLegCollection[0].Instrument.OptionStrikePrice, 0.001)
 	require.NotNil(t, order.OrderLegCollection[0].Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *order.OrderLegCollection[0].Instrument.PutCall)
 
 	// Leg 1: near-dated call at 150 (sold).
 	assert.Equal(t, models.InstructionSellToOpen, order.OrderLegCollection[1].Instruction)
 	require.NotNil(t, order.OrderLegCollection[1].Instrument.OptionStrikePrice)
-	assert.Equal(t, 150.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice)
+	assert.InDelta(t, 150.0, *order.OrderLegCollection[1].Instrument.OptionStrikePrice, 0.001)
 }
 
 func TestNewOrderCmdBuildDiagonalPutOpen(t *testing.T) {
@@ -4126,8 +4495,8 @@ func TestNewOrderCmdBuildDiagonalPutOpen(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "diagonal",
 		"--underlying", "AAPL",
-		"--near-expiration", testFutureExpDate,
-		"--far-expiration", farExpDate,
+		"--near-expiration", testFutureExpDate(),
+		"--far-expiration", farExpDate(),
 		"--near-strike", "150",
 		"--far-strike", "140",
 		"--put",
@@ -4157,7 +4526,7 @@ func TestNewOrderCmdBuildCollarOpen(t *testing.T) {
 		"--underlying", "AAPL",
 		"--put-strike", "140",
 		"--call-strike", "160",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--quantity", "3",
 		"--price", "450",
 		"--open",
@@ -4169,7 +4538,7 @@ func TestNewOrderCmdBuildCollarOpen(t *testing.T) {
 	require.NotNil(t, order.ComplexOrderStrategyType)
 	assert.Equal(t, models.ComplexOrderStrategyTypeCollarWithStock, *order.ComplexOrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 450.0, *order.Price)
+	assert.InDelta(t, 450.0, *order.Price, 0.001)
 
 	// 3 legs: equity, protective put, covered call.
 	require.Len(t, order.OrderLegCollection, 3)
@@ -4177,7 +4546,7 @@ func TestNewOrderCmdBuildCollarOpen(t *testing.T) {
 	// Leg 0: equity BUY, 300 shares (3 contracts * 100).
 	equityLeg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuy, equityLeg.Instruction)
-	assert.Equal(t, 300.0, equityLeg.Quantity)
+	assert.InDelta(t, 300.0, equityLeg.Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeEquity, equityLeg.Instrument.AssetType)
 
 	// Leg 1: protective put BUY_TO_OPEN.
@@ -4186,7 +4555,7 @@ func TestNewOrderCmdBuildCollarOpen(t *testing.T) {
 	require.NotNil(t, putLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallPut, *putLeg.Instrument.PutCall)
 	require.NotNil(t, putLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 140.0, *putLeg.Instrument.OptionStrikePrice)
+	assert.InDelta(t, 140.0, *putLeg.Instrument.OptionStrikePrice, 0.001)
 
 	// Leg 2: covered call SELL_TO_OPEN.
 	callLeg := order.OrderLegCollection[2]
@@ -4194,7 +4563,7 @@ func TestNewOrderCmdBuildCollarOpen(t *testing.T) {
 	require.NotNil(t, callLeg.Instrument.PutCall)
 	assert.Equal(t, models.PutCallCall, *callLeg.Instrument.PutCall)
 	require.NotNil(t, callLeg.Instrument.OptionStrikePrice)
-	assert.Equal(t, 160.0, *callLeg.Instrument.OptionStrikePrice)
+	assert.InDelta(t, 160.0, *callLeg.Instrument.OptionStrikePrice, 0.001)
 }
 
 func TestNewOrderCmdBuildCollarClose(t *testing.T) {
@@ -4207,7 +4576,7 @@ func TestNewOrderCmdBuildCollarClose(t *testing.T) {
 		"--underlying", "AAPL",
 		"--put-strike", "140",
 		"--call-strike", "160",
-		"--expiration", testFutureExpDate,
+		"--expiration", testFutureExpDate(),
 		"--quantity", "2",
 		"--price", "300",
 		"--close",
@@ -4233,7 +4602,7 @@ func TestNewOrderCmdBuildCalendarInvalidDate(t *testing.T) {
 		"order", "build", "calendar",
 		"--underlying", "AAPL",
 		"--near-expiration", "not-a-date",
-		"--far-expiration", farExpDate,
+		"--far-expiration", farExpDate(),
 		"--strike", "150",
 		"--call",
 		"--open",
@@ -4255,7 +4624,7 @@ func TestNewOrderCmdBuildDiagonalInvalidDate(t *testing.T) {
 		t, nil, writeTestConfig(t, "hash123"), "",
 		"order", "build", "diagonal",
 		"--underlying", "AAPL",
-		"--near-expiration", testFutureExpDate,
+		"--near-expiration", testFutureExpDate(),
 		"--far-expiration", "bad-date",
 		"--near-strike", "150",
 		"--far-strike", "160",
@@ -4316,11 +4685,11 @@ func TestOrderGetIncludesAccountMetadata(t *testing.T) {
 		resp, ok := routes[r.URL.Path]
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
-			require.NoError(t, json.NewEncoder(w).Encode(map[string]string{"error": "not found"}))
+			assert.NoError(t, json.NewEncoder(w).Encode(map[string]string{"error": "not found"}))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(resp))
+		assert.NoError(t, json.NewEncoder(w).Encode(resp))
 	}))
 	defer server.Close()
 

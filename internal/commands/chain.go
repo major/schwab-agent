@@ -11,19 +11,19 @@ import (
 
 // chainGetOpts holds the options for the chain get subcommand.
 type chainGetOpts struct {
-	Type                   chainContractType `flag:"type" flagdescr:"Contract type: CALL, PUT, or ALL" flaggroup:"contract"`
-	StrikeCount            string            `flag:"strike-count" flagdescr:"Number of strikes to return" flaggroup:"filtering"`
-	Strategy               chainStrategy     `flag:"strategy" flagdescr:"Option pricing strategy" flaggroup:"contract"`
-	FromDate               string            `flag:"from-date" flagdescr:"Start date (YYYY-MM-DD)" flaggroup:"filtering"`
-	ToDate                 string            `flag:"to-date" flagdescr:"End date (YYYY-MM-DD)" flaggroup:"filtering"`
-	IncludeUnderlyingQuote bool              `flag:"include-underlying-quote" flagdescr:"Include underlying quote data in response" flaggroup:"filtering"`
-	Interval               string            `flag:"interval" flagdescr:"Strike interval for spread strategy chains" flaggroup:"filtering"`
-	Strike                 string            `flag:"strike" flagdescr:"Filter to a specific strike price" flaggroup:"filtering"`
-	StrikeRange            strikeRange       `flag:"strike-range" flagdescr:"Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL" flaggroup:"filtering"`
-	Volatility             string            `flag:"volatility" flagdescr:"Volatility for theoretical pricing calculations" flaggroup:"pricing"`
-	UnderlyingPrice        string            `flag:"underlying-price" flagdescr:"Override underlying price for theoretical calculations" flaggroup:"pricing"`
-	InterestRate           string            `flag:"interest-rate" flagdescr:"Interest rate for theoretical pricing calculations" flaggroup:"pricing"`
-	DaysToExpiration       string            `flag:"days-to-expiration" flagdescr:"Days to expiration for theoretical pricing calculations" flaggroup:"pricing"`
+	Type                   chainContractType `flag:"type"                     flagdescr:"Contract type: CALL, PUT, or ALL"                        flaggroup:"contract"`
+	StrikeCount            string            `flag:"strike-count"             flagdescr:"Number of strikes to return"                             flaggroup:"filtering"`
+	Strategy               chainStrategy     `flag:"strategy"                 flagdescr:"Option pricing strategy"                                 flaggroup:"contract"`
+	FromDate               string            `flag:"from-date"                flagdescr:"Start date (YYYY-MM-DD)"                                 flaggroup:"filtering"`
+	ToDate                 string            `flag:"to-date"                  flagdescr:"End date (YYYY-MM-DD)"                                   flaggroup:"filtering"`
+	IncludeUnderlyingQuote bool              `flag:"include-underlying-quote" flagdescr:"Include underlying quote data in response"               flaggroup:"filtering"`
+	Interval               string            `flag:"interval"                 flagdescr:"Strike interval for spread strategy chains"              flaggroup:"filtering"`
+	Strike                 string            `flag:"strike"                   flagdescr:"Filter to a specific strike price"                       flaggroup:"filtering"`
+	StrikeRange            strikeRange       `flag:"strike-range"             flagdescr:"Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL"  flaggroup:"filtering"`
+	Volatility             string            `flag:"volatility"               flagdescr:"Volatility for theoretical pricing calculations"         flaggroup:"pricing"`
+	UnderlyingPrice        string            `flag:"underlying-price"         flagdescr:"Override underlying price for theoretical calculations"  flaggroup:"pricing"`
+	InterestRate           string            `flag:"interest-rate"            flagdescr:"Interest rate for theoretical pricing calculations"      flaggroup:"pricing"`
+	DaysToExpiration       string            `flag:"days-to-expiration"       flagdescr:"Days to expiration for theoretical pricing calculations" flaggroup:"pricing"`
 }
 
 // NewChainCmd returns the Cobra command for option chain operations.
@@ -31,7 +31,7 @@ func NewChainCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "chain",
 		Short:   "Option chain operations",
-		GroupID: "market-data",
+		GroupID: groupIDMarketData,
 		RunE:    requireSubcommand,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
@@ -70,7 +70,7 @@ specific moneyness with --strike-range (ITM, NTM, OTM, ALL).`,
 			// uses its default behavior.
 			includeUnderlying := ""
 			if opts.IncludeUnderlyingQuote {
-				includeUnderlying = "true"
+				includeUnderlying = annotationValueTrue
 			}
 
 			params := client.ChainParams{

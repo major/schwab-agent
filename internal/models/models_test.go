@@ -60,11 +60,11 @@ func TestQuoteEquityJSONRoundTrip(t *testing.T) {
 
 	// Verify nested quote fields.
 	require.NotNil(t, unmarshaled.Quote)
-	assert.Equal(t, bidPrice, *unmarshaled.Quote.BidPrice)
-	assert.Equal(t, askPrice, *unmarshaled.Quote.AskPrice)
-	assert.Equal(t, lastPrice, *unmarshaled.Quote.LastPrice)
-	assert.Equal(t, netChange, *unmarshaled.Quote.NetChange)
-	assert.Equal(t, netPercentChange, *unmarshaled.Quote.NetPercentChange)
+	assert.InDelta(t, bidPrice, *unmarshaled.Quote.BidPrice, 0.001)
+	assert.InDelta(t, askPrice, *unmarshaled.Quote.AskPrice, 0.001)
+	assert.InDelta(t, lastPrice, *unmarshaled.Quote.LastPrice, 0.001)
+	assert.InDelta(t, netChange, *unmarshaled.Quote.NetChange, 0.001)
+	assert.InDelta(t, netPercentChange, *unmarshaled.Quote.NetPercentChange, 0.001)
 	assert.Equal(t, totalVolume, *unmarshaled.Quote.TotalVolume)
 	assert.Equal(t, bidSize, *unmarshaled.Quote.BidSize)
 	assert.Equal(t, askSize, *unmarshaled.Quote.AskSize)
@@ -104,10 +104,10 @@ func TestCandleJSONRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify fields match.
-	assert.Equal(t, open, *unmarshaled.Open)
-	assert.Equal(t, high, *unmarshaled.High)
-	assert.Equal(t, low, *unmarshaled.Low)
-	assert.Equal(t, closePrice, *unmarshaled.Close)
+	assert.InDelta(t, open, *unmarshaled.Open, 0.001)
+	assert.InDelta(t, high, *unmarshaled.High, 0.001)
+	assert.InDelta(t, low, *unmarshaled.Low, 0.001)
+	assert.InDelta(t, closePrice, *unmarshaled.Close, 0.001)
 	assert.Equal(t, volume, *unmarshaled.Volume)
 	assert.Equal(t, datetime, *unmarshaled.Datetime)
 }
@@ -136,9 +136,9 @@ func TestPositionJSONRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify fields match.
-	assert.Equal(t, longQuantity, *unmarshaled.LongQuantity)
-	assert.Equal(t, marketValue, *unmarshaled.MarketValue)
-	assert.Equal(t, averagePrice, *unmarshaled.AveragePrice)
+	assert.InDelta(t, longQuantity, *unmarshaled.LongQuantity, 0.001)
+	assert.InDelta(t, marketValue, *unmarshaled.MarketValue, 0.001)
+	assert.InDelta(t, averagePrice, *unmarshaled.AveragePrice, 0.001)
 }
 
 // --- SchwabTime tests ---
@@ -394,7 +394,7 @@ func TestOrderJSONRoundTrip(t *testing.T) {
 	assert.Equal(t, SessionNormal, order.Session)
 	assert.Equal(t, DurationDay, order.Duration)
 	assert.Equal(t, OrderTypeLimit, order.OrderType)
-	assert.Equal(t, 150.50, *order.Price)
+	assert.InDelta(t, 150.50, *order.Price, 0.001)
 	assert.Equal(t, OrderStatusWorking, *order.Status)
 	assert.Equal(t, int64(123456789), *order.OrderID)
 
@@ -461,7 +461,7 @@ func TestOrderRequestJSONRoundTrip(t *testing.T) {
 	assert.Equal(t, SessionNormal, req.Session)
 	assert.Equal(t, DurationDay, req.Duration)
 	assert.Equal(t, OrderTypeLimit, req.OrderType)
-	assert.Equal(t, 150.50, *req.Price)
+	assert.InDelta(t, 150.50, *req.Price, 0.001)
 	assert.Equal(t, OrderStrategyTypeSingle, req.OrderStrategyType)
 	require.Len(t, req.OrderLegCollection, 1)
 	assert.Equal(t, "AAPL", req.OrderLegCollection[0].Instrument.Symbol)
@@ -474,7 +474,7 @@ func TestOrderRequestJSONRoundTrip(t *testing.T) {
 	err = json.Unmarshal(data, &req2)
 	require.NoError(t, err)
 	assert.Equal(t, req.OrderType, req2.OrderType)
-	assert.Equal(t, *req.Price, *req2.Price)
+	assert.InDelta(t, *req.Price, *req2.Price, 0.001)
 }
 
 // TestOrderRequestWithChildStrategies verifies recursive child order nesting (OTO/OCO).
@@ -538,14 +538,14 @@ func TestOrderRequestWithChildStrategies(t *testing.T) {
 	child := req.ChildOrderStrategies[0]
 	assert.Equal(t, OrderStrategyTypeOCO, child.OrderStrategyType)
 	assert.Equal(t, DurationGoodTillCancel, child.Duration)
-	assert.Equal(t, 160.0, *child.Price)
+	assert.InDelta(t, 160.0, *child.Price, 0.001)
 
 	// Verify grandchild (stop-loss leg of OCO).
 	require.Len(t, child.ChildOrderStrategies, 1)
 	grandchild := child.ChildOrderStrategies[0]
 	assert.Equal(t, OrderStrategyTypeSingle, grandchild.OrderStrategyType)
 	assert.Equal(t, OrderTypeStop, grandchild.OrderType)
-	assert.Equal(t, 140.0, *grandchild.StopPrice)
+	assert.InDelta(t, 140.0, *grandchild.StopPrice, 0.001)
 }
 
 // TestOptionChainJSONRoundTrip verifies the nested map[string]map[string][]*OptionContract structure.
@@ -609,7 +609,7 @@ func TestOptionChainJSONRoundTrip(t *testing.T) {
 
 	// Top-level fields.
 	assert.Equal(t, "AAPL", *chain.Symbol)
-	assert.Equal(t, 175.50, *chain.UnderlyingPrice)
+	assert.InDelta(t, 175.50, *chain.UnderlyingPrice, 0.001)
 
 	// Underlying.
 	require.NotNil(t, chain.Underlying)
@@ -622,8 +622,8 @@ func TestOptionChainJSONRoundTrip(t *testing.T) {
 	calls := strikes["175.0"]
 	require.Len(t, calls, 1)
 	assert.Equal(t, "CALL", *calls[0].PutCall)
-	assert.Equal(t, 175.0, *calls[0].StrikePrice)
-	assert.Equal(t, 0.52, *calls[0].Delta)
+	assert.InDelta(t, 175.0, *calls[0].StrikePrice, 0.001)
+	assert.InDelta(t, 0.52, *calls[0].Delta, 0.001)
 	assert.True(t, *calls[0].InTheMoney)
 
 	// Put map.
@@ -690,13 +690,13 @@ func TestAccountJSONRoundTrip(t *testing.T) {
 	assert.Equal(t, "12345678", *acct.SecuritiesAccount.AccountNumber)
 
 	require.NotNil(t, acct.SecuritiesAccount.CurrentBalances)
-	assert.Equal(t, 10000.50, *acct.SecuritiesAccount.CurrentBalances.CashBalance)
-	assert.Equal(t, 20000.00, *acct.SecuritiesAccount.CurrentBalances.BuyingPower)
+	assert.InDelta(t, 10000.50, *acct.SecuritiesAccount.CurrentBalances.CashBalance, 0.001)
+	assert.InDelta(t, 20000.00, *acct.SecuritiesAccount.CurrentBalances.BuyingPower, 0.001)
 
 	require.Len(t, acct.SecuritiesAccount.Positions, 1)
 	pos := acct.SecuritiesAccount.Positions[0]
-	assert.Equal(t, 100.0, *pos.LongQuantity)
-	assert.Equal(t, 150.0, *pos.AveragePrice)
+	assert.InDelta(t, 100.0, *pos.LongQuantity, 0.001)
+	assert.InDelta(t, 150.0, *pos.AveragePrice, 0.001)
 	require.NotNil(t, pos.Instrument)
 	assert.Equal(t, "AAPL", *pos.Instrument.Symbol)
 
@@ -707,8 +707,8 @@ func TestAccountJSONRoundTrip(t *testing.T) {
 	err = json.Unmarshal(data, &acct2)
 	require.NoError(t, err)
 	assert.Equal(t, *acct.NickName, *acct2.NickName)
-	assert.Equal(t, *acct.SecuritiesAccount.CurrentBalances.CashBalance,
-		*acct2.SecuritiesAccount.CurrentBalances.CashBalance)
+	assert.InDelta(t, *acct.SecuritiesAccount.CurrentBalances.CashBalance,
+		*acct2.SecuritiesAccount.CurrentBalances.CashBalance, 0.001)
 }
 
 // TestTransactionJSONRoundTrip verifies nested transfer items and user details.
@@ -750,13 +750,13 @@ func TestTransactionJSONRoundTrip(t *testing.T) {
 
 	assert.Equal(t, int64(98765), *tx.ActivityID)
 	assert.Equal(t, TransactionTypeTrade, *tx.Type)
-	assert.Equal(t, -15050.00, *tx.NetAmount)
+	assert.InDelta(t, -15050.00, *tx.NetAmount, 0.001)
 
 	require.Len(t, tx.TransferItems, 1)
 	item := tx.TransferItems[0]
 	require.NotNil(t, item.Instrument)
 	assert.Equal(t, "AAPL", *item.Instrument.Symbol)
-	assert.Equal(t, 100.0, *item.PositionQuantity)
+	assert.InDelta(t, 100.0, *item.PositionQuantity, 0.001)
 
 	require.NotNil(t, tx.User)
 	assert.Equal(t, "Test User", *tx.User.Name)
@@ -800,10 +800,10 @@ func TestQuoteOptionJSONRoundTrip(t *testing.T) {
 	err := json.Unmarshal([]byte(input), &q)
 	require.NoError(t, err)
 
-	assert.Equal(t, 175.0, *q.StrikePrice)
-	assert.Equal(t, 0.52, *q.Delta)
-	assert.Equal(t, -0.08, *q.Theta)
-	assert.Equal(t, 0.25, *q.Vega)
+	assert.InDelta(t, 175.0, *q.StrikePrice, 0.001)
+	assert.InDelta(t, 0.52, *q.Delta, 0.001)
+	assert.InDelta(t, -0.08, *q.Theta, 0.001)
+	assert.InDelta(t, 0.25, *q.Vega, 0.001)
 	assert.True(t, *q.InTheMoney)
 	assert.Equal(t, "CALL", *q.PutCall)
 	assert.Equal(t, int64(15000), *q.OpenInterest)
@@ -814,8 +814,8 @@ func TestQuoteOptionJSONRoundTrip(t *testing.T) {
 	var q2 QuoteOption
 	err = json.Unmarshal(data, &q2)
 	require.NoError(t, err)
-	assert.Equal(t, *q.Delta, *q2.Delta)
-	assert.Equal(t, *q.StrikePrice, *q2.StrikePrice)
+	assert.InDelta(t, *q.Delta, *q2.Delta, 0.001)
+	assert.InDelta(t, *q.StrikePrice, *q2.StrikePrice, 0.001)
 }
 
 // TestMarketHoursJSONRoundTrip verifies nested session hours arrays.
@@ -941,11 +941,11 @@ func TestPreviewOrderJSONRoundTrip(t *testing.T) {
 	// Nested strategy.
 	require.NotNil(t, preview.OrderStrategy)
 	assert.Equal(t, OrderTypeLimit, preview.OrderStrategy.OrderType)
-	assert.Equal(t, 150.50, *preview.OrderStrategy.Price)
+	assert.InDelta(t, 150.50, *preview.OrderStrategy.Price, 0.001)
 
 	// Nested balance.
 	require.NotNil(t, preview.OrderStrategy.OrderBalance)
-	assert.Equal(t, 1505.00, *preview.OrderStrategy.OrderBalance.OrderValue)
+	assert.InDelta(t, 1505.00, *preview.OrderStrategy.OrderBalance.OrderValue, 0.001)
 
 	// Nested commission/fee.
 	require.NotNil(t, preview.OrderStrategy.CommissionAndFee)
@@ -994,7 +994,7 @@ func TestScreenerResponseJSONRoundTrip(t *testing.T) {
 
 	require.Len(t, sr.Screeners, 1)
 	assert.Equal(t, "AAPL", *sr.Screeners[0].Symbol)
-	assert.Equal(t, 175.50, *sr.Screeners[0].LastPrice)
+	assert.InDelta(t, 175.50, *sr.Screeners[0].LastPrice, 0.001)
 	assert.Equal(t, int64(45000000), *sr.Screeners[0].Volume)
 
 	// Round-trip.
@@ -1044,9 +1044,9 @@ func TestInstrumentResponseJSONRoundTrip(t *testing.T) {
 	assert.Equal(t, "NASDAQ", *inst.Exchange)
 
 	require.NotNil(t, inst.Fundamental)
-	assert.Equal(t, 200.0, *inst.Fundamental.High52)
-	assert.Equal(t, 28.5, *inst.Fundamental.PeRatio)
-	assert.Equal(t, 1.21, *inst.Fundamental.Beta)
+	assert.InDelta(t, 200.0, *inst.Fundamental.High52, 0.001)
+	assert.InDelta(t, 28.5, *inst.Fundamental.PeRatio, 0.001)
+	assert.InDelta(t, 1.21, *inst.Fundamental.Beta, 0.001)
 
 	// Round-trip.
 	data, err := json.Marshal(ir)
@@ -1135,9 +1135,9 @@ func TestQuoteDataSpecialJSONTags(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotNil(t, qd.WeekHigh52)
-	assert.Equal(t, 200.0, *qd.WeekHigh52)
+	assert.InDelta(t, 200.0, *qd.WeekHigh52, 0.001)
 	require.NotNil(t, qd.WeekLow52)
-	assert.Equal(t, 130.0, *qd.WeekLow52)
+	assert.InDelta(t, 130.0, *qd.WeekLow52, 0.001)
 
 	// Round-trip preserves the numeric-prefix tags.
 	data, err := json.Marshal(qd)
@@ -1201,11 +1201,11 @@ func TestCandleListJSONRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "AAPL", *cl.Symbol)
-	assert.Equal(t, 174.50, *cl.PreviousClose)
+	assert.InDelta(t, 174.50, *cl.PreviousClose, 0.001)
 	assert.False(t, *cl.Empty)
 	require.Len(t, cl.Candles, 2)
-	assert.Equal(t, 175.0, *cl.Candles[0].Open)
-	assert.Equal(t, 176.0, *cl.Candles[1].Open)
+	assert.InDelta(t, 175.0, *cl.Candles[0].Open, 0.001)
+	assert.InDelta(t, 176.0, *cl.Candles[1].Open, 0.001)
 
 	// Round-trip.
 	data, err := json.Marshal(cl)
@@ -1258,9 +1258,9 @@ func TestOrderToRequest(t *testing.T) {
 				assert.Equal(t, DurationDay, req.Duration)
 				assert.Equal(t, OrderTypeLimit, req.OrderType)
 				assert.NotNil(t, req.Price)
-				assert.Equal(t, 150.50, *req.Price)
+				assert.InDelta(t, 150.50, *req.Price, 0.001)
 				assert.NotNil(t, req.Quantity)
-				assert.Equal(t, 10.0, *req.Quantity)
+				assert.InDelta(t, 10.0, *req.Quantity, 0.001)
 				assert.Equal(t, OrderStrategyTypeSingle, req.OrderStrategyType)
 				assert.Len(t, req.OrderLegCollection, 1)
 				assert.Equal(t, InstructionBuy, req.OrderLegCollection[0].Instruction)
@@ -1313,10 +1313,10 @@ func TestOrderToRequest(t *testing.T) {
 				}
 
 				parentOrder := Order{
-					Session:            SessionNormal,
-					Duration:           DurationGoodTillCancel,
-					OrderType:          OrderTypeLimit,
-					OrderStrategyType:  OrderStrategyTypeOCO,
+					Session:              SessionNormal,
+					Duration:             DurationGoodTillCancel,
+					OrderType:            OrderTypeLimit,
+					OrderStrategyType:    OrderStrategyTypeOCO,
 					ChildOrderStrategies: []Order{childOrder1, childOrder2},
 				}
 
@@ -1330,13 +1330,13 @@ func TestOrderToRequest(t *testing.T) {
 				// Verify first child.
 				assert.Equal(t, OrderTypeLimit, req.ChildOrderStrategies[0].OrderType)
 				assert.NotNil(t, req.ChildOrderStrategies[0].Price)
-				assert.Equal(t, 150.00, *req.ChildOrderStrategies[0].Price)
+				assert.InDelta(t, 150.00, *req.ChildOrderStrategies[0].Price, 0.001)
 				assert.Len(t, req.ChildOrderStrategies[0].OrderLegCollection, 1)
 
 				// Verify second child.
 				assert.Equal(t, OrderTypeLimit, req.ChildOrderStrategies[1].OrderType)
 				assert.NotNil(t, req.ChildOrderStrategies[1].Price)
-				assert.Equal(t, 145.00, *req.ChildOrderStrategies[1].Price)
+				assert.InDelta(t, 145.00, *req.ChildOrderStrategies[1].Price, 0.001)
 				assert.Len(t, req.ChildOrderStrategies[1].OrderLegCollection, 1)
 			},
 		},
@@ -1455,12 +1455,12 @@ func TestOrderToRequest(t *testing.T) {
 				}
 
 				child := Order{
-					Session:            SessionNormal,
-					Duration:           DurationDay,
-					OrderType:          OrderTypeLimit,
-					Price:              &price,
-					Quantity:           &qty,
-					OrderStrategyType:  OrderStrategyTypeTrigger,
+					Session:              SessionNormal,
+					Duration:             DurationDay,
+					OrderType:            OrderTypeLimit,
+					Price:                &price,
+					Quantity:             &qty,
+					OrderStrategyType:    OrderStrategyTypeTrigger,
 					ChildOrderStrategies: []Order{grandchild},
 					OrderLegCollection: []OrderLegCollection{
 						{
@@ -1475,10 +1475,10 @@ func TestOrderToRequest(t *testing.T) {
 				}
 
 				parent := Order{
-					Session:            SessionNormal,
-					Duration:           DurationDay,
-					OrderType:          OrderTypeMarket,
-					OrderStrategyType:  OrderStrategyTypeTrigger,
+					Session:              SessionNormal,
+					Duration:             DurationDay,
+					OrderType:            OrderTypeMarket,
+					OrderStrategyType:    OrderStrategyTypeTrigger,
 					ChildOrderStrategies: []Order{child},
 					OrderLegCollection: []OrderLegCollection{
 						{
@@ -1502,7 +1502,7 @@ func TestOrderToRequest(t *testing.T) {
 				childReq := req.ChildOrderStrategies[0]
 				assert.Equal(t, OrderStrategyTypeTrigger, childReq.OrderStrategyType)
 				assert.NotNil(t, childReq.Price)
-				assert.Equal(t, 100.0, *childReq.Price)
+				assert.InDelta(t, 100.0, *childReq.Price, 0.001)
 				assert.Len(t, childReq.ChildOrderStrategies, 1)
 
 				grandchildReq := childReq.ChildOrderStrategies[0]

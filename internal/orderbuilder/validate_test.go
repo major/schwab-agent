@@ -4,10 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/models"
 )
 
 // TestValidateEquityOrderRequiresPriceForLimit verifies fix-suggesting limit validation.
@@ -33,7 +34,12 @@ func TestValidateEquityOrderRequiresStopPriceForStop(t *testing.T) {
 		OrderType: models.OrderTypeStop,
 	})
 
-	assertValidationError(t, err, "STOP order requires a stop price", "Add `--stop-price <amount>` to specify the stop price")
+	assertValidationError(
+		t,
+		err,
+		"STOP order requires a stop price",
+		"Add `--stop-price <amount>` to specify the stop price",
+	)
 }
 
 // TestValidateEquityOrderRejectsNonPositiveQuantity verifies quantity validation.
@@ -46,7 +52,12 @@ func TestValidateEquityOrderRejectsNonPositiveQuantity(t *testing.T) {
 		OrderType: models.OrderTypeMarket,
 	})
 
-	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"quantity must be greater than zero",
+		"Add `--quantity <number>` with a positive value",
+	)
 }
 
 // TestValidateOptionOrderRejectsPastExpiration verifies option expiration validation.
@@ -60,7 +71,12 @@ func TestValidateOptionOrderRejectsPastExpiration(t *testing.T) {
 		Quantity:   1,
 	})
 
-	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+	assertValidationError(
+		t,
+		err,
+		"option expiration date is in the past",
+		"Use a future expiration date with `--expiration YYYY-MM-DD`",
+	)
 }
 
 // TestValidateOCOOrderRequiresSymbol verifies symbol validation.
@@ -87,7 +103,12 @@ func TestValidateOCOOrderRequiresQuantity(t *testing.T) {
 		StopLoss: 140,
 	})
 
-	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"quantity must be greater than zero",
+		"Add `--quantity <number>` with a positive value",
+	)
 }
 
 // TestValidateOCOOrderRequiresAtLeastOneExit verifies that at least one exit is needed.
@@ -100,7 +121,12 @@ func TestValidateOCOOrderRequiresAtLeastOneExit(t *testing.T) {
 		Quantity: 10,
 	})
 
-	assertValidationError(t, err, "OCO order requires at least one exit condition", "Add `--take-profit <amount>` and/or `--stop-loss <amount>`")
+	assertValidationError(
+		t,
+		err,
+		"OCO order requires at least one exit condition",
+		"Add `--take-profit <amount>` and/or `--stop-loss <amount>`",
+	)
 }
 
 // TestValidateOCOOrderAcceptsStopLossOnly verifies stop-loss-only is valid.
@@ -213,7 +239,12 @@ func TestValidateBracketOrderRequiresAtLeastOneExit(t *testing.T) {
 		OrderType: models.OrderTypeMarket,
 	})
 
-	assertValidationError(t, err, "bracket order requires at least one exit condition", "Add `--take-profit <amount>` and/or `--stop-loss <amount>`")
+	assertValidationError(
+		t,
+		err,
+		"bracket order requires at least one exit condition",
+		"Add `--take-profit <amount>` and/or `--stop-loss <amount>`",
+	)
 }
 
 // TestValidateBracketOrderAcceptsStopLossOnly verifies stop-loss-only is valid.
@@ -258,7 +289,12 @@ func TestValidateVerticalOrderRequiresUnderlying(t *testing.T) {
 		Price:       0.50,
 	})
 
-	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+	assertValidationError(
+		t,
+		err,
+		"underlying symbol is required",
+		"Add `--underlying <TICKER>` to specify the underlying stock",
+	)
 }
 
 // TestValidateButterflyOrderRejectsUnorderedStrikes verifies butterfly strike ordering.
@@ -271,7 +307,12 @@ func TestValidateButterflyOrderRejectsUnorderedStrikes(t *testing.T) {
 		Buy: true, Open: true, Quantity: 1, Price: 0.50,
 	})
 
-	assertValidationError(t, err, "butterfly strikes must be ordered lower < middle < upper", "Use three increasing strikes with `--lower-strike`, `--middle-strike`, and `--upper-strike`")
+	assertValidationError(
+		t,
+		err,
+		"butterfly strikes must be ordered lower < middle < upper",
+		"Use three increasing strikes with `--lower-strike`, `--middle-strike`, and `--upper-strike`",
+	)
 }
 
 // TestValidateButterflyOrderRejectsUnbalancedWings keeps the balanced strategy
@@ -285,7 +326,12 @@ func TestValidateButterflyOrderRejectsUnbalancedWings(t *testing.T) {
 		Buy: true, Open: true, Quantity: 1, Price: 0.50,
 	})
 
-	assertValidationError(t, err, "butterfly wings must be balanced", "Use equal distances from `--middle-strike` to `--lower-strike` and `--upper-strike`; unbalanced butterflies are a separate strategy type")
+	assertValidationError(
+		t,
+		err,
+		"butterfly wings must be balanced",
+		"Use equal distances from `--middle-strike` to `--lower-strike` and `--upper-strike`; unbalanced butterflies are a separate strategy type",
+	)
 }
 
 // TestValidateCondorOrderRejectsUnorderedStrikes verifies condor strike ordering.
@@ -298,7 +344,12 @@ func TestValidateCondorOrderRejectsUnorderedStrikes(t *testing.T) {
 		Buy: true, Open: true, Quantity: 1, Price: 0.50,
 	})
 
-	assertValidationError(t, err, "condor strikes must be ordered lower < lower-middle < upper-middle < upper", "Use four increasing strikes for the condor wings and middle strikes")
+	assertValidationError(
+		t,
+		err,
+		"condor strikes must be ordered lower < lower-middle < upper-middle < upper",
+		"Use four increasing strikes for the condor wings and middle strikes",
+	)
 }
 
 // TestValidateCondorOrderRejectsUnbalancedWings keeps the balanced strategy
@@ -312,7 +363,12 @@ func TestValidateCondorOrderRejectsUnbalancedWings(t *testing.T) {
 		Buy: true, Open: true, Quantity: 1, Price: 0.50,
 	})
 
-	assertValidationError(t, err, "condor wings must be balanced", "Use equal wing widths between lower/lower-middle and upper-middle/upper; unbalanced condors are a separate strategy type")
+	assertValidationError(
+		t,
+		err,
+		"condor wings must be balanced",
+		"Use equal wing widths between lower/lower-middle and upper-middle/upper; unbalanced condors are a separate strategy type",
+	)
 }
 
 // TestValidateBackRatioOrderRejectsInvalidRatio verifies back-ratio quantity relationship.
@@ -325,7 +381,12 @@ func TestValidateBackRatioOrderRejectsInvalidRatio(t *testing.T) {
 		Open: true, Quantity: 1, LongRatio: 1, Price: 0.20,
 	})
 
-	assertValidationError(t, err, "long ratio must be greater than one", "Use `--long-ratio 2` for the standard one-by-two back-ratio")
+	assertValidationError(
+		t,
+		err,
+		"long ratio must be greater than one",
+		"Use `--long-ratio 2` for the standard one-by-two back-ratio",
+	)
 }
 
 // TestValidateBackRatioOrderRejectsFractionalRatio prevents fractional option legs.
@@ -352,7 +413,12 @@ func TestValidateBackRatioOrderRejectsWrongCallDirection(t *testing.T) {
 		Open: true, Quantity: 1, LongRatio: 2, Price: 0.20,
 	})
 
-	assertValidationError(t, err, "call back-ratio long strike must be above short strike", "For call back-ratios, sell the lower strike and buy more contracts at the higher strike")
+	assertValidationError(
+		t,
+		err,
+		"call back-ratio long strike must be above short strike",
+		"For call back-ratios, sell the lower strike and buy more contracts at the higher strike",
+	)
 }
 
 // TestValidateBackRatioOrderRejectsWrongPutDirection verifies the conventional
@@ -366,7 +432,12 @@ func TestValidateBackRatioOrderRejectsWrongPutDirection(t *testing.T) {
 		Open: true, Quantity: 1, LongRatio: 2, Price: 0.20,
 	})
 
-	assertValidationError(t, err, "put back-ratio long strike must be below short strike", "For put back-ratios, sell the higher strike and buy more contracts at the lower strike")
+	assertValidationError(
+		t,
+		err,
+		"put back-ratio long strike must be below short strike",
+		"For put back-ratios, sell the higher strike and buy more contracts at the lower strike",
+	)
 }
 
 // TestValidateVerticalRollOrderRejectsEqualOpenStrikes verifies rolled verticals remain spreads.
@@ -374,12 +445,24 @@ func TestValidateVerticalRollOrderRejectsEqualOpenStrikes(t *testing.T) {
 	t.Parallel()
 
 	err := ValidateVerticalRollOrder(&VerticalRollParams{
-		Underlying: "F", CloseExpiration: time.Now().UTC().Add(30 * 24 * time.Hour), OpenExpiration: time.Now().UTC().Add(60 * 24 * time.Hour),
-		CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 15, OpenShortStrike: 15,
-		PutCall: models.PutCallCall, Quantity: 1, Price: 0.25,
+		Underlying:       "F",
+		CloseExpiration:  time.Now().UTC().Add(30 * 24 * time.Hour),
+		OpenExpiration:   time.Now().UTC().Add(60 * 24 * time.Hour),
+		CloseLongStrike:  12,
+		CloseShortStrike: 14,
+		OpenLongStrike:   15,
+		OpenShortStrike:  15,
+		PutCall:          models.PutCallCall,
+		Quantity:         1,
+		Price:            0.25,
 	})
 
-	assertValidationError(t, err, "open long and short strikes must be different", "Use different values for `--open-long-strike` and `--open-short-strike`")
+	assertValidationError(
+		t,
+		err,
+		"open long and short strikes must be different",
+		"Use different values for `--open-long-strike` and `--open-short-strike`",
+	)
 }
 
 // TestValidateVerticalRollOrderAcceptsSameExpirationStrikeRoll verifies users can
@@ -412,7 +495,12 @@ func TestValidateVerticalRollOrderRejectsEarlierOpenExpiration(t *testing.T) {
 		PutCall: models.PutCallCall, Quantity: 1, Price: 0.25,
 	})
 
-	assertValidationError(t, err, "open expiration must not be before close expiration", "Use `--open-expiration` on or after `--close-expiration`")
+	assertValidationError(
+		t,
+		err,
+		"open expiration must not be before close expiration",
+		"Use `--open-expiration` on or after `--close-expiration`",
+	)
 }
 
 // TestValidateVerticalRollOrderRejectsUnequalWidths preserves the distinction
@@ -421,12 +509,24 @@ func TestValidateVerticalRollOrderRejectsUnequalWidths(t *testing.T) {
 	t.Parallel()
 
 	err := ValidateVerticalRollOrder(&VerticalRollParams{
-		Underlying: "F", CloseExpiration: time.Now().UTC().Add(30 * 24 * time.Hour), OpenExpiration: time.Now().UTC().Add(60 * 24 * time.Hour),
-		CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 16,
-		PutCall: models.PutCallCall, Quantity: 1, Price: 0.25,
+		Underlying:       "F",
+		CloseExpiration:  time.Now().UTC().Add(30 * 24 * time.Hour),
+		OpenExpiration:   time.Now().UTC().Add(60 * 24 * time.Hour),
+		CloseLongStrike:  12,
+		CloseShortStrike: 14,
+		OpenLongStrike:   13,
+		OpenShortStrike:  16,
+		PutCall:          models.PutCallCall,
+		Quantity:         1,
+		Price:            0.25,
 	})
 
-	assertValidationError(t, err, "vertical roll widths must match", "Use equal close and open spread widths for `VERTICAL_ROLL`; unequal widths are a separate unbalanced strategy type")
+	assertValidationError(
+		t,
+		err,
+		"vertical roll widths must match",
+		"Use equal close and open spread widths for `VERTICAL_ROLL`; unequal widths are a separate unbalanced strategy type",
+	)
 }
 
 // TestValidateVerticalRollOrderRejectsNoopRoll catches close/open legs that would
@@ -442,7 +542,12 @@ func TestValidateVerticalRollOrderRejectsNoopRoll(t *testing.T) {
 		PutCall: models.PutCallCall, Quantity: 1, Price: 0.25,
 	})
 
-	assertValidationError(t, err, "vertical roll must change strikes or expiration", "Use different open strikes or a later `--open-expiration` so the roll changes the position")
+	assertValidationError(
+		t,
+		err,
+		"vertical roll must change strikes or expiration",
+		"Use different open strikes or a later `--open-expiration` so the roll changes the position",
+	)
 }
 
 // TestValidateDoubleDiagonalOrderRejectsOverlappingStrikes verifies put/call sides do not overlap.
@@ -450,12 +555,24 @@ func TestValidateDoubleDiagonalOrderRejectsOverlappingStrikes(t *testing.T) {
 	t.Parallel()
 
 	err := ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{
-		Underlying: "F", NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour), FarExpiration: time.Now().UTC().Add(60 * 24 * time.Hour),
-		PutFarStrike: 9, PutNearStrike: 15, CallNearStrike: 14, CallFarStrike: 16,
-		Open: true, Quantity: 1, Price: 0.80,
+		Underlying:     "F",
+		NearExpiration: time.Now().UTC().Add(30 * 24 * time.Hour),
+		FarExpiration:  time.Now().UTC().Add(60 * 24 * time.Hour),
+		PutFarStrike:   9,
+		PutNearStrike:  15,
+		CallNearStrike: 14,
+		CallFarStrike:  16,
+		Open:           true,
+		Quantity:       1,
+		Price:          0.80,
 	})
 
-	assertValidationError(t, err, "double diagonal strikes must be ordered put-far < put-near < call-near < call-far", "Keep put strikes below call strikes so the near short legs do not overlap")
+	assertValidationError(
+		t,
+		err,
+		"double diagonal strikes must be ordered put-far < put-near < call-near < call-far",
+		"Keep put strikes below call strikes so the near short legs do not overlap",
+	)
 }
 
 // TestValidateNewOptionStrategiesCommonFailures covers validation branches that
@@ -477,224 +594,583 @@ func TestValidateNewOptionStrategiesCommonFailures(t *testing.T) {
 		{
 			name: "butterfly missing underlying",
 			check: func() error {
-				return ValidateButterflyOrder(&ButterflyParams{Expiration: future, LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14, PutCall: models.PutCallCall, Quantity: 1, Price: 0.50})
+				return ValidateButterflyOrder(
+					&ButterflyParams{
+						Expiration:   future,
+						LowerStrike:  10,
+						MiddleStrike: 12,
+						UpperStrike:  14,
+						PutCall:      models.PutCallCall,
+						Quantity:     1,
+						Price:        0.50,
+					},
+				)
 			},
 			message: "underlying symbol is required",
 		},
 		{
 			name: "butterfly zero quantity",
 			check: func() error {
-				return ValidateButterflyOrder(&ButterflyParams{Underlying: "F", Expiration: future, LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14, PutCall: models.PutCallCall, Price: 0.50})
+				return ValidateButterflyOrder(
+					&ButterflyParams{
+						Underlying:   "F",
+						Expiration:   future,
+						LowerStrike:  10,
+						MiddleStrike: 12,
+						UpperStrike:  14,
+						PutCall:      models.PutCallCall,
+						Price:        0.50,
+					},
+				)
 			},
 			message: "quantity must be greater than zero",
 		},
 		{
 			name: "butterfly past expiration",
 			check: func() error {
-				return ValidateButterflyOrder(&ButterflyParams{Underlying: "F", Expiration: past, LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14, PutCall: models.PutCallCall, Quantity: 1, Price: 0.50})
+				return ValidateButterflyOrder(
+					&ButterflyParams{
+						Underlying:   "F",
+						Expiration:   past,
+						LowerStrike:  10,
+						MiddleStrike: 12,
+						UpperStrike:  14,
+						PutCall:      models.PutCallCall,
+						Quantity:     1,
+						Price:        0.50,
+					},
+				)
 			},
 			message: "option expiration date is in the past",
 		},
 		{
 			name: "butterfly negative strike",
 			check: func() error {
-				return ValidateButterflyOrder(&ButterflyParams{Underlying: "F", Expiration: future, LowerStrike: -10, MiddleStrike: 12, UpperStrike: 14, PutCall: models.PutCallCall, Quantity: 1, Price: 0.50})
+				return ValidateButterflyOrder(
+					&ButterflyParams{
+						Underlying:   "F",
+						Expiration:   future,
+						LowerStrike:  -10,
+						MiddleStrike: 12,
+						UpperStrike:  14,
+						PutCall:      models.PutCallCall,
+						Quantity:     1,
+						Price:        0.50,
+					},
+				)
 			},
 			message: "lower-strike must be greater than zero",
 		},
 		{
 			name: "butterfly missing option type",
 			check: func() error {
-				return ValidateButterflyOrder(&ButterflyParams{Underlying: "F", Expiration: future, LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14, Quantity: 1, Price: 0.50})
+				return ValidateButterflyOrder(
+					&ButterflyParams{
+						Underlying:   "F",
+						Expiration:   future,
+						LowerStrike:  10,
+						MiddleStrike: 12,
+						UpperStrike:  14,
+						Quantity:     1,
+						Price:        0.50,
+					},
+				)
 			},
 			message: "option type (call or put) is required",
 		},
 		{
 			name: "butterfly missing price",
 			check: func() error {
-				return ValidateButterflyOrder(&ButterflyParams{Underlying: "F", Expiration: future, LowerStrike: 10, MiddleStrike: 12, UpperStrike: 14, PutCall: models.PutCallCall, Quantity: 1})
+				return ValidateButterflyOrder(
+					&ButterflyParams{
+						Underlying:   "F",
+						Expiration:   future,
+						LowerStrike:  10,
+						MiddleStrike: 12,
+						UpperStrike:  14,
+						PutCall:      models.PutCallCall,
+						Quantity:     1,
+					},
+				)
 			},
 			message: "price is required for butterflies",
 		},
 		{
 			name: "condor missing option type",
 			check: func() error {
-				return ValidateCondorOrder(&CondorParams{Underlying: "F", Expiration: future, LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16, Quantity: 1, Price: 0.50})
+				return ValidateCondorOrder(
+					&CondorParams{
+						Underlying:        "F",
+						Expiration:        future,
+						LowerStrike:       10,
+						LowerMiddleStrike: 12,
+						UpperMiddleStrike: 14,
+						UpperStrike:       16,
+						Quantity:          1,
+						Price:             0.50,
+					},
+				)
 			},
 			message: "option type (call or put) is required",
 		},
 		{
 			name: "condor missing underlying",
 			check: func() error {
-				return ValidateCondorOrder(&CondorParams{Expiration: future, LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16, PutCall: models.PutCallPut, Quantity: 1, Price: 0.50})
+				return ValidateCondorOrder(
+					&CondorParams{
+						Expiration:        future,
+						LowerStrike:       10,
+						LowerMiddleStrike: 12,
+						UpperMiddleStrike: 14,
+						UpperStrike:       16,
+						PutCall:           models.PutCallPut,
+						Quantity:          1,
+						Price:             0.50,
+					},
+				)
 			},
 			message: "underlying symbol is required",
 		},
 		{
 			name: "condor zero quantity",
 			check: func() error {
-				return ValidateCondorOrder(&CondorParams{Underlying: "F", Expiration: future, LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16, PutCall: models.PutCallPut, Price: 0.50})
+				return ValidateCondorOrder(
+					&CondorParams{
+						Underlying:        "F",
+						Expiration:        future,
+						LowerStrike:       10,
+						LowerMiddleStrike: 12,
+						UpperMiddleStrike: 14,
+						UpperStrike:       16,
+						PutCall:           models.PutCallPut,
+						Price:             0.50,
+					},
+				)
 			},
 			message: "quantity must be greater than zero",
 		},
 		{
 			name: "condor past expiration",
 			check: func() error {
-				return ValidateCondorOrder(&CondorParams{Underlying: "F", Expiration: past, LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16, PutCall: models.PutCallPut, Quantity: 1, Price: 0.50})
+				return ValidateCondorOrder(
+					&CondorParams{
+						Underlying:        "F",
+						Expiration:        past,
+						LowerStrike:       10,
+						LowerMiddleStrike: 12,
+						UpperMiddleStrike: 14,
+						UpperStrike:       16,
+						PutCall:           models.PutCallPut,
+						Quantity:          1,
+						Price:             0.50,
+					},
+				)
 			},
 			message: "option expiration date is in the past",
 		},
 		{
 			name: "condor negative strike",
 			check: func() error {
-				return ValidateCondorOrder(&CondorParams{Underlying: "F", Expiration: future, LowerStrike: 10, LowerMiddleStrike: -12, UpperMiddleStrike: 14, UpperStrike: 16, PutCall: models.PutCallPut, Quantity: 1, Price: 0.50})
+				return ValidateCondorOrder(
+					&CondorParams{
+						Underlying:        "F",
+						Expiration:        future,
+						LowerStrike:       10,
+						LowerMiddleStrike: -12,
+						UpperMiddleStrike: 14,
+						UpperStrike:       16,
+						PutCall:           models.PutCallPut,
+						Quantity:          1,
+						Price:             0.50,
+					},
+				)
 			},
 			message: "lower-middle-strike must be greater than zero",
 		},
 		{
 			name: "condor missing price",
 			check: func() error {
-				return ValidateCondorOrder(&CondorParams{Underlying: "F", Expiration: future, LowerStrike: 10, LowerMiddleStrike: 12, UpperMiddleStrike: 14, UpperStrike: 16, PutCall: models.PutCallPut, Quantity: 1})
+				return ValidateCondorOrder(
+					&CondorParams{
+						Underlying:        "F",
+						Expiration:        future,
+						LowerStrike:       10,
+						LowerMiddleStrike: 12,
+						UpperMiddleStrike: 14,
+						UpperStrike:       16,
+						PutCall:           models.PutCallPut,
+						Quantity:          1,
+					},
+				)
 			},
 			message: "price is required for condors",
 		},
 		{
 			name: "back-ratio equal strikes",
 			check: func() error {
-				return ValidateBackRatioOrder(&BackRatioParams{Underlying: "F", Expiration: future, ShortStrike: 12, LongStrike: 12, PutCall: models.PutCallCall, Quantity: 1, LongRatio: 2, Price: 0.20})
+				return ValidateBackRatioOrder(
+					&BackRatioParams{
+						Underlying:  "F",
+						Expiration:  future,
+						ShortStrike: 12,
+						LongStrike:  12,
+						PutCall:     models.PutCallCall,
+						Quantity:    1,
+						LongRatio:   2,
+						Price:       0.20,
+					},
+				)
 			},
 			message: "short and long strikes must be different",
 		},
 		{
 			name: "back-ratio missing underlying",
 			check: func() error {
-				return ValidateBackRatioOrder(&BackRatioParams{Expiration: future, ShortStrike: 12, LongStrike: 14, PutCall: models.PutCallCall, Quantity: 1, LongRatio: 2, Price: 0.20})
+				return ValidateBackRatioOrder(
+					&BackRatioParams{
+						Expiration:  future,
+						ShortStrike: 12,
+						LongStrike:  14,
+						PutCall:     models.PutCallCall,
+						Quantity:    1,
+						LongRatio:   2,
+						Price:       0.20,
+					},
+				)
 			},
 			message: "underlying symbol is required",
 		},
 		{
 			name: "back-ratio zero quantity",
 			check: func() error {
-				return ValidateBackRatioOrder(&BackRatioParams{Underlying: "F", Expiration: future, ShortStrike: 12, LongStrike: 14, PutCall: models.PutCallCall, LongRatio: 2, Price: 0.20})
+				return ValidateBackRatioOrder(
+					&BackRatioParams{
+						Underlying:  "F",
+						Expiration:  future,
+						ShortStrike: 12,
+						LongStrike:  14,
+						PutCall:     models.PutCallCall,
+						LongRatio:   2,
+						Price:       0.20,
+					},
+				)
 			},
 			message: "quantity must be greater than zero",
 		},
 		{
 			name: "back-ratio past expiration",
 			check: func() error {
-				return ValidateBackRatioOrder(&BackRatioParams{Underlying: "F", Expiration: past, ShortStrike: 12, LongStrike: 14, PutCall: models.PutCallCall, Quantity: 1, LongRatio: 2, Price: 0.20})
+				return ValidateBackRatioOrder(
+					&BackRatioParams{
+						Underlying:  "F",
+						Expiration:  past,
+						ShortStrike: 12,
+						LongStrike:  14,
+						PutCall:     models.PutCallCall,
+						Quantity:    1,
+						LongRatio:   2,
+						Price:       0.20,
+					},
+				)
 			},
 			message: "option expiration date is in the past",
 		},
 		{
 			name: "back-ratio negative strike",
 			check: func() error {
-				return ValidateBackRatioOrder(&BackRatioParams{Underlying: "F", Expiration: future, ShortStrike: -12, LongStrike: 14, PutCall: models.PutCallCall, Quantity: 1, LongRatio: 2, Price: 0.20})
+				return ValidateBackRatioOrder(
+					&BackRatioParams{
+						Underlying:  "F",
+						Expiration:  future,
+						ShortStrike: -12,
+						LongStrike:  14,
+						PutCall:     models.PutCallCall,
+						Quantity:    1,
+						LongRatio:   2,
+						Price:       0.20,
+					},
+				)
 			},
 			message: "short-strike must be greater than zero",
 		},
 		{
 			name: "back-ratio missing option type",
 			check: func() error {
-				return ValidateBackRatioOrder(&BackRatioParams{Underlying: "F", Expiration: future, ShortStrike: 12, LongStrike: 14, Quantity: 1, LongRatio: 2, Price: 0.20})
+				return ValidateBackRatioOrder(
+					&BackRatioParams{
+						Underlying:  "F",
+						Expiration:  future,
+						ShortStrike: 12,
+						LongStrike:  14,
+						Quantity:    1,
+						LongRatio:   2,
+						Price:       0.20,
+					},
+				)
 			},
 			message: "option type (call or put) is required",
 		},
 		{
 			name: "back-ratio missing price",
 			check: func() error {
-				return ValidateBackRatioOrder(&BackRatioParams{Underlying: "F", Expiration: future, ShortStrike: 12, LongStrike: 14, PutCall: models.PutCallCall, Quantity: 1, LongRatio: 2})
+				return ValidateBackRatioOrder(
+					&BackRatioParams{
+						Underlying:  "F",
+						Expiration:  future,
+						ShortStrike: 12,
+						LongStrike:  14,
+						PutCall:     models.PutCallCall,
+						Quantity:    1,
+						LongRatio:   2,
+					},
+				)
 			},
 			message: "price is required for back-ratios",
 		},
 		{
 			name: "vertical-roll equal close strikes",
 			check: func() error {
-				return ValidateVerticalRollOrder(&VerticalRollParams{Underlying: "F", CloseExpiration: future, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 12, OpenLongStrike: 13, OpenShortStrike: 15, PutCall: models.PutCallCall, Quantity: 1, Price: 0.25})
+				return ValidateVerticalRollOrder(
+					&VerticalRollParams{
+						Underlying:       "F",
+						CloseExpiration:  future,
+						OpenExpiration:   later,
+						CloseLongStrike:  12,
+						CloseShortStrike: 12,
+						OpenLongStrike:   13,
+						OpenShortStrike:  15,
+						PutCall:          models.PutCallCall,
+						Quantity:         1,
+						Price:            0.25,
+					},
+				)
 			},
 			message: "close long and short strikes must be different",
 		},
 		{
 			name: "vertical-roll missing underlying",
 			check: func() error {
-				return ValidateVerticalRollOrder(&VerticalRollParams{CloseExpiration: future, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15, PutCall: models.PutCallCall, Quantity: 1, Price: 0.25})
+				return ValidateVerticalRollOrder(
+					&VerticalRollParams{
+						CloseExpiration:  future,
+						OpenExpiration:   later,
+						CloseLongStrike:  12,
+						CloseShortStrike: 14,
+						OpenLongStrike:   13,
+						OpenShortStrike:  15,
+						PutCall:          models.PutCallCall,
+						Quantity:         1,
+						Price:            0.25,
+					},
+				)
 			},
 			message: "underlying symbol is required",
 		},
 		{
 			name: "vertical-roll zero quantity",
 			check: func() error {
-				return ValidateVerticalRollOrder(&VerticalRollParams{Underlying: "F", CloseExpiration: future, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15, PutCall: models.PutCallCall, Price: 0.25})
+				return ValidateVerticalRollOrder(
+					&VerticalRollParams{
+						Underlying:       "F",
+						CloseExpiration:  future,
+						OpenExpiration:   later,
+						CloseLongStrike:  12,
+						CloseShortStrike: 14,
+						OpenLongStrike:   13,
+						OpenShortStrike:  15,
+						PutCall:          models.PutCallCall,
+						Price:            0.25,
+					},
+				)
 			},
 			message: "quantity must be greater than zero",
 		},
 		{
 			name: "vertical-roll past close expiration",
 			check: func() error {
-				return ValidateVerticalRollOrder(&VerticalRollParams{Underlying: "F", CloseExpiration: past, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15, PutCall: models.PutCallCall, Quantity: 1, Price: 0.25})
+				return ValidateVerticalRollOrder(
+					&VerticalRollParams{
+						Underlying:       "F",
+						CloseExpiration:  past,
+						OpenExpiration:   later,
+						CloseLongStrike:  12,
+						CloseShortStrike: 14,
+						OpenLongStrike:   13,
+						OpenShortStrike:  15,
+						PutCall:          models.PutCallCall,
+						Quantity:         1,
+						Price:            0.25,
+					},
+				)
 			},
 			message: "option expiration date is in the past",
 		},
 		{
 			name: "vertical-roll negative strike",
 			check: func() error {
-				return ValidateVerticalRollOrder(&VerticalRollParams{Underlying: "F", CloseExpiration: future, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: -13, OpenShortStrike: 15, PutCall: models.PutCallCall, Quantity: 1, Price: 0.25})
+				return ValidateVerticalRollOrder(
+					&VerticalRollParams{
+						Underlying:       "F",
+						CloseExpiration:  future,
+						OpenExpiration:   later,
+						CloseLongStrike:  12,
+						CloseShortStrike: 14,
+						OpenLongStrike:   -13,
+						OpenShortStrike:  15,
+						PutCall:          models.PutCallCall,
+						Quantity:         1,
+						Price:            0.25,
+					},
+				)
 			},
 			message: "open-long-strike must be greater than zero",
 		},
 		{
 			name: "vertical-roll missing option type",
 			check: func() error {
-				return ValidateVerticalRollOrder(&VerticalRollParams{Underlying: "F", CloseExpiration: future, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15, Quantity: 1, Price: 0.25})
+				return ValidateVerticalRollOrder(
+					&VerticalRollParams{
+						Underlying:       "F",
+						CloseExpiration:  future,
+						OpenExpiration:   later,
+						CloseLongStrike:  12,
+						CloseShortStrike: 14,
+						OpenLongStrike:   13,
+						OpenShortStrike:  15,
+						Quantity:         1,
+						Price:            0.25,
+					},
+				)
 			},
 			message: "option type (call or put) is required",
 		},
 		{
 			name: "vertical-roll missing price",
 			check: func() error {
-				return ValidateVerticalRollOrder(&VerticalRollParams{Underlying: "F", CloseExpiration: future, OpenExpiration: later, CloseLongStrike: 12, CloseShortStrike: 14, OpenLongStrike: 13, OpenShortStrike: 15, PutCall: models.PutCallCall, Quantity: 1})
+				return ValidateVerticalRollOrder(
+					&VerticalRollParams{
+						Underlying:       "F",
+						CloseExpiration:  future,
+						OpenExpiration:   later,
+						CloseLongStrike:  12,
+						CloseShortStrike: 14,
+						OpenLongStrike:   13,
+						OpenShortStrike:  15,
+						PutCall:          models.PutCallCall,
+						Quantity:         1,
+					},
+				)
 			},
 			message: "price is required for vertical rolls",
 		},
 		{
 			name: "double-diagonal missing underlying",
 			check: func() error {
-				return ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{NearExpiration: future, FarExpiration: later, PutFarStrike: 9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15, Quantity: 1, Price: 0.80})
+				return ValidateDoubleDiagonalOrder(
+					&DoubleDiagonalParams{
+						NearExpiration: future,
+						FarExpiration:  later,
+						PutFarStrike:   9,
+						PutNearStrike:  10,
+						CallNearStrike: 14,
+						CallFarStrike:  15,
+						Quantity:       1,
+						Price:          0.80,
+					},
+				)
 			},
 			message: "underlying symbol is required",
 		},
 		{
 			name: "double-diagonal zero quantity",
 			check: func() error {
-				return ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{Underlying: "F", NearExpiration: future, FarExpiration: later, PutFarStrike: 9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15, Price: 0.80})
+				return ValidateDoubleDiagonalOrder(
+					&DoubleDiagonalParams{
+						Underlying:     "F",
+						NearExpiration: future,
+						FarExpiration:  later,
+						PutFarStrike:   9,
+						PutNearStrike:  10,
+						CallNearStrike: 14,
+						CallFarStrike:  15,
+						Price:          0.80,
+					},
+				)
 			},
 			message: "quantity must be greater than zero",
 		},
 		{
 			name: "double-diagonal past near expiration",
 			check: func() error {
-				return ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{Underlying: "F", NearExpiration: past, FarExpiration: later, PutFarStrike: 9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15, Quantity: 1, Price: 0.80})
+				return ValidateDoubleDiagonalOrder(
+					&DoubleDiagonalParams{
+						Underlying:     "F",
+						NearExpiration: past,
+						FarExpiration:  later,
+						PutFarStrike:   9,
+						PutNearStrike:  10,
+						CallNearStrike: 14,
+						CallFarStrike:  15,
+						Quantity:       1,
+						Price:          0.80,
+					},
+				)
 			},
 			message: "option expiration date is in the past",
 		},
 		{
 			name: "double-diagonal near not before far",
 			check: func() error {
-				return ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{Underlying: "F", NearExpiration: later, FarExpiration: future, PutFarStrike: 9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15, Quantity: 1, Price: 0.80})
+				return ValidateDoubleDiagonalOrder(
+					&DoubleDiagonalParams{
+						Underlying:     "F",
+						NearExpiration: later,
+						FarExpiration:  future,
+						PutFarStrike:   9,
+						PutNearStrike:  10,
+						CallNearStrike: 14,
+						CallFarStrike:  15,
+						Quantity:       1,
+						Price:          0.80,
+					},
+				)
 			},
 			message: "near expiration must be before far expiration",
 		},
 		{
 			name: "double-diagonal negative strike",
 			check: func() error {
-				return ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{Underlying: "F", NearExpiration: future, FarExpiration: later, PutFarStrike: -9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15, Quantity: 1, Price: 0.80})
+				return ValidateDoubleDiagonalOrder(
+					&DoubleDiagonalParams{
+						Underlying:     "F",
+						NearExpiration: future,
+						FarExpiration:  later,
+						PutFarStrike:   -9,
+						PutNearStrike:  10,
+						CallNearStrike: 14,
+						CallFarStrike:  15,
+						Quantity:       1,
+						Price:          0.80,
+					},
+				)
 			},
 			message: "put-far-strike must be greater than zero",
 		},
 		{
 			name: "double-diagonal missing price",
 			check: func() error {
-				return ValidateDoubleDiagonalOrder(&DoubleDiagonalParams{Underlying: "F", NearExpiration: future, FarExpiration: later, PutFarStrike: 9, PutNearStrike: 10, CallNearStrike: 14, CallFarStrike: 15, Quantity: 1})
+				return ValidateDoubleDiagonalOrder(
+					&DoubleDiagonalParams{
+						Underlying:     "F",
+						NearExpiration: future,
+						FarExpiration:  later,
+						PutFarStrike:   9,
+						PutNearStrike:  10,
+						CallNearStrike: 14,
+						CallFarStrike:  15,
+						Quantity:       1,
+					},
+				)
 			},
 			message: "price is required for double diagonals",
 		},
@@ -726,7 +1202,12 @@ func TestValidateVerticalOrderRejectsEqualStrikes(t *testing.T) {
 		Price:       0.50,
 	})
 
-	assertValidationError(t, err, "long and short strikes must be different", "Use different values for `--long-strike` and `--short-strike`")
+	assertValidationError(
+		t,
+		err,
+		"long and short strikes must be different",
+		"Use different values for `--long-strike` and `--short-strike`",
+	)
 }
 
 // TestValidateVerticalOrderRequiresPrice verifies price validation.
@@ -741,7 +1222,12 @@ func TestValidateVerticalOrderRequiresPrice(t *testing.T) {
 		Quantity:    1,
 	})
 
-	assertValidationError(t, err, "price is required for vertical spreads", "Add `--price <amount>` to specify the net debit or credit")
+	assertValidationError(
+		t,
+		err,
+		"price is required for vertical spreads",
+		"Add `--price <amount>` to specify the net debit or credit",
+	)
 }
 
 // TestValidateVerticalOrderAcceptsValidParams verifies valid parameters pass.
@@ -774,7 +1260,12 @@ func TestValidateIronCondorRequiresUnderlying(t *testing.T) {
 		Price:           1.50,
 	})
 
-	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+	assertValidationError(
+		t,
+		err,
+		"underlying symbol is required",
+		"Add `--underlying <TICKER>` to specify the underlying stock",
+	)
 }
 
 // TestValidateIronCondorRejectsUnorderedStrikes verifies strike ordering enforcement.
@@ -846,7 +1337,12 @@ func TestValidateStrangleRequiresUnderlying(t *testing.T) {
 		Price:      0.80,
 	})
 
-	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+	assertValidationError(
+		t,
+		err,
+		"underlying symbol is required",
+		"Add `--underlying <TICKER>` to specify the underlying stock",
+	)
 }
 
 // TestValidateStrangleRejectsEqualStrikes verifies same-strike rejection.
@@ -878,7 +1374,12 @@ func TestValidateStrangleRequiresPrice(t *testing.T) {
 		Quantity:   1,
 	})
 
-	assertValidationError(t, err, "price is required for strangles", "Add `--price <amount>` to specify the net debit or credit")
+	assertValidationError(
+		t,
+		err,
+		"price is required for strangles",
+		"Add `--price <amount>` to specify the net debit or credit",
+	)
 }
 
 // TestValidateStrangleAcceptsValidParams verifies valid parameters pass.
@@ -910,7 +1411,12 @@ func TestValidateStraddleRequiresUnderlying(t *testing.T) {
 		Price:      1.50,
 	})
 
-	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+	assertValidationError(
+		t,
+		err,
+		"underlying symbol is required",
+		"Add `--underlying <TICKER>` to specify the underlying stock",
+	)
 }
 
 // TestValidateStraddleRequiresStrike verifies strike is required.
@@ -924,7 +1430,12 @@ func TestValidateStraddleRequiresStrike(t *testing.T) {
 		Price:      1.50,
 	})
 
-	assertValidationError(t, err, "strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"strike price must be greater than zero",
+		"Add `--strike <price>` with a positive value",
+	)
 }
 
 // TestValidateStraddleRequiresPrice verifies price is required.
@@ -938,7 +1449,12 @@ func TestValidateStraddleRequiresPrice(t *testing.T) {
 		Quantity:   1,
 	})
 
-	assertValidationError(t, err, "price is required for straddles", "Add `--price <amount>` to specify the net debit or credit")
+	assertValidationError(
+		t,
+		err,
+		"price is required for straddles",
+		"Add `--price <amount>` to specify the net debit or credit",
+	)
 }
 
 // TestValidateStraddleAcceptsValidParams verifies valid parameters pass.
@@ -969,7 +1485,12 @@ func TestValidateCoveredCallOrderRequiresUnderlying(t *testing.T) {
 		Price:      12.00,
 	})
 
-	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+	assertValidationError(
+		t,
+		err,
+		"underlying symbol is required",
+		"Add `--underlying <TICKER>` to specify the underlying stock",
+	)
 }
 
 // TestValidateCoveredCallOrderRequiresStrike verifies strike is mandatory.
@@ -983,7 +1504,12 @@ func TestValidateCoveredCallOrderRequiresStrike(t *testing.T) {
 		Price:      12.00,
 	})
 
-	assertValidationError(t, err, "call strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"call strike price must be greater than zero",
+		"Add `--strike <price>` with a positive value",
+	)
 }
 
 // TestValidateCoveredCallOrderRequiresPrice verifies price is mandatory.
@@ -997,7 +1523,12 @@ func TestValidateCoveredCallOrderRequiresPrice(t *testing.T) {
 		Quantity:   1,
 	})
 
-	assertValidationError(t, err, "price is required for covered calls", "Add `--price <amount>` to specify the net debit")
+	assertValidationError(
+		t,
+		err,
+		"price is required for covered calls",
+		"Add `--price <amount>` to specify the net debit",
+	)
 }
 
 // TestValidateCoveredCallOrderAcceptsValidParams verifies a valid covered call passes.
@@ -1027,7 +1558,12 @@ func TestValidateCollarOrderRequiresUnderlying(t *testing.T) {
 		Price:      150.00,
 	})
 
-	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+	assertValidationError(
+		t,
+		err,
+		"underlying symbol is required",
+		"Add `--underlying <TICKER>` to specify the underlying stock",
+	)
 }
 
 // TestValidateCollarOrderRequiresPutStrike verifies put strike is mandatory.
@@ -1042,7 +1578,12 @@ func TestValidateCollarOrderRequiresPutStrike(t *testing.T) {
 		Price:      150.00,
 	})
 
-	assertValidationError(t, err, "put strike price must be greater than zero", "Add `--put-strike <price>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"put strike price must be greater than zero",
+		"Add `--put-strike <price>` with a positive value",
+	)
 }
 
 // TestValidateCollarOrderRequiresCallStrike verifies call strike is mandatory.
@@ -1057,7 +1598,12 @@ func TestValidateCollarOrderRequiresCallStrike(t *testing.T) {
 		Price:      150.00,
 	})
 
-	assertValidationError(t, err, "call strike price must be greater than zero", "Add `--call-strike <price>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"call strike price must be greater than zero",
+		"Add `--call-strike <price>` with a positive value",
+	)
 }
 
 // TestValidateCollarOrderRejectsInvertedStrikes verifies put strike must be below call strike.
@@ -1091,7 +1637,12 @@ func TestValidateCollarOrderRequiresExpiration(t *testing.T) {
 		Price:      150.00,
 	})
 
-	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+	assertValidationError(
+		t,
+		err,
+		"option expiration date is in the past",
+		"Use a future expiration date with `--expiration YYYY-MM-DD`",
+	)
 }
 
 // TestValidateCollarOrderRequiresQuantity verifies quantity must be positive.
@@ -1106,7 +1657,12 @@ func TestValidateCollarOrderRequiresQuantity(t *testing.T) {
 		Price:      150.00,
 	})
 
-	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"quantity must be greater than zero",
+		"Add `--quantity <number>` with a positive value",
+	)
 }
 
 // TestValidateCollarOrderAcceptsValidParams verifies a valid collar passes.
@@ -1137,7 +1693,12 @@ func TestValidateCalendarOrderRequiresUnderlying(t *testing.T) {
 		Price:          2.50,
 	})
 
-	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+	assertValidationError(
+		t,
+		err,
+		"underlying symbol is required",
+		"Add `--underlying <TICKER>` to specify the underlying stock",
+	)
 }
 
 // TestValidateCalendarOrderRejectsSameExpiration verifies that both expirations
@@ -1194,7 +1755,12 @@ func TestValidateCalendarOrderRequiresStrike(t *testing.T) {
 		Price:          2.50,
 	})
 
-	assertValidationError(t, err, "strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"strike price must be greater than zero",
+		"Add `--strike <price>` with a positive value",
+	)
 }
 
 // TestValidateCalendarOrderRequiresPrice verifies price is mandatory.
@@ -1210,7 +1776,12 @@ func TestValidateCalendarOrderRequiresPrice(t *testing.T) {
 		Quantity:       1,
 	})
 
-	assertValidationError(t, err, "price is required for calendar spreads", "Add `--price <amount>` to specify the net debit or credit")
+	assertValidationError(
+		t,
+		err,
+		"price is required for calendar spreads",
+		"Add `--price <amount>` to specify the net debit or credit",
+	)
 }
 
 // TestValidateCalendarOrderRequiresQuantity verifies quantity is mandatory.
@@ -1225,7 +1796,12 @@ func TestValidateCalendarOrderRequiresQuantity(t *testing.T) {
 		Price:          2.50,
 	})
 
-	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"quantity must be greater than zero",
+		"Add `--quantity <number>` with a positive value",
+	)
 }
 
 // TestValidateCalendarOrderRejectsMissingPutCall verifies PutCall is mandatory.
@@ -1274,7 +1850,12 @@ func TestValidateDiagonalOrderRequiresUnderlying(t *testing.T) {
 		Price:          3.00,
 	})
 
-	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+	assertValidationError(
+		t,
+		err,
+		"underlying symbol is required",
+		"Add `--underlying <TICKER>` to specify the underlying stock",
+	)
 }
 
 // TestValidateDiagonalOrderRejectsSameExpiration verifies that both expirations
@@ -1355,7 +1936,12 @@ func TestValidateDiagonalOrderRequiresNearStrike(t *testing.T) {
 		Price:          3.00,
 	})
 
-	assertValidationError(t, err, "near strike price must be greater than zero", "Add `--near-strike <price>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"near strike price must be greater than zero",
+		"Add `--near-strike <price>` with a positive value",
+	)
 }
 
 // TestValidateDiagonalOrderRequiresFarStrike verifies far strike is mandatory.
@@ -1371,7 +1957,12 @@ func TestValidateDiagonalOrderRequiresFarStrike(t *testing.T) {
 		Price:          3.00,
 	})
 
-	assertValidationError(t, err, "far strike price must be greater than zero", "Add `--far-strike <price>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"far strike price must be greater than zero",
+		"Add `--far-strike <price>` with a positive value",
+	)
 }
 
 // TestValidateDiagonalOrderRequiresPrice verifies price is mandatory.
@@ -1388,7 +1979,12 @@ func TestValidateDiagonalOrderRequiresPrice(t *testing.T) {
 		Quantity:       1,
 	})
 
-	assertValidationError(t, err, "price is required for diagonal spreads", "Add `--price <amount>` to specify the net debit or credit")
+	assertValidationError(
+		t,
+		err,
+		"price is required for diagonal spreads",
+		"Add `--price <amount>` to specify the net debit or credit",
+	)
 }
 
 // TestValidateDiagonalOrderRequiresQuantity verifies quantity is mandatory.
@@ -1404,7 +2000,12 @@ func TestValidateDiagonalOrderRequiresQuantity(t *testing.T) {
 		Price:          3.00,
 	})
 
-	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"quantity must be greater than zero",
+		"Add `--quantity <number>` with a positive value",
+	)
 }
 
 // TestValidateDiagonalOrderRejectsMissingPutCall verifies PutCall is mandatory.
@@ -1452,7 +2053,12 @@ func TestValidateOptionOrderRequiresUnderlying(t *testing.T) {
 		Quantity:   1,
 	})
 
-	assertValidationError(t, err, "underlying symbol is required", "Add `--underlying <TICKER>` to specify the underlying stock")
+	assertValidationError(
+		t,
+		err,
+		"underlying symbol is required",
+		"Add `--underlying <TICKER>` to specify the underlying stock",
+	)
 }
 
 // TestValidateOptionOrderRejectsZeroQuantity verifies quantity validation.
@@ -1466,7 +2072,12 @@ func TestValidateOptionOrderRejectsZeroQuantity(t *testing.T) {
 		Quantity:   0,
 	})
 
-	assertValidationError(t, err, "quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"quantity must be greater than zero",
+		"Add `--quantity <number>` with a positive value",
+	)
 }
 
 // TestValidateOptionOrderRejectsZeroStrike verifies strike price validation.
@@ -1479,7 +2090,12 @@ func TestValidateOptionOrderRejectsZeroStrike(t *testing.T) {
 		Quantity:   5,
 	})
 
-	assertValidationError(t, err, "option strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"option strike price must be greater than zero",
+		"Add `--strike <price>` with a positive value",
+	)
 }
 
 // TestValidateOptionOrderRejectsNegativeStrike verifies negative strike is rejected.
@@ -1493,7 +2109,12 @@ func TestValidateOptionOrderRejectsNegativeStrike(t *testing.T) {
 		Quantity:   5,
 	})
 
-	assertValidationError(t, err, "option strike price must be greater than zero", "Add `--strike <price>` with a positive value")
+	assertValidationError(
+		t,
+		err,
+		"option strike price must be greater than zero",
+		"Add `--strike <price>` with a positive value",
+	)
 }
 
 // TestValidateCalendarOrderRejectsPastNearExpiration verifies near expiration must be in the future.
@@ -1509,7 +2130,12 @@ func TestValidateCalendarOrderRejectsPastNearExpiration(t *testing.T) {
 		Price:          2.50,
 	})
 
-	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+	assertValidationError(
+		t,
+		err,
+		"option expiration date is in the past",
+		"Use a future expiration date with `--expiration YYYY-MM-DD`",
+	)
 }
 
 // TestValidateCalendarOrderRejectsPastFarExpiration verifies far expiration must be in the future.
@@ -1525,7 +2151,12 @@ func TestValidateCalendarOrderRejectsPastFarExpiration(t *testing.T) {
 		Price:          2.50,
 	})
 
-	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+	assertValidationError(
+		t,
+		err,
+		"option expiration date is in the past",
+		"Use a future expiration date with `--expiration YYYY-MM-DD`",
+	)
 }
 
 // TestValidateDiagonalOrderRejectsPastNearExpiration verifies near expiration must be in the future.
@@ -1542,7 +2173,12 @@ func TestValidateDiagonalOrderRejectsPastNearExpiration(t *testing.T) {
 		Price:          3.00,
 	})
 
-	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+	assertValidationError(
+		t,
+		err,
+		"option expiration date is in the past",
+		"Use a future expiration date with `--expiration YYYY-MM-DD`",
+	)
 }
 
 // TestValidateDiagonalOrderRejectsPastFarExpiration verifies far expiration must be in the future.
@@ -1559,7 +2195,12 @@ func TestValidateDiagonalOrderRejectsPastFarExpiration(t *testing.T) {
 		Price:          3.00,
 	})
 
-	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+	assertValidationError(
+		t,
+		err,
+		"option expiration date is in the past",
+		"Use a future expiration date with `--expiration YYYY-MM-DD`",
+	)
 }
 
 // TestValidateCollarOrderRequiresPrice verifies price is mandatory for collars.
@@ -1574,7 +2215,12 @@ func TestValidateCollarOrderRequiresPrice(t *testing.T) {
 		Quantity:   1,
 	})
 
-	assertValidationError(t, err, "price is required for collars", "Add `--price <amount>` to specify the net debit or credit")
+	assertValidationError(
+		t,
+		err,
+		"price is required for collars",
+		"Add `--price <amount>` to specify the net debit or credit",
+	)
 }
 
 // TestValidateCollarOrderRejectsPastExpiration verifies collar expiration must be in the future.
@@ -1590,7 +2236,12 @@ func TestValidateCollarOrderRejectsPastExpiration(t *testing.T) {
 		Price:      150.00,
 	})
 
-	assertValidationError(t, err, "option expiration date is in the past", "Use a future expiration date with `--expiration YYYY-MM-DD`")
+	assertValidationError(
+		t,
+		err,
+		"option expiration date is in the past",
+		"Use a future expiration date with `--expiration YYYY-MM-DD`",
+	)
 }
 
 // TestValidateOptionOrderRejectsTrailingStop verifies trailing stop types are rejected for options.
@@ -1619,7 +2270,12 @@ func TestValidateOptionOrderRejectsTrailingStop(t *testing.T) {
 			})
 
 			require.Error(t, err)
-			assertValidationError(t, err, "trailing stop orders are not supported for options", "Use `order build equity` for trailing stop orders")
+			assertValidationError(
+				t,
+				err,
+				"trailing stop orders are not supported for options",
+				"Use `order build equity` for trailing stop orders",
+			)
 		})
 	}
 }
@@ -2556,7 +3212,12 @@ func TestValidateOrderRequestRejectsOCOParentLegs(t *testing.T) {
 
 	err = ValidateOrderRequest(&ocoNode)
 
-	assertValidationError(t, err, "order OCO parent must not contain direct order legs", "Move executable legs into childOrderStrategies")
+	assertValidationError(
+		t,
+		err,
+		"order OCO parent must not contain direct order legs",
+		"Move executable legs into childOrderStrategies",
+	)
 }
 
 // TestValidateOrderRequestPriceLinkPathIncludesNestedChild verifies nested error paths.
@@ -2577,7 +3238,9 @@ func TestValidateOrderRequestPriceLinkPathIncludesNestedChild(t *testing.T) {
 
 	err = ValidateOrderRequest(order)
 
-	assertValidationError(t, err,
+	assertValidationError(
+		t,
+		err,
 		"order.childOrderStrategies[0].childOrderStrategies[0] priceLinkBasis and priceLinkType must be specified together",
 		"Set both priceLinkBasis and priceLinkType, or omit both fields",
 	)

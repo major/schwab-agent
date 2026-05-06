@@ -74,7 +74,11 @@ func TestNewInstrumentCmd_Get_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		// The Schwab API returns {"instruments": [...]} even for single-CUSIP lookups.
-		_, _ = w.Write([]byte(`{"instruments":[{"cusip":"037833100","symbol":"AAPL","description":"Apple Inc","exchange":"NASDAQ"}]}`))
+		_, _ = w.Write(
+			[]byte(
+				`{"instruments":[{"cusip":"037833100","symbol":"AAPL","description":"Apple Inc","exchange":"NASDAQ"}]}`,
+			),
+		)
 	}))
 	defer srv.Close()
 

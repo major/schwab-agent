@@ -13,8 +13,8 @@ func NewCompletionCmd(w io.Writer) *cobra.Command {
 		Use:         "completion",
 		Short:       "Generate shell completion scripts",
 		Long:        "Generate shell completion scripts for bash, zsh, fish, or powershell.",
-		Annotations: map[string]string{"skipAuth": "true"},
-		GroupID:     "tools",
+		Annotations: map[string]string{annotationSkipAuth: annotationValueTrue},
+		GroupID:     groupIDTools,
 		RunE:        requireSubcommand,
 	}
 
@@ -47,7 +47,7 @@ or
 
 	schwab-agent completion bash >> ~/.bashrc
 `,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Root().GenBashCompletionV2(w, true)
 		},
 	}
@@ -68,7 +68,7 @@ To load completions for every new session, execute once:
 
 	schwab-agent completion zsh > "${fpath[1]}/_schwab-agent"
 `,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Root().GenZshCompletion(w)
 		},
 	}
@@ -89,7 +89,7 @@ To load completions for every new session, execute once:
 
 	schwab-agent completion fish > ~/.config/fish/completions/schwab-agent.fish
 `,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Root().GenFishCompletion(w, true)
 		},
 	}
@@ -109,7 +109,7 @@ To load completions in your current shell session:
 To load completions for every new session, add the output of the above command
 to your powershell profile.
 `,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Root().GenPowerShellCompletionWithDesc(w)
 		},
 	}

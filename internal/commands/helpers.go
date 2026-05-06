@@ -162,7 +162,7 @@ func defineCobraFlags(cmd *cobra.Command, opts any) {
 		}
 		registerCobraFlag(cmd.Flags(), name, short, usage, field)
 
-		if fieldType.Tag.Get("flagrequired") == "true" {
+		if fieldType.Tag.Get("flagrequired") == annotationValueTrue {
 			if err := cmd.MarkFlagRequired(name); err != nil {
 				panic(err)
 			}
@@ -171,6 +171,7 @@ func defineCobraFlags(cmd *cobra.Command, opts any) {
 }
 
 func setCobraFlagDefault(field reflect.Value, raw, name string) {
+	//nolint:exhaustive // Only supported flag field kinds can define defaults.
 	switch field.Kind() {
 	case reflect.String:
 		field.SetString(raw)
@@ -198,10 +199,15 @@ func setCobraFlagDefault(field reflect.Value, raw, name string) {
 }
 
 func registerCobraFlag(flags *pflag.FlagSet, name, short, usage string, field reflect.Value) {
+	//nolint:exhaustive // Unsupported reflection kinds are rejected by the default branch.
 	switch field.Kind() {
 	case reflect.String:
 		if field.Type() == reflect.TypeFor[string]() {
-			flags.StringVarP(field.Addr().Interface().(*string), name, short, field.String(), usage)
+			value, ok := field.Addr().Interface().(*string)
+			if !ok {
+				panic(fmt.Sprintf("unsupported string flag %s type %s", name, field.Type()))
+			}
+			flags.StringVarP(value, name, short, field.String(), usage)
 			return
 		}
 
@@ -212,14 +218,30 @@ func registerCobraFlag(flags *pflag.FlagSet, name, short, usage string, field re
 			flags.Lookup(name).Annotations = map[string][]string{flagEnumAnnotation: valid}
 		}
 	case reflect.Bool:
-		flags.BoolVarP(field.Addr().Interface().(*bool), name, short, field.Bool(), usage)
+		value, ok := field.Addr().Interface().(*bool)
+		if !ok {
+			panic(fmt.Sprintf("unsupported bool flag %s type %s", name, field.Type()))
+		}
+		flags.BoolVarP(value, name, short, field.Bool(), usage)
 	case reflect.Int:
-		flags.IntVarP(field.Addr().Interface().(*int), name, short, int(field.Int()), usage)
+		value, ok := field.Addr().Interface().(*int)
+		if !ok {
+			panic(fmt.Sprintf("unsupported int flag %s type %s", name, field.Type()))
+		}
+		flags.IntVarP(value, name, short, int(field.Int()), usage)
 	case reflect.Float64:
-		flags.Float64VarP(field.Addr().Interface().(*float64), name, short, field.Float(), usage)
+		value, ok := field.Addr().Interface().(*float64)
+		if !ok {
+			panic(fmt.Sprintf("unsupported float64 flag %s type %s", name, field.Type()))
+		}
+		flags.Float64VarP(value, name, short, field.Float(), usage)
 	case reflect.Slice:
 		if field.Type().Elem().Kind() == reflect.String {
-			flags.StringArrayVarP(field.Addr().Interface().(*[]string), name, short, nil, usage)
+			value, ok := field.Addr().Interface().(*[]string)
+			if !ok {
+				panic(fmt.Sprintf("unsupported string slice flag %s type %s", name, field.Type()))
+			}
+			flags.StringArrayVarP(value, name, short, nil, usage)
 			return
 		}
 		panic(fmt.Sprintf("unsupported slice flag %s type %s", name, field.Type()))
@@ -247,54 +269,204 @@ func validateCobraOptions(ctx context.Context, opts any) error {
 	return newValidationError(strings.Join(messages, "; "))
 }
 
-func cobraEnumValues(value any) (valid []string, aliases map[string]string) {
+func cobraEnumValues(value any) ([]string, map[string]string) {
+	switch value.(type) {
+	case *models.Instruction,
+		*models.OrderType,
+		*models.Duration,
+		*models.Session,
+		*models.StopPriceLinkBasis,
+		*models.StopPriceLinkType,
+		*models.StopType,
+		*models.SpecialInstruction,
+		*models.RequestedDestination,
+		*models.PriceLinkBasis,
+		*models.PriceLinkType:
+		return modelEnumValues(value)
+	case *orderStatusFilter,
+		*chainContractType,
+		*chainStrategy,
+		*strikeRange,
+		*historyPeriodType,
+		*historyFrequencyType,
+		*historyFrequency,
+		*instrumentProjection,
+		*moversSort,
+		*moversFrequency,
+		*positionSort,
+		*taInterval:
+		return commandEnumValues(value)
+	default:
+		return nil, nil
+	}
+}
+
+func modelEnumValues(value any) ([]string, map[string]string) {
 	switch value.(type) {
 	case *models.Instruction:
-		return enumStrings(validInstructions), nil
+		return enumStrings(validInstructions()), nil
 	case *models.OrderType:
-		return enumStrings(validOrderTypes), map[string]string{"MOC": string(models.OrderTypeMarketOnClose), "LOC": string(models.OrderTypeLimitOnClose)}
+		return enumStrings(validOrderTypes()), map[string]string{
+			orderTypeAliasMarketOnClose: string(models.OrderTypeMarketOnClose),
+			orderTypeAliasLimitOnClose:  string(models.OrderTypeLimitOnClose),
+		}
 	case *models.Duration:
-		return enumStrings(validDurations), map[string]string{"GTC": string(models.DurationGoodTillCancel), "FOK": string(models.DurationFillOrKill), "IOC": string(models.DurationImmediateOrCancel)}
+		return enumStrings(validDurations()), map[string]string{
+			durationAliasGoodTillCancel:    string(models.DurationGoodTillCancel),
+			durationAliasFillOrKill:        string(models.DurationFillOrKill),
+			durationAliasImmediateOrCancel: string(models.DurationImmediateOrCancel),
+		}
 	case *models.Session:
-		return enumStrings(validSessions), nil
+		return enumStrings(validSessions()), nil
 	case *models.StopPriceLinkBasis:
-		return enumStrings(validStopPriceLinkBases), nil
+		return enumStrings(validStopPriceLinkBases()), nil
 	case *models.StopPriceLinkType:
-		return enumStrings(validStopPriceLinkTypes), nil
+		return enumStrings(validStopPriceLinkTypes()), nil
 	case *models.StopType:
-		return enumStrings(validStopTypes), nil
+		return enumStrings(validStopTypes()), nil
 	case *models.SpecialInstruction:
-		return enumStrings(validSpecialInstructions), nil
+		return enumStrings(validSpecialInstructions()), nil
 	case *models.RequestedDestination:
-		return enumStrings(validDestinations), nil
+		return enumStrings(validDestinations()), nil
 	case *models.PriceLinkBasis:
-		return enumStrings(validPriceLinkBases), nil
+		return enumStrings(validPriceLinkBases()), nil
 	case *models.PriceLinkType:
-		return enumStrings(validPriceLinkTypes), nil
+		return enumStrings(validPriceLinkTypes()), nil
+	default:
+		return nil, nil
+	}
+}
+
+func commandEnumValues(value any) ([]string, map[string]string) {
+	switch value.(type) {
+	case *orderStatusFilter,
+		*chainContractType,
+		*chainStrategy,
+		*strikeRange:
+		return tradingEnumValues(value)
+	case *historyPeriodType,
+		*historyFrequencyType,
+		*historyFrequency,
+		*instrumentProjection,
+		*moversSort,
+		*moversFrequency,
+		*positionSort,
+		*taInterval:
+		return marketEnumValues(value)
+	default:
+		return nil, nil
+	}
+}
+
+func tradingEnumValues(value any) ([]string, map[string]string) {
+	switch value.(type) {
 	case *orderStatusFilter:
-		return enumStrings(validOrderStatusFilters), nil
+		return enumStrings(validOrderStatusFilters()), nil
 	case *chainContractType:
 		return enumStrings([]chainContractType{chainContractTypeCall, chainContractTypePut, chainContractTypeAll}), nil
 	case *chainStrategy:
-		return enumStrings([]chainStrategy{chainStrategySingle, chainStrategyAnalytical, chainStrategyCovered, chainStrategyVertical, chainStrategyCalendar, chainStrategyStrangle, chainStrategyStraddle, chainStrategyButterfly, chainStrategyCondor, chainStrategyDiagonal, chainStrategyCollar, chainStrategyRoll}), nil
+		return enumStrings(
+			[]chainStrategy{
+				chainStrategySingle,
+				chainStrategyAnalytical,
+				chainStrategyCovered,
+				chainStrategyVertical,
+				chainStrategyCalendar,
+				chainStrategyStrangle,
+				chainStrategyStraddle,
+				chainStrategyButterfly,
+				chainStrategyCondor,
+				chainStrategyDiagonal,
+				chainStrategyCollar,
+				chainStrategyRoll,
+			},
+		), nil
 	case *strikeRange:
-		return enumStrings([]strikeRange{strikeRangeITM, strikeRangeNTM, strikeRangeOTM, strikeRangeSAK, strikeRangeSBK, strikeRangeSNK, strikeRangeAll}), nil
+		return enumStrings(
+			[]strikeRange{
+				strikeRangeITM,
+				strikeRangeNTM,
+				strikeRangeOTM,
+				strikeRangeSAK,
+				strikeRangeSBK,
+				strikeRangeSNK,
+				strikeRangeAll,
+			},
+		), nil
+	default:
+		return nil, nil
+	}
+}
+
+func marketEnumValues(value any) ([]string, map[string]string) {
+	switch value.(type) {
 	case *historyPeriodType:
-		return enumStrings([]historyPeriodType{historyPeriodTypeDay, historyPeriodTypeMonth, historyPeriodTypeYear, historyPeriodTypeYTD}), nil
+		return enumStrings(
+			[]historyPeriodType{
+				historyPeriodTypeDay,
+				historyPeriodTypeMonth,
+				historyPeriodTypeYear,
+				historyPeriodTypeYTD,
+			},
+		), nil
 	case *historyFrequencyType:
-		return enumStrings([]historyFrequencyType{historyFrequencyTypeMinute, historyFrequencyTypeDaily, historyFrequencyTypeWeekly, historyFrequencyTypeMonthly}), nil
+		return enumStrings(
+			[]historyFrequencyType{
+				historyFrequencyTypeMinute,
+				historyFrequencyTypeDaily,
+				historyFrequencyTypeWeekly,
+				historyFrequencyTypeMonthly,
+			},
+		), nil
 	case *historyFrequency:
-		return enumStrings([]historyFrequency{historyFrequency1, historyFrequency5, historyFrequency10, historyFrequency15, historyFrequency30}), nil
+		return enumStrings(
+			[]historyFrequency{
+				historyFrequency1,
+				historyFrequency5,
+				historyFrequency10,
+				historyFrequency15,
+				historyFrequency30,
+			},
+		), nil
 	case *instrumentProjection:
-		return enumStrings([]instrumentProjection{instrumentProjectionSymbolSearch, instrumentProjectionSymbolRegex, instrumentProjectionDescSearch, instrumentProjectionDescRegex, instrumentProjectionSearch, instrumentProjectionFundamental}), nil
+		return enumStrings(
+			[]instrumentProjection{
+				instrumentProjectionSymbolSearch,
+				instrumentProjectionSymbolRegex,
+				instrumentProjectionDescSearch,
+				instrumentProjectionDescRegex,
+				instrumentProjectionSearch,
+				instrumentProjectionFundamental,
+			},
+		), nil
 	case *moversSort:
-		return enumStrings([]moversSort{moversSortVolume, moversSortTrades, moversSortPercentChangeUp, moversSortPercentChangeDown}), nil
+		return enumStrings(
+			[]moversSort{moversSortVolume, moversSortTrades, moversSortPercentChangeUp, moversSortPercentChangeDown},
+		), nil
 	case *moversFrequency:
-		return enumStrings([]moversFrequency{moversFrequency0, moversFrequency1, moversFrequency5, moversFrequency10, moversFrequency30, moversFrequency60}), nil
+		return enumStrings(
+			[]moversFrequency{
+				moversFrequency0,
+				moversFrequency1,
+				moversFrequency5,
+				moversFrequency10,
+				moversFrequency30,
+				moversFrequency60,
+			},
+		), nil
 	case *positionSort:
 		return enumStrings([]positionSort{positionSortPnLDesc, positionSortPnLAsc, positionSortValueDesc}), nil
 	case *taInterval:
-		return enumStrings([]taInterval{taIntervalDaily, taIntervalWeekly, taInterval1Min, taInterval5Min, taInterval15Min, taInterval30Min}), nil
+		return enumStrings(
+			[]taInterval{
+				taIntervalDaily,
+				taIntervalWeekly,
+				taInterval1Min,
+				taInterval5Min,
+				taInterval15Min,
+				taInterval30Min,
+			},
+		), nil
 	default:
 		return nil, nil
 	}
@@ -370,7 +542,8 @@ func defaultSubcommand(sub *cobra.Command) func(cmd *cobra.Command, args []strin
 // is most useful for parent commands whose subcommands own distinct flags: an
 // unknown flag on the parent usually means the user skipped the subcommand.
 func suggestSubcommands(cmd *cobra.Command, err error) error {
-	if !strings.Contains(err.Error(), "unknown flag") && !strings.Contains(err.Error(), "flag provided but not defined") {
+	if !strings.Contains(err.Error(), "unknown flag") &&
+		!strings.Contains(err.Error(), "flag provided but not defined") {
 		return err
 	}
 
@@ -426,7 +599,9 @@ func normalizeFlagValidationErrorWithCommand(cmd *cobra.Command, err error) erro
 		return err
 	}
 
-	return newValidationError(fmt.Sprintf("invalid %s: %q (valid: %s)", flagName, invalidValue, validEnumString(validValues)))
+	return newValidationError(
+		fmt.Sprintf("invalid %s: %q (valid: %s)", flagName, invalidValue, validEnumString(validValues)),
+	)
 }
 
 func normalizeFlagValidationErrorFunc(cmd *cobra.Command, err error) error {

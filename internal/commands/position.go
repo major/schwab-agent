@@ -14,14 +14,16 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
+const positionPercentMultiplier = 100.0
+
 // positionEntry enriches a position with account identifiers and computed
 // cost basis / P&L fields that Schwab's API doesn't provide directly.
 type positionEntry struct {
+	models.Position
+
 	AccountNumber   string `json:"accountNumber"`
 	AccountHash     string `json:"accountHash,omitempty"`
 	AccountNickName string `json:"accountNickName,omitempty"`
-
-	models.Position
 
 	// Computed fields derived from the raw position data.
 	TotalCostBasis   *float64 `json:"totalCostBasis,omitempty"`
@@ -104,7 +106,10 @@ func flattenAccountPositions(accounts []models.Account, numberToHash map[string]
 		}
 
 		for i := range acct.SecuritiesAccount.Positions {
-			entries = append(entries, newPositionEntry(acctNum, acctHash, acctNick, &acct.SecuritiesAccount.Positions[i]))
+			entries = append(
+				entries,
+				newPositionEntry(acctNum, acctHash, acctNick, &acct.SecuritiesAccount.Positions[i]),
+			)
 		}
 	}
 
@@ -177,7 +182,7 @@ func computePositionFields(e *positionEntry) {
 	// P&L percentage: avoid division by zero on zero-cost positions
 	// (e.g., positions acquired via stock split or transfer).
 	if e.UnrealizedPnL != nil && e.TotalCostBasis != nil && *e.TotalCostBasis != 0 {
-		pct := *e.UnrealizedPnL / *e.TotalCostBasis * 100
+		pct := *e.UnrealizedPnL / *e.TotalCostBasis * positionPercentMultiplier
 		e.UnrealizedPnLPct = &pct
 	}
 }
@@ -187,7 +192,7 @@ func NewPositionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:     "position",
 		Short:   "View positions across accounts",
-		GroupID: "account-mgmt",
+		GroupID: groupIDAccountMgmt,
 		RunE:    requireSubcommand,
 	}
 
@@ -200,11 +205,11 @@ func NewPositionCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Comman
 // positionListOpts holds the options for the position list subcommand.
 type positionListOpts struct {
 	AllAccounts bool         `flag:"all-accounts" flagdescr:"Show positions across all linked accounts"`
-	Symbols     []string     `flag:"symbol" flagdescr:"Filter by symbol (repeatable, comma-separated values allowed)"`
-	LosersOnly  bool         `flag:"losers-only" flagdescr:"Show only positions with negative unrealized P&L"`
-	MinPnL      float64      `flag:"min-pnl" flagdescr:"Minimum unrealized P&L to include when set"`
-	MaxPnL      float64      `flag:"max-pnl" flagdescr:"Maximum unrealized P&L to include when set"`
-	Sort        positionSort `flag:"sort" flagdescr:"Sort positions by pnl-desc, pnl-asc, or value-desc"`
+	Symbols     []string     `flag:"symbol"       flagdescr:"Filter by symbol (repeatable, comma-separated values allowed)"`
+	LosersOnly  bool         `flag:"losers-only"  flagdescr:"Show only positions with negative unrealized P&L"`
+	MinPnL      float64      `flag:"min-pnl"      flagdescr:"Minimum unrealized P&L to include when set"`
+	MaxPnL      float64      `flag:"max-pnl"      flagdescr:"Maximum unrealized P&L to include when set"`
+	Sort        positionSort `flag:"sort"         flagdescr:"Sort positions by pnl-desc, pnl-asc, or value-desc"`
 }
 
 // newPositionListCmd returns the Cobra subcommand for listing positions.
@@ -214,7 +219,7 @@ type positionListOpts struct {
 func newPositionListCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 	opts := &positionListOpts{}
 	cmd := &cobra.Command{
-		Use:   "list",
+		Use:   commandUseList,
 		Short: "List positions for one or all accounts",
 		Long: `List positions as a flat list with account identifiers and computed cost basis
 and P&L fields that Schwab's API does not provide directly. Uses the default
@@ -303,7 +308,10 @@ func cobraListSingleAccountPositions(
 
 	if account.SecuritiesAccount != nil {
 		for i := range account.SecuritiesAccount.Positions {
-			entries = append(entries, newPositionEntry(acctNum, hash, acctNick, &account.SecuritiesAccount.Positions[i]))
+			entries = append(
+				entries,
+				newPositionEntry(acctNum, hash, acctNick, &account.SecuritiesAccount.Positions[i]),
+			)
 		}
 	}
 
@@ -432,7 +440,7 @@ func sortPositionEntries(entries []positionEntry, sortBy positionSort) {
 	}
 }
 
-// optionalFloatLess compares optional numeric values for sort.SliceStable.
+// optionalFloatLess compares optional numeric values for [sort.SliceStable].
 // Nil values sort last in both directions because missing P&L or market value
 // should not outrank known portfolio data.
 func optionalFloatLess(left, right *float64, desc bool) bool {

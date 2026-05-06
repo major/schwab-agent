@@ -106,50 +106,10 @@ type MarginBalance struct {
 	CashDebitCallValue               *float64 `json:"cashDebitCallValue,omitempty"`
 }
 
-// MarginInitialBalance represents initial balance for margin accounts.
-type MarginInitialBalance struct {
-	ClosingTradesPL                  *float64 `json:"closingTradesPL,omitempty"`
-	FutureOptionBuyingPower          *float64 `json:"futureOptionBuyingPower,omitempty"`
-	NetLiquidatingValue              *float64 `json:"netLiquidatingValue,omitempty"`
-	CashBalance                      *float64 `json:"cashBalance,omitempty"`
-	CashReceipts                     *float64 `json:"cashReceipts,omitempty"`
-	ProjectedCashBalance             *float64 `json:"projectedCashBalance,omitempty"`
-	SegmentIsolationEquity           *float64 `json:"segmentIsolationEquity,omitempty"`
-	LongStockValue                   *float64 `json:"longStockValue,omitempty"`
-	MutualFundValue                  *float64 `json:"mutualFundValue,omitempty"`
-	LongOptionNonIraValue            *float64 `json:"longOptionNonIraValue,omitempty"`
-	LongNonMarginableValue           *float64 `json:"longNonMarginableValue,omitempty"`
-	LongMarginableValue              *float64 `json:"longMarginableValue,omitempty"`
-	PendingDeposits                  *float64 `json:"pendingDeposits,omitempty"`
-	MarginCallValue                  *float64 `json:"marginCallValue,omitempty"`
-	TotalCash                        *float64 `json:"totalCash,omitempty"`
-	CashAvailableForTrading          *float64 `json:"cashAvailableForTrading,omitempty"`
-	CashAvailableForWithdrawal       *float64 `json:"cashAvailableForWithdrawal,omitempty"`
-	CashCall                         *float64 `json:"cashCall,omitempty"`
-	LongNonMarginableMarketValue     *float64 `json:"longNonMarginableMarketValue,omitempty"`
-	TotalLongValue                   *float64 `json:"totalLongValue,omitempty"`
-	DayTradingBuyingPower            *float64 `json:"dayTradingBuyingPower,omitempty"`
-	DayTradingBuyingPowerCall        *float64 `json:"dayTradingBuyingPowerCall,omitempty"`
-	OptionBuyingPower                *float64 `json:"optionBuyingPower,omitempty"`
-	EquityPercentage                 *float64 `json:"equityPercentage,omitempty"`
-	Equity                           *float64 `json:"equity,omitempty"`
-	ShortMarginValue                 *float64 `json:"shortMarginValue,omitempty"`
-	ShortBalance                     *float64 `json:"shortBalance,omitempty"`
-	SMA                              *float64 `json:"sma,omitempty"`
-	BuyingPower                      *float64 `json:"buyingPower,omitempty"`
-	RegTCall                         *float64 `json:"regTCall,omitempty"`
-	MaintenanceCall                  *float64 `json:"maintenanceCall,omitempty"`
-	MaintenanceRequirement           *float64 `json:"maintenanceRequirement,omitempty"`
-	AmountNeededToMaintainEquity     *float64 `json:"amountNeededToMaintainEquity,omitempty"`
-	IsInCall                         *bool    `json:"isInCall,omitempty"`
-	StockBuyingPower                 *float64 `json:"stockBuyingPower,omitempty"`
-	BuyingPowerNonMarginableTrade    *float64 `json:"buyingPowerNonMarginableTrade,omitempty"`
-	AvailableFundsNonMarginableTrade *float64 `json:"availableFundsNonMarginableTrade,omitempty"`
-	AvailableFunds                   *float64 `json:"availableFunds,omitempty"`
-	LongMarginValue                  *float64 `json:"longMarginValue,omitempty"`
-	MarginBalance                    *float64 `json:"marginBalance,omitempty"`
-	CashDebitCallValue               *float64 `json:"cashDebitCallValue,omitempty"`
-}
+// MarginInitialBalance represents initial balance for margin accounts. Schwab
+// returns the same field set for current and initial margin balances, so keep a
+// distinct named type without duplicating the schema body.
+type MarginInitialBalance MarginBalance
 
 // CashBalance represents cash account balance information.
 type CashBalance struct {

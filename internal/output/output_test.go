@@ -7,10 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 func TestWriteSuccess(t *testing.T) {
@@ -481,7 +482,7 @@ func TestWritePartialMultipleErrors(t *testing.T) {
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &envelope)
 	require.NoError(t, unmarshalErr)
 
-	assert.Equal(t, 3, len(envelope.Errors))
+	assert.Len(t, envelope.Errors, 3)
 	assert.Equal(t, errs, envelope.Errors)
 }
 
@@ -504,8 +505,15 @@ func TestMetadataAccountContextFields(t *testing.T) {
 				AccountSource:       "explicit",
 				AccountDisplayLabel: "Roth IRA - My Roth IRA",
 			},
-			wantKeys: []string{"timestamp", "account", "accountNickName", "accountType", "accountSource", "accountDisplayLabel"},
-			notKeys:  []string{},
+			wantKeys: []string{
+				"timestamp",
+				"account",
+				"accountNickName",
+				"accountType",
+				"accountSource",
+				"accountDisplayLabel",
+			},
+			notKeys: []string{},
 		},
 		{
 			name: "only timestamp and account, new fields empty",

@@ -10,9 +10,11 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-// allMarkets is the full list of Schwab market types, used as the default
+// allMarkets returns the full list of Schwab market types, used as the default
 // when no specific markets are requested.
-var allMarkets = []string{"equity", "option", "bond", "future", "forex"}
+func allMarkets() []string {
+	return []string{commandUseEquity, commandUseOption, "bond", "future", "forex"}
+}
 
 // moversData wraps the movers response.
 type moversData struct {
@@ -21,7 +23,7 @@ type moversData struct {
 
 // marketMoversOpts holds the options for the market movers subcommand.
 type marketMoversOpts struct {
-	Sort      moversSort      `flag:"sort" flagdescr:"Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)"`
+	Sort      moversSort      `flag:"sort"      flagdescr:"Sort order (VOLUME, TRADES, PERCENT_CHANGE_UP, PERCENT_CHANGE_DOWN)"`
 	Frequency moversFrequency `flag:"frequency" flagdescr:"Minimum percent change magnitude (0, 1, 5, 10, 30, 60)"`
 }
 
@@ -30,7 +32,7 @@ func NewMarketCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "market",
 		Short:   "Market hours and top movers",
-		GroupID: "market-data",
+		GroupID: groupIDMarketData,
 		RunE:    requireSubcommand,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
@@ -57,7 +59,7 @@ more market names to filter.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			markets := args
 			if len(markets) == 0 {
-				markets = allMarkets
+				markets = allMarkets()
 			}
 
 			// Use the single-market endpoint when exactly one market

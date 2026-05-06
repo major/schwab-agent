@@ -29,8 +29,10 @@ import (
 )
 
 const (
+	callbackLoopbackHost = "127.0.0.1"
+
 	// defaultCallbackAddr limits the local callback server to loopback.
-	defaultCallbackAddr = "127.0.0.1:8182"
+	defaultCallbackAddr = callbackLoopbackHost + ":8182"
 
 	// callbackSuccessHTML is the browser response shown after login completes.
 	callbackSuccessHTML = "<html><body><p>Authentication successful! You can close this tab.</p></body></html>"
@@ -45,6 +47,14 @@ const (
 
 	// callbackServerTimeout bounds how long the local HTTPS callback server waits.
 	callbackServerTimeout = 300 * time.Second
+
+	// oauthStateBytes keeps the CSRF state at 256 bits before hex encoding.
+	oauthStateBytes = 32
+
+	callbackReadHeaderTimeout = 10 * time.Second
+	callbackShutdownTimeout   = 5 * time.Second
+	callbackCertificateBits   = 2048
+	callbackCertificateTTL    = 24 * time.Hour
 )
 
 // newOAuthClient creates a resty client configured for OAuth token requests.
@@ -58,8 +68,8 @@ func newOAuthClient(cfg *Config, timeout time.Duration) *resty.Client {
 }
 
 // AuthorizeURL builds the Schwab authorization URL and returns it with a random state value.
-func AuthorizeURL(cfg *Config) (authURL, state string, err error) {
-	state, err = randomOAuthState()
+func AuthorizeURL(cfg *Config) (string, string, error) {
+	state, err := randomOAuthState()
 	if err != nil {
 		return "", "", apperr.NewAuthCallbackError("failed to generate OAuth state", err)
 	}
@@ -105,8 +115,8 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*Toke
 	}
 
 	var token TokenData
-	if err := json.Unmarshal(resp.Bytes(), &token); err != nil {
-		return nil, apperr.NewAuthCallbackError("failed to parse token exchange response", err)
+	if unmarshalErr := json.Unmarshal(resp.Bytes(), &token); unmarshalErr != nil {
+		return nil, apperr.NewAuthCallbackError("failed to parse token exchange response", unmarshalErr)
 	}
 
 	nowUnix := now.Unix()
@@ -119,7 +129,7 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*Toke
 }
 
 // StartCallbackServer starts a loopback-only HTTPS callback server and waits for one callback.
-func StartCallbackServer(addr, expectedState string) (code string, err error) {
+func StartCallbackServer(addr, expectedState string) (string, error) {
 	return startCallbackServer(addr, expectedState, nil)
 }
 
@@ -149,13 +159,13 @@ func RunLogin(cfg *Config, tokenPath, tokenEndpoint string, openBrowser bool, w 
 
 	if openBrowser {
 		logger.Info("Opening browser for Schwab login")
-		if err := browser.OpenURL(authURL); err != nil {
-			return apperr.NewAuthCallbackError("failed to open browser", err)
+		if openErr := browser.OpenURL(authURL); openErr != nil {
+			return apperr.NewAuthCallbackError("failed to open browser", openErr)
 		}
 	} else {
 		logger.Info("Open this URL to authenticate", "url", authURL)
-		if _, err := fmt.Fprintln(w, authURL); err != nil {
-			return fmt.Errorf("failed to write authorization URL: %w", err)
+		if _, writeErr := fmt.Fprintln(w, authURL); writeErr != nil {
+			return fmt.Errorf("failed to write authorization URL: %w", writeErr)
 		}
 	}
 
@@ -171,8 +181,8 @@ func RunLogin(cfg *Config, tokenPath, tokenEndpoint string, openBrowser bool, w 
 		return err
 	}
 
-	if err := SaveToken(tokenPath, tokenFile); err != nil {
-		return fmt.Errorf("failed to save token: %w", err)
+	if saveErr := SaveToken(tokenPath, tokenFile); saveErr != nil {
+		return fmt.Errorf("failed to save token: %w", saveErr)
 	}
 
 	logger.Info("Saved OAuth token", "path", tokenPath)
@@ -189,7 +199,7 @@ type callbackResult struct {
 // Returns an error if the system CSPRNG is unavailable instead of panicking,
 // since this runs in a CLI tool where a clean error message beats a stack trace.
 func randomOAuthState() (string, error) {
-	buf := make([]byte, 32)
+	buf := make([]byte, oauthStateBytes)
 	if _, err := rand.Read(buf); err != nil {
 		return "", fmt.Errorf("failed to generate OAuth state: %w", err)
 	}
@@ -235,7 +245,8 @@ func startCallbackServer(addr, expectedState string, readyCh chan<- struct{}) (s
 		return "", apperr.NewAuthCallbackError("failed to generate callback TLS certificate", err)
 	}
 
-	listener, err := net.Listen("tcp", validatedAddr)
+	listenConfig := &net.ListenConfig{}
+	listener, err := listenConfig.Listen(context.Background(), "tcp", validatedAddr)
 	if err != nil {
 		if readyCh != nil {
 			close(readyCh)
@@ -251,7 +262,7 @@ func startCallbackServer(addr, expectedState string, readyCh chan<- struct{}) (s
 
 	server := &http.Server{
 		Handler:           callbackHandler(expectedState, resultCh, &once),
-		ReadHeaderTimeout: 10 * time.Second,
+		ReadHeaderTimeout: callbackReadHeaderTimeout,
 	}
 
 	go func() {
@@ -274,12 +285,12 @@ func startCallbackServer(addr, expectedState string, readyCh chan<- struct{}) (s
 
 	select {
 	case result := <-resultCh:
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), callbackShutdownTimeout)
 		defer cancel()
 		_ = server.Shutdown(shutdownCtx)
 		return result.code, result.err
 	case <-timer.C:
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), callbackShutdownTimeout)
 		defer cancel()
 		_ = server.Shutdown(shutdownCtx)
 		return "", apperr.NewAuthCallbackError("timed out waiting for OAuth callback after 300 seconds", nil)
@@ -335,7 +346,7 @@ func validateCallbackAddr(addr string) (string, error) {
 		return "", apperr.NewAuthCallbackError("callback address must include host and port", err)
 	}
 
-	if host != "127.0.0.1" {
+	if host != callbackLoopbackHost {
 		return "", apperr.NewAuthCallbackError("callback server must bind to 127.0.0.1 only", nil)
 	}
 
@@ -344,7 +355,7 @@ func validateCallbackAddr(addr string) (string, error) {
 
 // generateSelfSignedCertificate creates an in-memory TLS certificate for the loopback callback server.
 func generateSelfSignedCertificate() (tls.Certificate, error) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey, err := rsa.GenerateKey(rand.Reader, callbackCertificateBits)
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("failed to generate private key: %w", err)
 	}
@@ -353,15 +364,15 @@ func generateSelfSignedCertificate() (tls.Certificate, error) {
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
-			CommonName: "127.0.0.1",
+			CommonName: callbackLoopbackHost,
 		},
 		NotBefore:             now.Add(-1 * time.Minute),
-		NotAfter:              now.Add(24 * time.Hour),
+		NotAfter:              now.Add(callbackCertificateTTL),
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		DNSNames:              []string{"localhost"},
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		IPAddresses:           []net.IP{net.ParseIP(callbackLoopbackHost)},
 	}
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)

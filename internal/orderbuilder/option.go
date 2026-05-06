@@ -2,6 +2,7 @@ package orderbuilder
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -12,7 +13,10 @@ import (
 	"github.com/major/schwab-agent/internal/models"
 )
 
-const optionContractMultiplier = 100.0
+const (
+	optionContractMultiplier = 100.0
+	occStrikeScale           = 1000.0
+)
 
 // OptionParams holds parameters for building an option order.
 type OptionParams struct {
@@ -52,8 +56,13 @@ func BuildOptionOrder(params *OptionParams) (*models.OrderRequest, error) {
 				Instruction: params.Action,
 				Quantity:    params.Quantity,
 				Instrument: models.OrderInstrument{
-					AssetType:            models.AssetTypeOption,
-					Symbol:               BuildOCCSymbol(params.Underlying, params.Expiration, params.Strike, string(params.PutCall)),
+					AssetType: models.AssetTypeOption,
+					Symbol: BuildOCCSymbol(
+						params.Underlying,
+						params.Expiration,
+						params.Strike,
+						string(params.PutCall),
+					),
 					PutCall:              &putCall,
 					UnderlyingSymbol:     &underlying,
 					OptionMultiplier:     &multiplier,
@@ -101,7 +110,7 @@ func BuildOCCSymbol(underlying string, expiration time.Time, strike float64, put
 	paddedUnderlying := fmt.Sprintf("%-6s", underlying)
 	expirationCode := expiration.Format("060102")
 	putCallCode := optionPutCallCode(putCall)
-	strikeCode := fmt.Sprintf("%08d", int64(math.Round(strike*1000)))
+	strikeCode := fmt.Sprintf("%08d", int64(math.Round(strike*occStrikeScale)))
 
 	return paddedUnderlying + expirationCode + putCallCode + strikeCode
 }
@@ -128,7 +137,7 @@ func ParseOCCSymbol(symbol string) (*OCCComponents, error) {
 
 	underlying := strings.TrimRight(symbol[:6], " ")
 	if underlying == "" {
-		return nil, fmt.Errorf("OCC symbol has empty underlying")
+		return nil, errors.New("OCC symbol has empty underlying")
 	}
 
 	dateStr := symbol[6:12]
@@ -162,7 +171,7 @@ func ParseOCCSymbol(symbol string) (*OCCComponents, error) {
 		Underlying: underlying,
 		Expiration: expiration,
 		PutCall:    putCall,
-		Strike:     float64(strikeInt) / 1000.0,
+		Strike:     float64(strikeInt) / occStrikeScale,
 		Symbol:     symbol,
 	}, nil
 }

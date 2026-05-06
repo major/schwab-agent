@@ -27,8 +27,8 @@ type orderListOpts struct {
 	// Keep status as []string to support comma-separated repeatable input.
 	// RunE validates values against the registered enum set after expanding.
 	Status []string `flag:"status" flagdescr:"Filter by order status (repeatable, use 'all' for unfiltered): WORKING, PENDING_ACTIVATION, FILLED, EXPIRED, CANCELED, REJECTED, etc."`
-	From   string   `flag:"from" flagdescr:"Filter by entered time lower bound"`
-	To     string   `flag:"to" flagdescr:"Filter by entered time upper bound"`
+	From   string   `flag:"from"   flagdescr:"Filter by entered time lower bound"`
+	To     string   `flag:"to"     flagdescr:"Filter by entered time upper bound"`
 	Recent bool     `flag:"recent" flagdescr:"Show recent order activity, including terminal statuses, from the last 24 hours unless --from is set"`
 }
 
@@ -40,13 +40,13 @@ type orderGetOpts struct {
 // NewOrderCmd returns the Cobra command for order operations.
 func NewOrderCmd(c *client.Ref, configPath string, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "order",
+		Use:   commandUseOrder,
 		Short: "List, build, preview, place, cancel, and replace orders",
 		Long: `Manage orders across your Schwab accounts. Supports listing, viewing, placing,
 previewing, building, canceling, and replacing orders. Placing, canceling, and
 replacing orders require the "i-also-like-to-live-dangerously" config flag.
 Duration aliases GTC, FOK, and IOC are accepted.`,
-		GroupID: "trading",
+		GroupID: groupIDTrading,
 		RunE:    requireSubcommand,
 	}
 
@@ -62,15 +62,21 @@ Duration aliases GTC, FOK, and IOC are accepted.`,
 	return cmd
 }
 
-// terminalOrderStatuses are order statuses that represent completed/final states.
-// Orders in these statuses are filtered out by default to show only actionable
-// orders. Use --status all to include them.
-var terminalOrderStatuses = map[models.OrderStatus]bool{
-	models.OrderStatusFilled:   true,
-	models.OrderStatusCanceled: true,
-	models.OrderStatusRejected: true,
-	models.OrderStatusExpired:  true,
-	models.OrderStatusReplaced: true,
+// isTerminalOrderStatus reports whether an order status represents a
+// completed/final state. Orders in these statuses are filtered out by default to
+// show only actionable orders. Use --status all to include them.
+func isTerminalOrderStatus(status models.OrderStatus) bool {
+	//nolint:exhaustive // Non-terminal statuses intentionally fall through to false.
+	switch status {
+	case models.OrderStatusFilled,
+		models.OrderStatusCanceled,
+		models.OrderStatusRejected,
+		models.OrderStatusExpired,
+		models.OrderStatusReplaced:
+		return true
+	default:
+		return false
+	}
 }
 
 // filterNonTerminalOrders returns only orders whose status is not terminal.
@@ -78,7 +84,7 @@ var terminalOrderStatuses = map[models.OrderStatus]bool{
 func filterNonTerminalOrders(orders []models.Order) []models.Order {
 	filtered := make([]models.Order, 0, len(orders))
 	for i := range orders {
-		if orders[i].Status == nil || !terminalOrderStatuses[*orders[i].Status] {
+		if orders[i].Status == nil || !isTerminalOrderStatus(*orders[i].Status) {
 			filtered = append(filtered, orders[i])
 		}
 	}
@@ -90,7 +96,7 @@ func filterNonTerminalOrders(orders []models.Order) []models.Order {
 func newOrderListCmd(c *client.Ref, _ string, w io.Writer) *cobra.Command {
 	opts := &orderListOpts{}
 	cmd := &cobra.Command{
-		Use:   "list",
+		Use:   commandUseList,
 		Short: "List orders (defaults to non-terminal statuses)",
 		Long: `List orders for the current account, or all accounts when no --account is set.
 By default, terminal statuses (FILLED, CANCELED, REJECTED, EXPIRED, REPLACED)
@@ -106,78 +112,102 @@ results.`,
   schwab-agent order list --status WORKING,FILLED,EXPIRED
   schwab-agent order list --from 2025-01-01 --to 2025-01-31`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
-				return err
-			}
-
-			var statuses []string
-			for _, raw := range opts.Status {
-				for part := range strings.SplitSeq(raw, ",") {
-					trimmed := strings.TrimSpace(part)
-					if trimmed != "" {
-						statuses = append(statuses, trimmed)
-					}
-				}
-			}
-
-			showAll := opts.Recent && len(statuses) == 0
-			for _, s := range statuses {
-				if err := validateOrderStatusFilter(s); err != nil {
-					return err
-				}
-
-				if strings.EqualFold(s, "all") {
-					showAll = true
-					break
-				}
-			}
-
-			var apiStatuses []string
-			if !showAll {
-				apiStatuses = statuses
-			}
-
-			from := strings.TrimSpace(opts.From)
-			if opts.Recent && from == "" {
-				// Recent activity is meant for post-mutation verification. A 24-hour
-				// lookback keeps filled/canceled/replaced orders visible without the
-				// noisier 60-day default used by the underlying Schwab endpoint.
-				from = time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339)
-			}
-
-			params := client.OrderListParams{
-				Statuses:        apiStatuses,
-				FromEnteredTime: from,
-				ToEnteredTime:   strings.TrimSpace(opts.To),
-			}
-
-			account, err := cmd.Flags().GetString("account")
-			if err != nil {
-				return err
-			}
-			account = strings.TrimSpace(account)
-
-			var orders []models.Order
-			if account == "" {
-				orders, err = c.AllOrders(cmd.Context(), params)
-			} else {
-				orders, err = c.ListOrders(cmd.Context(), account, params)
-			}
-			if err != nil {
-				return err
-			}
-
-			if len(statuses) == 0 && !opts.Recent {
-				orders = filterNonTerminalOrders(orders)
-			}
-
-			return output.WriteSuccess(w, orderListData{Orders: orders}, output.NewMetadata())
+			return runOrderList(cmd, c, w, opts)
 		},
 	}
 
 	defineCobraFlags(cmd, opts)
 
 	return cmd
+}
+
+func runOrderList(cmd *cobra.Command, c *client.Ref, w io.Writer, opts *orderListOpts) error {
+	if err := validateCobraOptions(cmd.Context(), opts); err != nil {
+		return err
+	}
+
+	statuses, showAll, err := orderListStatusFilters(opts)
+	if err != nil {
+		return err
+	}
+
+	orders, err := fetchOrderList(cmd, c, orderListParams(opts, statuses, showAll))
+	if err != nil {
+		return err
+	}
+
+	if len(statuses) == 0 && !opts.Recent {
+		orders = filterNonTerminalOrders(orders)
+	}
+
+	return output.WriteSuccess(w, orderListData{Orders: orders}, output.NewMetadata())
+}
+
+func orderListStatusFilters(opts *orderListOpts) ([]string, bool, error) {
+	statuses := splitOrderStatusFilters(opts.Status)
+	showAll := opts.Recent && len(statuses) == 0
+	for _, s := range statuses {
+		if err := validateOrderStatusFilter(s); err != nil {
+			return nil, false, err
+		}
+		if strings.EqualFold(s, "all") {
+			showAll = true
+			break
+		}
+	}
+
+	return statuses, showAll, nil
+}
+
+func splitOrderStatusFilters(rawStatuses []string) []string {
+	var statuses []string
+	for _, raw := range rawStatuses {
+		for part := range strings.SplitSeq(raw, ",") {
+			if trimmed := strings.TrimSpace(part); trimmed != "" {
+				statuses = append(statuses, trimmed)
+			}
+		}
+	}
+
+	return statuses
+}
+
+func orderListParams(opts *orderListOpts, statuses []string, showAll bool) client.OrderListParams {
+	var apiStatuses []string
+	if !showAll {
+		apiStatuses = statuses
+	}
+
+	return client.OrderListParams{
+		Statuses:        apiStatuses,
+		FromEnteredTime: orderListFromTime(opts),
+		ToEnteredTime:   strings.TrimSpace(opts.To),
+	}
+}
+
+func orderListFromTime(opts *orderListOpts) string {
+	from := strings.TrimSpace(opts.From)
+	if !opts.Recent || from != "" {
+		return from
+	}
+
+	// Recent activity is meant for post-mutation verification. A 24-hour
+	// lookback keeps filled/canceled/replaced orders visible without the
+	// noisier 60-day default used by the underlying Schwab endpoint.
+	return time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339)
+}
+
+func fetchOrderList(cmd *cobra.Command, c *client.Ref, params client.OrderListParams) ([]models.Order, error) {
+	account, err := cmd.Flags().GetString("account")
+	if err != nil {
+		return nil, err
+	}
+	account = strings.TrimSpace(account)
+	if account == "" {
+		return c.AllOrders(cmd.Context(), params)
+	}
+
+	return c.ListOrders(cmd.Context(), account, params)
 }
 
 // newOrderGetCmd returns a single order by account and ID.

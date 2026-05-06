@@ -285,16 +285,16 @@ func TestNextValidPeriod(t *testing.T) {
 		valid []int
 		want  int
 	}{
-		{1, validYearPeriods, 1},
-		{3, validYearPeriods, 3},
-		{4, validYearPeriods, 5},   // 4 is not valid, rounds to 5
-		{6, validYearPeriods, 10},  // 6 is not valid, rounds to 10
-		{11, validYearPeriods, 15}, // 11 is not valid, rounds to 15
-		{16, validYearPeriods, 20}, // 16 is not valid, rounds to 20
-		{21, validYearPeriods, 20}, // exceeds max, capped at 20
-		{1, validDayPeriods, 1},
-		{6, validDayPeriods, 10},  // 6 is not valid, rounds to 10
-		{11, validDayPeriods, 10}, // exceeds max, capped at 10
+		{1, validYearPeriods(), 1},
+		{3, validYearPeriods(), 3},
+		{4, validYearPeriods(), 5},   // 4 is not valid, rounds to 5
+		{6, validYearPeriods(), 10},  // 6 is not valid, rounds to 10
+		{11, validYearPeriods(), 15}, // 11 is not valid, rounds to 15
+		{16, validYearPeriods(), 20}, // 16 is not valid, rounds to 20
+		{21, validYearPeriods(), 20}, // exceeds max, capped at 20
+		{1, validDayPeriods(), 1},
+		{6, validDayPeriods(), 10},  // 6 is not valid, rounds to 10
+		{11, validDayPeriods(), 10}, // exceeds max, capped at 10
 	}
 
 	for _, tt := range tests {

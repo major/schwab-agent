@@ -47,17 +47,26 @@ func ValidateBuyWithStopOrder(params *BuyWithStopParams) error {
 	}
 
 	if params.StopLoss <= 0 {
-		return validationError("stop-loss is required", "Add `--stop-loss <amount>` with a positive protective stop price")
+		return validationError(
+			"stop-loss is required",
+			"Add `--stop-loss <amount>` with a positive protective stop price",
+		)
 	}
 
 	if entryOrderType == models.OrderTypeLimit && params.Price <= 0 {
-		return validationError("LIMIT buy-with-stop order requires a price", "Add `--price <amount>` to specify the entry limit price")
+		return validationError(
+			"LIMIT buy-with-stop order requires a price",
+			"Add `--price <amount>` to specify the entry limit price",
+		)
 	}
 
 	// MARKET orders should never carry a price field; reject early so the
 	// builder doesn't accidentally attach one.
 	if entryOrderType == models.OrderTypeMarket && params.Price > 0 {
-		return validationError("MARKET entry does not accept a price", "Remove `--price` or use `--type LIMIT` for a priced entry")
+		return validationError(
+			"MARKET entry does not accept a price",
+			"Remove `--price` or use `--type LIMIT` for a priced entry",
+		)
 	}
 
 	// For a BUY entry, take-profit must sit above stop-loss regardless of
@@ -73,11 +82,17 @@ func ValidateBuyWithStopOrder(params *BuyWithStopParams) error {
 	// only when a price is present. This keeps MARKET+protective-stop usable.
 	if params.Price > 0 {
 		if params.StopLoss >= params.Price {
-			return validationError("stop-loss must be below entry price", "Lower `--stop-loss` so it is below the buy entry price")
+			return validationError(
+				"stop-loss must be below entry price",
+				"Lower `--stop-loss` so it is below the buy entry price",
+			)
 		}
 
 		if params.TakeProfit > 0 && params.TakeProfit <= params.Price {
-			return validationError("take-profit must be above entry price", "Increase `--take-profit` so it is above the buy entry price")
+			return validationError(
+				"take-profit must be above entry price",
+				"Increase `--take-profit` so it is above the buy entry price",
+			)
 		}
 	}
 

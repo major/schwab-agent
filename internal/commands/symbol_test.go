@@ -23,22 +23,49 @@ func TestNewSymbolCmdBuild(t *testing.T) {
 		wantStrike  float64
 	}{
 		{
-			name:        "aapl call",
-			args:        []string{"build", "--underlying", "AAPL", "--expiration", "2025-06-20", "--strike", "200", "--call"},
+			name: "aapl call",
+			args: []string{
+				"build",
+				"--underlying",
+				"AAPL",
+				"--expiration",
+				"2025-06-20",
+				"--strike",
+				"200",
+				"--call",
+			},
 			wantSymbol:  "AAPL  250620C00200000",
 			wantPutCall: "CALL",
 			wantStrike:  200,
 		},
 		{
-			name:        "spy put with decimal",
-			args:        []string{"build", "--underlying", "SPY", "--expiration", "2025-12-19", "--strike", "450.50", "--put"},
+			name: "spy put with decimal",
+			args: []string{
+				"build",
+				"--underlying",
+				"SPY",
+				"--expiration",
+				"2025-12-19",
+				"--strike",
+				"450.50",
+				"--put",
+			},
 			wantSymbol:  "SPY   251219P00450500",
 			wantPutCall: "PUT",
 			wantStrike:  450.5,
 		},
 		{
-			name:        "googl call",
-			args:        []string{"build", "--underlying", "GOOGL", "--expiration", "2025-01-17", "--strike", "150", "--call"},
+			name: "googl call",
+			args: []string{
+				"build",
+				"--underlying",
+				"GOOGL",
+				"--expiration",
+				"2025-01-17",
+				"--strike",
+				"150",
+				"--call",
+			},
 			wantSymbol:  "GOOGL 250117C00150000",
 			wantPutCall: "CALL",
 			wantStrike:  150,
@@ -47,6 +74,8 @@ func TestNewSymbolCmdBuild(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			buf := &bytes.Buffer{}
 			cmd := NewSymbolCmd(buf)
 
@@ -61,7 +90,7 @@ func TestNewSymbolCmdBuild(t *testing.T) {
 			require.True(t, ok)
 			assert.Equal(t, tt.wantSymbol, data["symbol"])
 			assert.Equal(t, tt.wantPutCall, data["put_call"])
-			assert.Equal(t, tt.wantStrike, data["strike"])
+			assert.InDelta(t, tt.wantStrike, data["strike"], 0.001)
 			assert.NotEmpty(t, env.Metadata.Timestamp)
 		})
 	}
@@ -82,19 +111,40 @@ func TestNewSymbolCmdBuildValidation(t *testing.T) {
 			wantMsg: "at least one of the flags in the group [call put] is required",
 		},
 		{
-			name:    "both put and call flags",
-			args:    []string{"build", "--underlying", "AAPL", "--expiration", "2025-06-20", "--strike", "200", "--call", "--put"},
+			name: "both put and call flags",
+			args: []string{
+				"build",
+				"--underlying",
+				"AAPL",
+				"--expiration",
+				"2025-06-20",
+				"--strike",
+				"200",
+				"--call",
+				"--put",
+			},
 			wantMsg: "if any flags in the group [call put] are set none of the others can be",
 		},
 		{
-			name:    "invalid expiration format",
-			args:    []string{"build", "--underlying", "AAPL", "--expiration", "06/20/2025", "--strike", "200", "--call"},
+			name: "invalid expiration format",
+			args: []string{
+				"build",
+				"--underlying",
+				"AAPL",
+				"--expiration",
+				"06/20/2025",
+				"--strike",
+				"200",
+				"--call",
+			},
 			wantMsg: "YYYY-MM-DD",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			buf := &bytes.Buffer{}
 			cmd := NewSymbolCmd(buf)
 
@@ -145,6 +195,8 @@ func TestNewSymbolCmdParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			buf := &bytes.Buffer{}
 			cmd := NewSymbolCmd(buf)
 
@@ -161,7 +213,7 @@ func TestNewSymbolCmdParse(t *testing.T) {
 			assert.Equal(t, tt.wantUnderlying, data["underlying"])
 			assert.Equal(t, tt.wantExpiration, data["expiration"])
 			assert.Equal(t, tt.wantPutCall, data["put_call"])
-			assert.Equal(t, tt.wantStrike, data["strike"])
+			assert.InDelta(t, tt.wantStrike, data["strike"], 0.001)
 			assert.NotEmpty(t, env.Metadata.Timestamp)
 		})
 	}
@@ -195,6 +247,8 @@ func TestNewSymbolCmdParseValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			buf := &bytes.Buffer{}
 			cmd := NewSymbolCmd(buf)
 
@@ -237,6 +291,6 @@ func TestNewSymbolCmdParseRoundTrip(t *testing.T) {
 	assert.Equal(t, "TSLA", parseData["underlying"])
 	assert.Equal(t, "2026-01-16", parseData["expiration"])
 	assert.Equal(t, "PUT", parseData["put_call"])
-	assert.Equal(t, 275.5, parseData["strike"])
+	assert.InDelta(t, 275.5, parseData["strike"], 0.001)
 	assert.Equal(t, symbol, parseData["symbol"])
 }

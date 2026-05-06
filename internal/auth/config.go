@@ -18,13 +18,14 @@ import (
 
 // ErrMissingCredentials is a sentinel error wrapped by the ValidationError
 // returned from LoadConfig when client_id or client_secret are absent. Callers
-// can use errors.Is(err, ErrMissingCredentials) to distinguish missing
+// can use [errors.Is] with ErrMissingCredentials to distinguish missing
 // credentials from other validation failures (e.g., invalid base_url) without
 // matching on error message text.
 var ErrMissingCredentials = errors.New("missing required credentials")
 
 const (
-	defaultBaseURL = "https://api.schwabapi.com"
+	defaultBaseURL     = "https://api.schwabapi.com"
+	defaultCallbackURL = "https://127.0.0.1:8182"
 )
 
 // Config holds Schwab API credentials and settings.
@@ -79,9 +80,10 @@ func (cfg *Config) TLSConfig() *tls.Config {
 	if cfg == nil || !cfg.BaseURLInsecure {
 		return nil
 	}
-	return &tls.Config{InsecureSkipVerify: true} //nolint:gosec // base_url_insecure is an explicit opt-in for local self-signed proxies
+	return &tls.Config{
+		InsecureSkipVerify: true, //nolint:gosec // base_url_insecure is an explicit opt-in for local self-signed proxies.
+	}
 }
-
 
 // resolveAPIPath joins an API path onto the normalized base URL while
 // preserving any proxy path prefix present in base_url.
@@ -113,7 +115,7 @@ func normalizeBaseURL(rawBaseURL string) (string, error) {
 	}
 
 	if parsedURL.Scheme == "" || parsedURL.Host == "" {
-		return "", fmt.Errorf("base_url must include scheme and host")
+		return "", errors.New("base_url must include scheme and host")
 	}
 
 	parsedURL.Path = strings.TrimRight(parsedURL.Path, "/")
@@ -141,8 +143,8 @@ func LoadConfig(configPath string) (*Config, error) {
 		// File doesn't exist, start with empty config
 	} else {
 		// File exists, parse it
-		if err := json.Unmarshal(data, cfg); err != nil {
-			return nil, fmt.Errorf("failed to parse config file: %w", err)
+		if unmarshalErr := json.Unmarshal(data, cfg); unmarshalErr != nil {
+			return nil, fmt.Errorf("failed to parse config file: %w", unmarshalErr)
 		}
 	}
 
@@ -164,11 +166,11 @@ func LoadConfig(configPath string) (*Config, error) {
 	}
 
 	if rawBaseURLInsecure, ok := os.LookupEnv("SCHWAB_BASE_URL_INSECURE"); ok {
-		baseURLInsecure, err := strconv.ParseBool(strings.TrimSpace(rawBaseURLInsecure))
-		if err != nil {
+		baseURLInsecure, parseErr := strconv.ParseBool(strings.TrimSpace(rawBaseURLInsecure))
+		if parseErr != nil {
 			return nil, apperr.NewValidationError(
 				"Invalid SCHWAB_BASE_URL_INSECURE: expected true or false",
-				err,
+				parseErr,
 			)
 		}
 
@@ -177,7 +179,7 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	// Set default callback URL if still empty
 	if cfg.CallbackURL == "" {
-		cfg.CallbackURL = "https://127.0.0.1:8182"
+		cfg.CallbackURL = defaultCallbackURL
 	}
 
 	normalizedBaseURL, err := normalizeBaseURL(cfg.BaseURL)
@@ -207,14 +209,19 @@ func SaveConfig(configPath string, cfg *Config) error {
 	}
 
 	// Marshal config to JSON
-	data, err := json.MarshalIndent(cfg, "", "  ") //nolint:gosec // G117: config file intentionally stores client_secret with 0600 perms
+	//nolint:gosec // G117: config files intentionally store client_secret with 0600 permissions.
+	data, err := json.MarshalIndent(
+		cfg,
+		"",
+		"  ",
+	)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
 	// Write file with 0600 permissions
-	if err := os.WriteFile(configPath, data, 0o600); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
+	if writeErr := os.WriteFile(configPath, data, 0o600); writeErr != nil {
+		return fmt.Errorf("failed to write config file: %w", writeErr)
 	}
 
 	return nil

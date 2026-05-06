@@ -34,7 +34,7 @@ func TestSearchInstruments_Success(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -61,7 +61,7 @@ func TestSearchInstruments_MultipleResults(t *testing.T) {
 				{Symbol: new("AAXJ"), Description: new("iShares MSCI All Country Asia")},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -75,7 +75,7 @@ func TestSearchInstruments_MultipleResults(t *testing.T) {
 func TestSearchInstruments_EmptyResult(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.InstrumentResponse{Instruments: []models.Instrument{}}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.InstrumentResponse{Instruments: []models.Instrument{}}))
 	}))
 	defer srv.Close()
 
@@ -105,7 +105,7 @@ func TestGetInstrument_Success(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 

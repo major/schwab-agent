@@ -1,4 +1,3 @@
-// Package commands provides CLI command definitions for schwab-agent.
 package commands
 
 import (
@@ -15,27 +14,35 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-// validQuoteFields lists the allowed values for the --fields flag.
-// The Schwab API accepts these field groups to control which data
-// sections are returned in the quote response.
-var validQuoteFields = map[string]bool{
-	"quote":       true,
-	"fundamental": true,
-	"extended":    true,
-	"reference":   true,
-	"regular":     true,
+const (
+	quoteFieldExtended    = "extended"
+	quoteFieldFundamental = "fundamental"
+	quoteFieldQuote       = "quote"
+	quoteFieldReference   = "reference"
+	quoteFieldRegular     = "regular"
+)
+
+// isValidQuoteField reports whether field names one of the Schwab API field
+// groups accepted by --fields.
+func isValidQuoteField(field string) bool {
+	switch field {
+	case quoteFieldQuote, quoteFieldFundamental, quoteFieldExtended, quoteFieldReference, quoteFieldRegular:
+		return true
+	default:
+		return false
+	}
 }
 
 // NewQuoteCmd returns the Cobra command for stock quote operations.
 func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	getCmd := newQuoteGetCmd(c, w)
 	cmd := &cobra.Command{
-		Use:     "quote",
+		Use:     commandUseQuote,
 		Short:   "Stock quote operations",
 		Long:    "Get quotes for one or more symbols",
 		Args:    cobra.ArbitraryArgs,
 		RunE:    defaultSubcommand(getCmd),
-		GroupID: "market-data",
+		GroupID: groupIDMarketData,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
@@ -46,13 +53,13 @@ func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
 
 // quoteGetOpts holds the options for the quote get subcommand.
 type quoteGetOpts struct {
-	Fields     []string `flag:"fields" flagdescr:"Quote fields to return (repeatable): quote, fundamental, extended, reference, regular"`
+	Fields     []string `flag:"fields"     flagdescr:"Quote fields to return (repeatable): quote, fundamental, extended, reference, regular"`
 	Indicative bool     `flag:"indicative" flagdescr:"Request indicative (non-tradeable) quotes"`
 	Underlying string   `flag:"underlying" flagdescr:"Underlying symbol for option quote"`
 	Expiration string   `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD) for option quote"`
-	Strike     float64  `flag:"strike" flagdescr:"Strike price for option quote"`
-	Call       bool     `flag:"call" flagdescr:"Call option"`
-	Put        bool     `flag:"put" flagdescr:"Put option"`
+	Strike     float64  `flag:"strike"     flagdescr:"Strike price for option quote"`
+	Call       bool     `flag:"call"       flagdescr:"Call option"`
+	Put        bool     `flag:"put"        flagdescr:"Put option"`
 }
 
 // Validate is called by validateCobraOptions after Cobra decodes bound flags.
@@ -66,7 +73,7 @@ func (o *quoteGetOpts) Validate(_ context.Context) []error {
 				continue
 			}
 			lower := strings.ToLower(trimmed)
-			if !validQuoteFields[lower] {
+			if !isValidQuoteField(lower) {
 				errs = append(errs, fmt.Errorf("%s", invalidQuoteFieldMessage(trimmed, lower)))
 			}
 		}
@@ -124,14 +131,16 @@ mutually exclusive with positional symbol arguments.`,
 			optionMode := cmd.Flags().Changed("underlying") ||
 				cmd.Flags().Changed("expiration") ||
 				cmd.Flags().Changed("strike") ||
-				cmd.Flags().Changed("call") ||
-				cmd.Flags().Changed("put")
+				cmd.Flags().Changed(flagCall) ||
+				cmd.Flags().Changed(flagPut)
 
 			if optionMode {
 				// Option flags and positional symbols are mutually exclusive.
 				if len(args) > 0 {
 					return apperr.NewValidationError(
-						"cannot combine positional symbols with option flags (--underlying, --expiration, --strike, --call/--put)", nil)
+						"cannot combine positional symbols with option flags (--underlying, --expiration, --strike, --call/--put)",
+						nil,
+					)
 				}
 
 				// Validate all required option flags are present.
@@ -151,7 +160,9 @@ mutually exclusive with positional symbol arguments.`,
 			// Positional symbol mode: require at least one symbol.
 			if len(args) == 0 {
 				return apperr.NewValidationError(
-					"at least one symbol is required (or use option flags: --underlying, --expiration, --strike, --call/--put)", nil)
+					"at least one symbol is required (or use option flags: --underlying, --expiration, --strike, --call/--put)",
+					nil,
+				)
 			}
 
 			if len(args) == 1 {
@@ -162,7 +173,7 @@ mutually exclusive with positional symbol arguments.`,
 	}
 
 	defineCobraFlags(cmd, opts)
-	cmd.MarkFlagsMutuallyExclusive("call", "put")
+	cmd.MarkFlagsMutuallyExclusive(flagCall, flagPut)
 
 	return cmd
 }
@@ -181,7 +192,7 @@ func validateOptionQuoteFlags(cmd *cobra.Command) error {
 	if !cmd.Flags().Changed("strike") {
 		missing = append(missing, "--strike")
 	}
-	if !cmd.Flags().Changed("call") && !cmd.Flags().Changed("put") {
+	if !cmd.Flags().Changed(flagCall) && !cmd.Flags().Changed(flagPut) {
 		missing = append(missing, "--call or --put")
 	}
 	if len(missing) > 0 {
@@ -215,9 +226,12 @@ func buildCobraQuoteParams(opts *quoteGetOpts) client.QuoteParams {
 // sortedQuoteFieldNames returns the valid field names sorted alphabetically,
 // joined as a comma-separated string for use in error messages.
 func sortedQuoteFieldNames() string {
-	names := make([]string, 0, len(validQuoteFields))
-	for k := range validQuoteFields {
-		names = append(names, k)
+	names := []string{
+		quoteFieldQuote,
+		quoteFieldFundamental,
+		quoteFieldExtended,
+		quoteFieldReference,
+		quoteFieldRegular,
 	}
 	slices.Sort(names)
 	return strings.Join(names, ", ")

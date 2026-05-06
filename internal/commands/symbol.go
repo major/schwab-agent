@@ -24,23 +24,23 @@ type symbolResult struct {
 
 // symbolBuildOpts holds the options for the symbol build subcommand.
 type symbolBuildOpts struct {
-	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol (e.g. AAPL)" flagrequired:"true"`
-	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)" flagrequired:"true"`
-	Strike     float64 `flag:"strike" flagdescr:"Strike price (e.g. 200, 450.50)" flagrequired:"true"`
-	Call       bool    `flag:"call" flagdescr:"Call option"`
-	Put        bool    `flag:"put" flagdescr:"Put option"`
+	Underlying string  `flag:"underlying" flagdescr:"Underlying symbol (e.g. AAPL)"   flagrequired:"true"`
+	Expiration string  `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD)"    flagrequired:"true"`
+	Strike     float64 `flag:"strike"     flagdescr:"Strike price (e.g. 200, 450.50)" flagrequired:"true"`
+	Call       bool    `flag:"call"       flagdescr:"Call option"`
+	Put        bool    `flag:"put"        flagdescr:"Put option"`
 }
 
 // NewSymbolCmd returns the Cobra command for option symbol utilities.
 // These are pure computation commands that do not require API authentication.
 func NewSymbolCmd(w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "symbol",
+		Use:   commandUseSymbol,
 		Short: "OCC symbol operations",
 		Long: `Build and parse OCC-format option symbols locally. These are pure computation
 commands that make no API calls and require no authentication.`,
-		GroupID:     "tools",
-		Annotations: map[string]string{"skipAuth": "true"},
+		GroupID:     groupIDTools,
+		Annotations: map[string]string{annotationSkipAuth: annotationValueTrue},
 		RunE:        requireSubcommand,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
@@ -53,14 +53,14 @@ commands that make no API calls and require no authentication.`,
 func newSymbolBuildCmd(w io.Writer) *cobra.Command {
 	opts := &symbolBuildOpts{}
 	cmd := &cobra.Command{
-		Use:   "build",
+		Use:   commandUseBuild,
 		Short: "Build an OCC option symbol from components",
 		Long: `Build an OCC option symbol from underlying, expiration date, strike price, and
 contract type. No API call or authentication required. Output is JSON with the
 constructed symbol and its components.`,
 		Example: `  schwab-agent symbol build --underlying AAPL --expiration 2025-06-20 --strike 200 --call
   schwab-agent symbol build --underlying TSLA --expiration 2025-12-19 --strike 350.50 --put`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 				return err
 			}
@@ -88,8 +88,8 @@ constructed symbol and its components.`,
 
 	defineCobraFlags(cmd, opts)
 
-	cmd.MarkFlagsMutuallyExclusive("call", "put")
-	cmd.MarkFlagsOneRequired("call", "put")
+	cmd.MarkFlagsMutuallyExclusive(flagCall, flagPut)
+	cmd.MarkFlagsOneRequired(flagCall, flagPut)
 	return cmd
 }
 
@@ -102,7 +102,7 @@ func newSymbolParseCmd(w io.Writer) *cobra.Command {
 price, and contract type components. No API call or authentication required.`,
 		Example: `  schwab-agent symbol parse "AAPL  250620C00200000"`,
 		Args:    cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			symbol := args[0]
 			components, err := orderbuilder.ParseOCCSymbol(symbol)
 			if err != nil {

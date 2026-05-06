@@ -51,7 +51,7 @@ func mockFlatCandleListJSON(symbol string, n int) string {
 
 // decodeTAEnvelope unmarshals the output buffer and returns the single symbol's
 // payload for tests that focus on indicator content rather than envelope shape.
-func decodeTAEnvelope(t *testing.T, buf *bytes.Buffer) (envelope output.Envelope, data map[string]any) {
+func decodeTAEnvelope(t *testing.T, buf *bytes.Buffer) (output.Envelope, map[string]any) {
 	t.Helper()
 	envelope, root := decodeTAEnvelopeRoot(t, buf)
 	if len(root) == 1 {
@@ -68,13 +68,15 @@ func decodeTAEnvelope(t *testing.T, buf *bytes.Buffer) (envelope output.Envelope
 
 // decodeTAEnvelopeRoot unmarshals the output buffer into an Envelope and
 // extracts the root data map without unwrapping symbol-keyed entries.
-func decodeTAEnvelopeRoot(t *testing.T, buf *bytes.Buffer) (envelope output.Envelope, data map[string]any) {
+func decodeTAEnvelopeRoot(t *testing.T, buf *bytes.Buffer) (output.Envelope, map[string]any) {
 	t.Helper()
+	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 
 	dataBytes, err := json.Marshal(envelope.Data)
 	require.NoError(t, err)
 
+	var data map[string]any
 	require.NoError(t, json.Unmarshal(dataBytes, &data))
 	return envelope, data
 }
@@ -102,7 +104,7 @@ func mockVariedCandleListJSON(symbol string, n int) string {
 	return fmt.Sprintf(`{"symbol":%q,"empty":false,"candles":[%s]}`, symbol, strings.Join(candles, ","))
 }
 
-// priceHistoryHandler returns an http.Handler that responds with mock candle data.
+// priceHistoryHandler returns an [http.Handler] that responds with mock candle data.
 // Validates the request path contains /marketdata/v1/pricehistory.
 func priceHistoryHandler(t *testing.T, symbol string, nCandles int) http.Handler {
 	t.Helper()
@@ -197,7 +199,7 @@ func mockEmptyOptionChainJSON(symbol string) string {
 	}`, symbol)
 }
 
-// optionChainHandler returns an http.Handler that responds with mock option chain data.
+// optionChainHandler returns an [http.Handler] that responds with mock option chain data.
 func optionChainHandler(t *testing.T, body string) http.Handler {
 	t.Helper()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -886,7 +888,9 @@ func TestTAATR_MultipleSymbolsReturnsSymbolMap(t *testing.T) {
 		requestCount++
 		assert.Contains(t, r.URL.Path, "/marketdata/v1/pricehistory")
 		symbol := r.URL.Query().Get("symbol")
-		require.Contains(t, []string{"AAPL", "MSFT"}, symbol)
+		if !assert.Contains(t, []string{"AAPL", "MSFT"}, symbol) {
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(mockCandleListJSON(symbol, 60)))
@@ -1458,7 +1462,7 @@ func TestMustParseFloat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := mustParseFloat(tt.in)
-			assert.Equal(t, tt.want, got)
+			assert.InDelta(t, tt.want, got, 0.001)
 		})
 	}
 }

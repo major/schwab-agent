@@ -25,16 +25,20 @@ func TestClassifyFlagError(t *testing.T) {
 			wantFlag: "bogus",
 		},
 		{
-			name:     "invalid long flag value",
-			err:      errors.New(`invalid argument "many" for "--count" flag: strconv.ParseInt: parsing "many": invalid syntax`),
+			name: "invalid long flag value",
+			err: errors.New(
+				`invalid argument "many" for "--count" flag: strconv.ParseInt: parsing "many": invalid syntax`,
+			),
 			wantOK:   true,
 			wantKind: FlagErrorInvalidValue,
 			wantFlag: "count",
 			wantGot:  "many",
 		},
 		{
-			name:     "invalid short and long flag value",
-			err:      errors.New(`invalid argument "many" for "-c, --count" flag: strconv.ParseInt: parsing "many": invalid syntax`),
+			name: "invalid short and long flag value",
+			err: errors.New(
+				`invalid argument "many" for "-c, --count" flag: strconv.ParseInt: parsing "many": invalid syntax`,
+			),
 			wantOK:   true,
 			wantKind: FlagErrorInvalidValue,
 			wantFlag: "count",

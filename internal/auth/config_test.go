@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/major/schwab-agent/internal/apperr"
 )
 
@@ -59,7 +60,7 @@ func TestLoadConfig_MissingFile_ReturnsValidationError(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "SCHWAB_CLIENT_ID")
 	assert.Contains(t, err.Error(), "SCHWAB_CLIENT_SECRET")
 }
@@ -232,7 +233,7 @@ func TestLoadConfig_InvalidBaseURLInsecureEnv_ReturnsValidationError(t *testing.
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "SCHWAB_BASE_URL_INSECURE")
 }
 
@@ -240,7 +241,10 @@ func TestLoadConfig_InvalidBaseURL_ReturnsValidationError(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
-	require.NoError(t, os.WriteFile(configPath, []byte(`{"client_id":"id","client_secret":"secret","base_url":"://bad"}`), 0o600))
+	require.NoError(
+		t,
+		os.WriteFile(configPath, []byte(`{"client_id":"id","client_secret":"secret","base_url":"://bad"}`), 0o600),
+	)
 
 	// Act
 	cfg, err := LoadConfig(configPath)
@@ -250,7 +254,7 @@ func TestLoadConfig_InvalidBaseURL_ReturnsValidationError(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "base_url")
 }
 
@@ -296,7 +300,7 @@ func TestLoadConfig_MissingClientID_ReturnsValidationError(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "SCHWAB_CLIENT_ID")
 	assert.Contains(t, err.Error(), "config file")
 }
@@ -322,7 +326,7 @@ func TestLoadConfig_MissingClientSecret_ReturnsValidationError(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "SCHWAB_CLIENT_SECRET")
 	assert.Contains(t, err.Error(), "config file")
 }
@@ -346,7 +350,7 @@ func TestLoadConfig_BothMissing_ReturnsValidationError(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 }
 
 func TestLoadConfig_EnvVarPriority(t *testing.T) {

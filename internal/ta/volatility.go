@@ -1,4 +1,3 @@
-// Package ta provides technical analysis indicator calculations.
 package ta
 
 import (
@@ -9,12 +8,23 @@ import (
 )
 
 const (
+	volatilityRegimeElevated = "elevated"
+	volatilityRegimeExtreme  = "extreme"
+	volatilityRegimeHigh     = "high"
+	volatilityRegimeLow      = "low"
+	volatilityRegimeNormal   = "normal"
+	volatilityRegimeVeryLow  = "very_low"
+
 	tradingDaysPerYear = 252
 	regimeVeryLow      = 10.0
 	regimeLow          = 15.0
 	regimeNormal       = 20.0
 	regimeElevated     = 30.0
 	regimeHigh         = 50.0
+
+	percentMultiplier   = 100.0
+	tradingDaysPerWeek  = 5.0
+	tradingDaysPerMonth = 21.0
 )
 
 // HistoricalVolatilityResult summarizes close-to-close historical volatility.
@@ -66,12 +76,12 @@ func HistoricalVolatility(closes []float64, period int) (*HistoricalVolatilityRe
 	annualizationFactor := math.Sqrt(tradingDaysPerYear)
 	annualizedSeries := make([]float64, len(volSeries))
 
-	minVol := volSeries[0] * annualizationFactor * 100
+	minVol := volSeries[0] * annualizationFactor * percentMultiplier
 	maxVol := minVol
 	meanVol := 0.0
 
 	for i, vol := range volSeries {
-		annualized := vol * annualizationFactor * 100
+		annualized := vol * annualizationFactor * percentMultiplier
 		annualizedSeries[i] = annualized
 		meanVol += annualized
 
@@ -84,12 +94,12 @@ func HistoricalVolatility(closes []float64, period int) (*HistoricalVolatilityRe
 	}
 
 	meanVol /= float64(len(annualizedSeries))
-	annualizedVol := dailyVolDecimal * annualizationFactor * 100
+	annualizedVol := dailyVolDecimal * annualizationFactor * percentMultiplier
 
 	return &HistoricalVolatilityResult{
-		DailyVol:       dailyVolDecimal * 100,
-		WeeklyVol:      dailyVolDecimal * math.Sqrt(5) * 100,
-		MonthlyVol:     dailyVolDecimal * math.Sqrt(21) * 100,
+		DailyVol:       dailyVolDecimal * percentMultiplier,
+		WeeklyVol:      dailyVolDecimal * math.Sqrt(tradingDaysPerWeek) * percentMultiplier,
+		MonthlyVol:     dailyVolDecimal * math.Sqrt(tradingDaysPerMonth) * percentMultiplier,
 		AnnualizedVol:  annualizedVol,
 		PercentileRank: percentileRank(volSeries, dailyVolDecimal),
 		Regime:         classifyRegime(annualizedVol),
@@ -102,17 +112,17 @@ func HistoricalVolatility(closes []float64, period int) (*HistoricalVolatilityRe
 func classifyRegime(annualizedVol float64) string {
 	switch {
 	case annualizedVol < regimeVeryLow:
-		return "very_low"
+		return volatilityRegimeVeryLow
 	case annualizedVol < regimeLow:
-		return "low"
+		return volatilityRegimeLow
 	case annualizedVol < regimeNormal:
-		return "normal"
+		return volatilityRegimeNormal
 	case annualizedVol < regimeElevated:
-		return "elevated"
+		return volatilityRegimeElevated
 	case annualizedVol < regimeHigh:
-		return "high"
+		return volatilityRegimeHigh
 	default:
-		return "extreme"
+		return volatilityRegimeExtreme
 	}
 }
 
@@ -149,5 +159,5 @@ func percentileRank(series []float64, current float64) float64 {
 		}
 	}
 
-	return float64(count) / float64(len(series)) * 100
+	return float64(count) / float64(len(series)) * percentMultiplier
 }

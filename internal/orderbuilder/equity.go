@@ -89,6 +89,7 @@ func BuildEquityOrder(params *EquityParams) (*models.OrderRequest, error) {
 
 // applyEquityPriceFields sets the order price fields required by the selected order type.
 func applyEquityPriceFields(order *models.OrderRequest, params *EquityParams) {
+	//nolint:exhaustive // Market-like and unsupported order types do not add price fields here.
 	switch params.OrderType {
 	case models.OrderTypeLimit:
 		order.Price = new(params.Price)

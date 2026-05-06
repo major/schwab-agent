@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -150,7 +151,7 @@ func TestNewAuthCmd_RefreshCallsRefresh(t *testing.T) {
 			called = true
 			assert.Equal(t, "client-id", cfg.ClientID)
 			assert.Equal(t, originalToken.Token.RefreshToken, tf.Token.RefreshToken)
-			assert.Equal(t, "", endpoint)
+			assert.Empty(t, endpoint)
 
 			return &auth.TokenFile{
 				CreationTimestamp: tf.CreationTimestamp,
@@ -199,7 +200,10 @@ func TestNewAuthCmd_LoginAutoSetsDefaultAccount(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/oauth/token":
 			assert.Equal(t, http.MethodPost, r.Method)
-			_, _ = io.WriteString(w, `{"access_token":"access-token","token_type":"Bearer","expires_in":1800,"refresh_token":"refresh-token","scope":"api"}`)
+			_, _ = io.WriteString(
+				w,
+				`{"access_token":"access-token","token_type":"Bearer","expires_in":1800,"refresh_token":"refresh-token","scope":"api"}`,
+			)
 		case "/trader/v1/accounts/accountNumbers":
 			assert.Equal(t, "Bearer access-token", r.Header.Get("Authorization"))
 			w.Header().Set("Content-Type", "application/json")
@@ -215,20 +219,24 @@ func TestNewAuthCmd_LoginAutoSetsDefaultAccount(t *testing.T) {
 		NewAccountClient: func(token string, _ *auth.Config) accountNumbersClient {
 			return client.NewClient(token, client.WithBaseURL(server.URL))
 		},
-		RunLogin: func(cfg *auth.Config, targetTokenPath string, tokenEndpoint string, openBrowser bool, w io.Writer) error {
+		RunLogin: func(_ *auth.Config, targetTokenPath string, tokenEndpoint string, openBrowser bool, w io.Writer) error {
 			assert.False(t, openBrowser)
 			_, err := fmt.Fprintln(w, "https://example.com/authorize")
 			require.NoError(t, err)
 
-			response, err := http.Post(tokenEndpoint, "application/x-www-form-urlencoded", bytes.NewBufferString("grant_type=authorization_code"))
+			response, err := http.Post(
+				tokenEndpoint,
+				"application/x-www-form-urlencoded",
+				bytes.NewBufferString("grant_type=authorization_code"),
+			)
 			if err != nil {
 				return err
 			}
 			defer response.Body.Close()
 
 			var token auth.TokenData
-			if err := json.NewDecoder(response.Body).Decode(&token); err != nil {
-				return err
+			if decodeErr := json.NewDecoder(response.Body).Decode(&token); decodeErr != nil {
+				return decodeErr
 			}
 
 			token.ExpiresAt = float64(expiresAt)
@@ -584,7 +592,7 @@ func TestNewAuthCmd_RefreshFails(t *testing.T) {
 
 	deps := AuthDeps{
 		RefreshAccessToken: func(_ *auth.Config, _ *auth.TokenFile, _ string) (*auth.TokenFile, error) {
-			return nil, fmt.Errorf("refresh failed: server error")
+			return nil, errors.New("refresh failed: server error")
 		},
 	}
 

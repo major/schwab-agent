@@ -1,4 +1,3 @@
-// Package commands provides CLI command builders for schwab-agent.
 package commands
 
 import (
@@ -142,6 +141,8 @@ func refreshExpiryRFC3339(tf *auth.TokenFile) string {
 	return time.Unix(tf.CreationTimestamp+refreshTokenMaxAgeSeconds, 0).UTC().Format(time.RFC3339)
 }
 
+const redactedClientIDPrefixLength = 4
+
 // redactClientID shortens the client ID to the first four characters plus ellipsis.
 func redactClientID(clientID string) string {
 	clientID = strings.TrimSpace(clientID)
@@ -149,11 +150,11 @@ func redactClientID(clientID string) string {
 		return ""
 	}
 
-	if len(clientID) <= 4 {
+	if len(clientID) <= redactedClientIDPrefixLength {
 		return clientID + "..."
 	}
 
-	return clientID[:4] + "..."
+	return clientID[:redactedClientIDPrefixLength] + "..."
 }
 
 // configDefaultAccount returns the configured default account, if any.
@@ -202,8 +203,8 @@ func NewAuthCmd(configPath, tokenPath string, w io.Writer, deps AuthDeps) *cobra
 status checks token expiration, and refresh forces a token refresh. Auth
 commands bypass the global auth check so they can run without existing tokens.
 Tokens are stored locally and refreshed automatically during normal use.`,
-		Annotations: map[string]string{"skipAuth": "true"},
-		GroupID:     "account-mgmt",
+		Annotations: map[string]string{annotationSkipAuth: annotationValueTrue},
+		GroupID:     groupIDAccountMgmt,
 		RunE:        requireSubcommand,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
@@ -245,8 +246,14 @@ it is automatically set as the default.`,
 			var loginOutput strings.Builder
 			openBrowser := !opts.NoBrowser
 
-			if err := deps.RunLogin(loginConfig, resolvedTokenPath, deps.OAuthTokenEndpoint(), openBrowser, &loginOutput); err != nil {
-				return err
+			if loginErr := deps.RunLogin(
+				loginConfig,
+				resolvedTokenPath,
+				deps.OAuthTokenEndpoint(),
+				openBrowser,
+				&loginOutput,
+			); loginErr != nil {
+				return loginErr
 			}
 
 			tokenFile, err := auth.LoadToken(resolvedTokenPath)
@@ -257,7 +264,8 @@ it is automatically set as the default.`,
 			defaultAccount := configDefaultAccount(loginConfig)
 			autoSetDefault := false
 
-			accounts, err := deps.NewAccountClient(tokenFile.Token.AccessToken, loginConfig).AccountNumbers(cmd.Context())
+			accounts, err := deps.NewAccountClient(tokenFile.Token.AccessToken, loginConfig).
+				AccountNumbers(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -265,8 +273,8 @@ it is automatically set as the default.`,
 			if len(accounts) == 1 {
 				defaultAccount = accounts[0].HashValue
 
-				if err := auth.SetDefaultAccount(resolvedConfigPath, defaultAccount); err != nil {
-					return err
+				if setDefaultErr := auth.SetDefaultAccount(resolvedConfigPath, defaultAccount); setDefaultErr != nil {
+					return setDefaultErr
 				}
 
 				autoSetDefault = true
@@ -354,8 +362,8 @@ a valid refresh token (not expired). If the refresh token is stale (older than
 				return err
 			}
 
-			if err := auth.SaveToken(resolvedTokenPath, refreshedToken); err != nil {
-				return err
+			if saveErr := auth.SaveToken(resolvedTokenPath, refreshedToken); saveErr != nil {
+				return saveErr
 			}
 
 			return output.WriteSuccess(w, authRefreshData{

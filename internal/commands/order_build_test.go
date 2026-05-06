@@ -24,8 +24,22 @@ func TestOrderBuildEquity(t *testing.T) {
 		wantSymbol    string
 	}{
 		{
-			name:          "limit order",
-			args:          []string{"equity", "--symbol", "AAPL", "--action", "BUY", "--quantity", "10", "--type", "LIMIT", "--price", "200", "--duration", "DAY"},
+			name: "limit order",
+			args: []string{
+				"equity",
+				"--symbol",
+				"AAPL",
+				"--action",
+				"BUY",
+				"--quantity",
+				"10",
+				"--type",
+				"LIMIT",
+				"--price",
+				"200",
+				"--duration",
+				"DAY",
+			},
 			wantOrderType: "LIMIT",
 			wantAction:    "BUY",
 			wantQuantity:  10,
@@ -40,8 +54,20 @@ func TestOrderBuildEquity(t *testing.T) {
 			wantSymbol:    "MSFT",
 		},
 		{
-			name:          "stop order",
-			args:          []string{"equity", "--symbol", "TSLA", "--action", "SELL", "--quantity", "1", "--type", "STOP", "--stop-price", "145"},
+			name: "stop order",
+			args: []string{
+				"equity",
+				"--symbol",
+				"TSLA",
+				"--action",
+				"SELL",
+				"--quantity",
+				"1",
+				"--type",
+				"STOP",
+				"--stop-price",
+				"145",
+			},
 			wantOrderType: "STOP",
 			wantAction:    "SELL",
 			wantQuantity:  1,
@@ -75,7 +101,7 @@ func TestOrderBuildEquity(t *testing.T) {
 
 			leg := legs[0].(map[string]any)
 			assert.Equal(t, tt.wantAction, leg["instruction"])
-			assert.Equal(t, tt.wantQuantity, leg["quantity"])
+			assert.InDelta(t, tt.wantQuantity, leg["quantity"], 0.001)
 
 			instrument := leg["instrument"].(map[string]any)
 			assert.Equal(t, tt.wantSymbol, instrument["symbol"])
@@ -120,13 +146,13 @@ func TestOrderBuildOption(t *testing.T) {
 
 	leg := legs[0].(map[string]any)
 	assert.Equal(t, "BUY_TO_OPEN", leg["instruction"])
-	assert.Equal(t, 1.0, leg["quantity"])
+	assert.InDelta(t, 1.0, leg["quantity"], 0.001)
 
 	instrument := leg["instrument"].(map[string]any)
 	assert.Equal(t, "OPTION", instrument["assetType"])
 	assert.Equal(t, "AAPL", instrument["underlyingSymbol"])
 	assert.Equal(t, "CALL", instrument["putCall"])
-	assert.Equal(t, 200.0, instrument["optionStrikePrice"])
+	assert.InDelta(t, 200.0, instrument["optionStrikePrice"], 0.001)
 }
 
 // TestOrderBuildBracket verifies the bracket build subcommand produces triggered order JSON
@@ -277,8 +303,20 @@ func TestOrderBuildValidationErrors(t *testing.T) {
 			wantMsg: "quantity must be greater than zero",
 		},
 		{
-			name:    "option missing call or put",
-			args:    []string{"option", "--underlying", "AAPL", "--expiration", "2027-12-17", "--strike", "200", "--action", "BUY_TO_OPEN", "--quantity", "1"},
+			name: "option missing call or put",
+			args: []string{
+				"option",
+				"--underlying",
+				"AAPL",
+				"--expiration",
+				"2027-12-17",
+				"--strike",
+				"200",
+				"--action",
+				"BUY_TO_OPEN",
+				"--quantity",
+				"1",
+			},
 			wantMsg: "at least one of the flags in the group [call put] is required",
 		},
 		{
@@ -287,8 +325,23 @@ func TestOrderBuildValidationErrors(t *testing.T) {
 			wantMsg: "bracket order requires at least one exit condition",
 		},
 		{
-			name:    "vertical missing call or put",
-			args:    []string{"vertical", "--underlying", "F", "--expiration", "2027-06-18", "--long-strike", "12", "--short-strike", "14", "--open", "--quantity", "1", "--price", "0.50"},
+			name: "vertical missing call or put",
+			args: []string{
+				"vertical",
+				"--underlying",
+				"F",
+				"--expiration",
+				"2027-06-18",
+				"--long-strike",
+				"12",
+				"--short-strike",
+				"14",
+				"--open",
+				"--quantity",
+				"1",
+				"--price",
+				"0.50",
+			},
 			wantMsg: "at least one of the flags in the group [call put] is required",
 		},
 		{

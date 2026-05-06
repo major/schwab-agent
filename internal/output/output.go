@@ -72,8 +72,6 @@ type ErrorEnvelope = StructuredError
 
 // WriteSuccess writes a successful response with data and metadata to the writer.
 // The response is formatted as a JSON envelope with data and metadata fields.
-//
-//nolint:gocritic // hugeParam: Metadata is passed by value intentionally to match the existing API contract; callers construct it inline and pointer indirection would complicate all call sites.
 func WriteSuccess(w io.Writer, data any, metadata Metadata) error {
 	envelope := Envelope{
 		Data:     data,
@@ -221,7 +219,7 @@ func flagStructuredError(cmd *cobra.Command, err *apperr.FlagError) StructuredEr
 
 // schwabErrorDetails extracts remediation details from every concrete domain
 // error. The concrete checks are intentional because embedding SchwabError does
-// not make errors.As match the embedded base type for wrapper errors.
+// not make [errors.As] match the embedded base type for wrapper errors.
 func schwabErrorDetails(err error) string {
 	if typedErr, ok := errors.AsType[*apperr.AuthRequiredError](err); ok {
 		return typedErr.Details()
@@ -275,8 +273,6 @@ func commandPath(cmd *cobra.Command) string {
 
 // WritePartial writes a response with both data and errors (partial success).
 // The response is formatted as a JSON envelope with data, errors, and metadata fields.
-//
-//nolint:gocritic // hugeParam: Metadata is passed by value intentionally to match the existing API contract; callers construct it inline and pointer indirection would complicate all call sites.
 func WritePartial(w io.Writer, data any, errs []string, metadata Metadata) error {
 	envelope := Envelope{
 		Data:     data,

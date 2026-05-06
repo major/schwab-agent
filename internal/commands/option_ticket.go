@@ -24,9 +24,9 @@ const strikeComparisonEpsilon = 0.0001
 // optionTicketGetOpts holds the inputs for narrowing an option chain to one actionable contract.
 type optionTicketGetOpts struct {
 	Expiration string  `flag:"expiration" flagdescr:"Option expiration date (YYYY-MM-DD)" flaggroup:"contract"`
-	Strike     float64 `flag:"strike" flagdescr:"Option strike price" flaggroup:"contract"`
-	Call       bool    `flag:"call" flagdescr:"Select the call contract" flaggroup:"contract"`
-	Put        bool    `flag:"put" flagdescr:"Select the put contract" flaggroup:"contract"`
+	Strike     float64 `flag:"strike"     flagdescr:"Option strike price"                 flaggroup:"contract"`
+	Call       bool    `flag:"call"       flagdescr:"Select the call contract"            flaggroup:"contract"`
+	Put        bool    `flag:"put"        flagdescr:"Select the put contract"             flaggroup:"contract"`
 }
 
 // optionTicketData is the agent-facing payload for an option ticket lookup.
@@ -54,11 +54,11 @@ type optionTicketChainSummary struct {
 // NewOptionCmd returns the Cobra command for option planning workflows.
 func NewOptionCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "option",
+		Use:     commandUseOption,
 		Short:   "Option planning workflows",
 		Long:    "Option planning workflows that combine quote, chain, and symbol context for agents.",
 		RunE:    requireSubcommand,
-		GroupID: "market-data",
+		GroupID: groupIDMarketData,
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
@@ -112,15 +112,20 @@ lookup, and OCC symbol construction into one read-only CLI call.`,
 	}
 
 	defineCobraFlags(cmd, opts)
-	cmd.MarkFlagsOneRequired("call", "put")
-	cmd.MarkFlagsMutuallyExclusive("call", "put")
+	cmd.MarkFlagsOneRequired(flagCall, flagPut)
+	cmd.MarkFlagsMutuallyExclusive(flagCall, flagPut)
 	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
 
 	return cmd
 }
 
 // buildOptionTicket fetches the quote and filtered option chain needed for an agent order ticket.
-func buildOptionTicket(ctx context.Context, c *client.Ref, rawSymbol string, opts *optionTicketGetOpts) (*optionTicketData, error) {
+func buildOptionTicket(
+	ctx context.Context,
+	c *client.Ref,
+	rawSymbol string,
+	opts *optionTicketGetOpts,
+) (*optionTicketData, error) {
 	symbol := strings.ToUpper(strings.TrimSpace(rawSymbol))
 	if symbol == "" {
 		return nil, newValidationError("symbol is required")
@@ -140,7 +145,11 @@ func buildOptionTicket(ctx context.Context, c *client.Ref, rawSymbol string, opt
 		return nil, newValidationError("strike must be greater than zero")
 	}
 
-	quote, err := c.Quote(ctx, symbol, client.QuoteParams{Fields: []string{"quote", "fundamental", "reference"}})
+	quote, err := c.Quote(
+		ctx,
+		symbol,
+		client.QuoteParams{Fields: []string{quoteFieldQuote, quoteFieldFundamental, quoteFieldReference}},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +162,13 @@ func buildOptionTicket(ctx context.Context, c *client.Ref, rawSymbol string, opt
 	contracts := matchingTicketContracts(chain, expiration, putCall, opts.Strike)
 	if len(contracts) == 0 {
 		return nil, apperr.NewSymbolNotFoundError(
-			fmt.Sprintf("option contract not found for %s %s %.3f %s", symbol, expiration.Format("2006-01-02"), opts.Strike, putCall),
+			fmt.Sprintf(
+				"option contract not found for %s %s %.3f %s",
+				symbol,
+				expiration.Format("2006-01-02"),
+				opts.Strike,
+				putCall,
+			),
 			nil,
 		)
 	}
@@ -178,13 +193,18 @@ func optionTicketChainParams(expiration time.Time, putCall models.PutCall, strik
 		Strategy:               string(chainStrategySingle),
 		FromDate:               expirationDate,
 		ToDate:                 expirationDate,
-		IncludeUnderlyingQuote: "true",
+		IncludeUnderlyingQuote: annotationValueTrue,
 		Strike:                 strconv.FormatFloat(strike, 'f', -1, 64),
 	}
 }
 
 // matchingTicketContracts extracts the matching expiration and strike contracts from a chain response.
-func matchingTicketContracts(chain *models.OptionChain, expiration time.Time, putCall models.PutCall, strike float64) []*models.OptionContract {
+func matchingTicketContracts(
+	chain *models.OptionChain,
+	expiration time.Time,
+	putCall models.PutCall,
+	strike float64,
+) []*models.OptionContract {
 	if chain == nil {
 		return nil
 	}

@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// SchwabTime wraps time.Time with custom JSON unmarshaling to handle the
+// SchwabTime wraps [time.Time] with custom JSON unmarshaling to handle the
 // Schwab API's non-standard timestamp format. The API returns timestamps
 // like "2026-04-21T17:25:35+0000" which omits the colon in the timezone
 // offset, making it invalid RFC3339. This type tries RFC3339 first, then
@@ -18,7 +18,7 @@ type SchwabTime struct {
 // It differs from RFC3339 only in the timezone offset: +0000 instead of +00:00.
 const schwabTimeLayout = "2006-01-02T15:04:05-0700"
 
-// UnmarshalJSON implements json.Unmarshaler for SchwabTime.
+// UnmarshalJSON implements [json.Unmarshaler] for SchwabTime.
 func (st *SchwabTime) UnmarshalJSON(data []byte) error {
 	var raw string
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -45,7 +45,7 @@ func (st *SchwabTime) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON implements json.Marshaler for SchwabTime, using RFC3339 output.
+// MarshalJSON implements [json.Marshaler] for SchwabTime, using RFC3339 output.
 func (st SchwabTime) MarshalJSON() ([]byte, error) {
 	if st.IsZero() {
 		return json.Marshal(nil)

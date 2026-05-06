@@ -22,26 +22,68 @@ func TestBuyWithStopBuild(t *testing.T) {
 		wantOCOChildren bool
 	}{
 		{
-			name:          "limit entry with stop loss",
-			args:          []string{"buy-with-stop", "--symbol", "AAPL", "--quantity", "10", "--price", "150", "--stop-loss", "140"},
+			name: "limit entry with stop loss",
+			args: []string{
+				"buy-with-stop",
+				"--symbol",
+				"AAPL",
+				"--quantity",
+				"10",
+				"--price",
+				"150",
+				"--stop-loss",
+				"140",
+			},
 			wantOrderType: "LIMIT",
 			wantPrice:     true,
 		},
 		{
-			name:          "market entry with stop loss",
-			args:          []string{"buy-with-stop", "--symbol", "AAPL", "--quantity", "10", "--type", "MARKET", "--stop-loss", "140"},
+			name: "market entry with stop loss",
+			args: []string{
+				"buy-with-stop",
+				"--symbol",
+				"AAPL",
+				"--quantity",
+				"10",
+				"--type",
+				"MARKET",
+				"--stop-loss",
+				"140",
+			},
 			wantOrderType: "MARKET",
 		},
 		{
-			name:            "limit entry with stop loss and take profit",
-			args:            []string{"buy-with-stop", "--symbol", "AAPL", "--quantity", "10", "--price", "150", "--stop-loss", "140", "--take-profit", "170"},
+			name: "limit entry with stop loss and take profit",
+			args: []string{
+				"buy-with-stop",
+				"--symbol",
+				"AAPL",
+				"--quantity",
+				"10",
+				"--price",
+				"150",
+				"--stop-loss",
+				"140",
+				"--take-profit",
+				"170",
+			},
 			wantOrderType:   "LIMIT",
 			wantPrice:       true,
 			wantOCOChildren: true,
 		},
 		{
-			name:          "order type alias",
-			args:          []string{"buy-with-stop", "--symbol", "AAPL", "--quantity", "10", "--order-type", "MARKET", "--stop-loss", "140"},
+			name: "order type alias",
+			args: []string{
+				"buy-with-stop",
+				"--symbol",
+				"AAPL",
+				"--quantity",
+				"10",
+				"--order-type",
+				"MARKET",
+				"--stop-loss",
+				"140",
+			},
 			wantOrderType: "MARKET",
 		},
 	}
@@ -68,7 +110,7 @@ func TestBuyWithStopBuild(t *testing.T) {
 			assert.Equal(t, "TRIGGER", order["orderStrategyType"])
 			assert.Equal(t, "DAY", order["duration"])
 			if tt.wantPrice {
-				assert.Equal(t, 150.0, order["price"])
+				assert.InDelta(t, 150.0, order["price"], 0.001)
 			} else {
 				assert.NotContains(t, order, "price")
 			}
@@ -79,7 +121,7 @@ func TestBuyWithStopBuild(t *testing.T) {
 
 			entryLeg := legs[0].(map[string]any)
 			assert.Equal(t, "BUY", entryLeg["instruction"])
-			assert.Equal(t, 10.0, entryLeg["quantity"])
+			assert.InDelta(t, 10.0, entryLeg["quantity"], 0.001)
 
 			children, ok := order["childOrderStrategies"].([]any)
 			require.True(t, ok, "buy-with-stop should have childOrderStrategies")
@@ -88,8 +130,8 @@ func TestBuyWithStopBuild(t *testing.T) {
 			child := children[0].(map[string]any)
 			if tt.wantOCOChildren {
 				assert.Equal(t, "OCO", child["orderStrategyType"])
-				exits, ok := child["childOrderStrategies"].([]any)
-				require.True(t, ok, "take-profit plus stop-loss should create OCO exits")
+				exits, exitsOK := child["childOrderStrategies"].([]any)
+				require.True(t, exitsOK, "take-profit plus stop-loss should create OCO exits")
 				require.Len(t, exits, 2)
 				for _, exit := range exits {
 					exitOrder := exit.(map[string]any)
@@ -119,13 +161,33 @@ func TestBuyWithStopValidationErrors(t *testing.T) {
 			wantMsg: "stop-loss",
 		},
 		{
-			name:    "stop loss above price",
-			args:    []string{"buy-with-stop", "--symbol", "AAPL", "--quantity", "10", "--price", "150", "--stop-loss", "160"},
+			name: "stop loss above price",
+			args: []string{
+				"buy-with-stop",
+				"--symbol",
+				"AAPL",
+				"--quantity",
+				"10",
+				"--price",
+				"150",
+				"--stop-loss",
+				"160",
+			},
 			wantMsg: "stop-loss must be below entry price",
 		},
 		{
-			name:    "unsupported entry type",
-			args:    []string{"buy-with-stop", "--symbol", "AAPL", "--quantity", "10", "--type", "STOP", "--stop-loss", "140"},
+			name: "unsupported entry type",
+			args: []string{
+				"buy-with-stop",
+				"--symbol",
+				"AAPL",
+				"--quantity",
+				"10",
+				"--type",
+				"STOP",
+				"--stop-loss",
+				"140",
+			},
 			wantMsg: "only LIMIT and MARKET entry orders are supported",
 		},
 	}

@@ -24,13 +24,17 @@ type TransactionParams struct {
 //
 // The types parameter filters by transaction type (e.g. "TRADE", "DIVIDEND").
 // When not provided, no type filter is sent, which returns all types.
-func (c *Client) Transactions(ctx context.Context, hashValue string, params TransactionParams) ([]models.Transaction, error) {
+func (c *Client) Transactions(
+	ctx context.Context,
+	hashValue string,
+	params TransactionParams,
+) ([]models.Transaction, error) {
 	path := fmt.Sprintf("/trader/v1/accounts/%s/transactions", hashValue)
 
 	queryParams := make(map[string]string)
 	queryParams["startDate"], queryParams["endDate"] = defaultDateRange(params.StartDate, params.EndDate)
 	setParam(queryParams, "types", params.Types)
-	setParam(queryParams, "symbol", params.Symbol)
+	setParam(queryParams, queryParamSymbol, params.Symbol)
 
 	var result []models.Transaction
 	err := c.doGet(ctx, path, queryParams, &result)

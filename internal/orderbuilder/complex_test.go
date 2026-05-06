@@ -4,10 +4,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/models"
 )
 
 // TestBuildOCOOrderFullOCO verifies OCO → 2 SINGLE structure with both exits.
@@ -38,19 +39,19 @@ func TestBuildOCOOrderFullOCO(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeSingle, takeProfit.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeLimit, takeProfit.OrderType)
 	require.NotNil(t, takeProfit.Price)
-	assert.Equal(t, 160.0, *takeProfit.Price)
+	assert.InDelta(t, 160.0, *takeProfit.Price, 0.001)
 	require.Len(t, takeProfit.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionSell, takeProfit.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 100.0, takeProfit.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 100.0, takeProfit.OrderLegCollection[0].Quantity, 0.001)
 
 	stopLoss := order.ChildOrderStrategies[1]
 	assert.Equal(t, models.OrderStrategyTypeSingle, stopLoss.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeStop, stopLoss.OrderType)
 	require.NotNil(t, stopLoss.StopPrice)
-	assert.Equal(t, 140.0, *stopLoss.StopPrice)
+	assert.InDelta(t, 140.0, *stopLoss.StopPrice, 0.001)
 	require.Len(t, stopLoss.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionSell, stopLoss.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 100.0, stopLoss.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 100.0, stopLoss.OrderLegCollection[0].Quantity, 0.001)
 }
 
 // TestBuildOCOOrderStopLossOnly verifies standalone SINGLE stop structure.
@@ -73,10 +74,10 @@ func TestBuildOCOOrderStopLossOnly(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeStop, order.OrderType)
 	require.NotNil(t, order.StopPrice)
-	assert.Equal(t, 7.0, *order.StopPrice)
+	assert.InDelta(t, 7.0, *order.StopPrice, 0.001)
 	require.Len(t, order.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionSell, order.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 50.0, order.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 50.0, order.OrderLegCollection[0].Quantity, 0.001)
 	assert.Empty(t, order.ChildOrderStrategies)
 }
 
@@ -100,10 +101,10 @@ func TestBuildOCOOrderTakeProfitOnly(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 15.0, *order.Price)
+	assert.InDelta(t, 15.0, *order.Price, 0.001)
 	require.Len(t, order.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionSell, order.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 50.0, order.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 50.0, order.OrderLegCollection[0].Quantity, 0.001)
 	assert.Empty(t, order.ChildOrderStrategies)
 }
 
@@ -154,12 +155,12 @@ func TestBuildOCOOrderBuyToCloseShort(t *testing.T) {
 	takeProfit := order.ChildOrderStrategies[0]
 	assert.Equal(t, models.InstructionBuy, takeProfit.OrderLegCollection[0].Instruction)
 	require.NotNil(t, takeProfit.Price)
-	assert.Equal(t, 100.0, *takeProfit.Price)
+	assert.InDelta(t, 100.0, *takeProfit.Price, 0.001)
 
 	stopLoss := order.ChildOrderStrategies[1]
 	assert.Equal(t, models.InstructionBuy, stopLoss.OrderLegCollection[0].Instruction)
 	require.NotNil(t, stopLoss.StopPrice)
-	assert.Equal(t, 200.0, *stopLoss.StopPrice)
+	assert.InDelta(t, 200.0, *stopLoss.StopPrice, 0.001)
 }
 
 // TestBuildBracketOrderStopLossOnly verifies TRIGGER → SINGLE stop structure.
@@ -183,7 +184,7 @@ func TestBuildBracketOrderStopLossOnly(t *testing.T) {
 	// Arrange
 	assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 9.0, *order.Price)
+	assert.InDelta(t, 9.0, *order.Price, 0.001)
 
 	// Single SINGLE child (no OCO wrapper).
 	require.Len(t, order.ChildOrderStrategies, 1)
@@ -192,10 +193,10 @@ func TestBuildBracketOrderStopLossOnly(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeSingle, stopLoss.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeStop, stopLoss.OrderType)
 	require.NotNil(t, stopLoss.StopPrice)
-	assert.Equal(t, 7.0, *stopLoss.StopPrice)
+	assert.InDelta(t, 7.0, *stopLoss.StopPrice, 0.001)
 	require.Len(t, stopLoss.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionSell, stopLoss.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 1.0, stopLoss.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 1.0, stopLoss.OrderLegCollection[0].Quantity, 0.001)
 
 	// No nested children (no OCO).
 	assert.Empty(t, stopLoss.ChildOrderStrategies)
@@ -228,7 +229,7 @@ func TestBuildBracketOrderTakeProfitOnly(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeSingle, takeProfit.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeLimit, takeProfit.OrderType)
 	require.NotNil(t, takeProfit.Price)
-	assert.Equal(t, 15.0, *takeProfit.Price)
+	assert.InDelta(t, 15.0, *takeProfit.Price, 0.001)
 	require.Len(t, takeProfit.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionSell, takeProfit.OrderLegCollection[0].Instruction)
 
@@ -257,10 +258,10 @@ func TestBuildBracketOrderCreatesTriggerWithOCOChildren(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 150.0, *order.Price)
+	assert.InDelta(t, 150.0, *order.Price, 0.001)
 	require.Len(t, order.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 100.0, order.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 100.0, order.OrderLegCollection[0].Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeEquity, order.OrderLegCollection[0].Instrument.AssetType)
 	assert.Equal(t, "AAPL", order.OrderLegCollection[0].Instrument.Symbol)
 
@@ -277,19 +278,19 @@ func TestBuildBracketOrderCreatesTriggerWithOCOChildren(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeSingle, takeProfit.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeLimit, takeProfit.OrderType)
 	require.NotNil(t, takeProfit.Price)
-	assert.Equal(t, 160.0, *takeProfit.Price)
+	assert.InDelta(t, 160.0, *takeProfit.Price, 0.001)
 	require.Len(t, takeProfit.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionSell, takeProfit.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 100.0, takeProfit.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 100.0, takeProfit.OrderLegCollection[0].Quantity, 0.001)
 
 	stopLoss := ocoNode.ChildOrderStrategies[1]
 	assert.Equal(t, models.OrderStrategyTypeSingle, stopLoss.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeStop, stopLoss.OrderType)
 	require.NotNil(t, stopLoss.StopPrice)
-	assert.Equal(t, 140.0, *stopLoss.StopPrice)
+	assert.InDelta(t, 140.0, *stopLoss.StopPrice, 0.001)
 	require.Len(t, stopLoss.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionSell, stopLoss.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 100.0, stopLoss.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 100.0, stopLoss.OrderLegCollection[0].Quantity, 0.001)
 }
 
 // TestValidateFTSOrder verifies validation rules for first-triggers-second orders.
@@ -463,10 +464,10 @@ func TestBuildFTSOrderStructure(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeTrigger, order.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeLimit, order.OrderType)
 	require.NotNil(t, order.Price)
-	assert.Equal(t, 150.0, *order.Price)
+	assert.InDelta(t, 150.0, *order.Price, 0.001)
 	require.Len(t, order.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionBuy, order.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 100.0, order.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 100.0, order.OrderLegCollection[0].Quantity, 0.001)
 	assert.Equal(t, "AAPL", order.OrderLegCollection[0].Instrument.Symbol)
 
 	// Single SINGLE child (secondary order).
@@ -476,10 +477,10 @@ func TestBuildFTSOrderStructure(t *testing.T) {
 	assert.Equal(t, models.OrderStrategyTypeSingle, child.OrderStrategyType)
 	assert.Equal(t, models.OrderTypeStop, child.OrderType)
 	require.NotNil(t, child.StopPrice)
-	assert.Equal(t, 140.0, *child.StopPrice)
+	assert.InDelta(t, 140.0, *child.StopPrice, 0.001)
 	require.Len(t, child.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionSell, child.OrderLegCollection[0].Instruction)
-	assert.Equal(t, 100.0, child.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, 100.0, child.OrderLegCollection[0].Quantity, 0.001)
 
 	// No nested children.
 	assert.Empty(t, child.ChildOrderStrategies)
@@ -525,7 +526,7 @@ func TestBuildFTSOrderPreservesOriginalFields(t *testing.T) {
 	assert.Equal(t, models.DurationDay, child.Duration)
 	assert.Equal(t, models.OrderTypeLimit, child.OrderType)
 	require.NotNil(t, child.Price)
-	assert.Equal(t, 200.0, *child.Price)
+	assert.InDelta(t, 200.0, *child.Price, 0.001)
 }
 
 // TestBuildFTSOrderRejectsInvalidParams verifies BuildFTSOrder returns

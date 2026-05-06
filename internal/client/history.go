@@ -18,7 +18,7 @@ type HistoryParams struct {
 
 // historyParams builds the query parameter map from HistoryParams, including the symbol.
 func historyParams(symbol string, params *HistoryParams) map[string]string {
-	m := map[string]string{"symbol": symbol}
+	m := map[string]string{queryParamSymbol: symbol}
 	setParam(m, "periodType", params.PeriodType)
 	setParam(m, "period", params.Period)
 	setParam(m, "frequencyType", params.FrequencyType)

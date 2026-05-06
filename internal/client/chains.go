@@ -35,7 +35,7 @@ type ExpirationDate struct {
 
 // chainParams builds the query parameter map from ChainParams, including the symbol.
 func chainParams(symbol string, params *ChainParams) map[string]string {
-	m := map[string]string{"symbol": symbol}
+	m := map[string]string{queryParamSymbol: symbol}
 	setParam(m, "contractType", params.ContractType)
 	setParam(m, "strikeCount", params.StrikeCount)
 	setParam(m, "strategy", params.Strategy)
@@ -66,7 +66,7 @@ func (c *Client) OptionChain(ctx context.Context, symbol string, params *ChainPa
 
 // ExpirationChainForSymbol retrieves the expiration chain for a symbol.
 func (c *Client) ExpirationChainForSymbol(ctx context.Context, symbol string) (*ExpirationChain, error) {
-	params := map[string]string{"symbol": symbol}
+	params := map[string]string{queryParamSymbol: symbol}
 	var result ExpirationChain
 	err := c.doGet(ctx, "/marketdata/v1/expirationchain", params, &result)
 	if err != nil {

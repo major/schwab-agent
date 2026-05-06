@@ -43,7 +43,7 @@ func TestTransactions_Success(t *testing.T) {
 				NetAmount:   new(50.00),
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -75,7 +75,7 @@ func TestTransactions_WithTypeFilter(t *testing.T) {
 				Description: new("BUY 100 AAPL"),
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -106,7 +106,7 @@ func TestTransactions_WithDateFilters(t *testing.T) {
 				Description: new("BUY 100 AAPL"),
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -128,7 +128,7 @@ func TestTransactions_WithAllFilters(t *testing.T) {
 		assert.Equal(t, "2024-01-31", query.Get("endDate"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode([]models.Transaction{}))
+		assert.NoError(t, json.NewEncoder(w).Encode([]models.Transaction{}))
 	}))
 	defer srv.Close()
 
@@ -171,7 +171,7 @@ func TestTransaction_Success(t *testing.T) {
 			Description: new("BUY 100 AAPL"),
 			NetAmount:   new(-15000.00),
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -182,7 +182,7 @@ func TestTransaction_Success(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, int64(1001), *result.ActivityID)
 	assert.Equal(t, "BUY 100 AAPL", *result.Description)
-	assert.Equal(t, -15000.00, *result.NetAmount)
+	assert.InDelta(t, -15000.00, *result.NetAmount, 0.001)
 }
 
 func TestTransaction_WithComplexData(t *testing.T) {
@@ -215,7 +215,7 @@ func TestTransaction_WithComplexData(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -229,14 +229,14 @@ func TestTransaction_WithComplexData(t *testing.T) {
 	assert.Equal(t, "2024-01-17", *result.SettlementDate)
 	require.Len(t, result.TransferItems, 1)
 	assert.Equal(t, "AAPL", *result.TransferItems[0].Instrument.Symbol)
-	assert.Equal(t, 100.0, *result.TransferItems[0].Position)
+	assert.InDelta(t, 100.0, *result.TransferItems[0].Position, 0.001)
 }
 
 func TestTransaction_BearerTokenAuth(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "Bearer my-secret-token", r.Header.Get("Authorization"))
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.Transaction{}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.Transaction{}))
 	}))
 	defer srv.Close()
 
@@ -250,7 +250,7 @@ func TestTransactions_BearerTokenAuth(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "Bearer my-secret-token", r.Header.Get("Authorization"))
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode([]models.Transaction{}))
+		assert.NoError(t, json.NewEncoder(w).Encode([]models.Transaction{}))
 	}))
 	defer srv.Close()
 

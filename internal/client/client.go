@@ -9,15 +9,15 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"mime"
 	"net/http"
 	"net/url"
 	"time"
 
-	"github.com/major/schwab-agent/internal/apperr"
 	"resty.dev/v3"
+
+	"github.com/major/schwab-agent/internal/apperr"
 )
 
 const (
@@ -38,6 +38,8 @@ const (
 	// defaultUserAgent identifies this client to the Schwab API. Overridden at
 	// build time via WithUserAgent to include the real version from ldflags.
 	defaultUserAgent = "schwab-agent/dev"
+
+	unexpectedContentTypePreviewBytes = 200
 )
 
 // Ref holds a lazily-populated reference to a Client. Command constructors
@@ -68,7 +70,7 @@ func NewClient(token string, opts ...Option) *Client {
 		resty:     rc,
 		token:     token,
 		userAgent: defaultUserAgent,
-		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		logger:    slog.New(slog.DiscardHandler),
 	}
 	rc.SetBaseURL(defaultBaseURL)
 	rc.SetTimeout(defaultTimeout)
@@ -143,13 +145,13 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 		return fmt.Errorf("execute request: %w", err)
 	}
 
-	c.logger.Debug("http request", "method", method, "path", path, "status", resp.StatusCode())
+	c.logger.DebugContext(ctx, "http request", "method", method, "path", path, "status", resp.StatusCode())
 
 	// Map non-2xx status codes to typed errors.
 	if resp.StatusCode() == http.StatusUnauthorized {
 		return apperr.NewAuthExpiredError("authentication expired", nil)
 	}
-	if resp.StatusCode() >= 400 {
+	if resp.StatusCode() >= http.StatusBadRequest {
 		return apperr.NewHTTPError(
 			fmt.Sprintf("HTTP %d", resp.StatusCode()),
 			resp.StatusCode(),
@@ -163,34 +165,36 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 
 	// Decode JSON response if a result target was provided and there is a body.
 	respBody := resp.Bytes()
-	if result != nil && len(respBody) > 0 {
-		// Validate Content-Type before attempting JSON decode. Without this,
-		// an HTML error page from a proxy or maintenance window produces a
-		// cryptic json.Unmarshal error instead of a clear diagnostic.
-		ct := resp.Header().Get("Content-Type")
-		if ct != "" {
-			mediaType, _, err := mime.ParseMediaType(ct)
-			if err == nil && mediaType != "application/json" {
-				// Show a body preview so the caller can see what came back
-				// (e.g., an HTML maintenance page or a proxy error).
-				preview := resp.String()
-				if len(preview) > 200 {
-					preview = preview[:200] + "..."
-				}
-				return fmt.Errorf("unexpected Content-Type %q (expected application/json): %s", ct, preview)
-			}
-		}
+	if result == nil || len(respBody) == 0 {
+		return nil
+	}
 
-		if err := json.Unmarshal(respBody, result); err != nil {
-			return fmt.Errorf("decode response: %w", err)
+	// Validate Content-Type before attempting JSON decode. Without this,
+	// an HTML error page from a proxy or maintenance window produces a
+	// cryptic json.Unmarshal error instead of a clear diagnostic.
+	ct := resp.Header().Get("Content-Type")
+	if ct != "" {
+		mediaType, _, parseErr := mime.ParseMediaType(ct)
+		if parseErr == nil && mediaType != "application/json" {
+			// Show a body preview so the caller can see what came back
+			// (e.g., an HTML maintenance page or a proxy error).
+			preview := resp.String()
+			if len(preview) > unexpectedContentTypePreviewBytes {
+				preview = preview[:unexpectedContentTypePreviewBytes] + "..."
+			}
+			return fmt.Errorf("unexpected Content-Type %q (expected application/json): %s", ct, preview)
 		}
+	}
+
+	if unmarshalErr := json.Unmarshal(respBody, result); unmarshalErr != nil {
+		return fmt.Errorf("decode response: %w", unmarshalErr)
 	}
 
 	return nil
 }
 
 // doGet performs a GET request with optional query parameters.
-// Values are percent-encoded via url.Values to handle special characters safely.
+// Values are percent-encoded via [url.Values] to handle special characters safely.
 func (c *Client) doGet(ctx context.Context, path string, params map[string]string, result any) error {
 	if len(params) > 0 {
 		q := url.Values{}

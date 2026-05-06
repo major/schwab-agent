@@ -1,14 +1,13 @@
 package orderbuilder
 
 import (
-	"errors"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestValidateBuyWithStopOrder verifies buy-with-stop input validation without
@@ -187,7 +186,7 @@ func TestValidateBuyWithStopOrder(t *testing.T) {
 
 			require.Error(t, err)
 			var validationErr *apperr.ValidationError
-			require.True(t, errors.As(err, &validationErr))
+			require.ErrorAs(t, err, &validationErr)
 			assert.Contains(t, validationErr.Error(), tt.wantMessage)
 		})
 	}
@@ -327,7 +326,16 @@ func TestBuildBuyWithStopOrder(t *testing.T) {
 			// Assert
 			require.NoError(t, err)
 			require.NotNil(t, order)
-			assertBuyWithStopEntry(t, order, &tt.params, tt.wantEntryType, tt.wantEntryDuration, tt.wantSession, tt.wantPrice, tt.wantPriceSet)
+			assertBuyWithStopEntry(
+				t,
+				order,
+				&tt.params,
+				tt.wantEntryType,
+				tt.wantEntryDuration,
+				tt.wantSession,
+				tt.wantPrice,
+				tt.wantPriceSet,
+			)
 
 			if tt.wantOCO {
 				assertBuyWithStopOCOExits(t, order, &tt.params, tt.wantSession)
@@ -360,13 +368,13 @@ func assertBuyWithStopEntry(
 		assert.Nil(t, order.Price)
 	} else {
 		require.NotNil(t, order.Price)
-		assert.Equal(t, wantPrice, *order.Price)
+		assert.InDelta(t, wantPrice, *order.Price, 0.001)
 	}
 
 	require.Len(t, order.OrderLegCollection, 1)
 	entryLeg := order.OrderLegCollection[0]
 	assert.Equal(t, models.InstructionBuy, entryLeg.Instruction)
-	assert.Equal(t, params.Quantity, entryLeg.Quantity)
+	assert.InDelta(t, params.Quantity, entryLeg.Quantity, 0.001)
 	assert.Equal(t, models.AssetTypeEquity, entryLeg.Instrument.AssetType)
 	assert.Equal(t, params.Symbol, entryLeg.Instrument.Symbol)
 }
@@ -384,7 +392,7 @@ func assertBuyWithStopSingleStopExit(
 	assertBuyWithStopExitCommon(t, &stopLoss, wantSession, params.Quantity)
 	assert.Equal(t, models.OrderTypeStop, stopLoss.OrderType)
 	require.NotNil(t, stopLoss.StopPrice)
-	assert.Equal(t, params.StopLoss, *stopLoss.StopPrice)
+	assert.InDelta(t, params.StopLoss, *stopLoss.StopPrice, 0.001)
 	assert.Empty(t, stopLoss.ChildOrderStrategies)
 }
 
@@ -405,16 +413,21 @@ func assertBuyWithStopOCOExits(
 	assertBuyWithStopExitCommon(t, &takeProfit, wantSession, params.Quantity)
 	assert.Equal(t, models.OrderTypeLimit, takeProfit.OrderType)
 	require.NotNil(t, takeProfit.Price)
-	assert.Equal(t, params.TakeProfit, *takeProfit.Price)
+	assert.InDelta(t, params.TakeProfit, *takeProfit.Price, 0.001)
 
 	stopLoss := oco.ChildOrderStrategies[1]
 	assertBuyWithStopExitCommon(t, &stopLoss, wantSession, params.Quantity)
 	assert.Equal(t, models.OrderTypeStop, stopLoss.OrderType)
 	require.NotNil(t, stopLoss.StopPrice)
-	assert.Equal(t, params.StopLoss, *stopLoss.StopPrice)
+	assert.InDelta(t, params.StopLoss, *stopLoss.StopPrice, 0.001)
 }
 
-func assertBuyWithStopExitCommon(t *testing.T, order *models.OrderRequest, wantSession models.Session, wantQuantity float64) {
+func assertBuyWithStopExitCommon(
+	t *testing.T,
+	order *models.OrderRequest,
+	wantSession models.Session,
+	wantQuantity float64,
+) {
 	t.Helper()
 
 	assert.Equal(t, models.OrderStrategyTypeSingle, order.OrderStrategyType)
@@ -422,7 +435,7 @@ func assertBuyWithStopExitCommon(t *testing.T, order *models.OrderRequest, wantS
 	assert.Equal(t, wantSession, order.Session)
 	require.Len(t, order.OrderLegCollection, 1)
 	assert.Equal(t, models.InstructionSell, order.OrderLegCollection[0].Instruction)
-	assert.Equal(t, wantQuantity, order.OrderLegCollection[0].Quantity)
+	assert.InDelta(t, wantQuantity, order.OrderLegCollection[0].Quantity, 0.001)
 }
 
 // TestValidateBuyWithStopOrderRejectsStopTypes is a narrow regression check for
@@ -444,7 +457,7 @@ func TestValidateBuyWithStopOrderRejectsStopTypes(t *testing.T) {
 			})
 
 			require.Error(t, err)
-			assert.True(t, strings.Contains(err.Error(), "only LIMIT and MARKET"))
+			assert.Contains(t, err.Error(), "only LIMIT and MARKET")
 		})
 	}
 }

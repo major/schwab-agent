@@ -75,8 +75,8 @@ func TestPositionListSingleAccount(t *testing.T) {
 	assert.Equal(t, "12345", pos["accountNumber"])
 	assert.Equal(t, "HASH123", pos["accountHash"])
 	assert.Equal(t, "My IRA", pos["accountNickName"])
-	assert.Equal(t, 15000.0, pos["totalCostBasis"]) // 150 * 100
-	assert.Equal(t, 1000.0, pos["unrealizedPnL"])   // longOpenProfitLoss only
+	assert.InDelta(t, 15000.0, pos["totalCostBasis"], 0.001) // 150 * 100
+	assert.InDelta(t, 1000.0, pos["unrealizedPnL"], 0.001)   // longOpenProfitLoss only
 
 	// Verify instrument came through.
 	inst, ok := pos["instrument"].(map[string]any)
@@ -213,7 +213,7 @@ func TestPositionListAllAccounts(t *testing.T) {
 	// Third position: short TSLA in account 22222
 	pos2 := positions[2].(map[string]any)
 	assert.Equal(t, "22222", pos2["accountNumber"])
-	assert.Equal(t, -500.0, pos2["unrealizedPnL"])
+	assert.InDelta(t, -500.0, pos2["unrealizedPnL"], 0.001)
 
 	inst2, ok := pos2["instrument"].(map[string]any)
 	require.True(t, ok)
@@ -348,7 +348,7 @@ func TestPositionListRequestsPositionsField(t *testing.T) {
 			capturedFields = r.URL.Query().Get("fields")
 
 			w.Header().Set("Content-Type", "application/json")
-			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"securitiesAccount": map[string]any{
 					"type":          "MARGIN",
 					"accountNumber": "12345",
@@ -356,7 +356,7 @@ func TestPositionListRequestsPositionsField(t *testing.T) {
 			}))
 		case "/trader/v1/userPreference":
 			w.Header().Set("Content-Type", "application/json")
-			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"accounts": []any{}}))
+			assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{"accounts": []any{}}))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -418,14 +418,14 @@ func TestPositionListComputedFieldsInOutput(t *testing.T) {
 	pos, ok := positions[0].(map[string]any)
 	require.True(t, ok, "expected position to be map[string]any")
 
-	assert.Equal(t, 15000.0, pos["totalCostBasis"])                   // 150 * 100
-	assert.Equal(t, 1500.0, pos["unrealizedPnL"])                     // longOpenProfitLoss
+	assert.InDelta(t, 15000.0, pos["totalCostBasis"], 0.001)          // 150 * 100
+	assert.InDelta(t, 1500.0, pos["unrealizedPnL"], 0.001)            // longOpenProfitLoss
 	assert.InDelta(t, 10.0, pos["unrealizedPnLPct"].(float64), 0.001) // 1500/15000*100
 
 	// Original API fields should still be present.
-	assert.Equal(t, 100.0, pos["longQuantity"])
-	assert.Equal(t, 150.0, pos["averagePrice"])
-	assert.Equal(t, 16500.0, pos["marketValue"])
+	assert.InDelta(t, 100.0, pos["longQuantity"], 0.001)
+	assert.InDelta(t, 150.0, pos["averagePrice"], 0.001)
+	assert.InDelta(t, 16500.0, pos["marketValue"], 0.001)
 }
 
 func TestPositionListFiltersSymbolsAndSortsByValue(t *testing.T) {
@@ -532,7 +532,20 @@ func TestPositionListFiltersPnLAndSortsAscending(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewPositionCmd(c, configPath, &buf)
 
-	_, err := runTestCommand(t, cmd, "list", "--account", "HASH123", "--losers-only", "--min-pnl", "-600", "--max-pnl", "-100", "--sort", "pnl-asc")
+	_, err := runTestCommand(
+		t,
+		cmd,
+		"list",
+		"--account",
+		"HASH123",
+		"--losers-only",
+		"--min-pnl",
+		"-600",
+		"--max-pnl",
+		"-100",
+		"--sort",
+		"pnl-asc",
+	)
 	require.NoError(t, err)
 
 	env := decodeAccountEnvelope(t, buf.Bytes())
@@ -541,9 +554,9 @@ func TestPositionListFiltersPnLAndSortsAscending(t *testing.T) {
 	positions := positionListFromEnvelope(t, env.Data)
 	require.Len(t, positions, 2)
 	assert.Equal(t, "TSLA", positionSymbol(t, positions[0]))
-	assert.Equal(t, -500.0, positions[0]["unrealizedPnL"])
+	assert.InDelta(t, -500.0, positions[0]["unrealizedPnL"], 0.001)
 	assert.Equal(t, "MSFT", positionSymbol(t, positions[1]))
-	assert.Equal(t, -250.0, positions[1]["unrealizedPnL"])
+	assert.InDelta(t, -250.0, positions[1]["unrealizedPnL"], 0.001)
 }
 
 func TestPositionListRejectsInvalidPnLRange(t *testing.T) {
@@ -578,8 +591,8 @@ func positionListFromEnvelope(t *testing.T, data any) []map[string]any {
 
 	positions := make([]map[string]any, 0, len(positionsRaw))
 	for _, raw := range positionsRaw {
-		position, ok := raw.(map[string]any)
-		require.True(t, ok, "expected position to be map[string]any")
+		position, positionOK := raw.(map[string]any)
+		require.True(t, positionOK, "expected position to be map[string]any")
 		positions = append(positions, position)
 	}
 
@@ -597,22 +610,32 @@ func positionSymbol(t *testing.T, position map[string]any) string {
 	return symbol
 }
 
+func testFloatPtr(v float64) *float64 {
+	value := v
+	return &value
+}
+
+func testStringPtr(v string) *string {
+	value := v
+	return &value
+}
+
 func TestComputePositionFields(t *testing.T) {
 	t.Run("long position with P&L", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice:       &testFloat150,
-				LongQuantity:       &testFloat100,
-				LongOpenProfitLoss: &testFloat1000,
+				AveragePrice:       testFloatPtr(150),
+				LongQuantity:       testFloatPtr(100),
+				LongOpenProfitLoss: testFloatPtr(1000),
 			},
 		}
 		computePositionFields(&entry)
 
 		require.NotNil(t, entry.TotalCostBasis)
-		assert.Equal(t, 15000.0, *entry.TotalCostBasis)
+		assert.InDelta(t, 15000.0, *entry.TotalCostBasis, 0.001)
 
 		require.NotNil(t, entry.UnrealizedPnL)
-		assert.Equal(t, 1000.0, *entry.UnrealizedPnL)
+		assert.InDelta(t, 1000.0, *entry.UnrealizedPnL, 0.001)
 
 		require.NotNil(t, entry.UnrealizedPnLPct)
 		assert.InDelta(t, 6.6667, *entry.UnrealizedPnLPct, 0.001)
@@ -621,18 +644,18 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("short position with P&L", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice:        &testFloat300,
-				ShortQuantity:       &testFloat10,
-				ShortOpenProfitLoss: &testFloatNeg500,
+				AveragePrice:        testFloatPtr(300),
+				ShortQuantity:       testFloatPtr(10),
+				ShortOpenProfitLoss: testFloatPtr(-500),
 			},
 		}
 		computePositionFields(&entry)
 
 		require.NotNil(t, entry.TotalCostBasis)
-		assert.Equal(t, 3000.0, *entry.TotalCostBasis)
+		assert.InDelta(t, 3000.0, *entry.TotalCostBasis, 0.001)
 
 		require.NotNil(t, entry.UnrealizedPnL)
-		assert.Equal(t, -500.0, *entry.UnrealizedPnL)
+		assert.InDelta(t, -500.0, *entry.UnrealizedPnL, 0.001)
 
 		require.NotNil(t, entry.UnrealizedPnLPct)
 		assert.InDelta(t, -16.6667, *entry.UnrealizedPnLPct, 0.001)
@@ -641,20 +664,20 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("both long and short P&L", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice:        &testFloat100,
-				LongQuantity:        &testFloat50,
-				ShortQuantity:       &testFloat10,
-				LongOpenProfitLoss:  &testFloat500,
-				ShortOpenProfitLoss: &testFloatNeg200,
+				AveragePrice:        testFloatPtr(100),
+				LongQuantity:        testFloatPtr(50),
+				ShortQuantity:       testFloatPtr(10),
+				LongOpenProfitLoss:  testFloatPtr(500),
+				ShortOpenProfitLoss: testFloatPtr(-200),
 			},
 		}
 		computePositionFields(&entry)
 
 		require.NotNil(t, entry.TotalCostBasis)
-		assert.Equal(t, 6000.0, *entry.TotalCostBasis) // 100 * (50 + 10)
+		assert.InDelta(t, 6000.0, *entry.TotalCostBasis, 0.001) // 100 * (50 + 10)
 
 		require.NotNil(t, entry.UnrealizedPnL)
-		assert.Equal(t, 300.0, *entry.UnrealizedPnL) // 500 + (-200)
+		assert.InDelta(t, 300.0, *entry.UnrealizedPnL, 0.001) // 500 + (-200)
 
 		require.NotNil(t, entry.UnrealizedPnLPct)
 		assert.InDelta(t, 5.0, *entry.UnrealizedPnLPct, 0.001) // 300/6000*100
@@ -663,15 +686,15 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("nil averagePrice skips cost basis", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				LongQuantity:       &testFloat100,
-				LongOpenProfitLoss: &testFloat500,
+				LongQuantity:       testFloatPtr(100),
+				LongOpenProfitLoss: testFloatPtr(500),
 			},
 		}
 		computePositionFields(&entry)
 
 		assert.Nil(t, entry.TotalCostBasis)
 		require.NotNil(t, entry.UnrealizedPnL)
-		assert.Equal(t, 500.0, *entry.UnrealizedPnL)
+		assert.InDelta(t, 500.0, *entry.UnrealizedPnL, 0.001)
 		// No P&L pct because no cost basis.
 		assert.Nil(t, entry.UnrealizedPnLPct)
 	})
@@ -679,7 +702,7 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("zero quantity skips cost basis", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice: &testFloat150,
+				AveragePrice: testFloatPtr(150),
 				// No quantity fields set (both nil, default to 0).
 			},
 		}
@@ -691,14 +714,14 @@ func TestComputePositionFields(t *testing.T) {
 	t.Run("no P&L fields", func(t *testing.T) {
 		entry := positionEntry{
 			Position: models.Position{
-				AveragePrice: &testFloat150,
-				LongQuantity: &testFloat100,
+				AveragePrice: testFloatPtr(150),
+				LongQuantity: testFloatPtr(100),
 			},
 		}
 		computePositionFields(&entry)
 
 		require.NotNil(t, entry.TotalCostBasis)
-		assert.Equal(t, 15000.0, *entry.TotalCostBasis)
+		assert.InDelta(t, 15000.0, *entry.TotalCostBasis, 0.001)
 		assert.Nil(t, entry.UnrealizedPnL)
 		assert.Nil(t, entry.UnrealizedPnLPct)
 	})
@@ -713,40 +736,20 @@ func TestComputePositionFields(t *testing.T) {
 	})
 }
 
-var (
-	testFloat5      = 5.0
-	testFloat10     = 10.0
-	testFloat50     = 50.0
-	testFloat100    = 100.0
-	testFloat150    = 150.0
-	testFloat200    = 200.0
-	testFloat300    = 300.0
-	testFloat500    = 500.0
-	testFloat1000   = 1000.0
-	testFloatNeg200 = -200.0
-	testFloatNeg500 = -500.0
-
-	testString11111   = "11111"
-	testString22222   = "22222"
-	testStringAAPL    = "AAPL"
-	testStringTSLA    = "TSLA"
-	testStringTrading = "Trading"
-)
-
 func TestFlattenAccountPositions(t *testing.T) {
 	accounts := []models.Account{
 		{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				AccountNumber: &testString11111,
+				AccountNumber: testStringPtr("11111"),
 				Positions: []models.Position{
 					{
-						LongQuantity: &testFloat100,
-						AveragePrice: &testFloat50,
-						Instrument:   &models.AccountsInstrument{Symbol: &testStringAAPL},
+						LongQuantity: testFloatPtr(100),
+						AveragePrice: testFloatPtr(50),
+						Instrument:   &models.AccountsInstrument{Symbol: testStringPtr("AAPL")},
 					},
 				},
 			},
-			NickName: &testStringTrading,
+			NickName: testStringPtr("Trading"),
 		},
 		{
 			// Account with no SecuritiesAccount: should be skipped.
@@ -754,12 +757,12 @@ func TestFlattenAccountPositions(t *testing.T) {
 		},
 		{
 			SecuritiesAccount: &models.SecuritiesAccount{
-				AccountNumber: &testString22222,
+				AccountNumber: testStringPtr("22222"),
 				Positions: []models.Position{
 					{
-						ShortQuantity: &testFloat5,
-						AveragePrice:  &testFloat200,
-						Instrument:    &models.AccountsInstrument{Symbol: &testStringTSLA},
+						ShortQuantity: testFloatPtr(5),
+						AveragePrice:  testFloatPtr(200),
+						Instrument:    &models.AccountsInstrument{Symbol: testStringPtr("TSLA")},
 					},
 				},
 			},

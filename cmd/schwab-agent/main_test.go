@@ -55,7 +55,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-// runApp builds and executes the root command without allowing Cobra to call os.Exit.
+// runApp builds and executes the root command without allowing Cobra to call [os.Exit].
 func runApp(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
@@ -212,7 +212,11 @@ func TestBeforeHook_ReturnsAuthRequiredErrorForMissingConfig(t *testing.T) {
 	var authErr *apperr.AuthRequiredError
 	require.ErrorAs(t, err, &authErr)
 	assert.Equal(t, "AUTH_REQUIRED", apperr.ErrorCode(err))
-	assert.Equal(t, "Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file", authErr.Message)
+	assert.Equal(
+		t,
+		"Missing required credentials: set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET env vars, or add client_id and client_secret to the config file",
+		authErr.Message,
+	)
 	assert.Equal(t, "Run `schwab-agent auth login` to authenticate", authErr.Details())
 	assert.Equal(t, 3, apperr.ExitCodeFor(err))
 }
@@ -222,7 +226,14 @@ func TestBeforeHook_ReturnsValidationErrorForInvalidBaseURLConfig(t *testing.T) 
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	configPath := filepath.Join(tmpDir, "invalid-config.json")
-	require.NoError(t, os.WriteFile(configPath, []byte(`{"client_id":"test-client","client_secret":"test-secret","base_url":"://bad"}`), 0o600))
+	require.NoError(
+		t,
+		os.WriteFile(
+			configPath,
+			[]byte(`{"client_id":"test-client","client_secret":"test-secret","base_url":"://bad"}`),
+			0o600,
+		),
+	)
 
 	_, err := runApp(t, "schwab-agent", "--config", configPath, "account")
 	require.Error(t, err)
@@ -310,7 +321,11 @@ func TestBeforeHook_RefreshesExpiredToken(t *testing.T) {
 			refreshCalls.Add(1)
 			assert.Equal(t, http.MethodPost, r.Method)
 			assert.Equal(t, "Basic dGVzdC1jbGllbnQ6dGVzdC1zZWNyZXQ=", r.Header.Get("Authorization"))
-			_, _ = w.Write([]byte(`{"access_token":"fresh-access-token","token_type":"Bearer","expires_in":1800,"refresh_token":"refresh-token","scope":"api"}`))
+			_, _ = w.Write(
+				[]byte(
+					`{"access_token":"fresh-access-token","token_type":"Bearer","expires_in":1800,"refresh_token":"refresh-token","scope":"api"}`,
+				),
+			)
 		case "/trader/v1/accounts/accountNumbers":
 			assert.Equal(t, "Bearer fresh-access-token", r.Header.Get("Authorization"))
 			w.Header().Set("Content-Type", "application/json")
@@ -327,14 +342,24 @@ func TestBeforeHook_RefreshesExpiredToken(t *testing.T) {
 		return client.NewClient(token, client.WithBaseURL(server.URL))
 	}
 
-	_, err := runAppWithDeps(t, deps, "schwab-agent", "--config", configPath, "--token", tokenPath, "account", "numbers")
+	_, err := runAppWithDeps(
+		t,
+		deps,
+		"schwab-agent",
+		"--config",
+		configPath,
+		"--token",
+		tokenPath,
+		"account",
+		"numbers",
+	)
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), refreshCalls.Load())
 
 	refreshed, loadErr := auth.LoadToken(tokenPath)
 	require.NoError(t, loadErr)
 	assert.Equal(t, "fresh-access-token", refreshed.Token.AccessToken)
-	assert.True(t, refreshed.Token.ExpiresAt > float64(time.Now().Unix()))
+	assert.Greater(t, refreshed.Token.ExpiresAt, float64(time.Now().Unix()))
 }
 
 func TestBeforeHook_UsesConfiguredProxyForRefreshAndAPIRequests(t *testing.T) {
@@ -360,7 +385,11 @@ func TestBeforeHook_UsesConfiguredProxyForRefreshAndAPIRequests(t *testing.T) {
 			refreshCalls.Add(1)
 			assert.Equal(t, http.MethodPost, r.Method)
 			assert.Equal(t, "Basic dGVzdC1jbGllbnQ6dGVzdC1zZWNyZXQ=", r.Header.Get("Authorization"))
-			_, _ = w.Write([]byte(`{"access_token":"fresh-access-token","token_type":"Bearer","expires_in":1800,"refresh_token":"refresh-token","scope":"api"}`))
+			_, _ = w.Write(
+				[]byte(
+					`{"access_token":"fresh-access-token","token_type":"Bearer","expires_in":1800,"refresh_token":"refresh-token","scope":"api"}`,
+				),
+			)
 		case "/proxy/trader/v1/accounts/accountNumbers":
 			assert.Equal(t, "Bearer fresh-access-token", r.Header.Get("Authorization"))
 			w.Header().Set("Content-Type", "application/json")
@@ -379,14 +408,24 @@ func TestBeforeHook_UsesConfiguredProxyForRefreshAndAPIRequests(t *testing.T) {
 		BaseURLInsecure: true,
 	}))
 
-	_, err := runAppWithDeps(t, commands.DefaultRootDeps(), "schwab-agent", "--config", configPath, "--token", tokenPath, "account", "numbers")
+	_, err := runAppWithDeps(
+		t,
+		commands.DefaultRootDeps(),
+		"schwab-agent",
+		"--config",
+		configPath,
+		"--token",
+		tokenPath,
+		"account",
+		"numbers",
+	)
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), refreshCalls.Load())
 
 	refreshed, loadErr := auth.LoadToken(tokenPath)
 	require.NoError(t, loadErr)
 	assert.Equal(t, "fresh-access-token", refreshed.Token.AccessToken)
-	assert.True(t, refreshed.Token.ExpiresAt > float64(time.Now().Unix()))
+	assert.Greater(t, refreshed.Token.ExpiresAt, float64(time.Now().Unix()))
 }
 
 func freshToken() *auth.TokenFile {
@@ -416,10 +455,18 @@ func TestIntegration_ValidToken_QuoteGet(t *testing.T) {
 		switch {
 		case r.URL.Path == "/marketdata/v1/AAPL/quotes":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","bidPrice":150.0,"askPrice":151.0,"lastPrice":150.5,"totalVolume":1000000}}`))
+			_, _ = w.Write(
+				[]byte(
+					`{"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","bidPrice":150.0,"askPrice":151.0,"lastPrice":150.5,"totalVolume":1000000}}`,
+				),
+			)
 		case r.URL.Path == "/marketdata/v1/quotes" && r.URL.Query().Get("symbols") == "AAPL":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","bidPrice":150.0,"askPrice":151.0,"lastPrice":150.5,"totalVolume":1000000}}`))
+			_, _ = w.Write(
+				[]byte(
+					`{"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","bidPrice":150.0,"askPrice":151.0,"lastPrice":150.5,"totalVolume":1000000}}`,
+				),
+			)
 		default:
 			http.NotFound(w, r)
 		}
@@ -431,7 +478,18 @@ func TestIntegration_ValidToken_QuoteGet(t *testing.T) {
 		return client.NewClient(token, client.WithBaseURL(server.URL))
 	}
 
-	stdout, err := runAppWithDeps(t, deps, "schwab-agent", "--config", configPath, "--token", tokenPath, "quote", "get", "AAPL")
+	stdout, err := runAppWithDeps(
+		t,
+		deps,
+		"schwab-agent",
+		"--config",
+		configPath,
+		"--token",
+		tokenPath,
+		"quote",
+		"get",
+		"AAPL",
+	)
 	require.NoError(t, err)
 	assert.Contains(t, stdout, `"data"`)
 	assert.Contains(t, stdout, `"AAPL"`)
@@ -514,5 +572,3 @@ func TestBuildApp_VersionFlag(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "dev")
 }
-
-

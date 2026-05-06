@@ -8,17 +8,18 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/client"
-	"github.com/major/schwab-agent/internal/models"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/client"
+	"github.com/major/schwab-agent/internal/models"
 )
 
 type defineAndConstrainTestOpts struct {
 	Call bool `flag:"call" flagdescr:"Call option"`
-	Put  bool `flag:"put" flagdescr:"Put option"`
+	Put  bool `flag:"put"  flagdescr:"Put option"`
 }
 
 type flagValidationTestOpts struct {
@@ -26,13 +27,13 @@ type flagValidationTestOpts struct {
 }
 
 type cobraFlagCoverageOpts struct {
-	Symbol   string           `flag:"symbol" flagdescr:"Symbol" flagshort:"s" default:"AAPL"`
-	Count    int              `flag:"count" flagdescr:"Count" default:"3"`
-	Price    float64          `flag:"price" flagdescr:"Price" default:"1.25"`
-	Enabled  bool             `flag:"enabled" flagdescr:"Enabled" default:"true"`
-	Fields   []string         `flag:"field" flagdescr:"Field"`
-	Duration models.Duration  `flag:"duration" flagdescr:"Duration" default:"DAY"`
-	Type     models.OrderType `flag:"type" flagdescr:"Order type"`
+	Symbol   string           `flag:"symbol"   flagdescr:"Symbol"     flagshort:"s" default:"AAPL"`
+	Count    int              `flag:"count"    flagdescr:"Count"                    default:"3"`
+	Price    float64          `flag:"price"    flagdescr:"Price"                    default:"1.25"`
+	Enabled  bool             `flag:"enabled"  flagdescr:"Enabled"                  default:"true"`
+	Fields   []string         `flag:"field"    flagdescr:"Field"`
+	Duration models.Duration  `flag:"duration" flagdescr:"Duration"                 default:"DAY"`
+	Type     models.OrderType `flag:"type"     flagdescr:"Order type"`
 }
 
 type requiredCobraFlagOpts struct {
@@ -77,7 +78,7 @@ func testClient(t *testing.T, server *httptest.Server) *client.Ref {
 	return &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
 }
 
-// jsonServer returns an httptest.Server that always responds with the given JSON body.
+// jsonServer returns an [httptest.Server] that always responds with the given JSON body.
 func jsonServer(body string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -293,11 +294,23 @@ func TestDefineCobraFlags(t *testing.T) {
 		// Assert defaults are applied before Cobra executes so handlers can read opts directly.
 		assert.Equal(t, "AAPL", opts.Symbol)
 		assert.Equal(t, 3, opts.Count)
-		assert.Equal(t, 1.25, opts.Price)
+		assert.InDelta(t, 1.25, opts.Price, 0.001)
 		assert.True(t, opts.Enabled)
 		assert.Equal(t, models.DurationDay, opts.Duration)
 		require.NotNil(t, cmd.Flags().Lookup("duration"))
-		assert.Equal(t, []string{"DAY", "END_OF_MONTH", "END_OF_WEEK", "FILL_OR_KILL", "GOOD_TILL_CANCEL", "IMMEDIATE_OR_CANCEL", "NEXT_END_OF_MONTH"}, cmd.Flags().Lookup("duration").Annotations[flagEnumAnnotation])
+		assert.Equal(
+			t,
+			[]string{
+				"DAY",
+				"END_OF_MONTH",
+				"END_OF_WEEK",
+				"FILL_OR_KILL",
+				"GOOD_TILL_CANCEL",
+				"IMMEDIATE_OR_CANCEL",
+				"NEXT_END_OF_MONTH",
+			},
+			cmd.Flags().Lookup("duration").Annotations[flagEnumAnnotation],
+		)
 
 		// Act
 		_, err := runTestCommand(
@@ -317,7 +330,7 @@ func TestDefineCobraFlags(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "MSFT", opts.Symbol)
 		assert.Equal(t, 7, opts.Count)
-		assert.Equal(t, 2.50, opts.Price)
+		assert.InDelta(t, 2.50, opts.Price, 0.001)
 		assert.False(t, opts.Enabled)
 		assert.Equal(t, []string{"quote", "fundamental"}, opts.Fields)
 		assert.Equal(t, models.DurationGoodTillCancel, opts.Duration)
@@ -393,7 +406,11 @@ func TestCobraStringEnumValue(t *testing.T) {
 		value := cmd.Flags().Lookup("type").Value
 		require.NoError(t, value.Set(""))
 		assert.Empty(t, opts.Type)
-		assert.Equal(t, `invalid value "bogus" (allowed: LIMIT, LIMIT_ON_CLOSE, MARKET, MARKET_ON_CLOSE, NET_CREDIT, NET_DEBIT, NET_ZERO, STOP, STOP_LIMIT, TRAILING_STOP, TRAILING_STOP_LIMIT)`, value.Set("bogus").Error())
+		assert.Equal(
+			t,
+			`invalid value "bogus" (allowed: LIMIT, LIMIT_ON_CLOSE, MARKET, MARKET_ON_CLOSE, NET_CREDIT, NET_DEBIT, NET_ZERO, STOP, STOP_LIMIT, TRAILING_STOP, TRAILING_STOP_LIMIT)`,
+			value.Set("bogus").Error(),
+		)
 	})
 }
 

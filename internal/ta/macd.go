@@ -9,11 +9,14 @@ import (
 )
 
 // MACD computes Moving Average Convergence/Divergence.
-// Returns (macd, signal, histogram []float64, err error).
+// Returns the MACD, signal, and histogram series.
 // All three output slices are zero-stripped and aligned to the shortest length.
 // fastPeriod must be < slowPeriod. All periods must be > 0.
 // len(closes) must be >= slowPeriod + signalPeriod.
-func MACD(closes []float64, fastPeriod, slowPeriod, signalPeriod int) (macdLine, signalLine, histogram []float64, err error) {
+func MACD(
+	closes []float64,
+	fastPeriod, slowPeriod, signalPeriod int,
+) ([]float64, []float64, []float64, error) {
 	if fastPeriod <= 0 || slowPeriod <= 0 || signalPeriod <= 0 {
 		return nil, nil, nil, apperr.NewValidationError(
 			"macd: all periods must be > 0",

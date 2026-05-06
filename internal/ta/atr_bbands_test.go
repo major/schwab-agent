@@ -39,7 +39,7 @@ func TestATR_MismatchedLengths(t *testing.T) {
 	_, err := ATR(highs, lows, closes, 14)
 	require.Error(t, err)
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "length")
 }
 
@@ -66,8 +66,8 @@ func TestBBands_CorrectOrdering(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.NotEmpty(t, upper)
-	assert.Equal(t, len(upper), len(middle), "upper and middle must have same length")
-	assert.Equal(t, len(upper), len(lower), "upper and lower must have same length")
+	assert.Len(t, middle, len(upper), "upper and middle must have same length")
+	assert.Len(t, lower, len(upper), "upper and lower must have same length")
 	for i := range upper {
 		assert.Greater(t, upper[i], middle[i], "upper[%d] should be > middle[%d]", i, i)
 		assert.Greater(t, middle[i], lower[i], "middle[%d] should be > lower[%d]", i, i)
@@ -90,7 +90,7 @@ func TestBBands_MiddleEqualsMA(t *testing.T) {
 	require.NoError(t, err2)
 
 	// Assert: middle band should equal SMA
-	assert.Equal(t, len(sma), len(middle))
+	assert.Len(t, middle, len(sma))
 	for i := range middle {
 		assert.InDelta(t, sma[i], middle[i], 1e-6, "middle[%d] should equal SMA[%d]", i, i)
 	}
@@ -124,7 +124,7 @@ func TestBBands_InsufficientData(t *testing.T) {
 	_, _, _, err := BBands(closes, 20, 2.0)
 	require.Error(t, err)
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "requires at least 20 values")
 }
 
@@ -142,6 +142,6 @@ func TestATR_InsufficientData(t *testing.T) {
 	_, err := ATR(highs, lows, closes, 14)
 	require.Error(t, err)
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "requires at least 15 values")
 }

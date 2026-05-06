@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -11,6 +12,8 @@ import (
 )
 
 const (
+	oauthGrantTypeRefreshToken = "refresh_token"
+
 	// refreshTokenMaxAge is 6.5 days in seconds, matching schwab-py's default.
 	refreshTokenMaxAge = 561600
 
@@ -49,8 +52,8 @@ func LoadToken(tokenPath string) (*TokenFile, error) {
 	}
 
 	var tf TokenFile
-	if err := json.Unmarshal(data, &tf); err != nil {
-		return nil, fmt.Errorf("failed to parse token file: %w", err)
+	if unmarshalErr := json.Unmarshal(data, &tf); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to parse token file: %w", unmarshalErr)
 	}
 
 	return &tf, nil
@@ -69,21 +72,21 @@ func SaveToken(tokenPath string, tf *TokenFile) error {
 		return fmt.Errorf("failed to marshal token: %w", err)
 	}
 
-	if err := os.WriteFile(tokenPath, data, 0o600); err != nil {
-		return fmt.Errorf("failed to write token file: %w", err)
+	if writeErr := os.WriteFile(tokenPath, data, 0o600); writeErr != nil {
+		return fmt.Errorf("failed to write token file: %w", writeErr)
 	}
 
 	return nil
 }
 
 // IsAccessTokenExpired checks if the access token is expired (with 300s leeway).
-// Returns true if time.Now() >= ExpiresAt - 300.
+// Returns true if [time.Now] is past ExpiresAt minus the leeway.
 func IsAccessTokenExpired(tf *TokenFile) bool {
 	return float64(time.Now().Unix()) >= tf.Token.ExpiresAt-accessTokenLeeway
 }
 
 // IsRefreshTokenStale checks if the refresh token is stale (> 6.5 days old).
-// Returns true if time.Now().Unix() >= creation_timestamp + 561600.
+// Returns true if [time.Now] is past creation_timestamp plus the max age.
 func IsRefreshTokenStale(tf *TokenFile) bool {
 	return time.Now().Unix() >= tf.CreationTimestamp+refreshTokenMaxAge
 }
@@ -108,8 +111,8 @@ func RefreshAccessToken(cfg *Config, tf *TokenFile, endpoint string) (*TokenFile
 	resp, err := client.R().
 		SetBasicAuth(cfg.ClientID, cfg.ClientSecret).
 		SetFormData(map[string]string{
-			"grant_type":    "refresh_token",
-			"refresh_token": tf.Token.RefreshToken,
+			"grant_type":               oauthGrantTypeRefreshToken,
+			oauthGrantTypeRefreshToken: tf.Token.RefreshToken,
 		}).
 		Post(endpoint)
 	if err != nil {
@@ -117,7 +120,7 @@ func RefreshAccessToken(cfg *Config, tf *TokenFile, endpoint string) (*TokenFile
 	}
 
 	// Handle non-2xx responses
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		var errResp tokenErrorResponse
 		if json.Unmarshal(resp.Bytes(), &errResp) == nil && errResp.Error == "invalid_grant" {
 			return nil, apperr.NewAuthExpiredError(
@@ -130,8 +133,8 @@ func RefreshAccessToken(cfg *Config, tf *TokenFile, endpoint string) (*TokenFile
 
 	// Parse new token data
 	var newToken TokenData
-	if err := json.Unmarshal(resp.Bytes(), &newToken); err != nil {
-		return nil, fmt.Errorf("failed to parse token response: %w", err)
+	if unmarshalErr := json.Unmarshal(resp.Bytes(), &newToken); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to parse token response: %w", unmarshalErr)
 	}
 
 	// Compute ExpiresAt: exchange time + expires_in

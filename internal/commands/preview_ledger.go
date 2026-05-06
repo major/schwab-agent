@@ -51,7 +51,11 @@ type savedOrderPreview struct {
 
 // saveOrderPreview stores a previewed order in the local state ledger and
 // returns the digest metadata callers should include in the preview envelope.
-func saveOrderPreview(account string, order *models.OrderRequest, preview *models.PreviewOrder) (*previewDigestData, error) {
+func saveOrderPreview(
+	account string,
+	order *models.OrderRequest,
+	preview *models.PreviewOrder,
+) (*previewDigestData, error) {
 	createdAt := time.Now().UTC()
 	expiresAt := createdAt.Add(previewLedgerTTL)
 	canonicalOrder, digest, err := previewDigestFor(account, order)
@@ -79,14 +83,18 @@ func saveOrderPreview(account string, order *models.OrderRequest, preview *model
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(ledgerDir, 0o700); err != nil {
-		return nil, fmt.Errorf("create preview ledger directory: %w", err)
+	if mkdirErr := os.MkdirAll(ledgerDir, 0o700); mkdirErr != nil {
+		return nil, fmt.Errorf("create preview ledger directory: %w", mkdirErr)
 	}
 	// MkdirAll only applies the requested mode when it creates a directory.
 	// Tighten existing directories too, because preview files contain exact order
 	// payloads and the command help promises private ledger storage.
-	if err := os.Chmod(ledgerDir, 0o700); err != nil { //nolint:gosec // Directories need execute bits; 0700 keeps the ledger private.
-		return nil, fmt.Errorf("secure preview ledger directory: %w", err)
+	//nolint:gosec // G302: directories need execute bits; 0700 keeps the ledger private.
+	if chmodErr := os.Chmod(
+		ledgerDir,
+		0o700,
+	); chmodErr != nil {
+		return nil, fmt.Errorf("secure preview ledger directory: %w", chmodErr)
 	}
 
 	encoded, err := json.MarshalIndent(&entry, "", "  ")
@@ -95,8 +103,8 @@ func saveOrderPreview(account string, order *models.OrderRequest, preview *model
 	}
 
 	path := filepath.Join(ledgerDir, digest+".json")
-	if err := os.WriteFile(path, encoded, 0o600); err != nil {
-		return nil, fmt.Errorf("write preview ledger entry: %w", err)
+	if writeErr := os.WriteFile(path, encoded, 0o600); writeErr != nil {
+		return nil, fmt.Errorf("write preview ledger entry: %w", writeErr)
 	}
 
 	return &previewDigestData{
@@ -128,10 +136,11 @@ func loadOrderPreview(digest string) (*savedOrderPreview, error) {
 	}
 
 	var entry savedOrderPreview
-	if err := json.Unmarshal(data, &entry); err != nil {
-		return nil, apperr.NewValidationError("preview ledger entry is not valid JSON", err)
+	if unmarshalErr := json.Unmarshal(data, &entry); unmarshalErr != nil {
+		return nil, apperr.NewValidationError("preview ledger entry is not valid JSON", unmarshalErr)
 	}
-	if entry.Version != previewLedgerSchemaVersion || entry.Operation != previewLedgerOperation || entry.Endpoint != previewLedgerEndpoint {
+	if entry.Version != previewLedgerSchemaVersion || entry.Operation != previewLedgerOperation ||
+		entry.Endpoint != previewLedgerEndpoint {
 		return nil, apperr.NewValidationError("preview ledger entry uses an unsupported schema or operation", nil)
 	}
 	if entry.Order == nil {
@@ -143,8 +152,8 @@ func loadOrderPreview(digest string) (*savedOrderPreview, error) {
 		return nil, err
 	}
 	var compactedLedgerOrder bytes.Buffer
-	if err := json.Compact(&compactedLedgerOrder, entry.CanonicalOrder); err != nil {
-		return nil, apperr.NewValidationError("preview ledger entry has invalid canonical order JSON", err)
+	if compactErr := json.Compact(&compactedLedgerOrder, entry.CanonicalOrder); compactErr != nil {
+		return nil, apperr.NewValidationError("preview ledger entry has invalid canonical order JSON", compactErr)
 	}
 	if expectedDigest != digest || entry.Digest != digest || string(canonicalOrder) != compactedLedgerOrder.String() {
 		return nil, apperr.NewValidationError("preview ledger entry no longer matches its digest", nil)

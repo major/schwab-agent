@@ -39,7 +39,7 @@ func TestQuotes_Success(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -50,10 +50,10 @@ func TestQuotes_Success(t *testing.T) {
 	require.Len(t, result, 2)
 	assert.Equal(t, "AAPL", *result["AAPL"].Symbol)
 	require.NotNil(t, result["AAPL"].Quote)
-	assert.Equal(t, 150.25, *result["AAPL"].Quote.LastPrice)
+	assert.InDelta(t, 150.25, *result["AAPL"].Quote.LastPrice, 0.001)
 	assert.Equal(t, "NVDA", *result["NVDA"].Symbol)
 	require.NotNil(t, result["NVDA"].Quote)
-	assert.Equal(t, 850.50, *result["NVDA"].Quote.LastPrice)
+	assert.InDelta(t, 850.50, *result["NVDA"].Quote.LastPrice, 0.001)
 }
 
 func TestQuotes_CommaSeparatedSymbols(t *testing.T) {
@@ -63,7 +63,7 @@ func TestQuotes_CommaSeparatedSymbols(t *testing.T) {
 		assert.Equal(t, "AAPL,NVDA,TSLA", symbols)
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]*models.QuoteEquity{}))
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]*models.QuoteEquity{}))
 	}))
 	defer srv.Close()
 
@@ -76,7 +76,7 @@ func TestQuotes_CommaSeparatedSymbols(t *testing.T) {
 func TestQuotes_EmptyResult(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]*models.QuoteEquity{}))
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]*models.QuoteEquity{}))
 	}))
 	defer srv.Close()
 
@@ -108,7 +108,7 @@ func TestQuote_Success(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -121,7 +121,7 @@ func TestQuote_Success(t *testing.T) {
 	require.NotNil(t, result.Reference)
 	assert.Equal(t, "Apple Inc", *result.Reference.Description)
 	require.NotNil(t, result.Quote)
-	assert.Equal(t, 150.25, *result.Quote.LastPrice)
+	assert.InDelta(t, 150.25, *result.Quote.LastPrice, 0.001)
 	assert.Equal(t, int64(45000000), *result.Quote.TotalVolume)
 }
 
@@ -147,7 +147,7 @@ func TestQuote_MissingSymbolInResponse(t *testing.T) {
 	// API returns 200 but the map doesn't contain the requested symbol.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]*models.QuoteEquity{}))
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]*models.QuoteEquity{}))
 	}))
 	defer srv.Close()
 

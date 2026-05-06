@@ -157,7 +157,11 @@ func (c *Client) GetOrder(ctx context.Context, hashValue string, orderID int64) 
 // PlaceOrder places a new order for the specified account.
 // Extracts the order ID from the Location header on success.
 // Returns OrderRejectedError on 400 or 422 responses.
-func (c *Client) PlaceOrder(ctx context.Context, hashValue string, order *models.OrderRequest) (*PlaceOrderResponse, error) {
+func (c *Client) PlaceOrder(
+	ctx context.Context,
+	hashValue string,
+	order *models.OrderRequest,
+) (*PlaceOrderResponse, error) {
 	path := fmt.Sprintf("/trader/v1/accounts/%s/orders", hashValue)
 
 	encoded, err := json.Marshal(order)
@@ -165,7 +169,7 @@ func (c *Client) PlaceOrder(ctx context.Context, hashValue string, order *models
 		return nil, fmt.Errorf("marshal request body: %w", err)
 	}
 
-	c.logger.Debug("http request", "method", http.MethodPost, "path", path)
+	c.logger.DebugContext(ctx, "http request", "method", http.MethodPost, "path", path)
 
 	resp, err := c.resty.R().
 		SetContext(ctx).
@@ -189,7 +193,7 @@ func (c *Client) PlaceOrder(ctx context.Context, hashValue string, order *models
 			nil,
 		)
 	}
-	if resp.StatusCode() >= 400 {
+	if resp.StatusCode() >= http.StatusBadRequest {
 		return nil, apperr.NewHTTPError(
 			fmt.Sprintf("HTTP %d", resp.StatusCode()),
 			resp.StatusCode(),
@@ -213,7 +217,11 @@ func (c *Client) PlaceOrder(ctx context.Context, hashValue string, order *models
 }
 
 // PreviewOrder previews an order without placing it, returning estimated costs and validation results.
-func (c *Client) PreviewOrder(ctx context.Context, hashValue string, order *models.OrderRequest) (*models.PreviewOrder, error) {
+func (c *Client) PreviewOrder(
+	ctx context.Context,
+	hashValue string,
+	order *models.OrderRequest,
+) (*models.PreviewOrder, error) {
 	path := fmt.Sprintf("/trader/v1/accounts/%s/previewOrder", hashValue)
 	var result models.PreviewOrder
 	if err := c.doPost(ctx, path, order, &result); err != nil {
@@ -223,7 +231,12 @@ func (c *Client) PreviewOrder(ctx context.Context, hashValue string, order *mode
 }
 
 // ReplaceOrder replaces an existing order with a new order specification.
-func (c *Client) ReplaceOrder(ctx context.Context, hashValue string, orderID int64, order *models.OrderRequest) (*ReplaceOrderResponse, error) {
+func (c *Client) ReplaceOrder(
+	ctx context.Context,
+	hashValue string,
+	orderID int64,
+	order *models.OrderRequest,
+) (*ReplaceOrderResponse, error) {
 	path := fmt.Sprintf("/trader/v1/accounts/%s/orders/%d", hashValue, orderID)
 
 	encoded, err := json.Marshal(order)
@@ -231,7 +244,7 @@ func (c *Client) ReplaceOrder(ctx context.Context, hashValue string, orderID int
 		return nil, fmt.Errorf("marshal request body: %w", err)
 	}
 
-	c.logger.Debug("http request", "method", http.MethodPut, "path", path)
+	c.logger.DebugContext(ctx, "http request", "method", http.MethodPut, "path", path)
 
 	resp, err := c.resty.R().
 		SetContext(ctx).
@@ -252,7 +265,7 @@ func (c *Client) ReplaceOrder(ctx context.Context, hashValue string, orderID int
 			nil,
 		)
 	}
-	if resp.StatusCode() >= 400 {
+	if resp.StatusCode() >= http.StatusBadRequest {
 		return nil, apperr.NewHTTPError(
 			fmt.Sprintf("HTTP %d", resp.StatusCode()),
 			resp.StatusCode(),

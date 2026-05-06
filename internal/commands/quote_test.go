@@ -7,10 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/major/schwab-agent/internal/apperr"
+	"github.com/major/schwab-agent/internal/output"
 )
 
 func TestNewQuoteCmd(t *testing.T) {
@@ -118,7 +119,7 @@ func TestNewQuoteGetSingleNotFound(t *testing.T) {
 	require.Error(t, err)
 
 	var symErr *apperr.SymbolNotFoundError
-	assert.ErrorAs(t, err, &symErr)
+	require.ErrorAs(t, err, &symErr)
 	assert.Empty(t, buf.String())
 }
 
@@ -134,7 +135,7 @@ func TestNewQuoteGetNoArgs(t *testing.T) {
 	// With ArbitraryArgs, RunE validates that at least one symbol is provided
 	// when no option flags are set.
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "at least one symbol is required")
 	assert.Empty(t, buf.String())
 }
@@ -149,7 +150,7 @@ func TestNewQuoteNoSubcommand(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "requires a subcommand")
 	assert.Contains(t, err.Error(), "get")
 }
@@ -197,7 +198,9 @@ func TestNewQuoteGetMultiWithFields(t *testing.T) {
 		assert.Equal(t, "extended", q.Get("fields"))
 
 		if r.URL.Path == "/marketdata/v1/quotes" {
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0},"MSFT":{"symbol":"MSFT","lastPrice":400.0}}`))
+			_, _ = w.Write(
+				[]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0},"MSFT":{"symbol":"MSFT","lastPrice":400.0}}`),
+			)
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -264,7 +267,7 @@ func TestNewQuoteGetInvalidField(t *testing.T) {
 	// Validation now runs after Cobra flag parsing via quoteGetOpts.Validate(),
 	// keeping command-level validation in the existing apperr hierarchy.
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "bogus")
 	assert.Empty(t, buf.String())
 }
@@ -418,7 +421,7 @@ func TestNewQuoteGetOptionFlagsWithPositionalArgs(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "cannot combine positional symbols with option flags")
 	assert.Empty(t, buf.String())
 }
@@ -438,7 +441,7 @@ func TestNewQuoteGetOptionFlagsMissingRequired(t *testing.T) {
 	require.Error(t, err)
 
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "--expiration")
 	assert.Contains(t, err.Error(), "--call or --put")
 	assert.Empty(t, buf.String())

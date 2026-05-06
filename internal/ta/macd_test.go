@@ -23,8 +23,8 @@ func TestMACD_ThreeAlignedSlices(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.NotEmpty(t, macdLine)
-	assert.Equal(t, len(macdLine), len(signal), "macd and signal must have same length")
-	assert.Equal(t, len(macdLine), len(histogram), "macd and histogram must have same length")
+	assert.Len(t, signal, len(macdLine), "macd and signal must have same length")
+	assert.Len(t, histogram, len(macdLine), "macd and histogram must have same length")
 	// No leading zeros
 	for i, v := range macdLine {
 		if i == 0 {
@@ -61,7 +61,7 @@ func TestMACD_RejectsFastGeSlow(t *testing.T) {
 	_, _, _, err := MACD(closes, 26, 12, 9)
 	require.Error(t, err)
 	var valErr *apperr.ValidationError
-	assert.ErrorAs(t, err, &valErr)
+	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, err.Error(), "fast period")
 }
 

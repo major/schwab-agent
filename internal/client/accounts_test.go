@@ -25,7 +25,7 @@ func TestAccountNumbers_Success(t *testing.T) {
 			{AccountNumber: "123456789", HashValue: "abc123def456"},
 			{AccountNumber: "987654321", HashValue: "xyz789uvw012"},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -93,7 +93,7 @@ func TestAccounts_Success(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -153,7 +153,7 @@ func TestAccount_Success(t *testing.T) {
 				AccountNumber: new("123456789"),
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -208,7 +208,7 @@ func TestAccounts_WithPositionsField(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -219,7 +219,7 @@ func TestAccounts_WithPositionsField(t *testing.T) {
 	require.Len(t, result, 1)
 	require.Len(t, result[0].SecuritiesAccount.Positions, 1)
 	assert.Equal(t, "AAPL", *result[0].SecuritiesAccount.Positions[0].Instrument.Symbol)
-	assert.Equal(t, 100.0, *result[0].SecuritiesAccount.Positions[0].LongQuantity)
+	assert.InDelta(t, 100.0, *result[0].SecuritiesAccount.Positions[0].LongQuantity, 0.001)
 }
 
 func TestAccounts_WithoutFields_NoQueryParam(t *testing.T) {
@@ -228,7 +228,7 @@ func TestAccounts_WithoutFields_NoQueryParam(t *testing.T) {
 		assert.Empty(t, r.URL.Query().Get("fields"))
 
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode([]models.Account{}))
+		assert.NoError(t, json.NewEncoder(w).Encode([]models.Account{}))
 	}))
 	defer srv.Close()
 
@@ -261,7 +261,7 @@ func TestAccount_WithPositionsField(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -272,7 +272,7 @@ func TestAccount_WithPositionsField(t *testing.T) {
 	require.NotNil(t, result)
 	require.Len(t, result.SecuritiesAccount.Positions, 1)
 	assert.Equal(t, "MSFT", *result.SecuritiesAccount.Positions[0].Instrument.Symbol)
-	assert.Equal(t, 50.0, *result.SecuritiesAccount.Positions[0].LongQuantity)
+	assert.InDelta(t, 50.0, *result.SecuritiesAccount.Positions[0].LongQuantity, 0.001)
 }
 
 func TestAccount_WithComplexData(t *testing.T) {
@@ -301,7 +301,7 @@ func TestAccount_WithComplexData(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(response))
+		assert.NoError(t, json.NewEncoder(w).Encode(response))
 	}))
 	defer srv.Close()
 
@@ -313,11 +313,11 @@ func TestAccount_WithComplexData(t *testing.T) {
 	assert.Equal(t, "MARGIN", *result.SecuritiesAccount.Type)
 	assert.Equal(t, 5, *result.SecuritiesAccount.RoundTrips)
 	assert.False(t, *result.SecuritiesAccount.IsForeign)
-	assert.Equal(t, 50000.00, *result.SecuritiesAccount.CurrentBalances.CashBalance)
-	assert.Equal(t, 100000.00, *result.SecuritiesAccount.CurrentBalances.BuyingPower)
+	assert.InDelta(t, 50000.00, *result.SecuritiesAccount.CurrentBalances.CashBalance, 0.001)
+	assert.InDelta(t, 100000.00, *result.SecuritiesAccount.CurrentBalances.BuyingPower, 0.001)
 	require.Len(t, result.SecuritiesAccount.Positions, 1)
 	assert.Equal(t, "AAPL", *result.SecuritiesAccount.Positions[0].Instrument.Symbol)
-	assert.Equal(t, 100.0, *result.SecuritiesAccount.Positions[0].LongQuantity)
+	assert.InDelta(t, 100.0, *result.SecuritiesAccount.Positions[0].LongQuantity, 0.001)
 }
 
 func TestAccount_401_ReturnsAuthExpiredError(t *testing.T) {
@@ -341,7 +341,7 @@ func TestAccountNumbers_BearerTokenAuth(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "Bearer my-secret-token", r.Header.Get("Authorization"))
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode([]models.AccountNumber{}))
+		assert.NoError(t, json.NewEncoder(w).Encode([]models.AccountNumber{}))
 	}))
 	defer srv.Close()
 
@@ -355,7 +355,7 @@ func TestAccounts_BearerTokenAuth(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "Bearer my-secret-token", r.Header.Get("Authorization"))
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode([]models.Account{}))
+		assert.NoError(t, json.NewEncoder(w).Encode([]models.Account{}))
 	}))
 	defer srv.Close()
 
@@ -369,7 +369,7 @@ func TestAccount_BearerTokenAuth(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "Bearer my-secret-token", r.Header.Get("Authorization"))
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(models.Account{}))
+		assert.NoError(t, json.NewEncoder(w).Encode(models.Account{}))
 	}))
 	defer srv.Close()
 

@@ -100,7 +100,7 @@ func ExtractTimestamps(candles []models.Candle) []string {
 }
 
 // ValidateMinCandles returns a ValidationError if len(candles) < required.
-// Error message format: "sma requires at least 20 candles, got 5"
+// Error message format: "sma requires at least 20 candles, got 5".
 func ValidateMinCandles(candles []models.Candle, required int, indicator string) error {
 	if len(candles) < required {
 		return apperr.NewValidationError(
