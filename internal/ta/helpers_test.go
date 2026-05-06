@@ -6,14 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/major/schwab-go/schwab/marketdata"
+
 	"github.com/major/schwab-agent/internal/apperr"
-	"github.com/major/schwab-agent/internal/models"
 )
 
 func TestExtractClose_Valid(t *testing.T) {
 	// Arrange
-	v1, v2 := 100.0, 200.0
-	candles := []models.Candle{{Close: &v1}, {Close: &v2}}
+	candles := []marketdata.Candle{{Close: 100.0}, {Close: 200.0}}
 
 	// Act
 	result, err := ExtractClose(candles)
@@ -23,10 +23,9 @@ func TestExtractClose_Valid(t *testing.T) {
 	assert.Equal(t, []float64{100.0, 200.0}, result)
 }
 
-func TestExtractClose_NilField(t *testing.T) {
+func TestExtractClose_NonPositiveField(t *testing.T) {
 	// Arrange
-	v1 := 100.0
-	candles := []models.Candle{{Close: &v1}, {Close: nil}}
+	candles := []marketdata.Candle{{Close: 100.0}, {Close: -1.0}}
 
 	// Act
 	result, err := ExtractClose(candles)
@@ -36,14 +35,13 @@ func TestExtractClose_NilField(t *testing.T) {
 	var valErr *apperr.ValidationError
 	require.True(t, assert.ErrorAs(t, err, &valErr), "error should be ValidationError")
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "nil close")
+	assert.Contains(t, err.Error(), "non-positive close")
 	assert.Contains(t, err.Error(), "1")
 }
 
 func TestExtractHigh_Valid(t *testing.T) {
 	// Arrange
-	v1, v2 := 105.0, 205.0
-	candles := []models.Candle{{High: &v1}, {High: &v2}}
+	candles := []marketdata.Candle{{High: 105.0}, {High: 205.0}}
 
 	// Act
 	result, err := ExtractHigh(candles)
@@ -53,10 +51,9 @@ func TestExtractHigh_Valid(t *testing.T) {
 	assert.Equal(t, []float64{105.0, 205.0}, result)
 }
 
-func TestExtractHigh_NilField(t *testing.T) {
+func TestExtractHigh_NonPositiveField(t *testing.T) {
 	// Arrange
-	v1 := 105.0
-	candles := []models.Candle{{High: &v1}, {High: nil}}
+	candles := []marketdata.Candle{{High: 105.0}, {}}
 
 	// Act
 	result, err := ExtractHigh(candles)
@@ -66,13 +63,12 @@ func TestExtractHigh_NilField(t *testing.T) {
 	var valErr *apperr.ValidationError
 	require.True(t, assert.ErrorAs(t, err, &valErr), "error should be ValidationError")
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "nil high")
+	assert.Contains(t, err.Error(), "non-positive high")
 }
 
 func TestExtractLow_Valid(t *testing.T) {
 	// Arrange
-	v1, v2 := 95.0, 195.0
-	candles := []models.Candle{{Low: &v1}, {Low: &v2}}
+	candles := []marketdata.Candle{{Low: 95.0}, {Low: 195.0}}
 
 	// Act
 	result, err := ExtractLow(candles)
@@ -82,10 +78,9 @@ func TestExtractLow_Valid(t *testing.T) {
 	assert.Equal(t, []float64{95.0, 195.0}, result)
 }
 
-func TestExtractLow_NilField(t *testing.T) {
+func TestExtractLow_NonPositiveField(t *testing.T) {
 	// Arrange
-	v1 := 95.0
-	candles := []models.Candle{{Low: &v1}, {Low: nil}}
+	candles := []marketdata.Candle{{Low: 95.0}, {Low: -1.0}}
 
 	// Act
 	result, err := ExtractLow(candles)
@@ -95,13 +90,12 @@ func TestExtractLow_NilField(t *testing.T) {
 	var valErr *apperr.ValidationError
 	require.True(t, assert.ErrorAs(t, err, &valErr), "error should be ValidationError")
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "nil low")
+	assert.Contains(t, err.Error(), "non-positive low")
 }
 
 func TestExtractOpen_Valid(t *testing.T) {
 	// Arrange
-	v1, v2 := 99.0, 199.0
-	candles := []models.Candle{{Open: &v1}, {Open: &v2}}
+	candles := []marketdata.Candle{{Open: 99.0}, {Open: 199.0}}
 
 	// Act
 	result, err := ExtractOpen(candles)
@@ -111,10 +105,9 @@ func TestExtractOpen_Valid(t *testing.T) {
 	assert.Equal(t, []float64{99.0, 199.0}, result)
 }
 
-func TestExtractOpen_NilField(t *testing.T) {
+func TestExtractOpen_NonPositiveField(t *testing.T) {
 	// Arrange
-	v1 := 99.0
-	candles := []models.Candle{{Open: &v1}, {Open: nil}}
+	candles := []marketdata.Candle{{Open: 99.0}, {}}
 
 	// Act
 	result, err := ExtractOpen(candles)
@@ -124,76 +117,84 @@ func TestExtractOpen_NilField(t *testing.T) {
 	var valErr *apperr.ValidationError
 	require.True(t, assert.ErrorAs(t, err, &valErr), "error should be ValidationError")
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "nil open")
+	assert.Contains(t, err.Error(), "non-positive open")
 }
 
 func TestExtractVolume_Valid(t *testing.T) {
 	// Arrange
-	v1, v2 := int64(1000), int64(2000)
-	candles := []models.Candle{{Volume: &v1}, {Volume: &v2}}
+	candles := []marketdata.Candle{{Volume: 1000}, {Volume: 2000}}
 
 	// Act
-	result, err := ExtractVolume(candles)
+	result := ExtractVolume(candles)
 
 	// Assert
-	require.NoError(t, err)
 	assert.Equal(t, []float64{1000.0, 2000.0}, result)
 }
 
-func TestExtractVolume_NilField(t *testing.T) {
+func TestExtractVolume_ZeroFieldAllowed(t *testing.T) {
 	// Arrange
-	v1 := int64(1000)
-	candles := []models.Candle{{Volume: &v1}, {Volume: nil}}
+	candles := []marketdata.Candle{{Volume: 1000}, {}}
 
 	// Act
-	result, err := ExtractVolume(candles)
+	result := ExtractVolume(candles)
 
 	// Assert
-	require.Error(t, err)
-	var valErr *apperr.ValidationError
-	require.True(t, assert.ErrorAs(t, err, &valErr), "error should be ValidationError")
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "nil volume")
+	assert.Equal(t, []float64{1000.0, 0.0}, result)
 }
 
 func TestExtractTimestamps_WithISO8601(t *testing.T) {
 	// Arrange
 	iso1 := "2024-01-01T10:00:00Z"
 	iso2 := "2024-01-02T10:00:00Z"
-	candles := []models.Candle{
-		{DatetimeISO8601: &iso1},
-		{DatetimeISO8601: &iso2},
+	candles := []marketdata.Candle{
+		{DatetimeISO: iso1},
+		{DatetimeISO: iso2},
 	}
 
 	// Act
-	result := ExtractTimestamps(candles)
+	result, err := ExtractTimestamps(candles)
 
 	// Assert
+	require.NoError(t, err)
 	assert.Equal(t, []string{iso1, iso2}, result)
 }
 
 func TestExtractTimestamps_WithDatetime(t *testing.T) {
 	// Arrange
-	dt1 := int64(1704110400000) // 2024-01-01T10:00:00Z in ms
-	dt2 := int64(1704196800000) // 2024-01-02T10:00:00Z in ms
-	candles := []models.Candle{
-		{Datetime: &dt1, DatetimeISO8601: nil},
-		{Datetime: &dt2, DatetimeISO8601: nil},
+	candles := []marketdata.Candle{
+		{Datetime: 1704110400000}, // 2024-01-01T10:00:00Z in ms
+		{Datetime: 1704196800000}, // 2024-01-02T10:00:00Z in ms
 	}
 
 	// Act
-	result := ExtractTimestamps(candles)
+	result, err := ExtractTimestamps(candles)
 
 	// Assert
+	require.NoError(t, err)
 	assert.Len(t, result, 2)
 	// Just verify they're RFC3339 formatted strings
 	assert.NotEmpty(t, result[0])
 	assert.NotEmpty(t, result[1])
 }
 
+func TestExtractTimestamps_MissingTimestamp(t *testing.T) {
+	// Arrange
+	candles := []marketdata.Candle{{Datetime: 1704110400000}, {}}
+
+	// Act
+	result, err := ExtractTimestamps(candles)
+
+	// Assert
+	require.Error(t, err)
+	var valErr *apperr.ValidationError
+	require.True(t, assert.ErrorAs(t, err, &valErr), "error should be ValidationError")
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "missing timestamp at index 1")
+}
+
 func TestValidateMinCandles_Sufficient(t *testing.T) {
 	// Arrange
-	candles := make([]models.Candle, 20)
+	candles := make([]marketdata.Candle, 20)
 
 	// Act
 	err := ValidateMinCandles(candles, 20, "sma")
@@ -204,7 +205,7 @@ func TestValidateMinCandles_Sufficient(t *testing.T) {
 
 func TestValidateMinCandles_Insufficient(t *testing.T) {
 	// Arrange
-	candles := make([]models.Candle, 5)
+	candles := make([]marketdata.Candle, 5)
 
 	// Act
 	err := ValidateMinCandles(candles, 20, "sma")
@@ -218,7 +219,7 @@ func TestValidateMinCandles_Insufficient(t *testing.T) {
 
 func TestValidateMinCandles_Empty(t *testing.T) {
 	// Arrange
-	candles := []models.Candle{}
+	candles := []marketdata.Candle{}
 
 	// Act
 	err := ValidateMinCandles(candles, 10, "ema")

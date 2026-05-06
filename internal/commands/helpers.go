@@ -534,6 +534,10 @@ func defaultSubcommand(sub *cobra.Command) func(cmd *cobra.Command, args []strin
 		// Do not call Execute here: that would re-run the root PersistentPreRunE,
 		// causing duplicate auth/client setup. The shorthand intentionally forwards
 		// positional args only; flags still require the explicit subcommand form.
+		// Cobra normally sets command context during Execute; because shorthand calls
+		// the child RunE directly, copy the parent's context so schwab-go requests do
+		// not receive a nil context.
+		sub.SetContext(cmd.Context())
 		return sub.RunE(sub, args)
 	}
 }

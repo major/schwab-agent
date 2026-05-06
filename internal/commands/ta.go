@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/major/schwab-go/schwab/marketdata"
 	"github.com/spf13/cobra"
 
 	"github.com/major/schwab-agent/internal/apperr"
@@ -143,7 +144,7 @@ type dashboardOutput struct {
 }
 
 type dashboardInputs struct {
-	Candles    []models.Candle
+	Candles    []marketdata.Candle
 	Timestamps []string
 	Opens      []float64
 	Highs      []float64
@@ -669,9 +670,7 @@ func fetchDashboardInputs(
 	if inputs.Closes, err = ta.ExtractClose(candles); err != nil {
 		return dashboardInputs{}, err
 	}
-	if inputs.Volumes, err = ta.ExtractVolume(candles); err != nil {
-		return dashboardInputs{}, err
-	}
+	inputs.Volumes = ta.ExtractVolume(candles)
 
 	return inputs, nil
 }
@@ -1427,10 +1426,7 @@ func buildVWAPOutput(ctx context.Context, c *client.Ref, opts *vwapOpts, symbol 
 	if err != nil {
 		return taOutput{}, err
 	}
-	volumes, err := ta.ExtractVolume(candles)
-	if err != nil {
-		return taOutput{}, err
-	}
+	volumes := ta.ExtractVolume(candles)
 
 	values, err := ta.VWAP(highs, lows, closes, volumes)
 	if err != nil {
@@ -1690,28 +1686,35 @@ func fetchAndValidateCandles(
 	symbol, interval string,
 	requiredCandles int,
 	indicator string,
-) ([]models.Candle, []string, error) {
+) ([]marketdata.Candle, []string, error) {
 	periodType, periodVal, freqType, freq, err := ta.IntervalToHistoryParams(interval, requiredCandles)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	params := client.HistoryParams{
+	params, err := newPriceHistoryParams(priceHistoryParamsInput{
 		PeriodType:    periodType,
 		Period:        periodVal,
 		FrequencyType: freqType,
 		Frequency:     freq,
-	}
-	result, err := c.PriceHistory(ctx, symbol, &params)
+	})
 	if err != nil {
 		return nil, nil, err
+	}
+
+	result, err := c.MarketData.GetPriceHistory(ctx, symbol, params)
+	if err != nil {
+		return nil, nil, mapSchwabGoError(err)
 	}
 
 	if validateErr := ta.ValidateMinCandles(result.Candles, requiredCandles, indicator); validateErr != nil {
 		return nil, nil, validateErr
 	}
 
-	timestamps := ta.ExtractTimestamps(result.Candles)
+	timestamps, err := ta.ExtractTimestamps(result.Candles)
+	if err != nil {
+		return nil, nil, err
+	}
 	return result.Candles, timestamps, nil
 }
 

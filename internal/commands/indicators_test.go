@@ -84,7 +84,7 @@ func TestNewIndicatorsCmd_ValidEnvelope(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewIndicatorsCmd(testClient(t, srv), &buf)
+	cmd := NewIndicatorsCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "AAPL")
 	require.NoError(t, err)
 	outputBytes := append([]byte(nil), buf.Bytes()...)
@@ -111,7 +111,7 @@ func TestNewIndicatorsCmd_IntervalFlag(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewIndicatorsCmd(testClient(t, srv), &buf)
+	cmd := NewIndicatorsCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "--interval", "weekly", "NVDA")
 	require.NoError(t, err)
 
