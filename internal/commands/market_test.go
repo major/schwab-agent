@@ -20,13 +20,16 @@ import (
 
 // testClientWithMarketData creates a *client.Ref with both the internal client
 // and a schwab-go marketdata.Client pointing at the given httptest server.
-// Use this for movers tests; hours tests use testClient.
+// Use this for market commands that are backed by schwab-go.
 func testClientWithMarketData(t *testing.T, server *httptest.Server) *client.Ref {
 	t.Helper()
 	ref := testClient(t, server)
 	ref.MarketData = marketdata.NewClient(
 		schwab.WithToken("test-token"),
-		schwab.WithBaseURL(server.URL),
+		// Production root wiring configures schwab-go with the marketdata base
+		// path already included, so mirror that here instead of testing a
+		// package-internal route relative to the httptest root.
+		schwab.WithBaseURL(server.URL+"/marketdata/v1"),
 	)
 	return ref
 }
@@ -47,7 +50,7 @@ func TestNewMarketCmd_Hours_AllMarkets(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "hours")
 
 	// Assert
@@ -72,7 +75,7 @@ func TestNewMarketCmd_Hours_SpecificMarket(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "hours", "equity")
 
 	// Assert
@@ -93,7 +96,7 @@ func TestNewMarketCmd_Hours_APIError(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "hours")
 
 	// Assert
@@ -110,7 +113,7 @@ func TestNewMarketCmd_Hours_SpecificMarketAPIError(t *testing.T) {
 
 	// Act
 	var buf bytes.Buffer
-	cmd := NewMarketCmd(testClient(t, srv), &buf)
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
 	_, err := runTestCommand(t, cmd, "hours", "invalid")
 
 	// Assert

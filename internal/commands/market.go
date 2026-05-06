@@ -65,19 +65,20 @@ more market names to filter.`,
 				markets = allMarkets()
 			}
 
-			// Use the single-market endpoint when exactly one market
-			// is requested, and the multi-market endpoint otherwise.
+			// Use the single-market endpoint when exactly one market is requested,
+			// matching Schwab's two market-hours routes while keeping the CLI output
+			// shape identical for both paths.
 			if len(markets) == 1 {
-				result, err := c.Market(cmd.Context(), markets[0])
+				result, err := c.MarketData.GetMarketHoursSingle(cmd.Context(), markets[0], "")
 				if err != nil {
-					return err
+					return mapSchwabGoError(err)
 				}
 				return output.WriteSuccess(w, result, output.NewMetadata())
 			}
 
-			result, err := c.Markets(cmd.Context(), markets)
+			result, err := c.MarketData.GetMarketHours(cmd.Context(), markets, "")
 			if err != nil {
-				return err
+				return mapSchwabGoError(err)
 			}
 			return output.WriteSuccess(w, result, output.NewMetadata())
 		},
