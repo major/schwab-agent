@@ -17,6 +17,8 @@ import (
 
 	"resty.dev/v3"
 
+	"github.com/major/schwab-go/schwab/marketdata"
+
 	"github.com/major/schwab-agent/internal/apperr"
 )
 
@@ -48,6 +50,8 @@ const (
 // assignment instead of the Go-unusual *x = *y dereference pattern.
 type Ref struct {
 	*Client
+
+	MarketData *marketdata.Client
 }
 
 // Client is an authenticated HTTP client for the Schwab API.

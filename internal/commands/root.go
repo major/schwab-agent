@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 
 	"github.com/spf13/cobra"
+
+	schwab "github.com/major/schwab-go/schwab"
+	"github.com/major/schwab-go/schwab/marketdata"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/auth"
@@ -130,6 +134,21 @@ func (cfg rootAuthConfig) preRun(cmd *cobra.Command, _ []string) error {
 	}
 
 	cfg.Ref.Client = cfg.Deps.NewClient(token.Token.AccessToken, rootClientOptions(authConfig, cfg.Version)...)
+
+	// schwab-go's market data client needs the same auth token, plus a fresh HTTP
+	// client when TLS verification must be customized for proxy setups.
+	mdOpts := []schwab.Option{
+		schwab.WithToken(token.Token.AccessToken),
+	}
+	if apiURL := authConfig.APIBaseURL(); apiURL != "https://api.schwabapi.com" {
+		mdOpts = append(mdOpts, schwab.WithBaseURL(apiURL+"/marketdata/v1"))
+	}
+	if tlsCfg := authConfig.TLSConfig(); tlsCfg != nil {
+		mdOpts = append(mdOpts, schwab.WithHTTPClient(&http.Client{
+			Transport: &http.Transport{TLSClientConfig: tlsCfg},
+		}))
+	}
+	cfg.Ref.MarketData = marketdata.NewClient(mdOpts...)
 	return nil
 }
 
