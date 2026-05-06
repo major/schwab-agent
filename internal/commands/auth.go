@@ -141,6 +141,8 @@ func refreshExpiryRFC3339(tf *auth.TokenFile) string {
 	return time.Unix(tf.CreationTimestamp+refreshTokenMaxAgeSeconds, 0).UTC().Format(time.RFC3339)
 }
 
+const redactedClientIDPrefixLength = 4
+
 // redactClientID shortens the client ID to the first four characters plus ellipsis.
 func redactClientID(clientID string) string {
 	clientID = strings.TrimSpace(clientID)
@@ -148,11 +150,11 @@ func redactClientID(clientID string) string {
 		return ""
 	}
 
-	if len(clientID) <= 4 {
+	if len(clientID) <= redactedClientIDPrefixLength {
 		return clientID + "..."
 	}
 
-	return clientID[:4] + "..."
+	return clientID[:redactedClientIDPrefixLength] + "..."
 }
 
 // configDefaultAccount returns the configured default account, if any.

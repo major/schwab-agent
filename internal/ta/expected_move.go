@@ -9,6 +9,8 @@ import (
 // DefaultMultiplier is the default straddle price adjustment factor.
 const DefaultMultiplier = 0.85
 
+const expectedMoveOuterBandMultiplier = 2.0
+
 // ExpectedMoveResult contains the calculated expected move values.
 type ExpectedMoveResult struct {
 	StraddlePrice float64 `json:"straddle_price"`
@@ -67,8 +69,8 @@ func ExpectedMove(underlyingPrice, callPrice, putPrice, multiplier float64) (*Ex
 	adjustedMove := straddle * multiplier
 	upper1x := underlyingPrice + adjustedMove
 	lower1x := underlyingPrice - adjustedMove
-	upper2x := underlyingPrice + (2 * adjustedMove)
-	lower2x := underlyingPrice - (2 * adjustedMove)
+	upper2x := underlyingPrice + (expectedMoveOuterBandMultiplier * adjustedMove)
+	lower2x := underlyingPrice - (expectedMoveOuterBandMultiplier * adjustedMove)
 
 	return &ExpectedMoveResult{
 		StraddlePrice: straddle,

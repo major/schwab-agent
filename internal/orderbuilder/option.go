@@ -13,7 +13,10 @@ import (
 	"github.com/major/schwab-agent/internal/models"
 )
 
-const optionContractMultiplier = 100.0
+const (
+	optionContractMultiplier = 100.0
+	occStrikeScale           = 1000.0
+)
 
 // OptionParams holds parameters for building an option order.
 type OptionParams struct {
@@ -107,7 +110,7 @@ func BuildOCCSymbol(underlying string, expiration time.Time, strike float64, put
 	paddedUnderlying := fmt.Sprintf("%-6s", underlying)
 	expirationCode := expiration.Format("060102")
 	putCallCode := optionPutCallCode(putCall)
-	strikeCode := fmt.Sprintf("%08d", int64(math.Round(strike*1000)))
+	strikeCode := fmt.Sprintf("%08d", int64(math.Round(strike*occStrikeScale)))
 
 	return paddedUnderlying + expirationCode + putCallCode + strikeCode
 }
@@ -168,7 +171,7 @@ func ParseOCCSymbol(symbol string) (*OCCComponents, error) {
 		Underlying: underlying,
 		Expiration: expiration,
 		PutCall:    putCall,
-		Strike:     float64(strikeInt) / 1000.0,
+		Strike:     float64(strikeInt) / occStrikeScale,
 		Symbol:     symbol,
 	}, nil
 }

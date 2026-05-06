@@ -8,6 +8,9 @@ import (
 )
 
 const (
+	flagExitCodeInvalidValue = 11
+	flagExitCodeUnknown      = 12
+
 	// FlagErrorInvalidValue marks pflag conversion failures, such as passing text
 	// to an integer flag. It maps to the existing structured-error exit code 11.
 	FlagErrorInvalidValue = "invalid_value"
@@ -68,10 +71,10 @@ func (e *FlagError) Unwrap() error {
 // values, so they retain the prior 12 code.
 func (e *FlagError) ExitCode() int {
 	if e != nil && e.Kind == FlagErrorUnknown {
-		return 12
+		return flagExitCodeUnknown
 	}
 
-	return 11
+	return flagExitCodeInvalidValue
 }
 
 // NormalizeFlagError converts Cobra's pflag parse errors into typed errors.

@@ -38,6 +38,8 @@ const (
 	// defaultUserAgent identifies this client to the Schwab API. Overridden at
 	// build time via WithUserAgent to include the real version from ldflags.
 	defaultUserAgent = "schwab-agent/dev"
+
+	unexpectedContentTypePreviewBytes = 200
 )
 
 // Ref holds a lazily-populated reference to a Client. Command constructors
@@ -149,7 +151,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 	if resp.StatusCode() == http.StatusUnauthorized {
 		return apperr.NewAuthExpiredError("authentication expired", nil)
 	}
-	if resp.StatusCode() >= 400 {
+	if resp.StatusCode() >= http.StatusBadRequest {
 		return apperr.NewHTTPError(
 			fmt.Sprintf("HTTP %d", resp.StatusCode()),
 			resp.StatusCode(),
@@ -177,8 +179,8 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 			// Show a body preview so the caller can see what came back
 			// (e.g., an HTML maintenance page or a proxy error).
 			preview := resp.String()
-			if len(preview) > 200 {
-				preview = preview[:200] + "..."
+			if len(preview) > unexpectedContentTypePreviewBytes {
+				preview = preview[:unexpectedContentTypePreviewBytes] + "..."
 			}
 			return fmt.Errorf("unexpected Content-Type %q (expected application/json): %s", ct, preview)
 		}

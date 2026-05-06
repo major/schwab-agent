@@ -5,6 +5,15 @@ import (
 	"errors"
 )
 
+const (
+	exitCodeSuccess        = 0
+	exitCodeValidation     = 1
+	exitCodeNotFound       = 2
+	exitCodeAuthentication = 3
+	exitCodeHTTP           = 4
+	exitCodeOrderRejected  = 5
+)
+
 // ErrorOption configures optional fields on SchwabError during construction.
 type ErrorOption func(*SchwabError)
 
@@ -50,7 +59,7 @@ func (e *SchwabError) Unwrap() error {
 
 // ExitCode returns the process exit code for this error type.
 func (e *SchwabError) ExitCode() int {
-	return 1
+	return exitCodeValidation
 }
 
 // AuthRequiredError indicates that authentication is required.
@@ -74,7 +83,7 @@ func NewAuthRequiredError(message string, cause error, opts ...ErrorOption) *Aut
 
 // ExitCode returns the process exit code for this error type.
 func (e *AuthRequiredError) ExitCode() int {
-	return 3
+	return exitCodeAuthentication
 }
 
 // AuthExpiredError indicates that authentication has expired.
@@ -98,7 +107,7 @@ func NewAuthExpiredError(message string, cause error, opts ...ErrorOption) *Auth
 
 // ExitCode returns the process exit code for this error type.
 func (e *AuthExpiredError) ExitCode() int {
-	return 3
+	return exitCodeAuthentication
 }
 
 // AuthCallbackError indicates that authentication callback failed.
@@ -122,7 +131,7 @@ func NewAuthCallbackError(message string, cause error, opts ...ErrorOption) *Aut
 
 // ExitCode returns the process exit code for this error type.
 func (e *AuthCallbackError) ExitCode() int {
-	return 3
+	return exitCodeAuthentication
 }
 
 // OrderRejectedError indicates that an order was rejected.
@@ -146,7 +155,7 @@ func NewOrderRejectedError(message string, cause error, opts ...ErrorOption) *Or
 
 // ExitCode returns the process exit code for this error type.
 func (e *OrderRejectedError) ExitCode() int {
-	return 5
+	return exitCodeOrderRejected
 }
 
 // SymbolNotFoundError indicates that a symbol was not found.
@@ -170,7 +179,7 @@ func NewSymbolNotFoundError(message string, cause error, opts ...ErrorOption) *S
 
 // ExitCode returns the process exit code for this error type.
 func (e *SymbolNotFoundError) ExitCode() int {
-	return 2
+	return exitCodeNotFound
 }
 
 // AccountNotFoundError indicates that an account was not found.
@@ -194,7 +203,7 @@ func NewAccountNotFoundError(message string, cause error, opts ...ErrorOption) *
 
 // ExitCode returns the process exit code for this error type.
 func (e *AccountNotFoundError) ExitCode() int {
-	return 2
+	return exitCodeNotFound
 }
 
 // HTTPError indicates that an HTTP request returned a non-2xx error status code.
@@ -223,7 +232,7 @@ func NewHTTPError(message string, statusCode int, body string, cause error, opts
 
 // ExitCode returns the process exit code for this error type.
 func (e *HTTPError) ExitCode() int {
-	return 4
+	return exitCodeHTTP
 }
 
 // ValidationError indicates that input validation failed.
@@ -247,7 +256,7 @@ func NewValidationError(message string, cause error, opts ...ErrorOption) *Valid
 
 // ExitCode returns the process exit code for this error type.
 func (e *ValidationError) ExitCode() int {
-	return 1
+	return exitCodeValidation
 }
 
 // OrderBuildError indicates that order building failed.
@@ -271,7 +280,7 @@ func NewOrderBuildError(message string, cause error, opts ...ErrorOption) *Order
 
 // ExitCode returns the process exit code for this error type.
 func (e *OrderBuildError) ExitCode() int {
-	return 1
+	return exitCodeValidation
 }
 
 // exitCoder is an interface for types that can provide an exit code.
@@ -284,14 +293,14 @@ type exitCoder interface {
 // Returns 0 if err is nil, otherwise returns the appropriate exit code.
 func ExitCodeFor(err error) int {
 	if err == nil {
-		return 0
+		return exitCodeSuccess
 	}
 
 	if coder, ok := errors.AsType[exitCoder](err); ok {
 		return coder.ExitCode()
 	}
 
-	return 1
+	return exitCodeValidation
 }
 
 // ErrorCode returns the error classification code for JSON responses.

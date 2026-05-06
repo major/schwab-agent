@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -119,7 +120,7 @@ func RefreshAccessToken(cfg *Config, tf *TokenFile, endpoint string) (*TokenFile
 	}
 
 	// Handle non-2xx responses
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		var errResp tokenErrorResponse
 		if json.Unmarshal(resp.Bytes(), &errResp) == nil && errResp.Error == "invalid_grant" {
 			return nil, apperr.NewAuthExpiredError(

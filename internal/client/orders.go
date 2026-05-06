@@ -193,7 +193,7 @@ func (c *Client) PlaceOrder(
 			nil,
 		)
 	}
-	if resp.StatusCode() >= 400 {
+	if resp.StatusCode() >= http.StatusBadRequest {
 		return nil, apperr.NewHTTPError(
 			fmt.Sprintf("HTTP %d", resp.StatusCode()),
 			resp.StatusCode(),
@@ -265,7 +265,7 @@ func (c *Client) ReplaceOrder(
 			nil,
 		)
 	}
-	if resp.StatusCode() >= 400 {
+	if resp.StatusCode() >= http.StatusBadRequest {
 		return nil, apperr.NewHTTPError(
 			fmt.Sprintf("HTTP %d", resp.StatusCode()),
 			resp.StatusCode(),

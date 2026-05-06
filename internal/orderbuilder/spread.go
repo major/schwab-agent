@@ -7,6 +7,8 @@ import (
 	"github.com/major/schwab-agent/internal/models"
 )
 
+const butterflyBodyQuantityMultiplier = 2.0
+
 // VerticalParams holds parameters for building a vertical spread order.
 type VerticalParams struct {
 	Underlying  string
@@ -205,7 +207,7 @@ func BuildButterflyOrder(params *ButterflyParams) (*models.OrderRequest, error) 
 			buildOptionLeg(&optionLegParams{
 				Underlying: params.Underlying, Expiration: params.Expiration,
 				Strike: params.MiddleStrike, PutCall: params.PutCall,
-				Instruction: bodyInstruction, Quantity: params.Quantity * 2,
+				Instruction: bodyInstruction, Quantity: params.Quantity * butterflyBodyQuantityMultiplier,
 			}),
 			buildOptionLeg(&optionLegParams{
 				Underlying: params.Underlying, Expiration: params.Expiration,

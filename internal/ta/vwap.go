@@ -6,6 +6,8 @@ import (
 	"github.com/major/schwab-agent/internal/apperr"
 )
 
+const typicalPriceComponentCount = 3.0
+
 // VWAP computes Volume Weighted Average Price.
 // Returns a slice of the same length as input with cumulative VWAP values.
 // Returns ValidationError if slices have mismatched lengths, are empty, or have all-zero volumes.
@@ -32,7 +34,7 @@ func VWAP(highs, lows, closes, volumes []float64) ([]float64, error) {
 
 	for i := range highs {
 		// Calculate typical price: (H + L + C) / 3
-		typicalPrice := (highs[i] + lows[i] + closes[i]) / 3.0
+		typicalPrice := (highs[i] + lows[i] + closes[i]) / typicalPriceComponentCount
 
 		// Accumulate typical price * volume and volume
 		cumulativeTV += typicalPrice * volumes[i]

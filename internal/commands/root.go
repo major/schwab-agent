@@ -14,6 +14,8 @@ import (
 	"github.com/major/schwab-agent/internal/client"
 )
 
+const rootSuggestionsMinimumDistance = 2
+
 // RootDeps holds injectable dependencies for the root command auth lifecycle.
 type RootDeps struct {
 	NewClient            func(token string, opts ...client.Option) *client.Client
@@ -56,7 +58,7 @@ func NewRootCmd(
 		Version:                    version,
 		SilenceErrors:              true,
 		SilenceUsage:               true,
-		SuggestionsMinimumDistance: 2,
+		SuggestionsMinimumDistance: rootSuggestionsMinimumDistance,
 		PersistentPreRunE: rootAuthConfig{
 			DefaultConfigPath: defaultConfigPath,
 			DefaultTokenPath:  defaultTokenPath,

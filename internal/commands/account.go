@@ -18,6 +18,12 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
+const (
+	accountHashMinLength               = 16
+	compactFixtureAccountHashMinLength = 6
+	accountDisplayHashSuffixLength     = 4
+)
+
 // accountListData wraps the account list response.
 type accountListData struct {
 	Accounts []models.Account `json:"accounts"`
@@ -411,7 +417,7 @@ func isLikelyAccountHash(value string) bool {
 }
 
 func isLongHexAccountHash(value string) bool {
-	if len(value) < 16 {
+	if len(value) < accountHashMinLength {
 		return false
 	}
 
@@ -431,7 +437,7 @@ type compactAccountHashParts struct {
 }
 
 func isCompactFixtureAccountHash(value string) bool {
-	if len(value) < 6 {
+	if len(value) < compactFixtureAccountHashMinLength {
 		return false
 	}
 
@@ -464,7 +470,7 @@ func compactAccountHashPartsFor(value string) (compactAccountHashParts, bool) {
 // shouldAttemptAccountHashEnrichment avoids extra network calls for compact test
 // fixtures such as hash123/default-hash while still enriching real Schwab hashes.
 func shouldAttemptAccountHashEnrichment(hash string) bool {
-	return len(strings.TrimSpace(hash)) >= 16
+	return len(strings.TrimSpace(hash)) >= accountHashMinLength
 }
 
 type resolvedAccountCandidate struct {
@@ -497,11 +503,11 @@ func accountDisplayLabel(nickname, hash string) string {
 		return "..."
 	}
 
-	if len(hash) < 4 {
+	if len(hash) < accountDisplayHashSuffixLength {
 		return fmt.Sprintf("...%s", hash)
 	}
 
-	return fmt.Sprintf("...%s", hash[len(hash)-4:])
+	return fmt.Sprintf("...%s", hash[len(hash)-accountDisplayHashSuffixLength:])
 }
 
 // matchingNicknameAccounts joins user preference nicknames back to hashes via

@@ -14,6 +14,8 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
+const positionPercentMultiplier = 100.0
+
 // positionEntry enriches a position with account identifiers and computed
 // cost basis / P&L fields that Schwab's API doesn't provide directly.
 type positionEntry struct {
@@ -180,7 +182,7 @@ func computePositionFields(e *positionEntry) {
 	// P&L percentage: avoid division by zero on zero-cost positions
 	// (e.g., positions acquired via stock split or transfer).
 	if e.UnrealizedPnL != nil && e.TotalCostBasis != nil && *e.TotalCostBasis != 0 {
-		pct := *e.UnrealizedPnL / *e.TotalCostBasis * 100
+		pct := *e.UnrealizedPnL / *e.TotalCostBasis * positionPercentMultiplier
 		e.UnrealizedPnLPct = &pct
 	}
 }

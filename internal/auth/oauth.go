@@ -47,6 +47,14 @@ const (
 
 	// callbackServerTimeout bounds how long the local HTTPS callback server waits.
 	callbackServerTimeout = 300 * time.Second
+
+	// oauthStateBytes keeps the CSRF state at 256 bits before hex encoding.
+	oauthStateBytes = 32
+
+	callbackReadHeaderTimeout = 10 * time.Second
+	callbackShutdownTimeout   = 5 * time.Second
+	callbackCertificateBits   = 2048
+	callbackCertificateTTL    = 24 * time.Hour
 )
 
 // newOAuthClient creates a resty client configured for OAuth token requests.
@@ -191,7 +199,7 @@ type callbackResult struct {
 // Returns an error if the system CSPRNG is unavailable instead of panicking,
 // since this runs in a CLI tool where a clean error message beats a stack trace.
 func randomOAuthState() (string, error) {
-	buf := make([]byte, 32)
+	buf := make([]byte, oauthStateBytes)
 	if _, err := rand.Read(buf); err != nil {
 		return "", fmt.Errorf("failed to generate OAuth state: %w", err)
 	}
@@ -254,7 +262,7 @@ func startCallbackServer(addr, expectedState string, readyCh chan<- struct{}) (s
 
 	server := &http.Server{
 		Handler:           callbackHandler(expectedState, resultCh, &once),
-		ReadHeaderTimeout: 10 * time.Second,
+		ReadHeaderTimeout: callbackReadHeaderTimeout,
 	}
 
 	go func() {
@@ -277,12 +285,12 @@ func startCallbackServer(addr, expectedState string, readyCh chan<- struct{}) (s
 
 	select {
 	case result := <-resultCh:
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), callbackShutdownTimeout)
 		defer cancel()
 		_ = server.Shutdown(shutdownCtx)
 		return result.code, result.err
 	case <-timer.C:
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), callbackShutdownTimeout)
 		defer cancel()
 		_ = server.Shutdown(shutdownCtx)
 		return "", apperr.NewAuthCallbackError("timed out waiting for OAuth callback after 300 seconds", nil)
@@ -347,7 +355,7 @@ func validateCallbackAddr(addr string) (string, error) {
 
 // generateSelfSignedCertificate creates an in-memory TLS certificate for the loopback callback server.
 func generateSelfSignedCertificate() (tls.Certificate, error) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey, err := rsa.GenerateKey(rand.Reader, callbackCertificateBits)
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("failed to generate private key: %w", err)
 	}
@@ -359,7 +367,7 @@ func generateSelfSignedCertificate() (tls.Certificate, error) {
 			CommonName: callbackLoopbackHost,
 		},
 		NotBefore:             now.Add(-1 * time.Minute),
-		NotAfter:              now.Add(24 * time.Hour),
+		NotAfter:              now.Add(callbackCertificateTTL),
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,

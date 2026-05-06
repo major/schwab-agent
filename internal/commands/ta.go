@@ -168,19 +168,38 @@ type dashboardSeries struct {
 }
 
 const (
-	dashboardSMAFastPeriod    = 21
-	dashboardSMAMediumPeriod  = 50
-	dashboardSMALongPeriod    = 200
-	dashboardRSIPeriod        = 14
-	dashboardMACDFastPeriod   = 12
-	dashboardMACDSlowPeriod   = 26
-	dashboardMACDSignalPeriod = 9
-	dashboardATRPeriod        = 14
-	dashboardBBandsPeriod     = 20
-	dashboardBBandsStdDev     = 2.0
-	dashboardVolumePeriod     = 20
-	dashboardRangePeriod      = 20
-	dashboardLongRangePeriod  = 252
+	dashboardSMAFastPeriod       = 21
+	dashboardSMAMediumPeriod     = 50
+	dashboardSMALongPeriod       = 200
+	dashboardRSIPeriod           = 14
+	dashboardMACDFastPeriod      = 12
+	dashboardMACDSlowPeriod      = 26
+	dashboardMACDSignalPeriod    = 9
+	dashboardATRPeriod           = 14
+	dashboardBBandsPeriod        = 20
+	dashboardBBandsStdDev        = 2.0
+	dashboardVolumePeriod        = 20
+	dashboardRangePeriod         = 20
+	dashboardLongRangePeriod     = 252
+	simpleTADefaultPeriod        = 20
+	rsiDefaultPeriod             = 14
+	smaConvergenceMultiplier     = 1
+	typicalConvergenceMultiplier = 3
+
+	rsiOverboughtThreshold        = 70.0
+	rsiOversoldThreshold          = 30.0
+	atrElevatedPercentThreshold   = 5.0
+	atrCompressedPercentThreshold = 2.0
+	relativeVolumeElevatedRatio   = 1.5
+	relativeVolumeLightRatio      = 0.75
+	macdConvergenceMultiplier     = 2
+	atrConvergenceMultiplier      = 3
+	adxConvergenceMultiplier      = 4
+	vwapMinimumCandles            = 20
+	hvWarmupCandles               = 21
+	percentMultiplier             = 100.0
+	expectedMoveExpirationParts   = 2
+	quoteMidpointDivisor          = 2.0
 )
 
 // taOutput is the common envelope for single-value time series indicators (SMA, EMA, RSI, etc.).
@@ -405,8 +424,8 @@ with keys like sma_21, sma_50, sma_200.`,
 			example: `  schwab-agent ta sma AAPL
   schwab-agent ta sma AAPL --period 50 --interval daily --points 10
   schwab-agent ta sma AAPL --period 21,50,200 --points 1`,
-			defaultPeriod: 20,
-			multiplier:    1,
+			defaultPeriod: simpleTADefaultPeriod,
+			multiplier:    smaConvergenceMultiplier,
 			compute:       ta.SMA,
 		}, c, w),
 		makeCobraSimpleTACommand(&simpleTAConfig{
@@ -419,8 +438,8 @@ analysis).`,
 			example: `  schwab-agent ta ema AAPL
   schwab-agent ta ema AAPL --period 50 --interval daily --points 10
   schwab-agent ta ema AAPL --period 12,26 --points 5`,
-			defaultPeriod: 20,
-			multiplier:    3,
+			defaultPeriod: simpleTADefaultPeriod,
+			multiplier:    typicalConvergenceMultiplier,
 			compute:       ta.EMA,
 		}, c, w),
 		makeCobraSimpleTACommand(&simpleTAConfig{
@@ -432,8 +451,8 @@ can be repeated or comma-separated for multiple lookbacks. Default period is 14.
 			example: `  schwab-agent ta rsi AAPL
   schwab-agent ta rsi AAPL --period 14 --interval daily --points 10
   schwab-agent ta rsi AAPL --period 9 --interval 5min --points 20`,
-			defaultPeriod: 14,
-			multiplier:    3,
+			defaultPeriod: rsiDefaultPeriod,
+			multiplier:    typicalConvergenceMultiplier,
 			compute:       ta.RSI,
 		}, c, w),
 		cobraTAMACDCommand(c, w),
@@ -918,14 +937,14 @@ func percentOf(value, base float64) float64 {
 	if base == 0 {
 		return 0
 	}
-	return value / base * 100
+	return value / base * percentMultiplier
 }
 
 func percentChange(value, base float64) float64 {
 	if base == 0 {
 		return 0
 	}
-	return (value - base) / base * 100
+	return (value - base) / base * percentMultiplier
 }
 
 func ratio(value, base float64) float64 {
@@ -996,8 +1015,8 @@ func dashboardSignals(latest map[string]any) (map[string]any, error) {
 		"close_above_sma_200":     closePrice > sma200,
 		"sma_21_above_sma_50":     sma21 > sma50,
 		"sma_50_above_sma_200":    sma50 > sma200,
-		"rsi_overbought":          rsi14 >= 70,
-		"rsi_oversold":            rsi14 <= 30,
+		"rsi_overbought":          rsi14 >= rsiOverboughtThreshold,
+		"rsi_oversold":            rsi14 <= rsiOversoldThreshold,
 		"macd_histogram_positive": macdHist > 0,
 	}, nil
 }
@@ -1015,9 +1034,9 @@ func trendSignal(closePrice, sma21, sma50, sma200 float64) string {
 
 func momentumSignal(rsi14, macdHistogram float64) string {
 	switch {
-	case rsi14 >= 70:
+	case rsi14 >= rsiOverboughtThreshold:
 		return "overbought"
-	case rsi14 <= 30:
+	case rsi14 <= rsiOversoldThreshold:
 		return "oversold"
 	case macdHistogram > 0:
 		return "bullish"
@@ -1030,9 +1049,9 @@ func momentumSignal(rsi14, macdHistogram float64) string {
 
 func volatilitySignal(atrPercent float64) string {
 	switch {
-	case atrPercent >= 5:
+	case atrPercent >= atrElevatedPercentThreshold:
 		return "elevated"
-	case atrPercent <= 2:
+	case atrPercent <= atrCompressedPercentThreshold:
 		return "compressed"
 	default:
 		return "normal"
@@ -1041,9 +1060,9 @@ func volatilitySignal(atrPercent float64) string {
 
 func volumeSignal(relativeVolume float64) string {
 	switch {
-	case relativeVolume >= 1.5:
+	case relativeVolume >= relativeVolumeElevatedRatio:
 		return "elevated"
-	case relativeVolume <= 0.75:
+	case relativeVolume <= relativeVolumeLightRatio:
 		return "light"
 	default:
 		return "normal"
@@ -1074,7 +1093,7 @@ func buildMACDOutput(ctx context.Context, c *client.Ref, opts *macdOpts, symbol 
 		c,
 		symbol,
 		interval,
-		(opts.Slow+opts.Signal)*2,
+		(opts.Slow+opts.Signal)*macdConvergenceMultiplier,
 		indicatorNameMACD,
 	)
 	if err != nil {
@@ -1135,7 +1154,7 @@ data with Wilder smoothing. Default period is 14.`,
 func buildATROutput(ctx context.Context, c *client.Ref, opts *atrOpts, symbol string) (taOutput, error) {
 	// ATR uses Wilder smoothing; 3x period provides convergence stability.
 	interval := string(opts.Interval)
-	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.Period*3, "atr")
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.Period*atrConvergenceMultiplier, "atr")
 	if err != nil {
 		return taOutput{}, err
 	}
@@ -1310,7 +1329,7 @@ plus_di, and minus_di for directional bias. Default period is 14.`,
 func buildADXOutput(ctx context.Context, c *client.Ref, opts *adxOpts, symbol string) (adxOutput, error) {
 	// ADX double-smooths (DI pass + ADX pass); 4x period ensures both converge.
 	interval := string(opts.Interval)
-	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.Period*4, "adx")
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.Period*adxConvergenceMultiplier, "adx")
 	if err != nil {
 		return adxOutput{}, err
 	}
@@ -1374,10 +1393,10 @@ suggests bearish.`,
 }
 
 func buildVWAPOutput(ctx context.Context, c *client.Ref, opts *vwapOpts, symbol string) (taOutput, error) {
-	// Use 20 as minimum candle count - VWAP works with any count >= 1
-	// but 20 gives meaningful output for typical use cases.
+	// Use a small minimum candle count. VWAP works with any count >= 1, but this
+	// gives meaningful output for typical use cases.
 	interval := string(opts.Interval)
-	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, 20, "vwap")
+	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, vwapMinimumCandles, "vwap")
 	if err != nil {
 		return taOutput{}, err
 	}
@@ -1425,9 +1444,9 @@ monthly volatility breakdowns.`,
 
 func buildHVOutput(ctx context.Context, c *client.Ref, opts *hvOpts, symbol string) (hvOutput, error) {
 	// Need period+1 closes for N returns, plus extra for rolling window warmup.
-	// period+21 provides a safety margin for the rolling window.
+	// hvWarmupCandles provides a safety margin for the rolling window.
 	interval := string(opts.Interval)
-	candles, _, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.Period+21, "hv")
+	candles, _, err := fetchAndValidateCandles(ctx, c, symbol, interval, opts.Period+hvWarmupCandles, "hv")
 	if err != nil {
 		return hvOutput{}, err
 	}
@@ -1582,7 +1601,7 @@ func expectedMoveExpiration(chain *models.OptionChain, symbol string, targetDTE 
 	bestDiff := -1
 	for expKey := range chain.CallExpDateMap {
 		parts := strings.Split(expKey, ":")
-		if len(parts) != 2 {
+		if len(parts) != expectedMoveExpirationParts {
 			continue
 		}
 
@@ -1629,7 +1648,7 @@ func contractPrice(contract *models.OptionContract, symbol, strike, putCall stri
 		return *contract.Mark, nil
 	}
 	if contract.Bid != nil && contract.Ask != nil {
-		return (*contract.Bid + *contract.Ask) / 2, nil
+		return (*contract.Bid + *contract.Ask) / quoteMidpointDivisor, nil
 	}
 
 	return 0, fmt.Errorf("unable to determine %s price for %s at strike %s", putCall, symbol, strike)
