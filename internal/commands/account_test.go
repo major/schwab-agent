@@ -21,7 +21,7 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-// accountMockServer creates an httptest.Server that routes requests by path.
+// accountMockServer creates an [httptest.Server] that routes requests by path.
 func accountMockServer(t *testing.T, routes map[string]any) *httptest.Server {
 	t.Helper()
 

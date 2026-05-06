@@ -1,4 +1,3 @@
-// Package commands provides CLI command builders for schwab-agent.
 package commands
 
 import (

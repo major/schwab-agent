@@ -104,7 +104,7 @@ func mockVariedCandleListJSON(symbol string, n int) string {
 	return fmt.Sprintf(`{"symbol":%q,"empty":false,"candles":[%s]}`, symbol, strings.Join(candles, ","))
 }
 
-// priceHistoryHandler returns an http.Handler that responds with mock candle data.
+// priceHistoryHandler returns an [http.Handler] that responds with mock candle data.
 // Validates the request path contains /marketdata/v1/pricehistory.
 func priceHistoryHandler(t *testing.T, symbol string, nCandles int) http.Handler {
 	t.Helper()
@@ -199,7 +199,7 @@ func mockEmptyOptionChainJSON(symbol string) string {
 	}`, symbol)
 }
 
-// optionChainHandler returns an http.Handler that responds with mock option chain data.
+// optionChainHandler returns an [http.Handler] that responds with mock option chain data.
 func optionChainHandler(t *testing.T, body string) http.Handler {
 	t.Helper()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -219,7 +219,7 @@ func flagStructuredError(cmd *cobra.Command, err *apperr.FlagError) StructuredEr
 
 // schwabErrorDetails extracts remediation details from every concrete domain
 // error. The concrete checks are intentional because embedding SchwabError does
-// not make errors.As match the embedded base type for wrapper errors.
+// not make [errors.As] match the embedded base type for wrapper errors.
 func schwabErrorDetails(err error) string {
 	if typedErr, ok := errors.AsType[*apperr.AuthRequiredError](err); ok {
 		return typedErr.Details()

@@ -16,7 +16,7 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-// analyzeServer returns an httptest.Server that handles both quote and
+// analyzeServer returns an [httptest.Server] that handles both quote and
 // price-history requests. quoteBody is keyed by symbol path suffix
 // (e.g., "/marketdata/v1/AAPL/quotes"), and candleBody applies to all
 // price-history requests.

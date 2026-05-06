@@ -1,4 +1,3 @@
-// Package ta provides technical analysis indicator calculations.
 package ta
 
 import (

@@ -192,7 +192,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 }
 
 // doGet performs a GET request with optional query parameters.
-// Values are percent-encoded via url.Values to handle special characters safely.
+// Values are percent-encoded via [url.Values] to handle special characters safely.
 func (c *Client) doGet(ctx context.Context, path string, params map[string]string, result any) error {
 	if len(params) > 0 {
 		q := url.Values{}

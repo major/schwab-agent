@@ -77,13 +77,13 @@ func SaveToken(tokenPath string, tf *TokenFile) error {
 }
 
 // IsAccessTokenExpired checks if the access token is expired (with 300s leeway).
-// Returns true if time.Now() >= ExpiresAt - 300.
+// Returns true if [time.Now] is past ExpiresAt minus the leeway.
 func IsAccessTokenExpired(tf *TokenFile) bool {
 	return float64(time.Now().Unix()) >= tf.Token.ExpiresAt-accessTokenLeeway
 }
 
 // IsRefreshTokenStale checks if the refresh token is stale (> 6.5 days old).
-// Returns true if time.Now().Unix() >= creation_timestamp + 561600.
+// Returns true if [time.Now] is past creation_timestamp plus the max age.
 func IsRefreshTokenStale(tf *TokenFile) bool {
 	return time.Now().Unix() >= tf.CreationTimestamp+refreshTokenMaxAge
 }

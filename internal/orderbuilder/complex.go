@@ -1,4 +1,3 @@
-// Package orderbuilder constructs Schwab order payloads.
 package orderbuilder
 
 import (

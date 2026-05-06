@@ -78,7 +78,7 @@ func testClient(t *testing.T, server *httptest.Server) *client.Ref {
 	return &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
 }
 
-// jsonServer returns an httptest.Server that always responds with the given JSON body.
+// jsonServer returns an [httptest.Server] that always responds with the given JSON body.
 func jsonServer(body string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

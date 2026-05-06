@@ -593,7 +593,7 @@ func parseSpecOrder(cmd *cobra.Command, spec string) (*models.OrderRequest, erro
 }
 
 // readSpecSource resolves inline, file, and stdin JSON inputs.
-// All three source types (stdin, @file, inline) share a single json.Valid check
+// All three source types (stdin, @file, inline) share a single [json.Valid] check
 // after the raw bytes are resolved.
 func readSpecSource(cmd any, spec string) ([]byte, error) {
 	trimmed := strings.TrimSpace(spec)
@@ -1169,7 +1169,7 @@ func parseDoubleDiagonalParams(opts *doubleDiagonalBuildOpts, _ []string) (*orde
 	}, nil
 }
 
-// parseDateFlag parses a named YYYY-MM-DD flag value into a time.Time.
+// parseDateFlag parses a named YYYY-MM-DD flag value into a [time.Time].
 // Used by calendar/diagonal spreads which have two expiration flags instead
 // of the single --expiration flag used by other spread types.
 func parseDateFlag(raw, flagName string) (time.Time, error) {

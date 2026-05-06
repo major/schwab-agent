@@ -1,4 +1,3 @@
-// Package client provides an authenticated HTTP client for the Schwab API.
 package client
 
 import (

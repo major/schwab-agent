@@ -55,7 +55,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-// runApp builds and executes the root command without allowing Cobra to call os.Exit.
+// runApp builds and executes the root command without allowing Cobra to call [os.Exit].
 func runApp(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 

@@ -18,7 +18,7 @@ import (
 
 // ErrMissingCredentials is a sentinel error wrapped by the ValidationError
 // returned from LoadConfig when client_id or client_secret are absent. Callers
-// can use errors.Is(err, ErrMissingCredentials) to distinguish missing
+// can use [errors.Is] with ErrMissingCredentials to distinguish missing
 // credentials from other validation failures (e.g., invalid base_url) without
 // matching on error message text.
 var ErrMissingCredentials = errors.New("missing required credentials")

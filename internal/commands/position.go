@@ -438,7 +438,7 @@ func sortPositionEntries(entries []positionEntry, sortBy positionSort) {
 	}
 }
 
-// optionalFloatLess compares optional numeric values for sort.SliceStable.
+// optionalFloatLess compares optional numeric values for [sort.SliceStable].
 // Nil values sort last in both directions because missing P&L or market value
 // should not outrank known portfolio data.
 func optionalFloatLess(left, right *float64, desc bool) bool {

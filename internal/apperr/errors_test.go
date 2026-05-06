@@ -84,7 +84,7 @@ func TestExitCodeForNilError(t *testing.T) {
 	assert.Equal(t, 0, code)
 }
 
-// TestExitCodeForStandardError verifies standard errors.New() maps to exit code 1.
+// TestExitCodeForStandardError verifies standard [errors.New] maps to exit code 1.
 func TestExitCodeForStandardError(t *testing.T) {
 	err := errors.New("standard error")
 	code := ExitCodeFor(err)
@@ -184,13 +184,13 @@ func TestErrorChainPreservation(t *testing.T) {
 	assert.ErrorIs(t, err.Unwrap(), underlying)
 }
 
-// TestErrorChainTraversal verifies errors.AsType() can traverse the error chain.
+// TestErrorChainTraversal verifies [errors.AsType] can traverse the error chain.
 func TestErrorChainTraversal(t *testing.T) {
 	underlying := errors.New("root cause")
 	err := NewAuthRequiredError("auth required", underlying)
 
 	authErr, ok := errors.AsType[*AuthRequiredError](err)
-	require.True(t, ok, "errors.AsType() should find AuthRequiredError in chain")
+	require.True(t, ok, "errors.AsType should find AuthRequiredError in chain")
 
 	// Note: errors.AsType() does not automatically traverse to parent types
 	// without explicit As() method implementation. This test verifies

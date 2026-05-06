@@ -25,7 +25,7 @@ var (
 //
 // Cobra intentionally returns plain string errors for parse failures. Wrapping
 // those strings at the SetFlagErrorFunc boundary lets the output package use
-// errors.As instead of re-parsing text after command execution has unwound.
+// [errors.As] instead of re-parsing text after command execution has unwound.
 type FlagError struct {
 	Kind     string
 	FlagName string
