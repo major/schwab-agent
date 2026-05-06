@@ -171,7 +171,7 @@ func assertTestAccountMetadata(
 	t *testing.T,
 	metadata output.Metadata,
 	source string,
-) { //nolint:gocritic // hugeParam: output.Metadata is passed by value intentionally to match the existing API contract.
+) {
 	t.Helper()
 
 	assert.Equal(t, "ABCDEF1234567890ABCDEF1234567890", metadata.Account)

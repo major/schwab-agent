@@ -165,7 +165,7 @@ func writeOrderActionResult(
 	data *orderActionData,
 	errs []string,
 	acct resolvedAccountInfo,
-) error { //nolint:gocritic // hugeParam: resolvedAccountInfo is passed by value intentionally; callers construct it inline and pointer indirection would complicate all call sites.
+) error {
 	metadata := output.NewMetadata()
 	metadata.Account = acct.Hash
 	metadata.AccountNickName = acct.NickName
@@ -261,7 +261,7 @@ func writeOrderPreviewResult(
 	order *models.OrderRequest,
 	preview *models.PreviewOrder,
 	savePreview bool,
-) error { //nolint:gocritic // hugeParam: resolvedAccountInfo is passed by value intentionally; callers construct it inline and pointer indirection would complicate all call sites.
+) error {
 	data := orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}
 	if savePreview {
 		digestData, err := saveOrderPreview(acct.Hash, order, preview)

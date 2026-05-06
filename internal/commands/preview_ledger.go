@@ -92,7 +92,7 @@ func saveOrderPreview(
 	if err := os.Chmod(
 		ledgerDir,
 		0o700,
-	); err != nil { //nolint:gosec // Directories need execute bits; 0700 keeps the ledger private.
+	); err != nil {
 		return nil, fmt.Errorf("secure preview ledger directory: %w", err)
 	}
 
