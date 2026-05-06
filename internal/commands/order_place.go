@@ -197,44 +197,7 @@ func resolveOrderPlacePayload(
 	opts *orderPlaceOpts,
 ) (*orderPlacePayload, error) {
 	if strings.TrimSpace(opts.FromPreview) != "" {
-		entry, err := loadOrderPreview(opts.FromPreview)
-		if err != nil {
-			return nil, err
-		}
-
-		accountFlag, err := cmd.Flags().GetString("account")
-		if err != nil {
-			return nil, err
-		}
-		if strings.TrimSpace(accountFlag) != "" {
-			acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configPath, nil)
-			if err != nil {
-				return nil, err
-			}
-			if acct.Hash != entry.Account {
-				return nil, newValidationError("--account does not match the account bound to the preview digest")
-			}
-		}
-
-		accountNumber, nickName, accountType := "", "", ""
-		if shouldAttemptAccountHashEnrichment(entry.Account) {
-			accountNumber, nickName, accountType = enrichAccountHash(cmd.Context(), c, entry.Account)
-		}
-		acct := resolvedAccountInfo{
-			Hash:          entry.Account,
-			AccountNumber: accountNumber,
-			NickName:      nickName,
-			AccountType:   accountType,
-			Source:        "preview",
-			DisplayLabel:  accountDisplayLabel(nickName, entry.Account),
-		}
-
-		return &orderPlacePayload{
-			Account:       entry.Account,
-			AccountInfo:   acct,
-			Order:         entry.Order,
-			PreviewDigest: entry.Digest,
-		}, nil
+		return resolveOrderPlacePreviewPayload(cmd, c, configPath, opts.FromPreview)
 	}
 
 	accountFlag, err := cmd.Flags().GetString("account")
@@ -251,6 +214,55 @@ func resolveOrderPlacePayload(
 		return nil, err
 	}
 	return &orderPlacePayload{Account: acct.Hash, AccountInfo: acct, Order: order}, nil
+}
+
+// resolveOrderPlacePreviewPayload loads the saved preview ledger entry and
+// verifies any explicit --account value still matches the account that approved
+// the preview. That keeps mutable placement bound to the reviewed payload.
+func resolveOrderPlacePreviewPayload(
+	cmd *cobra.Command,
+	c *client.Ref,
+	configPath string,
+	previewDigest string,
+) (*orderPlacePayload, error) {
+	entry, err := loadOrderPreview(previewDigest)
+	if err != nil {
+		return nil, err
+	}
+
+	accountFlag, err := cmd.Flags().GetString("account")
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(accountFlag) != "" {
+		acct, err := resolveAccountDetailed(cmd.Context(), c, accountFlag, configPath, nil)
+		if err != nil {
+			return nil, err
+		}
+		if acct.Hash != entry.Account {
+			return nil, newValidationError("--account does not match the account bound to the preview digest")
+		}
+	}
+
+	accountNumber, nickName, accountType := "", "", ""
+	if shouldAttemptAccountHashEnrichment(entry.Account) {
+		accountNumber, nickName, accountType = enrichAccountHash(cmd.Context(), c, entry.Account)
+	}
+	acct := resolvedAccountInfo{
+		Hash:          entry.Account,
+		AccountNumber: accountNumber,
+		NickName:      nickName,
+		AccountType:   accountType,
+		Source:        "preview",
+		DisplayLabel:  accountDisplayLabel(nickName, entry.Account),
+	}
+
+	return &orderPlacePayload{
+		Account:       entry.Account,
+		AccountInfo:   acct,
+		Order:         entry.Order,
+		PreviewDigest: entry.Digest,
+	}, nil
 }
 
 // writeOrderPreviewResult optionally saves the previewed order to the local

@@ -163,27 +163,29 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 
 	// Decode JSON response if a result target was provided and there is a body.
 	respBody := resp.Bytes()
-	if result != nil && len(respBody) > 0 {
-		// Validate Content-Type before attempting JSON decode. Without this,
-		// an HTML error page from a proxy or maintenance window produces a
-		// cryptic json.Unmarshal error instead of a clear diagnostic.
-		ct := resp.Header().Get("Content-Type")
-		if ct != "" {
-			mediaType, _, err := mime.ParseMediaType(ct)
-			if err == nil && mediaType != "application/json" {
-				// Show a body preview so the caller can see what came back
-				// (e.g., an HTML maintenance page or a proxy error).
-				preview := resp.String()
-				if len(preview) > 200 {
-					preview = preview[:200] + "..."
-				}
-				return fmt.Errorf("unexpected Content-Type %q (expected application/json): %s", ct, preview)
-			}
-		}
+	if result == nil || len(respBody) == 0 {
+		return nil
+	}
 
-		if err := json.Unmarshal(respBody, result); err != nil {
-			return fmt.Errorf("decode response: %w", err)
+	// Validate Content-Type before attempting JSON decode. Without this,
+	// an HTML error page from a proxy or maintenance window produces a
+	// cryptic json.Unmarshal error instead of a clear diagnostic.
+	ct := resp.Header().Get("Content-Type")
+	if ct != "" {
+		mediaType, _, err := mime.ParseMediaType(ct)
+		if err == nil && mediaType != "application/json" {
+			// Show a body preview so the caller can see what came back
+			// (e.g., an HTML maintenance page or a proxy error).
+			preview := resp.String()
+			if len(preview) > 200 {
+				preview = preview[:200] + "..."
+			}
+			return fmt.Errorf("unexpected Content-Type %q (expected application/json): %s", ct, preview)
 		}
+	}
+
+	if err := json.Unmarshal(respBody, result); err != nil {
+		return fmt.Errorf("decode response: %w", err)
 	}
 
 	return nil
