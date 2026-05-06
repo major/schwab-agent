@@ -55,9 +55,17 @@ func TestNewMarketCmd_Hours_AllMarkets(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	var envelope output.Envelope
+	var envelope testEnvelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
-	assert.NotNil(t, envelope.Data)
+	assert.JSONEq(t, `{
+		"equity": {
+			"EQ": {
+				"marketType": "EQUITY",
+				"isOpen": true,
+				"date": "2024-01-15"
+			}
+		}
+	}`, string(envelope.Data))
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
@@ -80,10 +88,54 @@ func TestNewMarketCmd_Hours_SpecificMarket(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	var envelope output.Envelope
+	var envelope testEnvelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
-	assert.NotNil(t, envelope.Data)
+	assert.JSONEq(t, `{
+		"equity": {
+			"EQ": {
+				"marketType": "EQUITY",
+				"isOpen": true,
+				"date": "2024-01-15"
+			}
+		}
+	}`, string(envelope.Data))
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
+}
+
+func TestNewMarketCmd_Hours_OmitsMissingOptionalFields(t *testing.T) {
+	// Arrange
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// schwab-go decodes the response into value fields, but schwab-agent's
+		// historical output model used pointers with omitempty. This partial
+		// fixture catches accidental zero-value fields leaking into the CLI JSON.
+		resp := `{"equity":{"EQ":{"date":"2024-01-15","isOpen":false,` +
+			`"sessionHours":{"regularMarket":[` +
+			`{"start":"2024-01-15T09:30:00-05:00"}]}}}}`
+		_, _ = w.Write([]byte(resp))
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "hours", "equity")
+
+	// Assert
+	require.NoError(t, err)
+	var envelope testEnvelope
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+	assert.JSONEq(t, `{
+		"equity": {
+			"EQ": {
+				"date": "2024-01-15",
+				"isOpen": false,
+				"sessionHours": {
+					"regularMarket": [{"start": "2024-01-15T09:30:00-05:00"}]
+				}
+			}
+		}
+	}`, string(envelope.Data))
 }
 
 func TestNewMarketCmd_Hours_APIError(t *testing.T) {
@@ -101,6 +153,9 @@ func TestNewMarketCmd_Hours_APIError(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
 }
 
 func TestNewMarketCmd_Hours_SpecificMarketAPIError(t *testing.T) {
@@ -118,6 +173,9 @@ func TestNewMarketCmd_Hours_SpecificMarketAPIError(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
 }
 
 func TestNewMarketCmd_Movers_Success(t *testing.T) {
