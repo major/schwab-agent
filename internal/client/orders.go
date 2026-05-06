@@ -169,7 +169,7 @@ func (c *Client) PlaceOrder(
 		return nil, fmt.Errorf("marshal request body: %w", err)
 	}
 
-	c.logger.Debug("http request", "method", http.MethodPost, "path", path)
+	c.logger.DebugContext(ctx, "http request", "method", http.MethodPost, "path", path)
 
 	resp, err := c.resty.R().
 		SetContext(ctx).
@@ -244,7 +244,7 @@ func (c *Client) ReplaceOrder(
 		return nil, fmt.Errorf("marshal request body: %w", err)
 	}
 
-	c.logger.Debug("http request", "method", http.MethodPut, "path", path)
+	c.logger.DebugContext(ctx, "http request", "method", http.MethodPut, "path", path)
 
 	resp, err := c.resty.R().
 		SetContext(ctx).

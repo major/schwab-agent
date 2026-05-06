@@ -56,7 +56,7 @@ func TestNewClient_WithTLSConfig(t *testing.T) {
 }
 
 func TestNewClient_WithLogger(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.DiscardHandler)
 	c := NewClient("tok", WithLogger(logger))
 
 	assert.Equal(t, logger, c.logger)
@@ -490,7 +490,7 @@ func TestDoRequest_JSONContentTypeWithCharset_Succeeds(t *testing.T) {
 }
 
 func TestDoRequest_MultipleOptions(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.DiscardHandler)
 
 	c := NewClient("tok",
 		WithBaseURL("https://custom.example.com"),

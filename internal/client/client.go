@@ -9,7 +9,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -69,7 +68,7 @@ func NewClient(token string, opts ...Option) *Client {
 		resty:     rc,
 		token:     token,
 		userAgent: defaultUserAgent,
-		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		logger:    slog.New(slog.DiscardHandler),
 	}
 	rc.SetBaseURL(defaultBaseURL)
 	rc.SetTimeout(defaultTimeout)
@@ -144,7 +143,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 		return fmt.Errorf("execute request: %w", err)
 	}
 
-	c.logger.Debug("http request", "method", method, "path", path, "status", resp.StatusCode())
+	c.logger.DebugContext(ctx, "http request", "method", method, "path", path, "status", resp.StatusCode())
 
 	// Map non-2xx status codes to typed errors.
 	if resp.StatusCode() == http.StatusUnauthorized {
