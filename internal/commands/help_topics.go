@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// NewHelpTopicCmds returns lightweight informational topics as real Cobra
-// commands so the normal auth-skip annotation path can handle them.
+// NewHelpTopicCmds returns Cobra-native help topic commands (env-vars, config-keys).
+// They are real commands so the normal Cobra auth-skip annotation path can handle them.
 func NewHelpTopicCmds(w io.Writer) []*cobra.Command {
 	return []*cobra.Command{
 		newEnvVarsCmd(w),
@@ -19,13 +19,12 @@ func NewHelpTopicCmds(w io.Writer) []*cobra.Command {
 }
 
 // newEnvVarsCmd returns a static reference for environment variables consumed
-// outside Cobra flag binding. Keeping this hand-written makes auth/config
-// environment support visible beside Cobra's command/flag help output.
+// outside Cobra flag binding. This includes auth, config, and state settings.
 func newEnvVarsCmd(w io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:         "env-vars",
 		Short:       "Show supported environment variables",
-		Long:        "Show environment variables that schwab-agent reads for authentication, API configuration, state, and debug behavior.",
+		Long:        "Show environment variables that schwab-agent reads for authentication, API configuration, and state.",
 		Annotations: map[string]string{"skipAuth": "true"},
 		GroupID:     "tools",
 		Args:        cobra.NoArgs,
@@ -41,14 +40,13 @@ func newEnvVarsCmd(w io.Writer) *cobra.Command {
 
   Local state and diagnostics:
     SCHWAB_AGENT_STATE_DIR      Directory for preview digest ledger files.
-    SCHWAB_AGENT_DEBUG_OPTIONS  Enables debug option tracing for --debug-options.
 `)
 			return err
 		},
 	}
 }
 
-// newConfigKeysCmd prints config keys from the live Cobra command tree.
+// newConfigKeysCmd prints config keys from the live Cobra command tree and their flags.
 func newConfigKeysCmd(w io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:         "config-keys",

@@ -16,7 +16,7 @@ import (
 	"github.com/major/schwab-agent/internal/models"
 )
 
-const cobraFlagEnumAnnotation = "schwab-agent/flag-enum"
+const flagEnumAnnotation = "schwab-agent/flag-enum"
 
 type cobraValidatable interface {
 	Validate(context.Context) []error
@@ -137,9 +137,8 @@ func defineAndConstrain[O any](cmd *cobra.Command, opts O, exclusivePairs ...[]s
 }
 
 // defineCobraFlags registers flags from the existing option structs using Cobra
-// bindings. Keeping this reflection local preserves concise command setup while
-// still making RunE handlers read regular typed option structs after pflag
-// parsing.
+// bindings. This keeps the command setup local and explicit enough for each
+// RunE to read its opts struct directly after pflag parsing.
 func defineCobraFlags(cmd *cobra.Command, opts any) {
 	value := reflect.ValueOf(opts)
 	if value.Kind() != reflect.Pointer || value.IsNil() || value.Elem().Kind() != reflect.Struct {
@@ -210,7 +209,7 @@ func registerCobraFlag(flags *pflag.FlagSet, name, short, usage string, field re
 		valid, aliases := cobraEnumValues(value)
 		flags.VarP(&cobraStringEnumValue{field: field, valid: valid, aliases: aliases}, name, short, usage)
 		if len(valid) > 0 {
-			flags.Lookup(name).Annotations = map[string][]string{cobraFlagEnumAnnotation: valid}
+			flags.Lookup(name).Annotations = map[string][]string{flagEnumAnnotation: valid}
 		}
 	case reflect.Bool:
 		flags.BoolVarP(field.Addr().Interface().(*bool), name, short, field.Bool(), usage)
@@ -451,7 +450,7 @@ func enumValuesForFlag(cmd *cobra.Command, flagName string) []string {
 		return nil
 	}
 
-	return cleanEnumValues(flag.Annotations[cobraFlagEnumAnnotation])
+	return cleanEnumValues(flag.Annotations[flagEnumAnnotation])
 }
 
 func enumValuesFromMessage(message string) []string {

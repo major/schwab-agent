@@ -54,13 +54,6 @@ func NewRootCmd(
 				return nil
 			}
 
-			// Debug mode prints flag source attribution and exits without
-			// executing the command. Skip auth since introspection doesn't
-			// need API access.
-			if IsDebugOptionsActive(cmd) {
-				return nil
-			}
-
 			verbose, err := cmd.Flags().GetBool("verbose")
 			if err != nil {
 				return err

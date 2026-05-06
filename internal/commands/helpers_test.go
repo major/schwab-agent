@@ -297,7 +297,7 @@ func TestDefineCobraFlags(t *testing.T) {
 		assert.True(t, opts.Enabled)
 		assert.Equal(t, models.DurationDay, opts.Duration)
 		require.NotNil(t, cmd.Flags().Lookup("duration"))
-		assert.Equal(t, []string{"DAY", "END_OF_MONTH", "END_OF_WEEK", "FILL_OR_KILL", "GOOD_TILL_CANCEL", "IMMEDIATE_OR_CANCEL", "NEXT_END_OF_MONTH"}, cmd.Flags().Lookup("duration").Annotations[cobraFlagEnumAnnotation])
+		assert.Equal(t, []string{"DAY", "END_OF_MONTH", "END_OF_WEEK", "FILL_OR_KILL", "GOOD_TILL_CANCEL", "IMMEDIATE_OR_CANCEL", "NEXT_END_OF_MONTH"}, cmd.Flags().Lookup("duration").Annotations[flagEnumAnnotation])
 
 		// Act
 		_, err := runTestCommand(

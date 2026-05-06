@@ -15,8 +15,8 @@ import (
 )
 
 // StructuredError is the top-level machine-readable error shape used by the
-// CLI. It preserves the JSON contract originally exposed to agents while all
-// classification is now handled by schwab-agent's Cobra-native error pipeline.
+// CLI. All error paths produce this shape so agents can parse one stable
+// JSON contract for domain, flag, and generic errors.
 type StructuredError struct {
 	Error      string      `json:"error"`
 	ExitCode   int         `json:"exit_code"`
@@ -33,11 +33,9 @@ type StructuredError struct {
 	EnvVar     string      `json:"env_var,omitempty"`
 }
 
-// Violation describes one field-level validation failure. schwab-agent's current
-// validators return compact messages, but the field is kept for callers that
-// decode the stable ErrorEnvelope schema.
+// Violation describes a single input validation failure.
 type Violation struct {
-	Field   string `json:"field,omitempty"`
+	Subject string `json:"subject,omitempty"`
 	Message string `json:"message,omitempty"`
 }
 
@@ -97,7 +95,7 @@ func WriteError(w io.Writer, err error) error {
 // WriteCommandError writes an error response and returns the process exit code
 // that should accompany it. Schwab-domain errors are mapped locally so their
 // existing 1-5 exit-code contract stays intact. Cobra flag errors are mapped
-// locally because Cobra surfaces raw pflag errors before RunE handlers execute.
+// locally. Non-domain, non-flag errors produce a generic exit-code-1 envelope.
 func WriteCommandError(w io.Writer, cmd *cobra.Command, err error) (int, error) {
 	if err == nil {
 		return 0, nil
