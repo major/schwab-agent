@@ -235,7 +235,8 @@ func startCallbackServer(addr, expectedState string, readyCh chan<- struct{}) (s
 		return "", apperr.NewAuthCallbackError("failed to generate callback TLS certificate", err)
 	}
 
-	listener, err := net.Listen("tcp", validatedAddr)
+	listenConfig := &net.ListenConfig{}
+	listener, err := listenConfig.Listen(context.Background(), "tcp", validatedAddr)
 	if err != nil {
 		if readyCh != nil {
 			close(readyCh)
