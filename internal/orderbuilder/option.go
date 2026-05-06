@@ -2,6 +2,7 @@ package orderbuilder
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -133,7 +134,7 @@ func ParseOCCSymbol(symbol string) (*OCCComponents, error) {
 
 	underlying := strings.TrimRight(symbol[:6], " ")
 	if underlying == "" {
-		return nil, fmt.Errorf("OCC symbol has empty underlying")
+		return nil, errors.New("OCC symbol has empty underlying")
 	}
 
 	dateStr := symbol[6:12]

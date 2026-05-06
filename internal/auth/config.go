@@ -114,7 +114,7 @@ func normalizeBaseURL(rawBaseURL string) (string, error) {
 	}
 
 	if parsedURL.Scheme == "" || parsedURL.Host == "" {
-		return "", fmt.Errorf("base_url must include scheme and host")
+		return "", errors.New("base_url must include scheme and host")
 	}
 
 	parsedURL.Path = strings.TrimRight(parsedURL.Path, "/")

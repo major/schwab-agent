@@ -248,14 +248,14 @@ type simpleTAOpts struct {
 // Checks that all requested periods are positive and unique.
 func (o *simpleTAOpts) Validate(_ context.Context) []error {
 	if len(o.Period) == 0 {
-		return []error{fmt.Errorf("at least one period is required")}
+		return []error{errors.New("at least one period is required")}
 	}
 
 	var errs []error
 	seen := make(map[int]struct{}, len(o.Period))
 	for _, period := range o.Period {
 		if period <= 0 {
-			errs = append(errs, fmt.Errorf("period must be greater than 0"))
+			errs = append(errs, errors.New("period must be greater than 0"))
 		}
 
 		if _, ok := seen[period]; ok {

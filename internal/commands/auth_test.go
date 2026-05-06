@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -591,7 +592,7 @@ func TestNewAuthCmd_RefreshFails(t *testing.T) {
 
 	deps := AuthDeps{
 		RefreshAccessToken: func(_ *auth.Config, _ *auth.TokenFile, _ string) (*auth.TokenFile, error) {
-			return nil, fmt.Errorf("refresh failed: server error")
+			return nil, errors.New("refresh failed: server error")
 		},
 	}
 
