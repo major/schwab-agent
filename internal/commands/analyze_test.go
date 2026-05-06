@@ -56,7 +56,7 @@ func TestNewAnalyzeCmd_Flags(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewAnalyzeCmd(ref, &buf)
 
-	// Assert - Cobra-registered flags exist with correct defaults
+	// Assert - registered flags exist with correct defaults
 	intervalFlag := cmd.Flags().Lookup("interval")
 	require.NotNil(t, intervalFlag, "--interval flag should be registered")
 	assert.Equal(t, "daily", intervalFlag.DefValue)

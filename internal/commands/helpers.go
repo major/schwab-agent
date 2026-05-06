@@ -137,9 +137,8 @@ func defineAndConstrain[O any](cmd *cobra.Command, opts O, exclusivePairs ...[]s
 }
 
 // defineCobraFlags registers flags from the existing option structs using Cobra
-// bindings. Keeping this reflection local preserves concise command setup while
-// still making RunE handlers read regular typed option structs after pflag
-// parsing.
+// bindings. This keeps the command setup local and explicit enough for each
+// RunE to read its opts struct directly after pflag parsing.
 func defineCobraFlags(cmd *cobra.Command, opts any) {
 	value := reflect.ValueOf(opts)
 	if value.Kind() != reflect.Pointer || value.IsNil() || value.Elem().Kind() != reflect.Struct {
