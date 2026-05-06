@@ -2,7 +2,47 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:best-practices"],
   "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update golangci-lint binary version used by golangci-lint-action",
+      "managerFilePatterns": ["/(^|/)\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "uses: golangci/golangci-lint-action@[^\\n]+\\n\\s+with:\\n\\s+version:\\s*[\\\"']?(?<currentValue>v?\\d+\\.\\d+(?:\\.\\d+)?)[\\\"']?"
+      ],
+      "depNameTemplate": "golangci/golangci-lint",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Update copied maratori golangci-lint config",
+      "managerFilePatterns": ["/^scripts/update-golangci-config\\.sh$/"],
+      "matchStrings": ["VERSION=\"\\$\\{1:-(?<currentValue>v?\\d+\\.\\d+\\.\\d+)\\}\""],
+      "depNameTemplate": "maratori/golangci-lint-config",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    }
+  ],
   "packageRules": [
+    {
+      "description": "Group golangci-lint action and binary updates",
+      "matchPackageNames": [
+        "golangci/golangci-lint-action",
+        "golangci/golangci-lint",
+        "maratori/golangci-lint-config"
+      ],
+      "groupName": "golangci-lint"
+    },
+    {
+      "description": "Refresh copied maratori golangci-lint config after version bumps",
+      "matchPackageNames": ["maratori/golangci-lint-config"],
+      "postUpgradeTasks": {
+        "commands": ["scripts/update-golangci-config.sh {{{newValue}}}"],
+        "fileFilters": [".golangci.yml", "scripts/update-golangci-config.sh"],
+        "executionMode": "update"
+      }
+    },
     {
       "description": "Auto-merge patch, minor, and digest updates",
       "matchUpdateTypes": ["patch", "minor", "digest"],
