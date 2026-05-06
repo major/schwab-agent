@@ -14,7 +14,7 @@ Go CLI tool for AI agents to trade via Charles Schwab APIs. Single binary, JSON-
 - **Module**: `github.com/major/schwab-agent`
 - **Go version**: 1.26 (check `/usr/local/go/bin/go version` for newer installs)
 - **Entry point**: `cmd/schwab-agent/main.go`
-- **Dependencies**: spf13/cobra v1.10.2 (CLI framework), pkg/browser (OAuth flow), resty.dev/v3 (HTTP client, used by both internal/client/ and internal/auth/), stretchr/testify (test assertions)
+- **Dependencies**: spf13/cobra v1.10.2 (CLI framework), pkg/browser (OAuth flow), schwab-go v0.1.0 (shared Schwab API client for migrated endpoints), resty.dev/v3 (HTTP client, used by both internal/client/ and internal/auth/), stretchr/testify (test assertions)
 
 ## Architecture
 
@@ -22,7 +22,7 @@ Go CLI tool for AI agents to trade via Charles Schwab APIs. Single binary, JSON-
 cmd/schwab-agent/       Entry point, buildApp(), PersistentPreRunE auth hook
 internal/
   auth/                 OAuth2 flow (resty v3 for token exchange), token lifecycle, config (JSON + env vars)
-  client/               Schwab API HTTP client (see internal/client/AGENTS.md)
+  client/               Schwab API HTTP client and schwab-go adapters (see internal/client/AGENTS.md)
   commands/             CLI command handlers (see internal/commands/AGENTS.md)
   apperr/               Typed error hierarchy with exit codes
   models/               Data structures/schemas for API payloads

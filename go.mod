@@ -3,6 +3,7 @@ module github.com/major/schwab-agent
 go 1.26
 
 require (
+	github.com/major/schwab-go v0.1.0
 	github.com/markcheno/go-talib v0.0.0-20250114000313-ec55a20c902f
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/spf13/cobra v1.10.2

@@ -21,6 +21,8 @@ type defineAndConstrainTestOpts struct {
 	Put  bool `flag:"put" flagdescr:"Put option"`
 }
 
+type testContextKey struct{}
+
 type flagValidationTestOpts struct {
 	Interval taInterval `flag:"interval" flagdescr:"Data interval" default:"daily"`
 }
@@ -156,15 +158,18 @@ func TestCobraRequireSubcommand(t *testing.T) {
 }
 
 func TestDefaultSubcommand(t *testing.T) {
-	newParent := func(t *testing.T, called *bool, gotArgs *[]string) *cobra.Command {
+	newParent := func(t *testing.T, called *bool, gotArgs *[]string, gotContext *context.Context) *cobra.Command {
 		t.Helper()
 
 		defaultCmd := &cobra.Command{
 			Use:   "get SYMBOL",
 			Short: "default subcommand",
-			RunE: func(_ *cobra.Command, args []string) error {
+			RunE: func(cmd *cobra.Command, args []string) error {
 				*called = true
 				*gotArgs = append((*gotArgs)[:0], args...)
+				if gotContext != nil {
+					*gotContext = cmd.Context()
+				}
 
 				return nil
 			},
@@ -188,7 +193,7 @@ func TestDefaultSubcommand(t *testing.T) {
 		// Arrange
 		called := false
 		gotArgs := []string{}
-		parent := newParent(t, &called, &gotArgs)
+		parent := newParent(t, &called, &gotArgs, nil)
 
 		// Act
 		_, err := runTestCommand(t, parent, "AAPL")
@@ -203,7 +208,7 @@ func TestDefaultSubcommand(t *testing.T) {
 		// Arrange
 		called := false
 		gotArgs := []string{}
-		parent := newParent(t, &called, &gotArgs)
+		parent := newParent(t, &called, &gotArgs, nil)
 
 		// Act
 		_, err := runTestCommand(t, parent)
@@ -220,7 +225,7 @@ func TestDefaultSubcommand(t *testing.T) {
 		// Arrange
 		called := false
 		gotArgs := []string{}
-		parent := newParent(t, &called, &gotArgs)
+		parent := newParent(t, &called, &gotArgs, nil)
 
 		// Act - Cobra normally routes this before parent RunE. Calling the RunE
 		// directly verifies the defensive guard for future command wiring changes.
@@ -232,6 +237,25 @@ func TestDefaultSubcommand(t *testing.T) {
 		assert.Contains(t, valErr.Error(), `unknown command "sma" for "parent"`)
 		assert.False(t, called)
 		assert.Empty(t, gotArgs)
+	})
+
+	t.Run("dispatch propagates parent context to default subcommand", func(t *testing.T) {
+		// Arrange
+		called := false
+		gotArgs := []string{}
+		var gotContext context.Context
+		parent := newParent(t, &called, &gotArgs, &gotContext)
+		ctx := context.WithValue(context.Background(), testContextKey{}, "parent-context")
+		parent.SetContext(ctx)
+
+		// Act
+		_, err := runTestCommand(t, parent, "AAPL")
+
+		// Assert
+		require.NoError(t, err)
+		assert.True(t, called)
+		assert.Equal(t, []string{"AAPL"}, gotArgs)
+		assert.Equal(t, "parent-context", gotContext.Value(testContextKey{}))
 	})
 }
 

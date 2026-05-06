@@ -227,8 +227,9 @@ func TestNewQuoteGetWithIndicative(t *testing.T) {
 		// Verify the indicative query parameter is set to "true".
 		q := r.URL.Query()
 		assert.Equal(t, "true", q.Get("indicative"))
+		assert.Equal(t, "AAPL", q.Get("symbols"))
 
-		if r.URL.Path == "/marketdata/v1/AAPL/quotes" {
+		if r.URL.Path == "/marketdata/v1/quotes" {
 			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
 			return
 		}

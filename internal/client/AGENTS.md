@@ -2,7 +2,7 @@
 
 > Leave generous comments when fixing bugs or working around API quirks. Anything that might save a future developer from re-discovering the same issue is worth writing down.
 
-HTTP client for the Charles Schwab API. Wraps all API endpoints with typed Go methods. 22 files (11 source + 11 test).
+HTTP client for the Charles Schwab API. Wraps all API endpoints with typed Go methods. Migrated endpoints should prefer `github.com/major/schwab-go` adapters while preserving schwab-agent's public method signatures, JSON output models, and typed error hierarchy.
 
 ## Client Construction
 
@@ -29,7 +29,7 @@ WithTLSConfig applies a custom TLS configuration to the resty client's transport
 
 ## HTTP Helpers
 
-Core method `doRequest` uses resty v3 internally. It sets the Bearer token via request middleware (reads c.token at request time for token refresh support), validates Content-Type before JSON decoding, and maps status codes to typed errors. Thin wrappers:
+Core method `doRequest` uses resty v3 internally. It sets the Bearer token via request middleware (reads c.token at request time for token refresh support), validates Content-Type before JSON decoding, and maps status codes to typed errors. Migrated `schwab-go` adapters should reuse `c.resty.Client()` so timeout/TLS transport behavior stays consistent, then map library errors back to `internal/apperr`. Thin wrappers:
 
 - `doGet(ctx, path, params, result)`: GET with query params
 - `doPost(ctx, path, body, result)`: POST with JSON body
@@ -63,22 +63,23 @@ Each file maps to one Schwab API resource:
 | movers.go | `Movers()` | `/marketdata/v1/movers` |
 | orders.go | `ListOrders()`, `AllOrders()`, `GetOrder()`, `PlaceOrder()`, `PreviewOrder()`, `ReplaceOrder()`, `CancelOrder()` | `/trader/v1/accounts/{hash}/orders` |
 | preferences.go | `UserPreference()` | `/trader/v1/userPreference` |
-| quotes.go | `Quote()`, `Quotes()` | `/marketdata/v1/quotes` |
+| quotes.go | `Quote()`, `Quotes()` | `/marketdata/v1/quotes` via schwab-go marketdata |
 | transactions.go | `Transactions()`, `Transaction()` | `/trader/v1/accounts/{hash}/transactions` |
 
 ## Query Parameters
 
 Methods accepting filters use either:
 
-- `map[string]string` passed to `doGet` (simple cases like `quotes.go`)
+- `map[string]string` passed to `doGet` for legacy direct-resty endpoints
 - Typed param structs with `toQueryParams()` method (e.g., `OrderListParams`, `ChainParams`)
+- Dedicated parameter conversion helpers for `schwab-go` adapters when the shared library uses typed arguments instead of a query map
 
 ## Error Conversion in Client Methods
 
 Some methods convert generic errors to domain-specific ones:
 
 ```go
-// quotes.go: 404 HTTPError -> SymbolNotFoundError
+// quotes.go: schwab-go APIError -> SchwabError subtype
 var httpErr *apperr.HTTPError
 if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
     return nil, apperr.NewSymbolNotFoundError(...)

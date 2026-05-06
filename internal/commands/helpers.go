@@ -362,6 +362,7 @@ func defaultSubcommand(sub *cobra.Command) func(cmd *cobra.Command, args []strin
 		// Do not call Execute here: that would re-run the root PersistentPreRunE,
 		// causing duplicate auth/client setup. The shorthand intentionally forwards
 		// positional args only; flags still require the explicit subcommand form.
+		sub.SetContext(cmd.Context())
 		return sub.RunE(sub, args)
 	}
 }
