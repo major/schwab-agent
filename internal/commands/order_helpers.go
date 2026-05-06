@@ -441,6 +441,7 @@ var (
 // normalizeOrderType preserves legacy CLI aliases after flag validation,
 // ensuring order builders receive canonical API enum values.
 func normalizeOrderType(orderType, fallback models.OrderType) models.OrderType {
+	//nolint:exhaustive // Only legacy aliases need rewriting; all canonical values pass through unchanged.
 	switch orderType {
 	case "":
 		return fallback
@@ -456,6 +457,7 @@ func normalizeOrderType(orderType, fallback models.OrderType) models.OrderType {
 // normalizeDuration preserves common trading abbreviations (GTC, FOK, IOC)
 // so order builders receive canonical API enum values.
 func normalizeDuration(duration models.Duration) models.Duration {
+	//nolint:exhaustive // Only legacy aliases need rewriting; all canonical values pass through unchanged.
 	switch duration {
 	case models.Duration("GTC"):
 		return models.DurationGoodTillCancel

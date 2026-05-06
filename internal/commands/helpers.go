@@ -171,6 +171,7 @@ func defineCobraFlags(cmd *cobra.Command, opts any) {
 }
 
 func setCobraFlagDefault(field reflect.Value, raw, name string) {
+	//nolint:exhaustive // Only supported flag field kinds can define defaults.
 	switch field.Kind() {
 	case reflect.String:
 		field.SetString(raw)
@@ -198,6 +199,7 @@ func setCobraFlagDefault(field reflect.Value, raw, name string) {
 }
 
 func registerCobraFlag(flags *pflag.FlagSet, name, short, usage string, field reflect.Value) {
+	//nolint:exhaustive // Unsupported reflection kinds are rejected by the default branch.
 	switch field.Kind() {
 	case reflect.String:
 		if field.Type() == reflect.TypeFor[string]() {

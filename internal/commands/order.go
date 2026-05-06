@@ -65,6 +65,8 @@ Duration aliases GTC, FOK, and IOC are accepted.`,
 // terminalOrderStatuses are order statuses that represent completed/final states.
 // Orders in these statuses are filtered out by default to show only actionable
 // orders. Use --status all to include them.
+//
+//nolint:exhaustive // Non-terminal statuses intentionally use the map zero value.
 var terminalOrderStatuses = map[models.OrderStatus]bool{
 	models.OrderStatusFilled:   true,
 	models.OrderStatusCanceled: true,

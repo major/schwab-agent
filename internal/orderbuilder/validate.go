@@ -20,6 +20,7 @@ func ValidateEquityOrder(params *EquityParams) error {
 		return validationError("quantity must be greater than zero", "Add `--quantity <number>` with a positive value")
 	}
 
+	//nolint:exhaustive // Only order types with local equity-specific price rules need cases.
 	switch params.OrderType {
 	case models.OrderTypeLimit:
 		if params.Price == 0 {

@@ -31,6 +31,7 @@ func validateOrderRequest(order *models.OrderRequest, path string) error {
 		strategy = models.OrderStrategyTypeSingle
 	}
 
+	//nolint:exhaustive // Spec mode supports only executable strategies that schwab-agent can validate locally.
 	switch strategy {
 	case models.OrderStrategyTypeSingle:
 		return validateSingleOrderRequest(order, path)
@@ -145,6 +146,7 @@ func validateChildOrderRequests(order *models.OrderRequest, path string) error {
 
 // validateOrderRequestPricing catches local price requirements for common order types.
 func validateOrderRequestPricing(order *models.OrderRequest, path string) error {
+	//nolint:exhaustive // Only order types requiring positive price fields are handled here.
 	switch order.OrderType {
 	case models.OrderTypeLimit, models.OrderTypeLimitOnClose, models.OrderTypeStopLimit,
 		models.OrderTypeTrailingStopLimit, models.OrderTypeNetDebit, models.OrderTypeNetCredit:
@@ -156,6 +158,7 @@ func validateOrderRequestPricing(order *models.OrderRequest, path string) error 
 		}
 	}
 
+	//nolint:exhaustive // Only order types requiring stop fields are handled here.
 	switch order.OrderType {
 	case models.OrderTypeStop, models.OrderTypeStopLimit:
 		if order.StopPrice == nil || *order.StopPrice <= 0 {
