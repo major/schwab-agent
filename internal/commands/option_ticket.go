@@ -18,15 +18,6 @@ import (
 
 const strikeComparisonEpsilon = 0.0001
 
-// optionTicketChainSummary preserves chain-level context without returning the full chain.
-type optionTicketChainSummary struct {
-	Status            string             `json:"status,omitempty"`
-	Underlying        *models.Underlying `json:"underlying,omitempty"`
-	UnderlyingPrice   float64            `json:"underlyingPrice,omitempty"`
-	IsDelayed         bool               `json:"isDelayed,omitempty"`
-	NumberOfContracts int                `json:"numberOfContracts,omitempty"`
-}
-
 // NewOptionCmd returns the Cobra command for option planning workflows.
 func NewOptionCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -116,21 +107,6 @@ func matchingStrikeContracts(
 		}
 	}
 	return matches
-}
-
-// summarizeTicketChain retains the chain fields agents need without echoing the full option matrix.
-func summarizeTicketChain(chain *models.OptionChain) optionTicketChainSummary {
-	if chain == nil {
-		return optionTicketChainSummary{}
-	}
-
-	return optionTicketChainSummary{
-		Status:            stringValue(chain.Status),
-		Underlying:        chain.Underlying,
-		UnderlyingPrice:   floatValue(chain.UnderlyingPrice),
-		IsDelayed:         boolValue(chain.IsDelayed),
-		NumberOfContracts: intValue(chain.NumberOfContracts),
-	}
 }
 
 // nearlyEqual compares decimal prices from CLI flags and Schwab string keys safely.
