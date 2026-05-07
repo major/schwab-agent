@@ -110,7 +110,7 @@ func TestAccountNumbers_WithTLSConfig(t *testing.T) {
 		WithBaseURL(srv.URL),
 		WithTLSConfig(&tls.Config{
 			// Test-only client trusts httptest's self-signed certificate.
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, // #nosec G402
 		}),
 	)
 	result, err := c.AccountNumbers(context.Background())
