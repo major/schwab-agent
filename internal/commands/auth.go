@@ -197,7 +197,7 @@ func NewAuthCmd(configPath, tokenPath string, w io.Writer, deps AuthDeps) *cobra
 	deps = completeAuthDeps(deps, configPath)
 
 	cmd := &cobra.Command{
-		Use:   "auth",
+		Use:   commandUseAuth,
 		Short: "Authentication commands",
 		Long: `Manage OAuth2 authentication with the Schwab API. Login starts the OAuth flow,
 status checks token expiration, and refresh forces a token refresh. Auth
