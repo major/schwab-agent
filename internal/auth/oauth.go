@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -66,13 +67,9 @@ func ExchangeCode(cfg *Config, code, tokenEndpoint string, now time.Time) (*Toke
 
 // StartCallbackServer starts a loopback-only HTTPS callback server and waits for one callback.
 func StartCallbackServer(addr, expectedState string) (string, error) {
-	callbackURL := addr
-	if !strings.Contains(callbackURL, "://") {
-		callbackURL = "https://" + callbackURL
-	}
-	if parsedURL, err := url.Parse(callbackURL); err == nil && parsedURL.Path == "" {
-		parsedURL.Path = "/"
-		callbackURL = parsedURL.String()
+	callbackURL, err := normalizeLoopbackCallbackURL(addr)
+	if err != nil {
+		return "", apperr.NewAuthCallbackError("invalid OAuth callback URL", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), callbackServerTimeout)
@@ -98,6 +95,32 @@ func StartCallbackServer(addr, expectedState string) (string, error) {
 	case <-ctx.Done():
 		return "", apperr.NewAuthCallbackError("timed out waiting for OAuth callback after 300 seconds", ctx.Err())
 	}
+}
+
+func normalizeLoopbackCallbackURL(addr string) (string, error) {
+	callbackURL := strings.TrimSpace(addr)
+	if !strings.Contains(callbackURL, "://") {
+		callbackURL = "https://" + callbackURL
+	}
+
+	parsedURL, err := url.Parse(callbackURL)
+	if err != nil {
+		return "", fmt.Errorf("parse callback URL: %w", err)
+	}
+	if parsedURL.Scheme != "https" {
+		return "", errors.New("callback URL must use https")
+	}
+	if parsedURL.Hostname() != "127.0.0.1" {
+		return "", fmt.Errorf("callback server must bind to 127.0.0.1 only, got %q", parsedURL.Hostname())
+	}
+	if parsedURL.Port() == "" {
+		return "", errors.New("callback URL must include an explicit port")
+	}
+	if parsedURL.Path == "" {
+		parsedURL.Path = "/"
+	}
+
+	return parsedURL.String(), nil
 }
 
 // RunLogin performs the full OAuth login flow and persists the resulting token.

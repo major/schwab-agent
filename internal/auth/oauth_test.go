@@ -388,7 +388,19 @@ func TestStartCallbackServer_InvalidAddressReturnsAuthCallbackError(t *testing.T
 	require.Error(t, err)
 	var callbackErr *apperr.AuthCallbackError
 	require.ErrorAs(t, err, &callbackErr)
-	assert.Contains(t, err.Error(), "failed to start OAuth callback server")
+	assert.Contains(t, err.Error(), "invalid OAuth callback URL")
+	assert.Contains(t, errors.Unwrap(err).Error(), "127.0.0.1")
+}
+
+func TestStartCallbackServer_NonHTTPSAddressReturnsAuthCallbackError(t *testing.T) {
+	code, err := StartCallbackServer("http://127.0.0.1:8182", "expected-state")
+
+	assert.Empty(t, code)
+	require.Error(t, err)
+	var callbackErr *apperr.AuthCallbackError
+	require.ErrorAs(t, err, &callbackErr)
+	assert.Contains(t, err.Error(), "invalid OAuth callback URL")
+	assert.Contains(t, errors.Unwrap(err).Error(), "must use https")
 }
 
 func TestRunLogin_InvalidConfigReturnsError(t *testing.T) {
