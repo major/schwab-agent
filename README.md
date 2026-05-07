@@ -106,11 +106,14 @@ schwab-agent account summary --positions
 # List full account details and balances
 schwab-agent account list
 
-# Get option chains
-schwab-agent chain get AAPL
+# List available option expirations for a symbol
+schwab-agent option expirations AAPL
 
-# Get a compact option planning ticket
-schwab-agent option ticket get AAPL --expiration <YYYY-MM-DD> --strike 200 --call
+# Discover option contracts (calls and puts near the money)
+schwab-agent option chain AAPL --type CALL --dte 30 --strike-count 5
+
+# Get a single option contract with underlying quote and OCC symbol context
+schwab-agent option contract AAPL --expiration 2025-06-20 --strike 200 --call
 
 # Get the latest row for multiple moving averages in one technical-analysis run.
 # Technical-analysis output is always keyed by symbol under data.<SYMBOL>.
@@ -196,8 +199,7 @@ schwab-agent order place --spec @order.json
 | `position` | List, filter, and sort positions for one or all accounts (with computed cost basis and P&L) |
 | `quote` | Get quotes for one or more symbols (supports structured option flags) |
 | `order` | List, get, place, preview, build, cancel, replace (equity and option) |
-| `chain` | Option chain data (`get`, `expiration`) |
-| `option` | Option planning tickets that combine quote, chain, and OCC symbol context |
+| `option` | Option discovery and contract details (`expirations`, `chain`, `contract`) |
 | `history` | Price history for a symbol (alias: `price-history`) |
 | `ta` | Technical analysis with symbol-keyed JSON output (dashboard, sma, ema, rsi, macd, atr, bbands, stoch, adx, vwap, hv, expected-move) |
 | `indicators` | Technical analysis dashboard shortcut with symbol-keyed JSON output |
