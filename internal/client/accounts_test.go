@@ -133,6 +133,20 @@ func TestAccountNumbers_EmptyList(t *testing.T) {
 	assert.Empty(t, result)
 }
 
+func TestAccountNumbers_NullList(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`null`))
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	result, err := c.AccountNumbers(context.Background())
+
+	require.NoError(t, err)
+	assert.Nil(t, result)
+}
+
 func TestAccounts_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)

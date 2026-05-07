@@ -34,6 +34,9 @@ func (c *Client) AccountNumbers(ctx context.Context) ([]models.AccountNumber, er
 }
 
 func accountNumberHashesToModels(accountNumbers []trader.AccountNumberHash) []models.AccountNumber {
+	if accountNumbers == nil {
+		return nil
+	}
 	result := make([]models.AccountNumber, 0, len(accountNumbers))
 	for _, accountNumber := range accountNumbers {
 		result = append(result, models.AccountNumber{
