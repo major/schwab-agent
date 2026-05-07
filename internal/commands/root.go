@@ -57,7 +57,7 @@ func NewRootCmd(
 	}
 
 	root := &cobra.Command{
-		Use:                        "schwab-agent",
+		Use:                        commandUseRoot,
 		Short:                      "CLI tool for AI agents to trade via Schwab APIs",
 		Version:                    version,
 		SilenceErrors:              true,
@@ -89,7 +89,7 @@ func NewRootCmd(
 		&cobra.Group{ID: groupIDTrading, Title: "Trading Commands"},
 		&cobra.Group{ID: groupIDMarketData, Title: "Market Data Commands"},
 		&cobra.Group{ID: groupIDAccountMgmt, Title: "Account Management Commands"},
-		&cobra.Group{ID: groupIDTools, Title: "Tool Commands"},
+		&cobra.Group{ID: groupIDTools, Title: groupTitleTools},
 	)
 
 	return root

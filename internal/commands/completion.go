@@ -10,7 +10,7 @@ import (
 // It generates shell completion scripts for bash, zsh, fish, and powershell.
 func NewCompletionCmd(w io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         "completion",
+		Use:         commandUseCompletion,
 		Short:       "Generate shell completion scripts",
 		Long:        "Generate shell completion scripts for bash, zsh, fish, or powershell.",
 		Annotations: map[string]string{annotationSkipAuth: annotationValueTrue},
@@ -31,7 +31,7 @@ func NewCompletionCmd(w io.Writer) *cobra.Command {
 // newBashCompletionCmd returns the bash completion subcommand.
 func newBashCompletionCmd(w io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:   "bash",
+		Use:   commandUseBash,
 		Short: "Generate bash completion script",
 		Long: `Generate bash completion script.
 
@@ -56,7 +56,7 @@ or
 // newZshCompletionCmd returns the zsh completion subcommand.
 func newZshCompletionCmd(w io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:   "zsh",
+		Use:   commandUseZsh,
 		Short: "Generate zsh completion script",
 		Long: `Generate zsh completion script.
 
@@ -77,7 +77,7 @@ To load completions for every new session, execute once:
 // newFishCompletionCmd returns the fish completion subcommand.
 func newFishCompletionCmd(w io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:   "fish",
+		Use:   commandUseFish,
 		Short: "Generate fish completion script",
 		Long: `Generate fish completion script.
 
@@ -98,7 +98,7 @@ To load completions for every new session, execute once:
 // newPowershellCompletionCmd returns the powershell completion subcommand.
 func newPowershellCompletionCmd(w io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:   "powershell",
+		Use:   commandUsePowerShell,
 		Short: "Generate powershell completion script",
 		Long: `Generate powershell completion script.
 

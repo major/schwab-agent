@@ -22,7 +22,7 @@ func NewHelpTopicCmds(w io.Writer) []*cobra.Command {
 // outside Cobra flag binding. This includes auth, config, and state settings.
 func newEnvVarsCmd(w io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:         "env-vars",
+		Use:         commandUseEnvVars,
 		Short:       "Show supported environment variables",
 		Long:        "Show environment variables that schwab-agent reads for authentication, API configuration, and state.",
 		Annotations: map[string]string{annotationSkipAuth: annotationValueTrue},

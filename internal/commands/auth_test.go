@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -47,6 +48,75 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(exitCode)
+}
+
+func TestDefaultAuthDeps(t *testing.T) {
+	deps := DefaultAuthDeps()
+
+	require.NotNil(t, deps.ConfigPath)
+	assert.NotEmpty(t, deps.ConfigPath())
+	require.NotNil(t, deps.OAuthTokenEndpoint)
+	require.NotNil(t, deps.RefreshAccessToken)
+	require.NotNil(t, deps.RunLogin)
+	require.NotNil(t, deps.NewAccountClient)
+	assert.Empty(t, deps.OAuthTokenEndpoint())
+}
+
+func TestCobraResolveAuthPaths(t *testing.T) {
+	tests := []struct {
+		name       string
+		configure  func(*testing.T, *cobra.Command)
+		wantConfig string
+		wantToken  string
+	}{
+		{
+			name:       "no flags uses fallbacks",
+			configure:  func(_ *testing.T, _ *cobra.Command) {},
+			wantConfig: "fallback-config.json",
+			wantToken:  "fallback-token.json",
+		},
+		{
+			name: "unchanged flags use fallbacks",
+			configure: func(_ *testing.T, cmd *cobra.Command) {
+				cmd.Flags().String("config", "default-config.json", "config path")
+				cmd.Flags().String("token", "default-token.json", "token path")
+			},
+			wantConfig: "fallback-config.json",
+			wantToken:  "fallback-token.json",
+		},
+		{
+			name: "changed blank flags use fallbacks",
+			configure: func(t *testing.T, cmd *cobra.Command) {
+				cmd.Flags().String("config", "", "config path")
+				cmd.Flags().String("token", "", "token path")
+				require.NoError(t, cmd.Flags().Set("config", "   "))
+				require.NoError(t, cmd.Flags().Set("token", "   "))
+			},
+			wantConfig: "fallback-config.json",
+			wantToken:  "fallback-token.json",
+		},
+		{
+			name: "changed paths are trimmed",
+			configure: func(t *testing.T, cmd *cobra.Command) {
+				cmd.Flags().String("config", "", "config path")
+				cmd.Flags().String("token", "", "token path")
+				require.NoError(t, cmd.Flags().Set("config", " /tmp/config.json "))
+				require.NoError(t, cmd.Flags().Set("token", " /tmp/token.json "))
+			},
+			wantConfig: "/tmp/config.json",
+			wantToken:  "/tmp/token.json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{Use: "auth"}
+			tt.configure(t, cmd)
+
+			assert.Equal(t, tt.wantConfig, cobraResolveConfigPath(cmd, "fallback-config.json"))
+			assert.Equal(t, tt.wantToken, cobraResolveTokenPath(cmd, "fallback-token.json"))
+		})
+	}
 }
 
 // testEnvelope mirrors the standard JSON success envelope for assertions.
