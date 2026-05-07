@@ -18,7 +18,6 @@ Trading Commands
 
 Market Data Commands
   analyze     Combined quote and technical analysis for one or more symbols
-  chain       Option chain operations
   history     Retrieve price history for a symbol
   indicators  Technical indicators dashboard (shortcut for ta dashboard)
   instrument  Search and look up instruments
@@ -61,7 +60,6 @@ Trading Commands
 
 Market Data Commands
   analyze     Combined quote and technical analysis for one or more symbols
-  chain       Option chain operations
   history     Retrieve price history for a symbol
   indicators  Technical indicators dashboard (shortcut for ta dashboard)
   instrument  Search and look up instruments
@@ -407,81 +405,6 @@ Global Flags:
   -v, --verbose                         Enable debug logging to stderr
 ```
 
-### `schwab-agent chain`
-
-```bash
-Usage:
-  schwab-agent chain [flags]
-  schwab-agent chain [command]
-
-Available Commands:
-  expiration  Get expiration dates for a symbol
-  get         Get option chain for a symbol
-
-Global Flags:
-  -a, --account string                  Override default account by hash, account number, or nickname
-      --config string                   Path to config file
-      --debug-options string[="text"]   Print resolved flag values and exit (text or json)
-      --token string                    Path to token file
-  -v, --verbose                         Enable debug logging to stderr
-
-Use "schwab-agent chain [command] --help" for more information about a command.
-```
-
-### `schwab-agent chain expiration`
-
-```bash
-Usage:
-  schwab-agent chain expiration <symbol> [flags]
-
-Examples:
-  schwab-agent chain expiration AAPL
-
-Global Flags:
-  -a, --account string                  Override default account by hash, account number, or nickname
-      --config string                   Path to config file
-      --debug-options string[="text"]   Print resolved flag values and exit (text or json)
-      --token string                    Path to token file
-  -v, --verbose                         Enable debug logging to stderr
-```
-
-### `schwab-agent chain get`
-
-```bash
-Usage:
-  schwab-agent chain get <symbol> [flags]
-
-Examples:
-  schwab-agent chain get AAPL
-  schwab-agent chain get AAPL --type CALL --strike-count 5
-  schwab-agent chain get AAPL --from-date 2025-06-01 --to-date 2025-07-31 --type PUT
-  schwab-agent chain get AAPL --strategy ANALYTICAL --volatility 30.5 --days-to-expiration 45
-  schwab-agent chain get AAPL --strike-range NTM --include-underlying-quote
-
-Flags:
-      --days-to-expiration string   Days to expiration for theoretical pricing calculations
-      --from-date string            Start date (YYYY-MM-DD)
-      --include-underlying-quote    Include underlying quote data in response
-      --interest-rate string        Interest rate for theoretical pricing calculations
-      --interval string             Strike interval for spread strategy chains
-      --order-type string           alias for --type (order type)
-      --strategy string             Option pricing strategy
-      --strike string               Filter to a specific strike price
-      --strike-count string         Number of strikes to return
-      --strike-range string         Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, or ALL
-      --to-date string              End date (YYYY-MM-DD)
-      --type string                 Contract type: CALL, PUT, or ALL
-      --underlying-price string     Override underlying price for theoretical calculations
-      --volatility string           Volatility for theoretical pricing calculations
-
-Global Flags:
-  -a, --account string                  Override default account by hash, account number, or nickname
-      --config string                   Path to config file
-      --debug-options string[="text"]   Print resolved flag values and exit (text or json)
-      --token string                    Path to token file
-  -v, --verbose                         Enable debug logging to stderr
-```
-
 ### `schwab-agent completion`
 
 ```bash
@@ -795,7 +718,9 @@ Usage:
   schwab-agent option [command]
 
 Available Commands:
-  ticket      Build an option planning ticket
+  chain       Get compact option chain for a symbol
+  contract    Get a single curated option contract with quote context
+  expirations List option expiration dates for a symbol
 
 Global Flags:
   -a, --account string                  Override default account by hash, account number, or nickname
@@ -807,15 +732,15 @@ Global Flags:
 Use "schwab-agent option [command] --help" for more information about a command.
 ```
 
-### `schwab-agent option ticket`
+### `schwab-agent option expirations`
 
 ```bash
 Usage:
-  schwab-agent option ticket [flags]
-  schwab-agent option ticket [command]
+  schwab-agent option expirations <symbol> [flags]
 
-Available Commands:
-  get         Get quote, chain, and OCC context for one option contract
+Examples:
+  schwab-agent option expirations AAPL
+  schwab-agent option expirations TSLA
 
 Global Flags:
   -a, --account string                  Override default account by hash, account number, or nickname
@@ -823,19 +748,50 @@ Global Flags:
       --debug-options string[="text"]   Print resolved flag values and exit (text or json)
       --token string                    Path to token file
   -v, --verbose                         Enable debug logging to stderr
-
-Use "schwab-agent option ticket [command] --help" for more information about a command.
 ```
 
-### `schwab-agent option ticket get`
+### `schwab-agent option chain`
 
 ```bash
 Usage:
-  schwab-agent option ticket get <symbol> [flags]
+  schwab-agent option chain <symbol> [flags]
 
 Examples:
-  schwab-agent option ticket get AAPL --expiration 2026-01-16 --strike 200 --call
-  schwab-agent option ticket get TSLA --expiration 2026-03-20 --strike 180 --put
+  schwab-agent option chain AAPL
+  schwab-agent option chain AAPL --type CALL --dte 30
+  schwab-agent option chain AAPL --expiration 2026-06-19 --fields strike,bid,ask,delta
+  schwab-agent option chain AAPL --strike-count 5
+  schwab-agent option chain AAPL --strike-min 190 --strike-max 210
+
+Flags:
+      --dte int               Target days to expiration
+      --expiration string     Exact expiration date (YYYY-MM-DD)
+      --fields string         Comma-separated field names for column projection
+      --order-type string     alias for --type (order type)
+      --strike float          Exact strike price
+      --strike-count int      Number of strikes around ATM
+      --strike-max float      Maximum strike price
+      --strike-min float      Minimum strike price
+      --strike-range string   Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, ALL
+      --type string           Contract type: CALL, PUT, or ALL (default "ALL")
+
+Global Flags:
+  -a, --account string                  Override default account by hash, account number, or nickname
+      --config string                   Path to config file
+      --debug-options string[="text"]   Print resolved flag values and exit (text or json)
+      --token string                    Path to token file
+  -v, --verbose                         Enable debug logging to stderr
+```
+
+### `schwab-agent option contract`
+
+```bash
+Usage:
+  schwab-agent option contract <symbol> [flags]
+
+Examples:
+  schwab-agent option contract AAPL --expiration 2026-06-19 --strike 200 --call
+  schwab-agent option contract TSLA --expiration 2026-03-20 --strike 180 --put
 
 Flags:
       --call                Select the call contract
