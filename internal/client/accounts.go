@@ -17,7 +17,7 @@ import (
 // AccountNumbers retrieves the list of account numbers and hash values.
 // Returns AccountNotFoundError on 404.
 func (c *Client) AccountNumbers(ctx context.Context) ([]models.AccountNumber, error) {
-	accountNumbers, err := c.trader.GetAccountNumbers(ctx)
+	accountNumbers, err := c.newTraderClient().GetAccountNumbers(ctx)
 	if err != nil {
 		// Preserve the historical internal/client error contract while letting
 		// schwab-go own the request construction, authentication header, and JSON

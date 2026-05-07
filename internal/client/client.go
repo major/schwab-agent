@@ -61,7 +61,6 @@ type Ref struct {
 type Client struct {
 	baseURL   string
 	resty     *resty.Client
-	trader    *trader.Client
 	token     string
 	tlsConfig *tls.Config
 	userAgent string
@@ -95,14 +94,15 @@ func NewClient(token string, opts ...Option) *Client {
 	for _, opt := range opts {
 		opt(c)
 	}
-	c.trader = c.newTraderClient()
 	return c
 }
 
 func (c *Client) newTraderClient() *trader.Client {
 	// Keep the schwab-go trader client behind this adapter so command packages
 	// retain the existing internal/client boundary and typed error contract while
-	// endpoint methods migrate one at a time.
+	// endpoint methods migrate one at a time. Build it from the current token on
+	// demand because schwab-go v0.4.1 accepts WithTokenProvider but does not retain
+	// it in concrete trader clients; see major/schwab-go#53.
 	return trader.NewClient(
 		schwab.WithToken(c.token),
 		schwab.WithBaseURL(c.baseURL),
@@ -116,6 +116,9 @@ func schwabAPIErrorToHTTPError(err error) error {
 	var apiErr *schwab.APIError
 	if !errors.As(err, &apiErr) {
 		return err
+	}
+	if apiErr.StatusCode == http.StatusUnauthorized {
+		return apperr.NewAuthExpiredError("authentication expired", err)
 	}
 	return apperr.NewHTTPError(
 		fmt.Sprintf("HTTP %d", apiErr.StatusCode),
