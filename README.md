@@ -287,7 +287,7 @@ Tests use `httptest.NewServer()` for API mocking, testify for assertions, and `t
 ```text
 cmd/schwab-agent/       Entry point, command tree construction
 internal/
-  auth/                 OAuth2 flow, token lifecycle, config
+  auth/                 Config and token adapters around schwab-go auth
   client/               Schwab API HTTP client
   commands/             CLI command handlers
   apperr/               Typed error hierarchy with exit codes

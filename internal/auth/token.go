@@ -1,79 +1,52 @@
 package auth
 
 import (
-	"encoding/json"
+	"context"
+	"errors"
 	"fmt"
-	"net/http"
-	"os"
-	"path/filepath"
+	"strings"
 	"time"
+
+	schwabauth "github.com/major/schwab-go/schwab/auth"
 
 	"github.com/major/schwab-agent/internal/apperr"
 )
 
-const (
-	oauthGrantTypeRefreshToken = "refresh_token"
+// refreshTokenMaxAge is 6.5 days in seconds, matching schwab-go and schwab-py's default.
+const refreshTokenMaxAge = 561600
 
-	// refreshTokenMaxAge is 6.5 days in seconds, matching schwab-py's default.
-	refreshTokenMaxAge = 561600
+// TokenFile is the on-disk token format shared with schwab-go.
+type TokenFile = schwabauth.TokenFile
 
-	// accessTokenLeeway is 5 minutes in seconds, matching schwab-py's leeway.
-	accessTokenLeeway = 300
-)
-
-// TokenFile is the on-disk format matching schwab-py.
-type TokenFile struct {
-	CreationTimestamp int64     `json:"creation_timestamp"`
-	Token             TokenData `json:"token"`
-}
-
-// TokenData holds the OAuth token fields.
-type TokenData struct {
-	AccessToken  string  `json:"access_token"`
-	TokenType    string  `json:"token_type"`
-	ExpiresIn    int     `json:"expires_in"`
-	RefreshToken string  `json:"refresh_token"`
-	Scope        string  `json:"scope"`
-	ExpiresAt    float64 `json:"expires_at"`
-}
+// TokenData holds the OAuth token fields shared with schwab-go.
+type TokenData = schwabauth.TokenData
 
 // LoadToken reads and parses the token file.
 // Returns AuthRequiredError if the file doesn't exist.
 func LoadToken(tokenPath string) (*TokenFile, error) {
-	data, err := os.ReadFile(tokenPath)
+	token, err := schwabauth.NewFileTokenStore(tokenPath).Load(context.Background())
 	if err != nil {
-		if os.IsNotExist(err) {
+		if schwabauth.IsRequired(err) {
 			return nil, apperr.NewAuthRequiredError(
 				"token file not found: run `schwab-agent auth login` to authenticate",
 				err,
 			)
 		}
-		return nil, fmt.Errorf("failed to read token file: %w", err)
+		return nil, fmt.Errorf("failed to load token file: %w", err)
 	}
 
-	var tf TokenFile
-	if unmarshalErr := json.Unmarshal(data, &tf); unmarshalErr != nil {
-		return nil, fmt.Errorf("failed to parse token file: %w", unmarshalErr)
-	}
-
-	return &tf, nil
+	return &token, nil
 }
 
 // SaveToken writes the token file with 0600 permissions.
 // Creates the parent directory with 0700 if missing.
 func SaveToken(tokenPath string, tf *TokenFile) error {
-	parentDir := filepath.Dir(tokenPath)
-	if err := os.MkdirAll(parentDir, 0o700); err != nil {
-		return fmt.Errorf("failed to create token directory: %w", err)
+	if tf == nil {
+		return errors.New("token file is required")
 	}
 
-	data, err := json.MarshalIndent(tf, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal token: %w", err)
-	}
-
-	if writeErr := os.WriteFile(tokenPath, data, 0o600); writeErr != nil {
-		return fmt.Errorf("failed to write token file: %w", writeErr)
+	if err := schwabauth.NewFileTokenStore(tokenPath).Save(context.Background(), *tf); err != nil {
+		return fmt.Errorf("failed to save token file: %w", err)
 	}
 
 	return nil
@@ -82,18 +55,21 @@ func SaveToken(tokenPath string, tf *TokenFile) error {
 // IsAccessTokenExpired checks if the access token is expired (with 300s leeway).
 // Returns true if [time.Now] is past ExpiresAt minus the leeway.
 func IsAccessTokenExpired(tf *TokenFile) bool {
-	return float64(time.Now().Unix()) >= tf.Token.ExpiresAt-accessTokenLeeway
+	if tf == nil {
+		return true
+	}
+
+	return schwabauth.IsAccessTokenExpired(*tf)
 }
 
 // IsRefreshTokenStale checks if the refresh token is stale (> 6.5 days old).
 // Returns true if [time.Now] is past creation_timestamp plus the max age.
 func IsRefreshTokenStale(tf *TokenFile) bool {
-	return time.Now().Unix() >= tf.CreationTimestamp+refreshTokenMaxAge
-}
+	if tf == nil {
+		return true
+	}
 
-// tokenErrorResponse represents the error body from the token endpoint.
-type tokenErrorResponse struct {
-	Error string `json:"error"`
+	return time.Now().Unix() >= tf.CreationTimestamp+refreshTokenMaxAge
 }
 
 // RefreshAccessToken exchanges the refresh token for a new access token.
@@ -101,48 +77,34 @@ type tokenErrorResponse struct {
 // Returns AuthExpiredError if the refresh fails with invalid_grant.
 // The endpoint parameter allows overriding the token URL for testing.
 func RefreshAccessToken(cfg *Config, tf *TokenFile, endpoint string) (*TokenFile, error) {
-	if endpoint == "" {
-		endpoint = cfg.OAuthTokenURL()
+	if tf == nil {
+		return nil, errors.New("token file is required")
 	}
 
-	client := newOAuthClient(cfg, oauthHTTPTimeout)
-	defer client.Close()
-
-	resp, err := client.R().
-		SetBasicAuth(cfg.ClientID, cfg.ClientSecret).
-		SetFormData(map[string]string{
-			"grant_type":               oauthGrantTypeRefreshToken,
-			oauthGrantTypeRefreshToken: tf.Token.RefreshToken,
-		}).
-		Post(endpoint)
+	schwabCfg, err := cfg.schwabAuthConfig(endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("token refresh request failed: %w", err)
+		return nil, err
 	}
 
-	// Handle non-2xx responses
-	if resp.StatusCode() != http.StatusOK {
-		var errResp tokenErrorResponse
-		if json.Unmarshal(resp.Bytes(), &errResp) == nil && errResp.Error == "invalid_grant" {
+	refreshed, err := schwabauth.RefreshTokenFile(context.Background(), schwabCfg, *tf, cfg.oauthHTTPClient())
+	if err != nil {
+		if schwabauth.IsExpired(err) || strings.Contains(err.Error(), "invalid_grant") {
 			return nil, apperr.NewAuthExpiredError(
 				"refresh token expired: run `schwab-agent auth login` to re-authenticate",
-				nil,
+				err,
 			)
 		}
-		return nil, fmt.Errorf("token refresh failed with status %d: %s", resp.StatusCode(), string(resp.Bytes()))
+		return nil, fmt.Errorf("refresh access token: %w", err)
 	}
 
-	// Parse new token data
-	var newToken TokenData
-	if unmarshalErr := json.Unmarshal(resp.Bytes(), &newToken); unmarshalErr != nil {
-		return nil, fmt.Errorf("failed to parse token response: %w", unmarshalErr)
+	return &refreshed, nil
+}
+
+func tokenEndpointOAuthBaseURL(endpoint string) string {
+	trimmedEndpoint := strings.TrimSpace(endpoint)
+	if trimmedEndpoint == "" {
+		return ""
 	}
 
-	// Compute ExpiresAt: exchange time + expires_in
-	newToken.ExpiresAt = float64(time.Now().Unix()) + float64(newToken.ExpiresIn)
-
-	// Preserve original creation_timestamp
-	return &TokenFile{
-		CreationTimestamp: tf.CreationTimestamp,
-		Token:             newToken,
-	}, nil
+	return strings.TrimSuffix(strings.TrimRight(trimmedEndpoint, "/"), "/token")
 }

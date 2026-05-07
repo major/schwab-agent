@@ -101,7 +101,7 @@ func TestNewAuthCmd_StatusWritesExpectedEnvelope(t *testing.T) {
 			AccessToken:  "access-token",
 			RefreshToken: "refresh-token",
 			ExpiresIn:    1800,
-			ExpiresAt:    float64(expiresAt),
+			ExpiresAt:    expiresAt,
 		},
 	}))
 
@@ -140,7 +140,7 @@ func TestNewAuthCmd_RefreshCallsRefresh(t *testing.T) {
 		Token: auth.TokenData{
 			AccessToken:  "old-token",
 			RefreshToken: "refresh-token",
-			ExpiresAt:    float64(1_650_000_100),
+			ExpiresAt:    1_650_000_100,
 		},
 	}
 	require.NoError(t, auth.SaveToken(tokenPath, originalToken))
@@ -158,7 +158,7 @@ func TestNewAuthCmd_RefreshCallsRefresh(t *testing.T) {
 				Token: auth.TokenData{
 					AccessToken:  "new-token",
 					RefreshToken: tf.Token.RefreshToken,
-					ExpiresAt:    float64(1_650_004_200),
+					ExpiresAt:    1_650_004_200,
 				},
 			}, nil
 		},
@@ -239,7 +239,7 @@ func TestNewAuthCmd_LoginAutoSetsDefaultAccount(t *testing.T) {
 				return decodeErr
 			}
 
-			token.ExpiresAt = float64(expiresAt)
+			token.ExpiresAt = expiresAt
 
 			return auth.SaveToken(targetTokenPath, &auth.TokenFile{
 				CreationTimestamp: time.Now().UTC().Add(-1 * time.Hour).Unix(),
@@ -309,7 +309,7 @@ func TestNewAuthCmd_LoginUsesConfiguredProxy(t *testing.T) {
 					ExpiresIn:    1800,
 					RefreshToken: "refresh-token",
 					Scope:        "api",
-					ExpiresAt:    float64(time.Now().UTC().Add(30 * time.Minute).Unix()),
+					ExpiresAt:    time.Now().UTC().Add(30 * time.Minute).Unix(),
 				},
 			})
 		},
@@ -370,7 +370,7 @@ func decodeAuthEnvelope(t *testing.T, raw []byte) testEnvelope {
 func TestUnixSecondsToRFC3339(t *testing.T) {
 	tests := []struct {
 		name     string
-		seconds  float64
+		seconds  int64
 		expected string
 	}{
 		{"positive timestamp", 1_700_000_000, "2023-11-14T22:13:20Z"},
@@ -586,7 +586,7 @@ func TestNewAuthCmd_RefreshFails(t *testing.T) {
 		Token: auth.TokenData{
 			AccessToken:  "old-token",
 			RefreshToken: "refresh-token",
-			ExpiresAt:    float64(time.Now().Unix() - 100),
+			ExpiresAt:    time.Now().Unix() - 100,
 		},
 	}))
 

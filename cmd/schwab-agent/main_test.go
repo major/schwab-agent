@@ -257,7 +257,7 @@ func TestBeforeHook_ReturnsAuthExpiredErrorForStaleRefreshToken(t *testing.T) {
 			AccessToken:  "expired-access-token",
 			RefreshToken: "stale-refresh-token",
 			ExpiresIn:    1800,
-			ExpiresAt:    float64(time.Now().Add(-time.Hour).Unix()),
+			ExpiresAt:    time.Now().Add(-time.Hour).Unix(),
 		},
 	})
 
@@ -303,19 +303,24 @@ func TestBeforeHook_RefreshesExpiredToken(t *testing.T) {
 
 	configPath := filepath.Join(tmpDir, "schwab-agent", "config.json")
 	tokenPath := filepath.Join(tmpDir, "schwab-agent", "token.json")
-	writeTestConfig(t, configPath)
+	require.NoError(t, auth.SaveConfig(configPath, &auth.Config{
+		ClientID:        "test-client",
+		ClientSecret:    "test-secret",
+		CallbackURL:     "https://127.0.0.1:8182",
+		BaseURLInsecure: true,
+	}))
 	writeTestToken(t, tokenPath, &auth.TokenFile{
 		CreationTimestamp: time.Now().Add(-time.Hour).Unix(),
 		Token: auth.TokenData{
 			AccessToken:  "expired-access-token",
 			RefreshToken: "refresh-token",
 			ExpiresIn:    1800,
-			ExpiresAt:    float64(time.Now().Add(-time.Hour).Unix()),
+			ExpiresAt:    time.Now().Add(-time.Hour).Unix(),
 		},
 	})
 
 	var refreshCalls atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/oauth/token":
 			refreshCalls.Add(1)
@@ -338,8 +343,8 @@ func TestBeforeHook_RefreshesExpiredToken(t *testing.T) {
 
 	deps := commands.DefaultRootDeps()
 	deps.TokenRefreshEndpoint = func(_ *auth.Config) string { return server.URL + "/oauth/token" }
-	deps.NewClient = func(token string, _ ...client.Option) *client.Client {
-		return client.NewClient(token, client.WithBaseURL(server.URL))
+	deps.NewClient = func(token string, opts ...client.Option) *client.Client {
+		return client.NewClient(token, append(opts, client.WithBaseURL(server.URL))...)
 	}
 
 	_, err := runAppWithDeps(
@@ -359,7 +364,7 @@ func TestBeforeHook_RefreshesExpiredToken(t *testing.T) {
 	refreshed, loadErr := auth.LoadToken(tokenPath)
 	require.NoError(t, loadErr)
 	assert.Equal(t, "fresh-access-token", refreshed.Token.AccessToken)
-	assert.Greater(t, refreshed.Token.ExpiresAt, float64(time.Now().Unix()))
+	assert.Greater(t, refreshed.Token.ExpiresAt, time.Now().Unix())
 }
 
 func TestBeforeHook_UsesConfiguredProxyForRefreshAndAPIRequests(t *testing.T) {
@@ -374,7 +379,7 @@ func TestBeforeHook_UsesConfiguredProxyForRefreshAndAPIRequests(t *testing.T) {
 			AccessToken:  "expired-access-token",
 			RefreshToken: "refresh-token",
 			ExpiresIn:    1800,
-			ExpiresAt:    float64(time.Now().Add(-time.Hour).Unix()),
+			ExpiresAt:    time.Now().Add(-time.Hour).Unix(),
 		},
 	})
 
@@ -425,7 +430,7 @@ func TestBeforeHook_UsesConfiguredProxyForRefreshAndAPIRequests(t *testing.T) {
 	refreshed, loadErr := auth.LoadToken(tokenPath)
 	require.NoError(t, loadErr)
 	assert.Equal(t, "fresh-access-token", refreshed.Token.AccessToken)
-	assert.Greater(t, refreshed.Token.ExpiresAt, float64(time.Now().Unix()))
+	assert.Greater(t, refreshed.Token.ExpiresAt, time.Now().Unix())
 }
 
 func freshToken() *auth.TokenFile {
@@ -435,7 +440,7 @@ func freshToken() *auth.TokenFile {
 			AccessToken:  "fresh-access-token",
 			RefreshToken: "refresh-token",
 			ExpiresIn:    1800,
-			ExpiresAt:    float64(time.Now().Add(30 * time.Minute).Unix()),
+			ExpiresAt:    time.Now().Add(30 * time.Minute).Unix(),
 		},
 	}
 }
