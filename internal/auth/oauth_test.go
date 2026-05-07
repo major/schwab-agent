@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	schwabauth "github.com/major/schwab-go/schwab/auth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -96,6 +98,21 @@ func TestAuthorizeURL_UsesDerivedBaseURL(t *testing.T) {
 		"https://proxy.example.com/prefix/v1/oauth/authorize",
 		parsedURL.Scheme+"://"+parsedURL.Host+parsedURL.Path,
 	)
+}
+
+func TestAuthorizeURL_InvalidConfigReturnsError(t *testing.T) {
+	cfg := &Config{
+		ClientID:     "test-client",
+		ClientSecret: "unused",
+		BaseURL:      "http://proxy.example.com",
+	}
+
+	authURL, state, err := AuthorizeURL(cfg)
+
+	assert.Empty(t, authURL)
+	assert.Empty(t, state)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to build OAuth authorization URL")
 }
 
 func TestExchangeCode_Success_UsesBasicAuthAndReturnsTokenFile(t *testing.T) {
@@ -182,6 +199,14 @@ func TestExchangeCode_Failure_ReturnsAuthCallbackError(t *testing.T) {
 	var callbackErr *apperr.AuthCallbackError
 	require.ErrorAs(t, err, &callbackErr)
 	assert.Contains(t, err.Error(), "token exchange failed")
+}
+
+func TestExchangeCode_InvalidConfigReturnsError(t *testing.T) {
+	tokenFile, err := ExchangeCode(nil, "auth-code", "", time.Now())
+
+	assert.Nil(t, tokenFile)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to prepare token exchange")
 }
 
 func TestExchangeCode_UsesDerivedTokenURLAndInsecureTLS(t *testing.T) {
@@ -354,6 +379,145 @@ func TestStartCallbackServer_MissingCode_ReturnsAuthCallbackError(t *testing.T) 
 	assert.Contains(t, result.err.Error(), "OAuth callback failed")
 	assert.Equal(t, http.StatusBadRequest, statusCode)
 	assert.Contains(t, responseBody, "missing code")
+}
+
+func TestStartCallbackServer_InvalidAddressReturnsAuthCallbackError(t *testing.T) {
+	code, err := StartCallbackServer("https://localhost:8182", "expected-state")
+
+	assert.Empty(t, code)
+	require.Error(t, err)
+	var callbackErr *apperr.AuthCallbackError
+	require.ErrorAs(t, err, &callbackErr)
+	assert.Contains(t, err.Error(), "failed to start OAuth callback server")
+}
+
+func TestRunLogin_InvalidConfigReturnsError(t *testing.T) {
+	err := RunLogin(nil, filepath.Join(t.TempDir(), "token.json"), "", false, io.Discard)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to prepare OAuth login")
+}
+
+func TestRunLogin_WriteAuthorizationURLFailureReturnsError(t *testing.T) {
+	callbackAddr := freeLoopbackAddress(t)
+	cfg := &Config{
+		ClientID:     "client-id",
+		ClientSecret: "client-secret",
+		CallbackURL:  "https://" + callbackAddr,
+	}
+
+	err := RunLogin(cfg, filepath.Join(t.TempDir(), "token.json"), "", false, errWriter{})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to write authorization URL")
+}
+
+func TestRunLogin_TokenExchangeFailureReturnsError(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "token.json")
+	callbackAddr := freeLoopbackAddress(t)
+	cfg := &Config{
+		ClientID:        "client-id",
+		ClientSecret:    "client-secret",
+		CallbackURL:     "https://" + callbackAddr,
+		BaseURLInsecure: true,
+	}
+
+	tokenServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/token", r.URL.Path)
+		w.WriteHeader(http.StatusBadRequest)
+		assert.NoError(t, json.NewEncoder(w).Encode(map[string]string{"error": "invalid_request"}))
+	}))
+	defer tokenServer.Close()
+
+	writer := &synchronizedBuffer{}
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- RunLogin(cfg, tokenPath, tokenServer.URL, false, writer)
+	}()
+
+	authURL := waitForAuthURL(t, writer)
+	parsedURL, err := url.Parse(strings.TrimSpace(authURL))
+	require.NoError(t, err)
+	_, statusCode := sendCallbackRequest(t, callbackAddr, "login-code", parsedURL.Query().Get("state"))
+	err = <-errCh
+
+	assert.Equal(t, http.StatusOK, statusCode)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "OAuth login failed")
+}
+
+func TestMapSchwabAuthError_ReturnsExpectedAppErrors(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       error
+		check     func(*testing.T, error)
+		wantError bool
+	}{
+		{
+			name:      "nil",
+			err:       nil,
+			wantError: false,
+		},
+		{
+			name: "callback",
+			err:  &schwabauth.AuthCallbackError{Msg: "callback failed"},
+			check: func(t *testing.T, err error) {
+				t.Helper()
+				var callbackErr *apperr.AuthCallbackError
+				require.ErrorAs(t, err, &callbackErr)
+			},
+			wantError: true,
+		},
+		{
+			name: "expired",
+			err:  &schwabauth.AuthExpiredError{Msg: "expired"},
+			check: func(t *testing.T, err error) {
+				t.Helper()
+				var expiredErr *apperr.AuthExpiredError
+				require.ErrorAs(t, err, &expiredErr)
+			},
+			wantError: true,
+		},
+		{
+			name: "required",
+			err:  &schwabauth.AuthRequiredError{Msg: "required"},
+			check: func(t *testing.T, err error) {
+				t.Helper()
+				var requiredErr *apperr.AuthRequiredError
+				require.ErrorAs(t, err, &requiredErr)
+			},
+			wantError: true,
+		},
+		{
+			name:      "generic",
+			err:       errors.New("plain error"),
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mapSchwabAuthError("wrapped", tt.err)
+
+			if !tt.wantError {
+				assert.NoError(t, got)
+				return
+			}
+
+			require.Error(t, got)
+			assert.Contains(t, got.Error(), "wrapped")
+			if tt.check != nil {
+				tt.check(t, got)
+			}
+		})
+	}
+}
+
+type errWriter struct{}
+
+func (errWriter) Write([]byte) (int, error) {
+	return 0, errors.New("writer failed")
 }
 
 // freeLoopbackAddress reserves and returns an available loopback port for tests.

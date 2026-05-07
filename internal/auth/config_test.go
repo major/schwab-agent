@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/tls"
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +13,12 @@ import (
 
 	"github.com/major/schwab-agent/internal/apperr"
 )
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return f(r)
+}
 
 func TestMain(m *testing.M) {
 	envVars := []string{
@@ -277,6 +284,61 @@ func TestConfig_TLSConfig_InsecureFlag(t *testing.T) {
 
 	// Touch the tls import so the intent of the transport assertion is explicit.
 	_ = tls.VersionTLS13
+}
+
+func TestConfigSchwabAuthConfig_NilConfigReturnsError(t *testing.T) {
+	var cfg *Config
+
+	schwabCfg, err := cfg.schwabAuthConfig("")
+
+	assert.Empty(t, schwabCfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "auth config is required")
+}
+
+func TestConfigSchwabAuthConfig_InvalidBaseURLReturnsError(t *testing.T) {
+	cfg := &Config{
+		ClientID:     "client-id",
+		ClientSecret: "client-secret",
+		BaseURL:      "://bad",
+	}
+
+	schwabCfg, err := cfg.schwabAuthConfig("")
+
+	assert.Empty(t, schwabCfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "derive OAuth base URL")
+}
+
+func TestConfigOAuthHTTPClient_NilConfigUsesDefaultTimeout(t *testing.T) {
+	var cfg *Config
+
+	client := cfg.oauthHTTPClient()
+
+	require.NotNil(t, client)
+	assert.Equal(t, oauthHTTPTimeout, client.Timeout)
+	assert.Nil(t, client.Transport)
+}
+
+func TestConfigOAuthHTTPClient_InsecureFallbackWhenDefaultTransportIsCustom(t *testing.T) {
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() {
+		//nolint:reassign // Restore the process-wide default after exercising the custom RoundTripper fallback branch.
+		http.DefaultTransport = originalTransport
+	})
+
+	//nolint:reassign // The fallback exists only for unusual custom DefaultTransport setups, so the test must replace it temporarily.
+	http.DefaultTransport = roundTripperFunc(func(*http.Request) (*http.Response, error) {
+		return nil, http.ErrUseLastResponse
+	})
+	cfg := &Config{BaseURLInsecure: true}
+
+	client := cfg.oauthHTTPClient()
+
+	transport, ok := client.Transport.(*http.Transport)
+	require.True(t, ok, "oauthHTTPClient() transport type = %T, want *http.Transport", client.Transport)
+	require.NotNil(t, transport.TLSClientConfig)
+	assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
 }
 
 func TestLoadConfig_MissingClientID_ReturnsValidationError(t *testing.T) {

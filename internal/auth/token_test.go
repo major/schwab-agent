@@ -218,6 +218,15 @@ func TestSaveToken_MkdirAllFailure(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to save token file")
 }
 
+func TestSaveToken_NilTokenFileReturnsError(t *testing.T) {
+	tokenPath := filepath.Join(t.TempDir(), "token.json")
+
+	err := SaveToken(tokenPath, nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "token file is required")
+}
+
 func TestSaveToken_WriteFileFailure(t *testing.T) {
 	// Arrange: create a read-only directory so WriteFile fails.
 	tmpDir := t.TempDir()
@@ -287,6 +296,10 @@ func TestIsAccessTokenExpired_JustBeyondLeeway_ReturnsFalse(t *testing.T) {
 	assert.False(t, IsAccessTokenExpired(tf))
 }
 
+func TestIsAccessTokenExpired_NilTokenFileReturnsTrue(t *testing.T) {
+	assert.True(t, IsAccessTokenExpired(nil))
+}
+
 // --- IsRefreshTokenStale tests ---
 
 func TestIsRefreshTokenStale_RecentToken_ReturnsFalse(t *testing.T) {
@@ -326,6 +339,10 @@ func TestIsRefreshTokenStale_JustBefore561600Seconds_ReturnsFalse(t *testing.T) 
 	tf := makeTokenFile(notStaleTime, time.Now().Add(30*time.Minute).Unix())
 
 	assert.False(t, IsRefreshTokenStale(tf))
+}
+
+func TestIsRefreshTokenStale_NilTokenFileReturnsTrue(t *testing.T) {
+	assert.True(t, IsRefreshTokenStale(nil))
 }
 
 // --- RefreshAccessToken tests ---
@@ -393,6 +410,16 @@ func TestRefreshAccessToken_Success_ReturnsNewTokenFile(t *testing.T) {
 
 	// ExpiresAt should be computed (approximately now + ExpiresIn)
 	assert.InDelta(t, time.Now().Unix()+1800, newTF.Token.ExpiresAt, 5.0)
+}
+
+func TestRefreshAccessToken_NilTokenFileReturnsError(t *testing.T) {
+	cfg := &Config{ClientID: "id", ClientSecret: "secret"}
+
+	newTF, err := RefreshAccessToken(cfg, nil, "")
+
+	assert.Nil(t, newTF)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "token file is required")
 }
 
 func TestRefreshAccessToken_UsesDerivedTokenURLAndInsecureTLS(t *testing.T) {
