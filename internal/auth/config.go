@@ -6,12 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	schwabauth "github.com/major/schwab-go/schwab/auth"
 
 	"github.com/major/schwab-agent/internal/apperr"
 )
@@ -83,6 +86,70 @@ func (cfg *Config) TLSConfig() *tls.Config {
 	return &tls.Config{
 		InsecureSkipVerify: true, //nolint:gosec // base_url_insecure is an explicit opt-in for local self-signed proxies.
 	}
+}
+
+// schwabAuthConfig adapts schwab-agent's app-owned config to schwab-go's
+// OAuth-only config. The optional tokenEndpoint keeps old tests and injected
+// dependencies able to point directly at a token endpoint while production code
+// derives OAuth endpoints from base_url.
+func (cfg *Config) schwabAuthConfig(tokenEndpoint string) (schwabauth.Config, error) {
+	if cfg == nil {
+		return schwabauth.Config{}, errors.New("auth config is required")
+	}
+
+	oauthBaseURL := tokenEndpointOAuthBaseURL(tokenEndpoint)
+	if oauthBaseURL == "" {
+		var err error
+		oauthBaseURL, err = schwabauth.OAuthBaseURLFromAPIBaseURL(cfg.APIBaseURL())
+		if err != nil {
+			return schwabauth.Config{}, fmt.Errorf("derive OAuth base URL: %w", err)
+		}
+	}
+
+	callbackURL := cfg.CallbackURL
+	if callbackURL == "" {
+		callbackURL = defaultCallbackURL
+	}
+
+	schwabCfg := schwabauth.Config{
+		ClientID:     cfg.ClientID,
+		ClientSecret: cfg.ClientSecret,
+		CallbackURL:  callbackURL,
+		OAuthBaseURL: oauthBaseURL,
+	}
+	if err := schwabCfg.Validate(); err != nil {
+		return schwabauth.Config{}, fmt.Errorf("validate schwab auth config: %w", err)
+	}
+
+	return schwabCfg, nil
+}
+
+// oauthHTTPClient returns the HTTP client used by schwab-go for outbound OAuth
+// token exchange and refresh requests. Keeping this adapter preserves
+// schwab-agent's base_url_insecure proxy behavior while letting schwab-go own
+// request construction, response parsing, and refresh-token age checks.
+func (cfg *Config) oauthHTTPClient() *http.Client {
+	if cfg == nil {
+		return &http.Client{Timeout: oauthHTTPTimeout}
+	}
+
+	client := &http.Client{Timeout: oauthHTTPTimeout}
+	if tlsCfg := cfg.TLSConfig(); tlsCfg != nil {
+		// Clone DefaultTransport so insecure proxy testing only changes TLS
+		// verification. This keeps proxy env vars, connection pooling, keep-alives,
+		// and other standard transport defaults intact for schwab-go OAuth calls.
+		transport, ok := http.DefaultTransport.(*http.Transport)
+		if !ok {
+			client.Transport = &http.Transport{TLSClientConfig: tlsCfg}
+			return client
+		}
+
+		transport = transport.Clone()
+		transport.TLSClientConfig = tlsCfg
+		client.Transport = transport
+	}
+
+	return client
 }
 
 // resolveAPIPath joins an API path onto the normalized base URL while

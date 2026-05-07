@@ -3,7 +3,6 @@ package auth
 import (
 	"bytes"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -28,6 +27,11 @@ import (
 type synchronizedBuffer struct {
 	mu  sync.Mutex
 	buf bytes.Buffer
+}
+
+type callbackResult struct {
+	code string
+	err  error
 }
 
 // Write appends data to the buffer safely.
@@ -68,7 +72,7 @@ func TestAuthorizeURL_ReturnsExpectedParametersAndState(t *testing.T) {
 	assert.Equal(t, "test-client", parsedURL.Query().Get("client_id"))
 	assert.Equal(t, "https://127.0.0.1:8182", parsedURL.Query().Get("redirect_uri"))
 	assert.Equal(t, "code", parsedURL.Query().Get("response_type"))
-	assert.Equal(t, "api", parsedURL.Query().Get("scope"))
+	assert.Empty(t, parsedURL.Query().Get("scope"))
 	assert.Len(t, state, 64)
 	_, err = hex.DecodeString(state)
 	require.NoError(t, err)
@@ -98,7 +102,8 @@ func TestExchangeCode_Success_UsesBasicAuthAndReturnsTokenFile(t *testing.T) {
 	// Arrange
 	fixedNow := time.Date(2026, time.April, 21, 12, 0, 0, 0, time.UTC)
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/token", r.URL.Path)
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "application/x-www-form-urlencoded", r.Header.Get("Content-Type"))
 
@@ -131,9 +136,10 @@ func TestExchangeCode_Success_UsesBasicAuthAndReturnsTokenFile(t *testing.T) {
 	defer server.Close()
 
 	cfg := &Config{
-		ClientID:     "client-id",
-		ClientSecret: "client-secret",
-		CallbackURL:  "https://127.0.0.1:8182",
+		ClientID:        "client-id",
+		ClientSecret:    "client-secret",
+		CallbackURL:     "https://127.0.0.1:8182",
+		BaseURLInsecure: true,
 	}
 
 	// Act
@@ -148,21 +154,23 @@ func TestExchangeCode_Success_UsesBasicAuthAndReturnsTokenFile(t *testing.T) {
 	assert.Equal(t, "Bearer", tokenFile.Token.TokenType)
 	assert.Equal(t, 1800, tokenFile.Token.ExpiresIn)
 	assert.Equal(t, "api", tokenFile.Token.Scope)
-	assert.InDelta(t, float64(fixedNow.Unix()+1800), tokenFile.Token.ExpiresAt, 0.001)
+	assert.Equal(t, fixedNow.Unix()+1800, tokenFile.Token.ExpiresAt)
 }
 
 func TestExchangeCode_Failure_ReturnsAuthCallbackError(t *testing.T) {
 	// Arrange
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/token", r.URL.Path)
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"error":"invalid_request"}`))
 	}))
 	defer server.Close()
 
 	cfg := &Config{
-		ClientID:     "client-id",
-		ClientSecret: "client-secret",
-		CallbackURL:  "https://127.0.0.1:8182",
+		ClientID:        "client-id",
+		ClientSecret:    "client-secret",
+		CallbackURL:     "https://127.0.0.1:8182",
+		BaseURLInsecure: true,
 	}
 
 	// Act
@@ -230,7 +238,7 @@ func TestStartCallbackServer_Success_ReturnsCode(t *testing.T) {
 	require.NoError(t, result.err)
 	assert.Equal(t, "valid-code", result.code)
 	assert.Equal(t, http.StatusOK, statusCode)
-	assert.Contains(t, responseBody, "Authentication successful! You can close this tab.")
+	assert.Contains(t, responseBody, "Login successful. You can close this tab.")
 }
 
 func TestStartCallbackServer_StateMismatch_ReturnsAuthCallbackError(t *testing.T) {
@@ -252,8 +260,12 @@ func TestStartCallbackServer_StateMismatch_ReturnsAuthCallbackError(t *testing.T
 	require.Error(t, result.err)
 	var callbackErr *apperr.AuthCallbackError
 	require.ErrorAs(t, result.err, &callbackErr)
-	assert.Equal(t, http.StatusBadRequest, statusCode)
-	assert.Contains(t, responseBody, "state mismatch")
+	// schwab-go writes the browser response before schwab-agent validates the
+	// returned state. The CLI still receives AuthCallbackError, but the browser
+	// sees schwab-go's generic success page until upstream exposes response
+	// control for state validation failures.
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.Contains(t, responseBody, "Login successful. You can close this tab.")
 }
 
 func TestRunLogin_PrintsURLAndSavesToken(t *testing.T) {
@@ -262,12 +274,14 @@ func TestRunLogin_PrintsURLAndSavesToken(t *testing.T) {
 	tokenPath := filepath.Join(tmpDir, "token.json")
 	callbackAddr := freeLoopbackAddress(t)
 	cfg := &Config{
-		ClientID:     "client-id",
-		ClientSecret: "client-secret",
-		CallbackURL:  "https://" + callbackAddr,
+		ClientID:        "client-id",
+		ClientSecret:    "client-secret",
+		CallbackURL:     "https://" + callbackAddr,
+		BaseURLInsecure: true,
 	}
 
-	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tokenServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/token", r.URL.Path)
 		if !assert.NoError(t, r.ParseForm()) {
 			return
 		}
@@ -305,7 +319,7 @@ func TestRunLogin_PrintsURLAndSavesToken(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, statusCode)
-	assert.Contains(t, writer.String(), cfg.OAuthAuthorizeURL())
+	assert.Contains(t, writer.String(), "/authorize")
 
 	tokenFile, err := LoadToken(tokenPath)
 	require.NoError(t, err)
@@ -313,37 +327,7 @@ func TestRunLogin_PrintsURLAndSavesToken(t *testing.T) {
 	assert.LessOrEqual(t, tokenFile.CreationTimestamp, after)
 	assert.Equal(t, "saved-access-token", tokenFile.Token.AccessToken)
 	assert.Equal(t, "saved-refresh-token", tokenFile.Token.RefreshToken)
-	assert.InDelta(t, float64(tokenFile.CreationTimestamp+900), tokenFile.Token.ExpiresAt, 1)
-}
-
-func TestValidateCallbackAddr_EdgeCases(t *testing.T) {
-	t.Run("empty addr returns default", func(t *testing.T) {
-		addr, err := validateCallbackAddr("")
-		require.NoError(t, err)
-		assert.Equal(t, defaultCallbackAddr, addr)
-	})
-
-	t.Run("missing port returns error", func(t *testing.T) {
-		_, err := validateCallbackAddr("127.0.0.1")
-		require.Error(t, err)
-		var callbackErr *apperr.AuthCallbackError
-		require.ErrorAs(t, err, &callbackErr)
-		assert.Contains(t, err.Error(), "host and port")
-	})
-
-	t.Run("non-loopback host returns error", func(t *testing.T) {
-		_, err := validateCallbackAddr("192.168.1.1:8182")
-		require.Error(t, err)
-		var callbackErr *apperr.AuthCallbackError
-		require.ErrorAs(t, err, &callbackErr)
-		assert.Contains(t, err.Error(), "127.0.0.1")
-	})
-
-	t.Run("valid loopback addr passes through", func(t *testing.T) {
-		addr, err := validateCallbackAddr("127.0.0.1:9999")
-		require.NoError(t, err)
-		assert.Equal(t, "127.0.0.1:9999", addr)
-	})
+	assert.InDelta(t, tokenFile.CreationTimestamp+900, tokenFile.Token.ExpiresAt, 1)
 }
 
 func TestStartCallbackServer_MissingCode_ReturnsAuthCallbackError(t *testing.T) {
@@ -365,141 +349,11 @@ func TestStartCallbackServer_MissingCode_ReturnsAuthCallbackError(t *testing.T) 
 	require.Error(t, result.err)
 	var callbackErr *apperr.AuthCallbackError
 	require.ErrorAs(t, result.err, &callbackErr)
-	assert.Contains(t, result.err.Error(), "missing code")
+	// The exact delegated schwab-go callback error text may change; this assertion
+	// verifies schwab-agent still maps it into the stable app callback category.
+	assert.Contains(t, result.err.Error(), "OAuth callback failed")
 	assert.Equal(t, http.StatusBadRequest, statusCode)
 	assert.Contains(t, responseBody, "missing code")
-}
-
-func TestCallbackHandler_Idempotency_OnlyProcessesFirstRequest(t *testing.T) {
-	// Arrange
-	resultCh := make(chan callbackResult, 1)
-	var once sync.Once
-	handler := callbackHandler("test-state", resultCh, &once)
-
-	// Act - first request with valid code
-	req1 := httptest.NewRequest(http.MethodGet, "/?code=first-code&state=test-state", http.NoBody)
-	w1 := httptest.NewRecorder()
-	handler.ServeHTTP(w1, req1)
-
-	// Act - second request with different code (sync.Once prevents processing)
-	req2 := httptest.NewRequest(http.MethodGet, "/?code=second-code&state=test-state", http.NoBody)
-	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, req2)
-
-	// Assert - only the first code was captured
-	result := <-resultCh
-	assert.Equal(t, "first-code", result.code)
-	require.NoError(t, result.err)
-
-	// Both requests got success HTML since the response is written before once.Do
-	assert.Equal(t, http.StatusOK, w1.Code)
-	assert.Contains(t, w1.Body.String(), "Authentication successful")
-	assert.Equal(t, http.StatusOK, w2.Code)
-
-	// Channel should be empty - second request did not send a result
-	select {
-	case r := <-resultCh:
-		require.Failf(t, "unexpected channel result", "second request should not have sent a result, got: %+v", r)
-	default:
-		// expected: sync.Once prevented second write
-	}
-}
-
-func TestCallbackAddress(t *testing.T) {
-	tests := []struct {
-		name        string
-		callbackURL string
-		wantAddr    string
-		wantErr     bool
-		errContains string
-	}{
-		{
-			name:        "valid loopback URL with port",
-			callbackURL: "https://127.0.0.1:8182",
-			wantAddr:    "127.0.0.1:8182",
-		},
-		{
-			name:        "valid loopback URL with different port",
-			callbackURL: "https://127.0.0.1:9999",
-			wantAddr:    "127.0.0.1:9999",
-		},
-		{
-			name:        "missing host returns error",
-			callbackURL: "/just-a-path",
-			wantErr:     true,
-			errContains: "host and port",
-		},
-		{
-			name:        "non-loopback host returns error",
-			callbackURL: "https://192.168.1.1:8182",
-			wantErr:     true,
-			errContains: "127.0.0.1",
-		},
-		{
-			name:        "missing port returns error",
-			callbackURL: "https://127.0.0.1",
-			wantErr:     true,
-			errContains: "host and port",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := &Config{CallbackURL: tt.callbackURL}
-
-			addr, err := callbackAddress(cfg)
-
-			if tt.wantErr {
-				require.Error(t, err)
-				var callbackErr *apperr.AuthCallbackError
-				assert.ErrorAs(t, err, &callbackErr)
-				if tt.errContains != "" {
-					assert.Contains(t, err.Error(), tt.errContains)
-				}
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantAddr, addr)
-		})
-	}
-}
-
-func TestGenerateSelfSignedCertificate_ReturnsValidCertificate(t *testing.T) {
-	// Act
-	cert, err := generateSelfSignedCertificate()
-
-	// Assert
-	require.NoError(t, err)
-	require.Len(t, cert.Certificate, 1, "should contain exactly one certificate")
-
-	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
-	require.NoError(t, err)
-
-	// Subject and SANs
-	assert.Equal(t, "127.0.0.1", x509Cert.Subject.CommonName)
-	assert.Contains(t, x509Cert.DNSNames, "localhost")
-
-	// IP SAN check: net.ParseIP returns a 16-byte representation, so compare
-	// using Equal method rather than direct slice comparison.
-	foundIP := false
-	for _, ip := range x509Cert.IPAddresses {
-		if ip.Equal(net.ParseIP("127.0.0.1")) {
-			foundIP = true
-			break
-		}
-	}
-	assert.True(t, foundIP, "certificate should include 127.0.0.1 in IP SANs")
-
-	// Validity window
-	now := time.Now()
-	assert.True(t, x509Cert.NotBefore.Before(now), "NotBefore should be in the past")
-	assert.True(t, x509Cert.NotAfter.After(now), "NotAfter should be in the future")
-
-	// Key usage
-	assert.Equal(t, x509.KeyUsageDigitalSignature|x509.KeyUsageKeyEncipherment, x509Cert.KeyUsage)
-	assert.Contains(t, x509Cert.ExtKeyUsage, x509.ExtKeyUsageServerAuth)
-	assert.True(t, x509Cert.BasicConstraintsValid)
 }
 
 // freeLoopbackAddress reserves and returns an available loopback port for tests.

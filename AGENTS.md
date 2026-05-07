@@ -14,14 +14,14 @@ Go CLI tool for AI agents to trade via Charles Schwab APIs. Single binary, JSON-
 - **Module**: `github.com/major/schwab-agent`
 - **Go version**: 1.26 (check `/usr/local/go/bin/go version` for newer installs)
 - **Entry point**: `cmd/schwab-agent/main.go`
-- **Dependencies**: spf13/cobra v1.10.2 (CLI framework), pkg/browser (OAuth flow), resty.dev/v3 (HTTP client, used by both internal/client/ and internal/auth/), stretchr/testify (test assertions)
+- **Dependencies**: spf13/cobra v1.10.2 (CLI framework), pkg/browser (OAuth flow), schwab-go (API and auth helpers), resty.dev/v3 (internal/client HTTP client), stretchr/testify (test assertions)
 
 ## Architecture
 
 ```text
 cmd/schwab-agent/       Entry point, buildApp(), PersistentPreRunE auth hook
 internal/
-  auth/                 OAuth2 flow (resty v3 for token exchange), token lifecycle, config (JSON + env vars)
+  auth/                 App config plus thin adapters around schwab-go auth helpers
   client/               Schwab API HTTP client (see internal/client/AGENTS.md)
   commands/             CLI command handlers (see internal/commands/AGENTS.md)
   apperr/               Typed error hierarchy with exit codes
@@ -168,7 +168,7 @@ Empty sections are omitted automatically.
 3. **Command references**: `SKILL.md` and `llms.txt` are maintained by hand alongside CLI changes, while runtime discovery uses Cobra help output. The binary does not expose `--jsonschema`.
 4. **Workflow knowledge in help text**: Command Long descriptions and Example fields embed the workflow knowledge that was previously in separate skill files
 5. **No testdata/**: All test data generated inline or via helper functions
-6. **TLSConfig over HTTPClient**: `Config.TLSConfig()` returns a `*tls.Config` instead of the old `*http.Client` factory. Both the API client (`WithTLSConfig`) and auth token exchange (`newOAuthClient`) use this to support insecure proxy setups. The callback server still uses raw net/http (server-side code).
+6. **TLSConfig over HTTPClient**: `Config.TLSConfig()` returns a `*tls.Config` instead of the old `*http.Client` factory. Both the API client (`WithTLSConfig`) and schwab-go auth adapter HTTP client (`oauthHTTPClient`) use this to support insecure proxy setups. The OAuth callback server is delegated to schwab-go auth.
 7. **Cobra tag migration pattern**: Command flags defined via project-owned struct tags (`flag`, `flagdescr`, `default`, `flagshort`) with `defineCobraFlags()` in command setup. RunE handlers read bound opts structs directly and call `validateCobraOptions()` for optional validation hooks. Root persistent flags and Cobra relationship checks stay as raw Cobra calls.
 8. **Flag alias pattern**: `registerOrderFlagAliases()` adds `--instruction` (alias for `--action`) and `--order-type` (alias for `--type`) to qualifying order commands. `resolveOrderFlagAliasesViaFlags()` runs before handlers read option structs, copying alias values to canonical flags via `cmd.Flags().Set()`. `RegisterOrderFlagAliasesOnTree(root)` walks the full command tree post-setup to register aliases on all qualifying subcommands.
 9. **Order replace option subcommand**: `order replace` parent retains its equity RunE. The `option` subcommand uses `buildOCCSymbol()` to construct the OCC symbol from `--underlying`, `--expiration`, `--strike`, `--call`/`--put` flags.

@@ -2,13 +2,13 @@
 
 > Leave generous comments when fixing bugs or working around API quirks. Anything that might save a future developer from re-discovering the same issue is worth writing down.
 
-OAuth2 flow, token lifecycle, and config management for Schwab API authentication.
+OAuth2 config adapters and token lifecycle helpers for Schwab API authentication. Generic OAuth mechanics should live in `github.com/major/schwab-go/schwab/auth`; this package keeps schwab-agent-specific config, output, and compatibility behavior.
 
 ## Token Exchange
 
-`ExchangeCode()` and `RefreshAccessToken()` use resty v3 via the `newOAuthClient` helper. Both create a short-lived resty client with `defer client.Close()`. Requests are form-urlencoded POSTs with HTTP Basic Auth (client ID + secret). The token endpoint URL is derived from `Config.BaseURL`.
+`ExchangeCode()`, `RefreshAccessToken()`, `RunLogin()`, token load/save, authorization URL construction, and the HTTPS callback server delegate to `github.com/major/schwab-go/schwab/auth`. Keep this package as a thin adapter around schwab-go plus app-specific error mapping.
 
-`newOAuthClient` applies `Config.TLSConfig()` so insecure proxy setups work for token requests the same way they do for API requests.
+`Config.schwabAuthConfig(tokenEndpoint)` adapts schwab-agent config to schwab-go auth config. Production code derives the OAuth base URL from `Config.APIBaseURL()`. Tests may pass an injected token endpoint, which is normalized to an OAuth base URL by trimming a trailing `/token`.
 
 ## TLSConfig
 
@@ -17,11 +17,11 @@ OAuth2 flow, token lifecycle, and config management for Schwab API authenticatio
 - Returns nil when `base_url_insecure` is false (default TLS behavior).
 - Returns `&tls.Config{InsecureSkipVerify: true}` when `base_url_insecure` is true.
 
-Both the auth token exchange (`newOAuthClient`) and the API client (`client.WithTLSConfig`) call this method, so insecure mode is applied consistently across all outbound connections.
+Both auth token exchange/refresh (`oauthHTTPClient`) and the API client (`client.WithTLSConfig`) call this method, so insecure mode is applied consistently across all outbound connections.
 
 ## Callback Server
 
-`StartCallbackServer` and `startCallbackServer` use raw `net/http` - this is intentional. The callback server is inbound server-side code that receives Schwab's OAuth redirect, not an outbound HTTP client. It is not a resty migration candidate.
+`StartCallbackServer` wraps `schwab-go/schwab/auth.StartCallbackServer`. Do not re-add local certificate generation, callback handlers, or `sync.Once` request processing unless schwab-go cannot support a required behavior.
 
 ## Config
 
@@ -29,6 +29,5 @@ JSON at `~/.config/schwab-agent/config.json`. Fields: `client_id`, `client_secre
 
 ## Testing
 
-- `httptest.NewServer` for plain HTTP token endpoint mocking.
-- `httptest.NewTLSServer` for TLS token endpoint mocking (tests the insecure path).
+- Use `httptest.NewTLSServer` for token endpoint mocking and set `BaseURLInsecure: true`; schwab-go auth config intentionally requires HTTPS OAuth URLs.
 - `sendCallbackRequest` helper uses a raw `http.Client` - this is test infrastructure for exercising the callback server, not production code.

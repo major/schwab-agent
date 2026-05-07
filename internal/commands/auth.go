@@ -124,12 +124,12 @@ func defaultAuthConfigPath() string {
 }
 
 // unixSecondsToRFC3339 converts Unix seconds into RFC3339, returning an empty string for zero.
-func unixSecondsToRFC3339(seconds float64) string {
+func unixSecondsToRFC3339(seconds int64) string {
 	if seconds <= 0 {
 		return ""
 	}
 
-	return time.Unix(int64(seconds), 0).UTC().Format(time.RFC3339)
+	return time.Unix(seconds, 0).UTC().Format(time.RFC3339)
 }
 
 // refreshExpiryRFC3339 converts the refresh token lifetime into RFC3339.
