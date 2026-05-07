@@ -245,6 +245,56 @@ func TestNewAnalyzeCmd_PartialFailure_TAFails(t *testing.T) {
 	assert.Equal(t, 2, envelope.Metadata.Returned)
 }
 
+func TestNewAnalyzeCmd_QuoteHTTPNotFound(t *testing.T) {
+	// Arrange - schwab-go turns a 404 quote response into an API error. analyze
+	// should preserve the existing quote command behavior by mapping that to the
+	// user-facing SymbolNotFoundError type.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case strings.Contains(r.URL.Path, "/quotes"):
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"message":"symbol not found"}`))
+		case strings.Contains(r.URL.Path, "/pricehistory"):
+			_, _ = w.Write([]byte(mockCandleListJSON("MISSING", 252)))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "MISSING")
+
+	// Assert
+	var symErr *apperr.SymbolNotFoundError
+	require.ErrorAs(t, err, &symErr)
+}
+
+func TestNewAnalyzeCmd_QuoteResponseMissingSymbol(t *testing.T) {
+	// Arrange - Schwab can return a successful quote envelope that still omits
+	// the requested symbol. Treat that as the same symbol-not-found condition as
+	// quote.go rather than returning a nil quote with successful analysis.
+	srv := analyzeServer(
+		t,
+		`{"OTHER":{"assetMainType":"EQUITY","symbol":"OTHER","quote":{"lastPrice":1.0}}}`,
+		mockCandleListJSON("MISSING", 252),
+	)
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "MISSING")
+
+	// Assert
+	var symErr *apperr.SymbolNotFoundError
+	require.ErrorAs(t, err, &symErr)
+}
+
 func TestNewAnalyzeCmd_InvalidInterval(t *testing.T) {
 	// Arrange
 	ref := &client.Ref{}
