@@ -1,6 +1,19 @@
 package models
 
+import (
+	"encoding/json"
+
+	"github.com/major/schwab-go/schwab/marketdata"
+)
+
 // OptionChain represents an option chain for a symbol.
+//
+// The command layer now uses schwab-go for the option-chain request mechanics,
+// but this agent-facing model intentionally keeps the historical Schwab JSON
+// field names. schwab-go v0.1.x names several contract fields with a "Price"
+// suffix, while live Schwab chain payloads and prior CLI output use bid, ask,
+// last, mark, and inTheMoney. Keeping this model avoids silently zeroing prices
+// or breaking downstream agents while the dependency catches up.
 type OptionChain struct {
 	Symbol            *string     `json:"symbol,omitempty"`
 	Status            *string     `json:"status,omitempty"`
@@ -19,7 +32,8 @@ type OptionChain struct {
 	AssetSubType      *string     `json:"assetSubType,omitempty"`
 	IsChainTruncated  *bool       `json:"isChainTruncated,omitempty"`
 	// Each expiration date maps to a set of strike prices, each containing
-	// a slice of contracts (typically one, but the API returns an array).
+	// a slice of contracts. Schwab returns an array even when only one contract
+	// matches the expiration and strike.
 	CallExpDateMap map[string]map[string][]*OptionContract `json:"callExpDateMap,omitempty"`
 	PutExpDateMap  map[string]map[string][]*OptionContract `json:"putExpDateMap,omitempty"`
 }
@@ -50,7 +64,7 @@ type Underlying struct {
 }
 
 // OptionContract represents a single option contract.
-// Field names match the Schwab API response (e.g. "bid" not "bidPrice").
+// Field names match the Schwab API response (for example, "bid" not "bidPrice").
 type OptionContract struct {
 	PutCall                *string              `json:"putCall,omitempty"`
 	Symbol                 *string              `json:"symbol,omitempty"`
@@ -105,6 +119,53 @@ type OptionContract struct {
 	Low52Week              *float64             `json:"low52Week,omitempty"`
 	Volatility             *float64             `json:"volatility,omitempty"`
 }
+
+// UnmarshalJSON accepts both Schwab's observed chain contract field names and
+// schwab-go's v0.1.x field names. This keeps local command output stable while
+// allowing fixtures copied from schwab-go tests to decode correctly.
+func (o *OptionContract) UnmarshalJSON(data []byte) error {
+	type optionContract OptionContract
+	var raw struct {
+		*optionContract
+
+		BidPrice      *float64 `json:"bidPrice"`
+		AskPrice      *float64 `json:"askPrice"`
+		LastPrice     *float64 `json:"lastPrice"`
+		MarkPrice     *float64 `json:"markPrice"`
+		IsInTheMoney  *bool    `json:"isInTheMoney"`
+		IsMini        *bool    `json:"isMini"`
+		IsNonStandard *bool    `json:"isNonStandard"`
+		IsPennyPilot  *bool    `json:"isPennyPilot"`
+	}
+	raw.optionContract = (*optionContract)(o)
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	assignFallbackFloat(&o.Bid, raw.BidPrice)
+	assignFallbackFloat(&o.Ask, raw.AskPrice)
+	assignFallbackFloat(&o.Last, raw.LastPrice)
+	assignFallbackFloat(&o.Mark, raw.MarkPrice)
+	assignFallbackBool(&o.InTheMoney, raw.IsInTheMoney)
+	assignFallbackBool(&o.Mini, raw.IsMini)
+	assignFallbackBool(&o.NonStandard, raw.IsNonStandard)
+	assignFallbackBool(&o.PennyPilot, raw.IsPennyPilot)
+	return nil
+}
+
+func assignFallbackFloat(dst **float64, fallback *float64) {
+	if *dst == nil && fallback != nil {
+		*dst = fallback
+	}
+}
+
+func assignFallbackBool(dst **bool, fallback *bool) {
+	if *dst == nil && fallback != nil {
+		*dst = fallback
+	}
+}
+
+// OptionDeliverable is an alias for schwab-go's singular deliverable type.
+type OptionDeliverable = marketdata.OptionDeliverable
 
 // OptionDeliverables represents deliverables for an option contract.
 type OptionDeliverables struct {

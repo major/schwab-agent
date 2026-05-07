@@ -1,10 +1,15 @@
 package commands
 
 import (
+	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
+	"github.com/major/schwab-go/schwab/marketdata"
+
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -63,33 +68,12 @@ specific moneyness with --strike-range (ITM, NTM, OTM, ALL).`,
 				return err
 			}
 
-			symbol := args[0]
-
-			// Convert the bool flag to a string for the query param builder.
-			// Only send "true" when explicitly set; omit otherwise so the API
-			// uses its default behavior.
-			includeUnderlying := ""
-			if opts.IncludeUnderlyingQuote {
-				includeUnderlying = annotationValueTrue
+			params, err := optionChainParams(args[0], opts)
+			if err != nil {
+				return err
 			}
 
-			params := client.ChainParams{
-				ContractType:           string(opts.Type),
-				StrikeCount:            opts.StrikeCount,
-				Strategy:               string(opts.Strategy),
-				FromDate:               opts.FromDate,
-				ToDate:                 opts.ToDate,
-				IncludeUnderlyingQuote: includeUnderlying,
-				Interval:               opts.Interval,
-				Strike:                 opts.Strike,
-				StrikeRange:            string(opts.StrikeRange),
-				Volatility:             opts.Volatility,
-				UnderlyingPrice:        opts.UnderlyingPrice,
-				InterestRate:           opts.InterestRate,
-				DaysToExpiration:       opts.DaysToExpiration,
-			}
-
-			chain, err := c.OptionChain(cmd.Context(), symbol, &params)
+			chain, err := c.OptionChain(cmd.Context(), params)
 			if err != nil {
 				return err
 			}
@@ -114,13 +98,114 @@ detailed chain.`,
 		Example: "  schwab-agent chain expiration AAPL",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			symbol := args[0]
-
-			chain, err := c.ExpirationChainForSymbol(cmd.Context(), symbol)
+			chain, err := c.ExpirationChainForSymbol(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
 			return output.WriteSuccess(w, chain, output.NewMetadata())
 		},
 	}
+}
+
+func optionChainParams(symbol string, opts *chainGetOpts) (*marketdata.OptionChainParams, error) {
+	strikeCount, err := optionalPositiveInt(opts.StrikeCount, "strike-count")
+	if err != nil {
+		return nil, err
+	}
+
+	interval, err := optionalPositiveFloat(opts.Interval, "interval")
+	if err != nil {
+		return nil, err
+	}
+
+	strike, err := optionalPositiveFloat(opts.Strike, "strike")
+	if err != nil {
+		return nil, err
+	}
+
+	volatility, err := optionalPositiveFloat(opts.Volatility, "volatility")
+	if err != nil {
+		return nil, err
+	}
+
+	underlyingPrice, err := optionalPositiveFloat(opts.UnderlyingPrice, "underlying-price")
+	if err != nil {
+		return nil, err
+	}
+
+	interestRate, err := optionalFloat(opts.InterestRate, "interest-rate")
+	if err != nil {
+		return nil, err
+	}
+
+	daysToExpiration, err := optionalPositiveInt(opts.DaysToExpiration, "days-to-expiration")
+	if err != nil {
+		return nil, err
+	}
+
+	return &marketdata.OptionChainParams{
+		Symbol:                 symbol,
+		ContractType:           marketdata.OptionChainContractType(opts.Type),
+		StrikeCount:            strikeCount,
+		IncludeUnderlyingQuote: opts.IncludeUnderlyingQuote,
+		Strategy:               marketdata.OptionChainStrategy(opts.Strategy),
+		Interval:               interval,
+		Strike:                 strike,
+		Range:                  marketdata.OptionChainRange(opts.StrikeRange),
+		FromDate:               opts.FromDate,
+		ToDate:                 opts.ToDate,
+		Volatility:             volatility,
+		UnderlyingPrice:        underlyingPrice,
+		InterestRate:           interestRate,
+		DaysToExpiration:       daysToExpiration,
+	}, nil
+}
+
+func optionalPositiveInt(raw, flagName string) (int, error) {
+	value, err := optionalInt(raw, flagName)
+	if err != nil || value == 0 {
+		return value, err
+	}
+	if value < 0 {
+		return 0, apperr.NewValidationError(
+			fmt.Sprintf("invalid %s: %s (must be > 0)", flagName, raw),
+			nil,
+		)
+	}
+	return value, nil
+}
+
+func optionalFloat(raw, flagName string) (float64, error) {
+	if raw == "" {
+		return 0, nil
+	}
+
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, apperr.NewValidationError(fmt.Sprintf("invalid %s: %s", flagName, raw), err)
+	}
+	// schwab-go's option-chain params use zero values to mean "omit this query
+	// parameter." Reject an explicit 0 here so the CLI does not silently drop a
+	// flag the user supplied.
+	if value == 0 {
+		return 0, apperr.NewValidationError(
+			fmt.Sprintf("invalid %s: %s (must be non-zero)", flagName, raw),
+			nil,
+		)
+	}
+	return value, nil
+}
+
+func optionalPositiveFloat(raw, flagName string) (float64, error) {
+	value, err := optionalFloat(raw, flagName)
+	if err != nil || raw == "" {
+		return value, err
+	}
+	if value < 0 {
+		return 0, apperr.NewValidationError(
+			fmt.Sprintf("invalid %s: %s (must be > 0)", flagName, raw),
+			nil,
+		)
+	}
+	return value, nil
 }
