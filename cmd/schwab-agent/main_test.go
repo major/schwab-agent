@@ -117,7 +117,18 @@ func TestBuildApp_AllCommandsPresent(t *testing.T) {
 	stdout, err := runApp(t, "schwab-agent", "--help")
 	require.NoError(t, err)
 
-	for _, name := range []string{"auth", "account", "order", "quote", "chain", "history", "market", "instrument", "completion", "symbol"} {
+	for _, name := range []string{"auth", "account", "order", "quote", "history", "market", "instrument", "completion", "symbol", "option"} {
+		assert.Contains(t, stdout, name)
+	}
+}
+
+func TestOptionHelp_ListsPorcelainSubcommands(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	stdout, err := runApp(t, "schwab-agent", "option", "--help")
+	require.NoError(t, err)
+
+	for _, name := range []string{"expirations", "chain", "contract"} {
 		assert.Contains(t, stdout, name)
 	}
 }

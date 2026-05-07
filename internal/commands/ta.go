@@ -1007,7 +1007,7 @@ func dashboardSignals(latest map[string]any) (map[string]any, error) {
 		"trend":                   trendSignal(closePrice, sma21, sma50, sma200),
 		"momentum":                momentumSignal(rsi14, macdHist),
 		"volatility":              volatilitySignal(atrPercent),
-		"volume":                  volumeSignal(relativeVolume),
+		dashboardKeyVolume:        volumeSignal(relativeVolume),
 		"close_above_sma_21":      closePrice > sma21,
 		"close_above_sma_50":      closePrice > sma50,
 		"close_above_sma_200":     closePrice > sma200,

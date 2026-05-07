@@ -26,7 +26,6 @@ func BuildCommandTree(
 	root.AddCommand(NewQuoteCmd(ref, w))
 	root.AddCommand(NewHistoryCmd(ref, w))
 	root.AddCommand(NewInstrumentCmd(ref, w))
-	root.AddCommand(NewChainCmd(ref, w))
 	root.AddCommand(NewOptionCmd(ref, w))
 	root.AddCommand(NewMarketCmd(ref, w))
 	root.AddCommand(NewTACmd(ref, w))

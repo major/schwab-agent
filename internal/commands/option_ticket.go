@@ -1,8 +1,6 @@
 package commands
 
 import (
-	"context"
-	"fmt"
 	"io"
 	"math"
 	"slices"
@@ -14,43 +12,11 @@ import (
 
 	"github.com/major/schwab-go/schwab/marketdata"
 
-	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/models"
-	"github.com/major/schwab-agent/internal/orderbuilder"
-	"github.com/major/schwab-agent/internal/output"
 )
 
 const strikeComparisonEpsilon = 0.0001
-
-// optionTicketGetOpts holds the inputs for narrowing an option chain to one actionable contract.
-type optionTicketGetOpts struct {
-	Expiration string  `flag:"expiration" flagdescr:"Option expiration date (YYYY-MM-DD)" flaggroup:"contract"`
-	Strike     float64 `flag:"strike"     flagdescr:"Option strike price"                 flaggroup:"contract"`
-	Call       bool    `flag:"call"       flagdescr:"Select the call contract"            flaggroup:"contract"`
-	Put        bool    `flag:"put"        flagdescr:"Select the put contract"             flaggroup:"contract"`
-}
-
-// optionTicketData is the agent-facing payload for an option ticket lookup.
-type optionTicketData struct {
-	Symbol          string                   `json:"symbol"`
-	Expiration      string                   `json:"expiration"`
-	Strike          float64                  `json:"strike"`
-	PutCall         models.PutCall           `json:"putCall"`
-	OCCSymbol       string                   `json:"occSymbol"`
-	UnderlyingQuote *models.QuoteEquity      `json:"underlyingQuote"`
-	Chain           optionTicketChainSummary `json:"chain"`
-	Contracts       []*models.OptionContract `json:"contracts"`
-}
-
-// optionTicketChainSummary preserves chain-level context without returning the full chain.
-type optionTicketChainSummary struct {
-	Status            string             `json:"status,omitempty"`
-	Underlying        *models.Underlying `json:"underlying,omitempty"`
-	UnderlyingPrice   float64            `json:"underlyingPrice,omitempty"`
-	IsDelayed         bool               `json:"isDelayed,omitempty"`
-	NumberOfContracts int                `json:"numberOfContracts,omitempty"`
-}
 
 // NewOptionCmd returns the Cobra command for option planning workflows.
 func NewOptionCmd(c *client.Ref, w io.Writer) *cobra.Command {
@@ -63,127 +29,11 @@ func NewOptionCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	}
 	cmd.SetFlagErrorFunc(suggestSubcommands)
 
-	cmd.AddCommand(newOptionTicketCmd(c, w))
+	cmd.AddCommand(newOptionExpirationsCmd(c, w))
+	cmd.AddCommand(newOptionChainCmd(c, w))
+	cmd.AddCommand(newOptionContractCmd(c, w))
 
 	return cmd
-}
-
-// newOptionTicketCmd returns the parent command for option ticket workflows.
-func newOptionTicketCmd(c *client.Ref, w io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "ticket",
-		Short: "Build an option planning ticket",
-		Long: `Build an option planning ticket from live market data. The ticket combines
-the underlying quote, a narrowly filtered option chain, the matching contract,
-and the OCC symbol in one read-only command. Use order preview option when you
-are ready to turn the ticket into a Schwab preview request.`,
-		RunE: requireSubcommand,
-	}
-	cmd.SetFlagErrorFunc(suggestSubcommands)
-
-	cmd.AddCommand(newOptionTicketGetCmd(c, w))
-
-	return cmd
-}
-
-// newOptionTicketGetCmd returns the command that resolves one option contract ticket.
-func newOptionTicketGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
-	opts := &optionTicketGetOpts{}
-	cmd := &cobra.Command{
-		Use:   "get <symbol>",
-		Short: "Get quote, chain, and OCC context for one option contract",
-		Long: `Get a compact option ticket for one underlying, expiration, strike, and
-contract side. This collapses the common agent workflow of quote lookup, chain
-lookup, and OCC symbol construction into one read-only CLI call.`,
-		Example: `  schwab-agent option ticket get AAPL --expiration 2026-01-16 --strike 200 --call
-  schwab-agent option ticket get TSLA --expiration 2026-03-20 --strike 180 --put`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
-				return err
-			}
-
-			ticket, err := buildOptionTicket(cmd.Context(), c, args[0], opts)
-			if err != nil {
-				return err
-			}
-
-			return output.WriteSuccess(w, ticket, output.NewMetadata())
-		},
-	}
-
-	defineCobraFlags(cmd, opts)
-	cmd.MarkFlagsOneRequired(flagCall, flagPut)
-	cmd.MarkFlagsMutuallyExclusive(flagCall, flagPut)
-	cmd.SetFlagErrorFunc(normalizeFlagValidationErrorFunc)
-
-	return cmd
-}
-
-// buildOptionTicket fetches the quote and filtered option chain needed for an agent order ticket.
-func buildOptionTicket(
-	ctx context.Context,
-	c *client.Ref,
-	rawSymbol string,
-	opts *optionTicketGetOpts,
-) (*optionTicketData, error) {
-	symbol := strings.ToUpper(strings.TrimSpace(rawSymbol))
-	if symbol == "" {
-		return nil, newValidationError("symbol is required")
-	}
-
-	expiration, err := parseExpiration(opts.Expiration)
-	if err != nil {
-		return nil, err
-	}
-
-	putCall, err := parsePutCall(opts.Call, opts.Put)
-	if err != nil {
-		return nil, err
-	}
-
-	if opts.Strike <= 0 {
-		return nil, newValidationError("strike must be greater than zero")
-	}
-
-	quote, err := c.Quote(
-		ctx,
-		symbol,
-		client.QuoteParams{Fields: []string{quoteFieldQuote, quoteFieldFundamental, quoteFieldReference}},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	chain, err := c.OptionChain(ctx, optionTicketChainParams(symbol, expiration, putCall, opts.Strike))
-	if err != nil {
-		return nil, err
-	}
-
-	contracts := matchingTicketContracts(chain, expiration, putCall, opts.Strike)
-	if len(contracts) == 0 {
-		return nil, apperr.NewSymbolNotFoundError(
-			fmt.Sprintf(
-				"option contract not found for %s %s %.3f %s",
-				symbol,
-				expiration.Format("2006-01-02"),
-				opts.Strike,
-				putCall,
-			),
-			nil,
-		)
-	}
-
-	return &optionTicketData{
-		Symbol:          symbol,
-		Expiration:      expiration.Format("2006-01-02"),
-		Strike:          opts.Strike,
-		PutCall:         putCall,
-		OCCSymbol:       orderbuilder.BuildOCCSymbol(symbol, expiration, opts.Strike, string(putCall)),
-		UnderlyingQuote: quote,
-		Chain:           summarizeTicketChain(chain),
-		Contracts:       contracts,
-	}, nil
 }
 
 // optionTicketChainParams keeps Schwab's chain response narrow enough for LLM-friendly output.
@@ -257,21 +107,6 @@ func matchingStrikeContracts(
 		}
 	}
 	return matches
-}
-
-// summarizeTicketChain retains the chain fields agents need without echoing the full option matrix.
-func summarizeTicketChain(chain *models.OptionChain) optionTicketChainSummary {
-	if chain == nil {
-		return optionTicketChainSummary{}
-	}
-
-	return optionTicketChainSummary{
-		Status:            stringValue(chain.Status),
-		Underlying:        chain.Underlying,
-		UnderlyingPrice:   floatValue(chain.UnderlyingPrice),
-		IsDelayed:         boolValue(chain.IsDelayed),
-		NumberOfContracts: intValue(chain.NumberOfContracts),
-	}
 }
 
 // nearlyEqual compares decimal prices from CLI flags and Schwab string keys safely.
