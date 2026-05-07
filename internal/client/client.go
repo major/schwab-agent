@@ -102,8 +102,8 @@ func (c *Client) newTraderClient() *trader.Client {
 	// Keep the schwab-go trader client behind this adapter so command packages
 	// retain the existing internal/client boundary and typed error contract while
 	// endpoint methods migrate one at a time. Build it from the current token on
-	// demand because schwab-go v0.4.1 accepts WithTokenProvider but does not retain
-	// it in concrete trader clients; see major/schwab-go#53.
+	// demand so the root auth hook can refresh c.token and the next request sees
+	// the new bearer token without rebuilding command wiring.
 	return trader.NewClient(
 		schwab.WithToken(c.token),
 		schwab.WithBaseURL(c.baseURL),

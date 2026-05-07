@@ -56,12 +56,12 @@ Each file maps to one Schwab API resource:
 
 | File | Methods | API Path Prefix |
 |---|---|---|
-| accounts.go | `AccountNumbers()` via schwab-go; `Accounts()`, `Account()` compatibility decoder | `/trader/v1/accounts` |
-| chains.go | `ExpirationChainForSymbol()` via schwab-go; `OptionChain()` compatibility decoder | `/marketdata/v1/chains`, `/marketdata/v1/expirationchain` |
-| orders.go | `ListOrders()`, `AllOrders()`, `GetOrder()`, `CancelOrder()` via schwab-go; `PlaceOrder()`, `PreviewOrder()`, `ReplaceOrder()` compatibility paths | `/trader/v1/accounts/{hash}/orders` |
-| preferences.go | `UserPreference()` compatibility decoder | `/trader/v1/userPreference` |
+| accounts.go | `AccountNumbers()` via schwab-go; `Accounts()`, `Account()` via schwab-go raw responses plus local model decoder | `/trader/v1/accounts` |
+| chains.go | `ExpirationChainForSymbol()` via schwab-go; `OptionChain()` compatibility decoder pending major/schwab-go#62 | `/marketdata/v1/chains`, `/marketdata/v1/expirationchain` |
+| orders.go | `ListOrders()`, `AllOrders()`, `GetOrder()`, `CancelOrder()` via schwab-go; `PlaceOrder()`, `PreviewOrder()`, `ReplaceOrder()` compatibility paths pending major/schwab-go#65 | `/trader/v1/accounts/{hash}/orders` |
+| preferences.go | `UserPreference()` compatibility decoder pending major/schwab-go#63 | `/trader/v1/userPreference` |
 | quotes.go | `Quote()`, `Quotes()` via schwab-go | `/marketdata/v1/quotes` |
-| transactions.go | `Transactions()`, `Transaction()` compatibility decoder | `/trader/v1/accounts/{hash}/transactions` |
+| transactions.go | `Transactions()`, `Transaction()` compatibility decoder pending major/schwab-go#64 | `/trader/v1/accounts/{hash}/transactions` |
 
 `client.go` contains shared client construction and HTTP helpers. `params.go` contains reusable query parameter helpers, not endpoint methods.
 

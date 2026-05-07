@@ -196,6 +196,10 @@ func (c *Client) PlaceOrder(
 	hashValue string,
 	order *models.OrderRequest,
 ) (*PlaceOrderResponse, error) {
+	// This intentionally stays on the compatibility transport until schwab-go can
+	// preserve exact order request bodies and report malformed non-empty Location
+	// headers. A typed trader.OrderRequest would currently drop fields such as
+	// priceOffset used by trailing stop limit orders; see major/schwab-go#65.
 	path := fmt.Sprintf("/trader/v1/accounts/%s/orders", hashValue)
 
 	encoded, err := json.Marshal(order)
@@ -256,6 +260,8 @@ func (c *Client) PreviewOrder(
 	hashValue string,
 	order *models.OrderRequest,
 ) (*models.PreviewOrder, error) {
+	// Preview must send the same local order JSON used by place so saved preview
+	// digests remain meaningful. See PlaceOrder and major/schwab-go#65.
 	path := fmt.Sprintf("/trader/v1/accounts/%s/previewOrder", hashValue)
 	var result models.PreviewOrder
 	if err := c.doPost(ctx, path, order, &result); err != nil {
@@ -271,6 +277,7 @@ func (c *Client) ReplaceOrder(
 	orderID int64,
 	order *models.OrderRequest,
 ) (*ReplaceOrderResponse, error) {
+	// See PlaceOrder for the exact-body and strict Location parsing constraints.
 	path := fmt.Sprintf("/trader/v1/accounts/%s/orders/%d", hashValue, orderID)
 
 	encoded, err := json.Marshal(order)

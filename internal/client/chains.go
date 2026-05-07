@@ -3,11 +3,15 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 
+	schwab "github.com/major/schwab-go/schwab"
 	"github.com/major/schwab-go/schwab/marketdata"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -41,8 +45,9 @@ func (e *ExpirationDate) UnmarshalJSON(data []byte) error {
 
 // OptionChain retrieves the option chain for a symbol with schwab-go parameter
 // types while decoding into the project model that preserves Schwab's observed
-// option-chain JSON names. This bridges a schwab-go v0.1.x response-model gap
-// without reintroducing the old stringly typed ChainParams API.
+// option-chain JSON names. Keep this compatibility decoder until schwab-go
+// exposes raw option-chain responses or model parity for fields such as
+// numberOfContracts; see major/schwab-go#62.
 func (c *Client) OptionChain(
 	ctx context.Context,
 	params *marketdata.OptionChainParams,
@@ -60,6 +65,9 @@ func (c *Client) OptionChain(
 func (c *Client) ExpirationChainForSymbol(ctx context.Context, symbol string) (*ExpirationChain, error) {
 	chain, err := c.newMarketDataClient().GetExpirationChain(ctx, symbol)
 	if err != nil {
+		if schwab.IsStatusCode(err, http.StatusNotFound) {
+			return nil, apperr.NewSymbolNotFoundError(fmt.Sprintf("symbol %s not found", symbol), err)
+		}
 		return nil, schwabAPIErrorToHTTPError(err)
 	}
 	result, err := adaptSchwabGoModel[ExpirationChain](chain)

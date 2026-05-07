@@ -29,6 +29,10 @@ func (c *Client) Transactions(
 	hashValue string,
 	params TransactionParams,
 ) ([]models.Transaction, error) {
+	// schwab-go v0.4.2 transaction models do not preserve every field this CLI
+	// passes through today, including transfer position details. Keep the raw
+	// compatibility decoder until schwab-go exposes raw transactions or full model
+	// parity; see major/schwab-go#64.
 	path := fmt.Sprintf("/trader/v1/accounts/%s/transactions", hashValue)
 
 	queryParams := make(map[string]string)
@@ -46,6 +50,7 @@ func (c *Client) Transactions(
 
 // Transaction retrieves a specific transaction by ID.
 func (c *Client) Transaction(ctx context.Context, hashValue string, txnID int64) (*models.Transaction, error) {
+	// See Transactions for why this endpoint remains on the compatibility path.
 	path := fmt.Sprintf("/trader/v1/accounts/%s/transactions/%d", hashValue, txnID)
 	var result models.Transaction
 	err := c.doGet(ctx, path, nil, &result)
