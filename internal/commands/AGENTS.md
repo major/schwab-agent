@@ -104,17 +104,9 @@ Four order types share a common pattern: parse flags -> validate -> build -> pla
 Spec mode (`--spec`): Accepts inline JSON, `@file` path, or `-` for stdin via `readSpecSource()`.
 Preview digest mode (`order preview --save-preview` then `order place --from-preview <digest>`): Binds the canonical order JSON to the account, operation, and endpoint so agents can separate review from mutation without rebuilding the payload.
 
-## Enum Parsing
+## Enum Validation
 
-CLI string inputs are validated against `models` constants via switch statements:
-
-- `parseInstruction()`: BUY, SELL, BUY_TO_COVER, etc.
-- `parseOrderType()`: MARKET, LIMIT, STOP, STOP_LIMIT, etc.
-- `parseDuration()`: DAY, GOOD_TILL_CANCEL, FILL_OR_KILL, etc.
-- `parseSession()`: NORMAL, AM, PM, SEAMLESS
-- `parsePutCall()`: Mutually exclusive `--call`/`--put` flags
-
-All return `ValidationError` on invalid input.
+Order enum flags are validated through the tagged-flag helpers and pflag-backed enum values in `helpers.go`. Legacy aliases such as `MOC`, `LOC`, `GTC`, `FOK`, and `IOC` are normalized after flag validation so order builders receive canonical Schwab API values. `parsePutCall()` remains the shared helper for mutually exclusive `--call`/`--put` flags and returns `ValidationError` on invalid input.
 
 ## Testing
 

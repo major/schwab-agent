@@ -532,44 +532,6 @@ func validateOrderStatusFilter(raw string) error {
 	return newValidationError("invalid status")
 }
 
-// parseInstruction converts CLI input to an instruction enum.
-func parseInstruction(raw string) (models.Instruction, error) {
-	return requireEnum(raw, validInstructions(), "action")
-}
-
-// parseOrderType converts CLI input to an order type enum.
-// Supports aliases MOC (MARKET_ON_CLOSE) and LOC (LIMIT_ON_CLOSE).
-func parseOrderType(raw string, fallback models.OrderType) (models.OrderType, error) {
-	upper := strings.ToUpper(strings.TrimSpace(raw))
-
-	// Resolve aliases before standard enum validation.
-	switch upper {
-	case orderTypeAliasMarketOnClose:
-		return models.OrderTypeMarketOnClose, nil
-	case orderTypeAliasLimitOnClose:
-		return models.OrderTypeLimitOnClose, nil
-	}
-
-	return parseEnum(raw, validOrderTypes(), fallback, "type")
-}
-
-// parseDuration converts CLI input to a duration enum for focused unit tests and
-// legacy helper coverage. Runtime flag decoding is handled by pflag enum validation.
-func parseDuration(raw string) (models.Duration, error) {
-	upper := strings.ToUpper(strings.TrimSpace(raw))
-
-	switch upper {
-	case durationAliasGoodTillCancel:
-		return models.DurationGoodTillCancel, nil
-	case durationAliasFillOrKill:
-		return models.DurationFillOrKill, nil
-	case durationAliasImmediateOrCancel:
-		return models.DurationImmediateOrCancel, nil
-	}
-
-	return parseEnum(raw, validDurations(), "", "duration")
-}
-
 // requireMutableEnabled checks that mutable operations are explicitly enabled in config.
 func requireMutableEnabled(configPath string) error {
 	cfg, err := auth.LoadConfig(configPath)

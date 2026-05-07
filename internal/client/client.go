@@ -276,8 +276,3 @@ func (c *Client) doGet(ctx context.Context, path string, params map[string]strin
 func (c *Client) doPost(ctx context.Context, path string, body, result any) error {
 	return c.doRequest(ctx, http.MethodPost, path, body, result)
 }
-
-// doDelete performs a DELETE request.
-func (c *Client) doDelete(ctx context.Context, path string, result any) error {
-	return c.doRequest(ctx, http.MethodDelete, path, nil, result)
-}

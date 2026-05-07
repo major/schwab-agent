@@ -72,48 +72,6 @@ func requireArg(value, name string) error {
 	return nil
 }
 
-// parseEnum validates raw against valid, returning the matching enum member or
-// fallback when raw is empty. Trims whitespace and uppercases before comparison.
-func parseEnum[T ~string](raw string, valid []T, fallback T, label string) (T, error) {
-	v := strings.TrimSpace(raw)
-	if v == "" {
-		return fallback, nil
-	}
-
-	candidate := T(strings.ToUpper(v))
-	if slices.Contains(valid, candidate) {
-		return candidate, nil
-	}
-
-	var zero T
-
-	return zero, newValidationError(
-		fmt.Sprintf("invalid %s: %q (valid: %s)", label, raw, validEnumString(valid)),
-	)
-}
-
-// requireEnum validates raw against valid, returning a ValidationError when raw
-// is empty. Use this for required enum flags that have no fallback.
-func requireEnum[T ~string](raw string, valid []T, label string) (T, error) {
-	v := strings.TrimSpace(raw)
-	if v == "" {
-		var zero T
-
-		return zero, newValidationError(label + " is required")
-	}
-
-	candidate := T(strings.ToUpper(v))
-	if slices.Contains(valid, candidate) {
-		return candidate, nil
-	}
-
-	var zero T
-
-	return zero, newValidationError(
-		fmt.Sprintf("invalid %s: %q (valid: %s)", label, raw, validEnumString(valid)),
-	)
-}
-
 // requireTypedEnum validates that a typed enum flag with no useful zero value
 // was provided. Cobra validates explicit enum values through pflag.Value, but
 // omitted flags still arrive as the enum type's zero value.
