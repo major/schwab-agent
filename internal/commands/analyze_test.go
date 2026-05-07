@@ -16,6 +16,14 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
+const invalidAnalyzeQuoteEntryResponse = `{
+	"INVALID": {
+		"assetMainType": "EQUITY",
+		"symbol": "INVALID",
+		"quote": {"lastPrice": 100.0}
+	}
+}`
+
 // analyzeServer returns an [httptest.Server] that handles both quote and
 // price-history requests. quoteBody is keyed by symbol path suffix
 // (e.g., "/marketdata/v1/AAPL/quotes"), and candleBody applies to all
@@ -99,7 +107,7 @@ func TestNewAnalyzeCmd_HelpText(t *testing.T) {
 
 func TestNewAnalyzeCmd_SingleSymbol(t *testing.T) {
 	// Arrange - server handles both quote and price-history endpoints
-	quoteJSON := `{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`
+	quoteJSON := aaplQuoteEntryResponse
 	candleJSON := mockCandleListJSON("AAPL", 252)
 	srv := analyzeServer(t, quoteJSON, candleJSON)
 	defer srv.Close()
@@ -141,9 +149,9 @@ func TestNewAnalyzeCmd_MultiSymbol(t *testing.T) {
 
 		switch {
 		case strings.Contains(r.URL.Path, "AAPL/quotes"):
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
+			_, _ = w.Write([]byte(aaplQuoteEntryResponse))
 		case strings.Contains(r.URL.Path, "NVDA/quotes"):
-			_, _ = w.Write([]byte(`{"NVDA":{"symbol":"NVDA","lastPrice":800.0}}`))
+			_, _ = w.Write([]byte(`{"NVDA":{"assetMainType":"EQUITY","symbol":"NVDA","quote":{"lastPrice":800.0}}}`))
 		case strings.Contains(r.URL.Path, "/pricehistory"):
 			// Determine symbol from query param
 			sym := r.URL.Query().Get("symbol")
@@ -191,10 +199,10 @@ func TestNewAnalyzeCmd_PartialFailure_TAFails(t *testing.T) {
 
 		switch {
 		case strings.Contains(r.URL.Path, "AAPL/quotes"):
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
+			_, _ = w.Write([]byte(aaplQuoteEntryResponse))
 		case strings.Contains(r.URL.Path, "INVALID/quotes"):
 			// Quote succeeds for INVALID
-			_, _ = w.Write([]byte(`{"INVALID":{"symbol":"INVALID","lastPrice":100.0}}`))
+			_, _ = w.Write([]byte(invalidAnalyzeQuoteEntryResponse))
 		case strings.Contains(r.URL.Path, "/pricehistory"):
 			// Return valid candles for AAPL, empty for INVALID (TA will fail)
 			sym := r.URL.Query().Get("symbol")
@@ -235,6 +243,56 @@ func TestNewAnalyzeCmd_PartialFailure_TAFails(t *testing.T) {
 	require.NotEmpty(t, envelope.Errors, "should have partial errors")
 	assert.Equal(t, 2, envelope.Metadata.Requested)
 	assert.Equal(t, 2, envelope.Metadata.Returned)
+}
+
+func TestNewAnalyzeCmd_QuoteHTTPNotFound(t *testing.T) {
+	// Arrange - schwab-go turns a 404 quote response into an API error. analyze
+	// should preserve the existing quote command behavior by mapping that to the
+	// user-facing SymbolNotFoundError type.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case strings.Contains(r.URL.Path, "/quotes"):
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"message":"symbol not found"}`))
+		case strings.Contains(r.URL.Path, "/pricehistory"):
+			_, _ = w.Write([]byte(mockCandleListJSON("MISSING", 252)))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "MISSING")
+
+	// Assert
+	var symErr *apperr.SymbolNotFoundError
+	require.ErrorAs(t, err, &symErr)
+}
+
+func TestNewAnalyzeCmd_QuoteResponseMissingSymbol(t *testing.T) {
+	// Arrange - Schwab can return a successful quote envelope that still omits
+	// the requested symbol. Treat that as the same symbol-not-found condition as
+	// quote.go rather than returning a nil quote with successful analysis.
+	srv := analyzeServer(
+		t,
+		`{"OTHER":{"assetMainType":"EQUITY","symbol":"OTHER","quote":{"lastPrice":1.0}}}`,
+		mockCandleListJSON("MISSING", 252),
+	)
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "MISSING")
+
+	// Assert
+	var symErr *apperr.SymbolNotFoundError
+	require.ErrorAs(t, err, &symErr)
 }
 
 func TestNewAnalyzeCmd_InvalidInterval(t *testing.T) {

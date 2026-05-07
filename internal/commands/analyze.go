@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/client"
 	"github.com/major/schwab-agent/internal/output"
 )
@@ -133,14 +134,20 @@ func buildAnalyzeResult(
 	var result analyzeResult
 	var quoteErr, taErr error
 
-	// Fetch quote. Use zero-value QuoteParams since analyze does not expose
-	// --fields or --indicative flags. The full default quote is what agents
-	// need for combined analysis.
-	quote, err := c.Quote(ctx, symbol, client.QuoteParams{})
+	// Fetch quote via schwab-go. analyze does not expose --fields or
+	// --indicative flags, so an empty fields string asks Schwab for the
+	// default quote payload while keeping this command on the same marketdata
+	// client path as quote, instrument, and market commands.
+	quoteResponse, err := c.MarketData.GetQuote(ctx, symbol, "")
 	if err != nil {
-		quoteErr = err
+		quoteErr = mapQuoteSingleError(symbol, err)
 	} else {
-		result.Quote = quote
+		quote := quoteResponseValue(quoteResponse)[symbol]
+		if quoteEntryMissing(quote) {
+			quoteErr = apperr.NewSymbolNotFoundError(fmt.Sprintf("symbol %s not found", symbol), nil)
+		} else {
+			result.Quote = quote
+		}
 	}
 
 	// Compute TA dashboard.
