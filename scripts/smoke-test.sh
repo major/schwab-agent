@@ -4,7 +4,7 @@
 # Tier 1 (no auth): help text, symbol build/parse, all order build permutations.
 #   Runs in CI and locally.
 #
-# Tier 2 (auth required): read-only API commands (account, quote, chain, etc.).
+# Tier 2 (auth required): read-only API commands (account, quote, option, etc.).
 #   Runs locally only when a valid auth token exists.
 #
 # Usage:
@@ -228,9 +228,10 @@ run_help_test "order build vertical-roll" order build vertical-roll
 run_help_test "order build back-ratio"   order build back-ratio
 run_help_test "order build double-diagonal" order build double-diagonal
 run_help_test "order build fts"          order build fts
-run_help_test "chain"             chain
-run_help_test "chain get"         chain get
-run_help_test "chain expiration"  chain expiration
+run_help_test "option"             option
+run_help_test "option expirations" option expirations
+run_help_test "option chain"       option chain
+run_help_test "option contract"    option contract
 run_help_test "history"           history
 run_help_test "history get"       history get
 run_help_test "instrument"        instrument
@@ -267,6 +268,13 @@ run_help_contains_test "order replace option shows put flag" "--put" order repla
 run_help_contains_test "order preview shows save-preview flag" "--save-preview" order preview
 run_help_contains_test "order preview equity shows save-preview flag" "--save-preview" order preview equity
 run_help_contains_test "order place shows from-preview flag" "--from-preview" order place
+
+run_help_contains_test "option chain shows --dte flag" "--dte" option chain
+run_help_contains_test "option chain shows --fields flag" "--fields" option chain
+run_help_contains_test "option chain shows --strike-count flag" "--strike-count" option chain
+run_help_contains_test "option contract shows --expiration flag" "--expiration" option contract
+run_help_contains_test "option contract shows --call flag" "--call" option contract
+run_help_contains_test "option contract shows --put flag" "--put" option contract
 
 run_help_contains_test "quote get shows underlying flag" "--underlying" quote get
 run_help_contains_test "quote get shows call flag" "--call" quote get
@@ -785,15 +793,13 @@ run_test "order list" order list
 run_test "order list --status all" order list --status all
 
 # -------------------------------------------------------------------
-# Chain
+# Option (porcelain)
 # -------------------------------------------------------------------
 
-section "Chain"
+section "Option"
 
-run_test "chain get" chain get AAPL
-run_test "chain get: CALL only" chain get AAPL --type CALL
-run_test "chain get: PUT only" chain get AAPL --type PUT
-run_test "chain expiration" chain expiration AAPL
+run_test "option expirations" option expirations AAPL
+run_test "option chain: CALL" option chain AAPL --type CALL --strike-count 5
 
 # -------------------------------------------------------------------
 # History
