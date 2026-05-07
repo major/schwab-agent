@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -74,6 +75,48 @@ func TestAccountNumbers_401_ReturnsAuthExpiredError(t *testing.T) {
 	var authErr *apperr.AuthExpiredError
 	require.ErrorAs(t, err, &authErr)
 	assert.Contains(t, authErr.Error(), "authentication expired")
+}
+
+func TestAccountNumbers_500_ReturnsHTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"server error"}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	result, err := c.AccountNumbers(context.Background())
+
+	require.Error(t, err)
+	assert.Nil(t, result)
+
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
+	assert.JSONEq(t, `{"error":"server error"}`, httpErr.Body)
+}
+
+func TestAccountNumbers_WithTLSConfig(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/trader/v1/accounts/accountNumbers", r.URL.Path)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(
+		"test-token",
+		WithBaseURL(srv.URL),
+		WithTLSConfig(&tls.Config{
+			// Test-only client trusts httptest's self-signed certificate.
+			InsecureSkipVerify: true,
+		}),
+	)
+	result, err := c.AccountNumbers(context.Background())
+
+	require.NoError(t, err)
+	assert.Empty(t, result)
 }
 
 func TestAccountNumbers_EmptyList(t *testing.T) {
