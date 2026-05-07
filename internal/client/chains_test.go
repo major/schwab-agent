@@ -12,6 +12,7 @@ import (
 
 	"github.com/major/schwab-go/schwab/marketdata"
 
+	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
 
@@ -133,6 +134,23 @@ func TestExpirationChainForSymbolPreservesExpirationDateOutput(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.ExpirationList, 1)
 	assert.Equal(t, "2026-01-16", result.ExpirationList[0].ExpirationDate)
+}
+
+func TestExpirationChainForSymbol_404_ReturnsSymbolNotFoundError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":"symbol not found"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	c := NewClient("test-token", WithBaseURL(server.URL))
+	result, err := c.ExpirationChainForSymbol(context.Background(), "MISSING")
+
+	require.Error(t, err)
+	assert.Nil(t, result)
+
+	var symbolErr *apperr.SymbolNotFoundError
+	require.ErrorAs(t, err, &symbolErr)
 }
 
 func TestOptionChainQueryParamsOmitsZeroValues(t *testing.T) {

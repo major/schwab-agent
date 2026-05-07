@@ -201,6 +201,23 @@ func TestAccounts_404_ReturnsAccountNotFoundError(t *testing.T) {
 	assert.Contains(t, accountErr.Error(), "accounts not found")
 }
 
+func TestAccounts_401_ReturnsAuthExpiredError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"token expired"}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient("bad-token", WithBaseURL(srv.URL))
+	result, err := c.Accounts(context.Background())
+
+	require.Error(t, err)
+	assert.Nil(t, result)
+
+	var authErr *apperr.AuthExpiredError
+	require.ErrorAs(t, err, &authErr)
+}
+
 func TestAccounts_EmptyList(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

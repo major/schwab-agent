@@ -2,7 +2,7 @@ package client
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -52,18 +52,23 @@ func accountNumberHashesToModels(accountNumbers []trader.AccountNumberHash) []mo
 // The Schwab API only returns position data when explicitly requested via ?fields=positions.
 // Returns AccountNotFoundError on 404.
 func (c *Client) Accounts(ctx context.Context, fields ...string) ([]models.Account, error) {
-	var params map[string]string
-	if len(fields) > 0 {
-		params = map[string]string{queryParamFields: strings.Join(fields, ",")}
-	}
-	var result []models.Account
-	err := c.doGet(ctx, "/trader/v1/accounts", params, &result)
+	raw, err := c.newTraderClient().GetAccountsRaw(ctx, accountFields(fields...))
 	if err != nil {
-		// Convert 404 HTTPError to AccountNotFoundError
-		if httpErr, ok := errors.AsType[*apperr.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
+		// schwab-go v0.4.2 exposes raw account responses, which lets it own
+		// request construction while this compatibility facade preserves the
+		// CLI's stable local model and 404 -> AccountNotFoundError mapping.
+		if schwab.IsUnauthorized(err) {
+			return nil, apperr.NewAuthExpiredError("authentication expired", err)
+		}
+		if schwab.IsStatusCode(err, http.StatusNotFound) {
 			return nil, apperr.NewAccountNotFoundError("accounts not found", err)
 		}
-		return nil, err
+		return nil, schwabAPIErrorToHTTPError(err)
+	}
+
+	var result []models.Account
+	if unmarshalErr := json.Unmarshal(raw, &result); unmarshalErr != nil {
+		return nil, fmt.Errorf("decode accounts response: %w", unmarshalErr)
 	}
 	return result, nil
 }
@@ -73,19 +78,27 @@ func (c *Client) Accounts(ctx context.Context, fields ...string) ([]models.Accou
 // The Schwab API only returns position data when explicitly requested via ?fields=positions.
 // Returns AccountNotFoundError on 404.
 func (c *Client) Account(ctx context.Context, hashValue string, fields ...string) (*models.Account, error) {
-	path := fmt.Sprintf("/trader/v1/accounts/%s", hashValue)
-	var params map[string]string
-	if len(fields) > 0 {
-		params = map[string]string{queryParamFields: strings.Join(fields, ",")}
-	}
-	var result models.Account
-	err := c.doGet(ctx, path, params, &result)
+	raw, err := c.newTraderClient().GetAccountRaw(ctx, hashValue, accountFields(fields...))
 	if err != nil {
-		// Convert 404 HTTPError to AccountNotFoundError
-		if httpErr, ok := errors.AsType[*apperr.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
+		if schwab.IsUnauthorized(err) {
+			return nil, apperr.NewAuthExpiredError("authentication expired", err)
+		}
+		if schwab.IsStatusCode(err, http.StatusNotFound) {
 			return nil, apperr.NewAccountNotFoundError(fmt.Sprintf("account %s not found", hashValue), err)
 		}
-		return nil, err
+		return nil, schwabAPIErrorToHTTPError(err)
+	}
+
+	var result models.Account
+	if unmarshalErr := json.Unmarshal(raw, &result); unmarshalErr != nil {
+		return nil, fmt.Errorf("decode account response: %w", unmarshalErr)
 	}
 	return &result, nil
+}
+
+func accountFields(fields ...string) string {
+	if len(fields) == 0 {
+		return ""
+	}
+	return strings.Join(fields, ",")
 }
