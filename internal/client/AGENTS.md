@@ -24,7 +24,7 @@ WithTLSConfig applies a custom TLS configuration to both schwab-go clients and t
 
 1. Create `<resource>.go` with methods on `*Client`
 2. Prefer the appropriate schwab-go trader or marketdata method, then adapt back into `internal/models` only when output parity is proven by tests
-3. Use `doGet`, `doPost`, `doDelete`, or direct resty only for documented schwab-go gaps such as response headers, incompatible request/response models, or missing optional filter behavior
+3. Use `doGet`, `doPost`, or direct resty only for documented schwab-go gaps such as response headers, incompatible request/response models, or missing optional filter behavior
 4. Create `<resource>_test.go` with httptest-based tests
 5. Define any new request/response types in `internal/models/`
 
@@ -34,7 +34,6 @@ Core method `doRequest` is the remaining resty v3 compatibility path. It sets th
 
 - `doGet(ctx, path, params, result)`: GET with query params
 - `doPost(ctx, path, body, result)`: POST with JSON body
-- `doDelete(ctx, path, result)`: DELETE
 
 Content-Type header is set by resty only when a request body is present (not on GET). Accept: application/json is set globally on the resty client. New migrated calls should use `newTraderClient()` or `newMarketDataClient()` so schwab-go owns request construction.
 
@@ -45,7 +44,6 @@ Content-Type header is set by resty only when a request body is present (not on 
 | Status | Error Type |
 |---|---|
 | 401 | `AuthExpiredError` |
-| 400, 422 (on order endpoints) | `OrderRejectedError` |
 | Other 4xx/5xx | `HTTPError` (includes status code + body) |
 
 The `PlaceOrder` and `ReplaceOrder` methods have custom status handling (bypasses `doRequest`) to extract the order ID from the Location header and map 400/422 to `OrderRejectedError`. Keep this until schwab-go exposes order mutation response headers or order IDs.
@@ -60,7 +58,7 @@ Each file maps to one Schwab API resource:
 | chains.go | `ExpirationChainForSymbol()` via schwab-go; `OptionChain()` compatibility decoder pending major/schwab-go#62 | `/marketdata/v1/chains`, `/marketdata/v1/expirationchain` |
 | orders.go | `ListOrders()`, `AllOrders()`, `GetOrder()`, `CancelOrder()` via schwab-go; `PlaceOrder()`, `PreviewOrder()`, `ReplaceOrder()` compatibility paths pending major/schwab-go#65 | `/trader/v1/accounts/{hash}/orders` |
 | preferences.go | `UserPreference()` compatibility decoder pending major/schwab-go#63 | `/trader/v1/userPreference` |
-| quotes.go | `Quote()`, `Quotes()` via schwab-go | `/marketdata/v1/quotes` |
+| quotes.go | `Quote()` via schwab-go | `/marketdata/v1/quotes` |
 | transactions.go | `Transactions()`, `Transaction()` compatibility decoder pending major/schwab-go#64 | `/trader/v1/accounts/{hash}/transactions` |
 
 `client.go` contains shared client construction and HTTP helpers. `params.go` contains reusable query parameter helpers, not endpoint methods.
@@ -69,7 +67,7 @@ Each file maps to one Schwab API resource:
 
 Methods accepting filters use either:
 
-- `map[string]string` passed to `doGet` (simple cases like `quotes.go`)
+- `map[string]string` passed to `doGet` for remaining compatibility decoders
 - Typed param structs or schwab-go parameter structs (e.g., `OrderListParams`, `TransactionListParams`, `marketdata.OptionChainParams`)
 
 ## Error Conversion in Client Methods

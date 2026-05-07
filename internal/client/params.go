@@ -3,7 +3,6 @@ package client
 import "time"
 
 const (
-	queryParamFields = "fields"
 	queryParamSymbol = "symbol"
 )
 

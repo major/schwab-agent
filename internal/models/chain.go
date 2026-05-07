@@ -1,10 +1,6 @@
 package models
 
-import (
-	"encoding/json"
-
-	"github.com/major/schwab-go/schwab/marketdata"
-)
+import "encoding/json"
 
 // OptionChain represents an option chain for a symbol.
 //
@@ -163,9 +159,6 @@ func assignFallbackBool(dst **bool, fallback *bool) {
 		*dst = fallback
 	}
 }
-
-// OptionDeliverable is an alias for schwab-go's singular deliverable type.
-type OptionDeliverable = marketdata.OptionDeliverable
 
 // OptionDeliverables represents deliverables for an option contract.
 type OptionDeliverables struct {

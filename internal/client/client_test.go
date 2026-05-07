@@ -188,22 +188,6 @@ func TestDoPost_NilBody(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestDoDelete(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodDelete, r.Method)
-		assert.Equal(t, "Bearer del-token", r.Header.Get("Authorization"))
-		assert.Equal(t, "/orders/456", r.URL.Path)
-
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	c := NewClient("del-token", WithBaseURL(srv.URL))
-	err := c.doDelete(context.Background(), "/orders/456", nil)
-
-	require.NoError(t, err)
-}
-
 func TestDoRequest_401_ReturnsAuthExpiredError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -355,7 +339,7 @@ func TestDoRequest_EmptyResponseBody_Success(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient("tok", WithBaseURL(srv.URL))
-	err := c.doDelete(context.Background(), "/orders/789", nil)
+	err := c.doPost(context.Background(), "/orders/789", nil, nil)
 
 	require.NoError(t, err)
 }
