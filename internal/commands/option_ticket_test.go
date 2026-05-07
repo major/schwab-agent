@@ -20,7 +20,10 @@ func TestNewOptionCmdTicketGet(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.URL.Path {
-		case "/marketdata/v1/AAPL/quotes":
+		case "/marketdata/v1/quotes":
+			if got := r.URL.Query().Get("symbols"); got != "AAPL" {
+				t.Errorf("quote symbols query = %q, want %q", got, "AAPL")
+			}
 			_, _ = w.Write([]byte(`{
 				"AAPL": {
 					"symbol": "AAPL",
@@ -121,7 +124,10 @@ func TestNewOptionCmdTicketGetMissingContract(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.URL.Path {
-		case "/marketdata/v1/AAPL/quotes":
+		case "/marketdata/v1/quotes":
+			if got := r.URL.Query().Get("symbols"); got != "AAPL" {
+				t.Errorf("quote symbols query = %q, want %q", got, "AAPL")
+			}
 			_, _ = w.Write([]byte(`{"AAPL": {"symbol": "AAPL", "quote": {"lastPrice": 199.50}}}`))
 		case "/marketdata/v1/chains":
 			_, _ = w.Write([]byte(`{"symbol": "AAPL", "putExpDateMap": {}}`))

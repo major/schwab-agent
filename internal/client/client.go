@@ -1,7 +1,8 @@
-// Package client provides an authenticated HTTP client for the Schwab API.
+// Package client provides the CLI's Schwab API facade.
 //
-// All requests include Bearer token authentication, JSON content headers,
-// and automatic error mapping for non-2xx responses.
+// Endpoint methods route through schwab-go where that library exposes the
+// behavior the CLI needs, then adapt responses back into this repository's
+// stable output models and typed error hierarchy.
 package client
 
 import (
@@ -110,6 +111,31 @@ func (c *Client) newTraderClient() *trader.Client {
 		schwab.WithUserAgent(c.userAgent),
 		schwab.WithTLSConfig(c.tlsConfig),
 	)
+}
+
+func (c *Client) newMarketDataClient() *marketdata.Client {
+	// Build on demand for the same token-refresh reason as newTraderClient.
+	// Keeping construction here prevents command packages from depending on
+	// transport details while still letting schwab-go own request construction.
+	return marketdata.NewClient(
+		schwab.WithToken(c.token),
+		schwab.WithBaseURL(c.baseURL),
+		schwab.WithResponseBodyLimit(maxResponseSize),
+		schwab.WithUserAgent(c.userAgent),
+		schwab.WithTLSConfig(c.tlsConfig),
+	)
+}
+
+func adaptSchwabGoModel[T any](source any) (T, error) {
+	var target T
+	encoded, err := json.Marshal(source)
+	if err != nil {
+		return target, fmt.Errorf("encode schwab-go response: %w", err)
+	}
+	if unmarshalErr := json.Unmarshal(encoded, &target); unmarshalErr != nil {
+		return target, fmt.Errorf("decode schwab-go response into local model: %w", unmarshalErr)
+	}
+	return target, nil
 }
 
 func schwabAPIErrorToHTTPError(err error) error {

@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"net/http"
 	"strings"
+
+	"github.com/major/schwab-go/schwab/marketdata"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
@@ -31,33 +32,46 @@ func quoteParams(p QuoteParams) map[string]string {
 	return m
 }
 
+func quoteFields(p QuoteParams) string {
+	if len(p.Fields) == 0 {
+		return ""
+	}
+	return strings.Join(p.Fields, ",")
+}
+
+func quoteResponseToModels(response *marketdata.QuoteResponse) (map[string]*models.QuoteEquity, error) {
+	if response == nil {
+		return map[string]*models.QuoteEquity{}, nil
+	}
+	return adaptSchwabGoModel[map[string]*models.QuoteEquity](response)
+}
+
 // Quotes retrieves quotes for multiple symbols.
 // Symbols are passed as a comma-separated query parameter.
 func (c *Client) Quotes(ctx context.Context, symbols []string, p QuoteParams) (map[string]*models.QuoteEquity, error) {
-	params := map[string]string{"symbols": strings.Join(symbols, ",")}
-	maps.Copy(params, quoteParams(p))
-	var result map[string]*models.QuoteEquity
-	err := c.doGet(ctx, "/marketdata/v1/quotes", params, &result)
+	response, _, err := c.newMarketDataClient().GetQuotes(ctx, symbols, quoteFields(p), p.Indicative)
 	if err != nil {
-		return nil, err
+		return nil, schwabAPIErrorToHTTPError(err)
 	}
-	// The Schwab API includes an "errors" key in the response map for
-	// invalid symbols. Remove it so only real quote entries remain.
-	delete(result, "errors")
-	return result, nil
+	return quoteResponseToModels(response)
 }
 
 // Quote retrieves a quote for a single symbol.
 // Returns SymbolNotFoundError on 404.
 func (c *Client) Quote(ctx context.Context, symbol string, p QuoteParams) (*models.QuoteEquity, error) {
-	path := fmt.Sprintf("/marketdata/v1/%s/quotes", symbol)
-	var result map[string]*models.QuoteEquity
-	err := c.doGet(ctx, path, quoteParams(p), &result)
+	// Use GetQuotes rather than schwab-go's GetQuote because the multi-symbol
+	// helper preserves the indicative flag this CLI has historically accepted for
+	// single-symbol requests too.
+	response, _, err := c.newMarketDataClient().GetQuotes(ctx, []string{symbol}, quoteFields(p), p.Indicative)
 	if err != nil {
-		// Convert 404 HTTPError to SymbolNotFoundError
-		if httpErr, ok := errors.AsType[*apperr.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
+		mappedErr := schwabAPIErrorToHTTPError(err)
+		if httpErr, ok := errors.AsType[*apperr.HTTPError](mappedErr); ok && httpErr.StatusCode == http.StatusNotFound {
 			return nil, apperr.NewSymbolNotFoundError(fmt.Sprintf("symbol %s not found", symbol), err)
 		}
+		return nil, mappedErr
+	}
+	result, err := quoteResponseToModels(response)
+	if err != nil {
 		return nil, err
 	}
 	q, ok := result[symbol]

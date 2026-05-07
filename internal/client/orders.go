@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"net/http"
 	"net/url"
 	pathpkg "path"
 	"strconv"
 	"strings"
+
+	"github.com/major/schwab-go/schwab/trader"
 
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
@@ -22,20 +23,13 @@ type OrderListParams struct {
 	ToEnteredTime   string
 }
 
-// toQueryParams converts date fields to a map for doGet.
-//
-// The Schwab API requires fromEnteredTime and toEnteredTime as mandatory query
-// parameters in ISO 8601 format. When not provided, fromEnteredTime defaults
-// to 60 days ago and toEnteredTime defaults to now (matching the Python
-// schwab-py client behavior).
-//
-// Status is intentionally omitted here because the Schwab API accepts only a
-// single status value per request. Multiple statuses require separate API calls
-// with merged results, handled by fetchOrders.
-func (p OrderListParams) toQueryParams() map[string]string {
-	params := make(map[string]string)
-	params["fromEnteredTime"], params["toEnteredTime"] = defaultDateRange(p.FromEnteredTime, p.ToEnteredTime)
-	return params
+func (p OrderListParams) toSchwabGoParams(status string) *trader.OrderListParams {
+	fromEnteredTime, toEnteredTime := defaultDateRange(p.FromEnteredTime, p.ToEnteredTime)
+	return &trader.OrderListParams{
+		FromEnteredTime: fromEnteredTime,
+		ToEnteredTime:   toEnteredTime,
+		Status:          trader.OrderStatus(status),
+	}
 }
 
 // PlaceOrderResponse contains the result of a successful order placement.
@@ -87,19 +81,30 @@ func orderIDFromLocation(location string) (int64, error) {
 // status is provided, a single filtered request is made. When multiple are
 // provided, one request per status is made and results are merged, deduplicating
 // by OrderID.
-func (c *Client) fetchOrders(ctx context.Context, path string, params OrderListParams) ([]models.Order, error) {
-	baseQuery := params.toQueryParams()
-
+func (c *Client) fetchOrders(
+	ctx context.Context,
+	accountHash string,
+	allAccounts bool,
+	params OrderListParams,
+) ([]models.Order, error) {
+	traderClient := c.newTraderClient()
 	// Zero or one status: single API call.
 	if len(params.Statuses) <= 1 {
+		var status string
 		if len(params.Statuses) == 1 {
-			baseQuery["status"] = params.Statuses[0]
+			status = params.Statuses[0]
 		}
-		var result []models.Order
-		if err := c.doGet(ctx, path, baseQuery, &result); err != nil {
+		batch, err := c.fetchSchwabGoOrders(
+			ctx,
+			traderClient,
+			accountHash,
+			allAccounts,
+			params.toSchwabGoParams(status),
+		)
+		if err != nil {
 			return nil, err
 		}
-		return result, nil
+		return adaptSchwabGoModel[[]models.Order](batch)
 	}
 
 	// Multiple statuses: fan out one call per status, merge and dedup.
@@ -112,43 +117,72 @@ func (c *Client) fetchOrders(ctx context.Context, path string, params OrderListP
 	seen := make(map[int64]bool)
 	merged := make([]models.Order, 0)
 	for _, status := range params.Statuses {
-		query := make(map[string]string, len(baseQuery)+1)
-		maps.Copy(query, baseQuery)
-		query["status"] = status
-
-		var batch []models.Order
-		if err := c.doGet(ctx, path, query, &batch); err != nil {
+		batch, err := c.fetchSchwabGoOrders(
+			ctx,
+			traderClient,
+			accountHash,
+			allAccounts,
+			params.toSchwabGoParams(status),
+		)
+		if err != nil {
 			return nil, err
 		}
-		for i := range batch {
-			if batch[i].OrderID != nil {
-				if seen[*batch[i].OrderID] {
+		localBatch, err := adaptSchwabGoModel[[]models.Order](batch)
+		if err != nil {
+			return nil, err
+		}
+		for i := range localBatch {
+			if localBatch[i].OrderID != nil {
+				if seen[*localBatch[i].OrderID] {
 					continue
 				}
-				seen[*batch[i].OrderID] = true
+				seen[*localBatch[i].OrderID] = true
 			}
-			merged = append(merged, batch[i])
+			merged = append(merged, localBatch[i])
 		}
 	}
 	return merged, nil
 }
 
+func (c *Client) fetchSchwabGoOrders(
+	ctx context.Context,
+	traderClient *trader.Client,
+	accountHash string,
+	allAccounts bool,
+	params *trader.OrderListParams,
+) ([]trader.Order, error) {
+	if allAccounts {
+		orders, err := traderClient.GetAllOrders(ctx, params)
+		if err != nil {
+			return nil, schwabAPIErrorToHTTPError(err)
+		}
+		return orders, nil
+	}
+	orders, err := traderClient.GetOrders(ctx, accountHash, params)
+	if err != nil {
+		return nil, schwabAPIErrorToHTTPError(err)
+	}
+	return orders, nil
+}
+
 // ListOrders retrieves orders for a specific account, filtered by the given params.
 func (c *Client) ListOrders(ctx context.Context, hashValue string, params OrderListParams) ([]models.Order, error) {
-	path := fmt.Sprintf("/trader/v1/accounts/%s/orders", hashValue)
-	return c.fetchOrders(ctx, path, params)
+	return c.fetchOrders(ctx, hashValue, false, params)
 }
 
 // AllOrders retrieves orders across all accounts, filtered by the given params.
 func (c *Client) AllOrders(ctx context.Context, params OrderListParams) ([]models.Order, error) {
-	return c.fetchOrders(ctx, "/trader/v1/orders", params)
+	return c.fetchOrders(ctx, "", true, params)
 }
 
 // GetOrder retrieves a specific order by account hash and order ID.
 func (c *Client) GetOrder(ctx context.Context, hashValue string, orderID int64) (*models.Order, error) {
-	path := fmt.Sprintf("/trader/v1/accounts/%s/orders/%d", hashValue, orderID)
-	var result models.Order
-	if err := c.doGet(ctx, path, nil, &result); err != nil {
+	order, err := c.newTraderClient().GetOrder(ctx, hashValue, orderID)
+	if err != nil {
+		return nil, schwabAPIErrorToHTTPError(err)
+	}
+	result, err := adaptSchwabGoModel[models.Order](order)
+	if err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -289,6 +323,8 @@ func (c *Client) ReplaceOrder(
 
 // CancelOrder cancels an existing order.
 func (c *Client) CancelOrder(ctx context.Context, hashValue string, orderID int64) error {
-	path := fmt.Sprintf("/trader/v1/accounts/%s/orders/%d", hashValue, orderID)
-	return c.doDelete(ctx, path, nil)
+	if err := c.newTraderClient().CancelOrder(ctx, hashValue, orderID); err != nil {
+		return schwabAPIErrorToHTTPError(err)
+	}
+	return nil
 }

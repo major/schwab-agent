@@ -58,9 +58,11 @@ func (c *Client) OptionChain(
 
 // ExpirationChainForSymbol retrieves the expiration chain for a symbol.
 func (c *Client) ExpirationChainForSymbol(ctx context.Context, symbol string) (*ExpirationChain, error) {
-	params := map[string]string{queryParamSymbol: symbol}
-	var result ExpirationChain
-	err := c.doGet(ctx, "/marketdata/v1/expirationchain", params, &result)
+	chain, err := c.newMarketDataClient().GetExpirationChain(ctx, symbol)
+	if err != nil {
+		return nil, schwabAPIErrorToHTTPError(err)
+	}
+	result, err := adaptSchwabGoModel[ExpirationChain](chain)
 	if err != nil {
 		return nil, err
 	}
