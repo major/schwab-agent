@@ -15,10 +15,7 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
-// ptr returns a pointer to the given value. Test-only helper to build
-// OptionContract fixtures without local variables for every field.
-func ptr[T any](v T) *T { return &v }
-
+//nolint:gocognit // table-driven test with many subtests
 func TestOptionChainCompactRows(t *testing.T) {
 	// Expected default column order for the compact chain view.
 	wantColumns := []string{
@@ -40,17 +37,17 @@ func TestOptionChainCompactRows(t *testing.T) {
 					"2026-01-16:257": {
 						"200.0": {
 							{
-								PutCall:        ptr("CALL"),
-								Symbol:         ptr("AAPL  260116C00200000"),
-								ExpirationDate: ptr("2026-01-16"),
-								StrikePrice:    ptr(200.0),
-								Bid:            ptr(12.30),
-								Ask:            ptr(12.45),
-								Mark:           ptr(12.375),
-								Delta:          ptr(0.52),
-								Volatility:     ptr(0.28),
-								OpenInterest:   ptr(int64(1234)),
-								TotalVolume:    ptr(int64(567)),
+								PutCall:        new("CALL"),
+								Symbol:         new("AAPL  260116C00200000"),
+								ExpirationDate: new("2026-01-16"),
+								StrikePrice:    new(200.0),
+								Bid:            new(12.30),
+								Ask:            new(12.45),
+								Mark:           new(12.375),
+								Delta:          new(0.52),
+								Volatility:     new(0.28),
+								OpenInterest:   new(int64(1234)),
+								TotalVolume:    new(int64(567)),
 							},
 						},
 					},
@@ -58,7 +55,19 @@ func TestOptionChainCompactRows(t *testing.T) {
 			},
 			wantCols: wantColumns,
 			wantRows: [][]any{
-				{"2026-01-16", 200.0, "CALL", "AAPL  260116C00200000", 12.30, 12.45, 12.375, 0.52, 0.28, int64(1234), int64(567)},
+				{
+					"2026-01-16",
+					200.0,
+					"CALL",
+					"AAPL  260116C00200000",
+					12.30,
+					12.45,
+					12.375,
+					0.52,
+					0.28,
+					int64(1234),
+					int64(567),
+				},
 			},
 			wantErrNil: true,
 		},
@@ -69,17 +78,17 @@ func TestOptionChainCompactRows(t *testing.T) {
 					"2026-01-16:257": {
 						"200.0": {
 							{
-								PutCall:        ptr("PUT"),
-								Symbol:         ptr("AAPL  260116P00200000"),
-								ExpirationDate: ptr("2026-01-16"),
-								StrikePrice:    ptr(200.0),
-								Bid:            ptr(8.10),
-								Ask:            ptr(8.25),
-								Mark:           ptr(8.175),
-								Delta:          ptr(-0.48),
-								Volatility:     ptr(0.30),
-								OpenInterest:   ptr(int64(890)),
-								TotalVolume:    ptr(int64(123)),
+								PutCall:        new("PUT"),
+								Symbol:         new("AAPL  260116P00200000"),
+								ExpirationDate: new("2026-01-16"),
+								StrikePrice:    new(200.0),
+								Bid:            new(8.10),
+								Ask:            new(8.25),
+								Mark:           new(8.175),
+								Delta:          new(-0.48),
+								Volatility:     new(0.30),
+								OpenInterest:   new(int64(890)),
+								TotalVolume:    new(int64(123)),
 							},
 						},
 					},
@@ -87,7 +96,19 @@ func TestOptionChainCompactRows(t *testing.T) {
 			},
 			wantCols: wantColumns,
 			wantRows: [][]any{
-				{"2026-01-16", 200.0, "PUT", "AAPL  260116P00200000", 8.10, 8.25, 8.175, -0.48, 0.30, int64(890), int64(123)},
+				{
+					"2026-01-16",
+					200.0,
+					"PUT",
+					"AAPL  260116P00200000",
+					8.10,
+					8.25,
+					8.175,
+					-0.48,
+					0.30,
+					int64(890),
+					int64(123),
+				},
 			},
 			wantErrNil: true,
 		},
@@ -98,17 +119,17 @@ func TestOptionChainCompactRows(t *testing.T) {
 					"2026-01-16:257": {
 						"200.0": {
 							{
-								PutCall:        ptr("CALL"),
-								Symbol:         ptr("AAPL  260116C00200000"),
-								ExpirationDate: ptr("2026-01-16"),
-								StrikePrice:    ptr(200.0),
-								Bid:            ptr(12.30),
-								Ask:            ptr(12.45),
-								Mark:           ptr(12.375),
-								Delta:          ptr(0.52),
-								Volatility:     ptr(0.28),
-								OpenInterest:   ptr(int64(1234)),
-								TotalVolume:    ptr(int64(567)),
+								PutCall:        new("CALL"),
+								Symbol:         new("AAPL  260116C00200000"),
+								ExpirationDate: new("2026-01-16"),
+								StrikePrice:    new(200.0),
+								Bid:            new(12.30),
+								Ask:            new(12.45),
+								Mark:           new(12.375),
+								Delta:          new(0.52),
+								Volatility:     new(0.28),
+								OpenInterest:   new(int64(1234)),
+								TotalVolume:    new(int64(567)),
 							},
 						},
 					},
@@ -117,17 +138,17 @@ func TestOptionChainCompactRows(t *testing.T) {
 					"2026-01-16:257": {
 						"200.0": {
 							{
-								PutCall:        ptr("PUT"),
-								Symbol:         ptr("AAPL  260116P00200000"),
-								ExpirationDate: ptr("2026-01-16"),
-								StrikePrice:    ptr(200.0),
-								Bid:            ptr(8.10),
-								Ask:            ptr(8.25),
-								Mark:           ptr(8.175),
-								Delta:          ptr(-0.48),
-								Volatility:     ptr(0.30),
-								OpenInterest:   ptr(int64(890)),
-								TotalVolume:    ptr(int64(123)),
+								PutCall:        new("PUT"),
+								Symbol:         new("AAPL  260116P00200000"),
+								ExpirationDate: new("2026-01-16"),
+								StrikePrice:    new(200.0),
+								Bid:            new(8.10),
+								Ask:            new(8.25),
+								Mark:           new(8.175),
+								Delta:          new(-0.48),
+								Volatility:     new(0.30),
+								OpenInterest:   new(int64(890)),
+								TotalVolume:    new(int64(123)),
 							},
 						},
 					},
@@ -136,8 +157,32 @@ func TestOptionChainCompactRows(t *testing.T) {
 			wantCols: wantColumns,
 			wantRows: [][]any{
 				// Calls before puts at same expiry+strike.
-				{"2026-01-16", 200.0, "CALL", "AAPL  260116C00200000", 12.30, 12.45, 12.375, 0.52, 0.28, int64(1234), int64(567)},
-				{"2026-01-16", 200.0, "PUT", "AAPL  260116P00200000", 8.10, 8.25, 8.175, -0.48, 0.30, int64(890), int64(123)},
+				{
+					"2026-01-16",
+					200.0,
+					"CALL",
+					"AAPL  260116C00200000",
+					12.30,
+					12.45,
+					12.375,
+					0.52,
+					0.28,
+					int64(1234),
+					int64(567),
+				},
+				{
+					"2026-01-16",
+					200.0,
+					"PUT",
+					"AAPL  260116P00200000",
+					8.10,
+					8.25,
+					8.175,
+					-0.48,
+					0.30,
+					int64(890),
+					int64(123),
+				},
 			},
 			wantErrNil: true,
 		},
@@ -165,38 +210,38 @@ func TestOptionChainCompactRows(t *testing.T) {
 					// Later expiry comes first in map iteration to prove sorting.
 					"2026-06-19:411": {
 						"210.0": {{
-							PutCall: ptr("CALL"), Symbol: ptr("AAPL  260619C00210000"),
-							ExpirationDate: ptr("2026-06-19"), StrikePrice: ptr(210.0),
-							Bid: ptr(5.0), Ask: ptr(5.5), Mark: ptr(5.25),
-							Delta: ptr(0.40), Volatility: ptr(0.25),
-							OpenInterest: ptr(int64(100)), TotalVolume: ptr(int64(50)),
+							PutCall: new("CALL"), Symbol: new("AAPL  260619C00210000"),
+							ExpirationDate: new("2026-06-19"), StrikePrice: new(210.0),
+							Bid: new(5.0), Ask: new(5.5), Mark: new(5.25),
+							Delta: new(0.40), Volatility: new(0.25),
+							OpenInterest: new(int64(100)), TotalVolume: new(int64(50)),
 						}},
 					},
 					"2026-01-16:257": {
 						"210.0": {{
-							PutCall: ptr("CALL"), Symbol: ptr("AAPL  260116C00210000"),
-							ExpirationDate: ptr("2026-01-16"), StrikePrice: ptr(210.0),
-							Bid: ptr(7.0), Ask: ptr(7.5), Mark: ptr(7.25),
-							Delta: ptr(0.45), Volatility: ptr(0.27),
-							OpenInterest: ptr(int64(200)), TotalVolume: ptr(int64(80)),
+							PutCall: new("CALL"), Symbol: new("AAPL  260116C00210000"),
+							ExpirationDate: new("2026-01-16"), StrikePrice: new(210.0),
+							Bid: new(7.0), Ask: new(7.5), Mark: new(7.25),
+							Delta: new(0.45), Volatility: new(0.27),
+							OpenInterest: new(int64(200)), TotalVolume: new(int64(80)),
 						}},
 						"200.0": {{
-							PutCall: ptr("CALL"), Symbol: ptr("AAPL  260116C00200000"),
-							ExpirationDate: ptr("2026-01-16"), StrikePrice: ptr(200.0),
-							Bid: ptr(12.0), Ask: ptr(12.5), Mark: ptr(12.25),
-							Delta: ptr(0.52), Volatility: ptr(0.28),
-							OpenInterest: ptr(int64(300)), TotalVolume: ptr(int64(90)),
+							PutCall: new("CALL"), Symbol: new("AAPL  260116C00200000"),
+							ExpirationDate: new("2026-01-16"), StrikePrice: new(200.0),
+							Bid: new(12.0), Ask: new(12.5), Mark: new(12.25),
+							Delta: new(0.52), Volatility: new(0.28),
+							OpenInterest: new(int64(300)), TotalVolume: new(int64(90)),
 						}},
 					},
 				},
 				PutExpDateMap: map[string]map[string][]*models.OptionContract{
 					"2026-01-16:257": {
 						"200.0": {{
-							PutCall: ptr("PUT"), Symbol: ptr("AAPL  260116P00200000"),
-							ExpirationDate: ptr("2026-01-16"), StrikePrice: ptr(200.0),
-							Bid: ptr(8.0), Ask: ptr(8.5), Mark: ptr(8.25),
-							Delta: ptr(-0.48), Volatility: ptr(0.30),
-							OpenInterest: ptr(int64(400)), TotalVolume: ptr(int64(70)),
+							PutCall: new("PUT"), Symbol: new("AAPL  260116P00200000"),
+							ExpirationDate: new("2026-01-16"), StrikePrice: new(200.0),
+							Bid: new(8.0), Ask: new(8.5), Mark: new(8.25),
+							Delta: new(-0.48), Volatility: new(0.30),
+							OpenInterest: new(int64(400)), TotalVolume: new(int64(70)),
 						}},
 					},
 				},
@@ -204,12 +249,60 @@ func TestOptionChainCompactRows(t *testing.T) {
 			wantCols: wantColumns,
 			wantRows: [][]any{
 				// 2026-01-16, strike 200: call then put
-				{"2026-01-16", 200.0, "CALL", "AAPL  260116C00200000", 12.0, 12.5, 12.25, 0.52, 0.28, int64(300), int64(90)},
-				{"2026-01-16", 200.0, "PUT", "AAPL  260116P00200000", 8.0, 8.5, 8.25, -0.48, 0.30, int64(400), int64(70)},
+				{
+					"2026-01-16",
+					200.0,
+					"CALL",
+					"AAPL  260116C00200000",
+					12.0,
+					12.5,
+					12.25,
+					0.52,
+					0.28,
+					int64(300),
+					int64(90),
+				},
+				{
+					"2026-01-16",
+					200.0,
+					"PUT",
+					"AAPL  260116P00200000",
+					8.0,
+					8.5,
+					8.25,
+					-0.48,
+					0.30,
+					int64(400),
+					int64(70),
+				},
 				// 2026-01-16, strike 210: call only (no put at this strike)
-				{"2026-01-16", 210.0, "CALL", "AAPL  260116C00210000", 7.0, 7.5, 7.25, 0.45, 0.27, int64(200), int64(80)},
+				{
+					"2026-01-16",
+					210.0,
+					"CALL",
+					"AAPL  260116C00210000",
+					7.0,
+					7.5,
+					7.25,
+					0.45,
+					0.27,
+					int64(200),
+					int64(80),
+				},
 				// 2026-06-19, strike 210: call only
-				{"2026-06-19", 210.0, "CALL", "AAPL  260619C00210000", 5.0, 5.5, 5.25, 0.40, 0.25, int64(100), int64(50)},
+				{
+					"2026-06-19",
+					210.0,
+					"CALL",
+					"AAPL  260619C00210000",
+					5.0,
+					5.5,
+					5.25,
+					0.40,
+					0.25,
+					int64(100),
+					int64(50),
+				},
 			},
 			wantErrNil: true,
 		},
@@ -222,10 +315,10 @@ func TestOptionChainCompactRows(t *testing.T) {
 							{
 								// Only PutCall, Symbol, ExpirationDate, and StrikePrice are set.
 								// All price and greek fields are nil.
-								PutCall:        ptr("CALL"),
-								Symbol:         ptr("AAPL  260116C00200000"),
-								ExpirationDate: ptr("2026-01-16"),
-								StrikePrice:    ptr(200.0),
+								PutCall:        new("CALL"),
+								Symbol:         new("AAPL  260116C00200000"),
+								ExpirationDate: new("2026-01-16"),
+								StrikePrice:    new(200.0),
 								// Bid, Ask, Mark, Delta, Volatility, OpenInterest, TotalVolume are nil.
 							},
 						},
@@ -246,17 +339,17 @@ func TestOptionChainCompactRows(t *testing.T) {
 					"2026-01-16:257": {
 						"200.0": {
 							{
-								PutCall:        ptr("CALL"),
-								Symbol:         ptr("AAPL  260116C00200000"),
-								ExpirationDate: ptr("2026-01-16"),
-								StrikePrice:    ptr(200.0),
-								Bid:            ptr(0.01),
-								Ask:            ptr(0.05),
-								Mark:           ptr(0.03),
-								Delta:          ptr(0.01),
-								Volatility:     ptr(0.90),
-								OpenInterest:   ptr(int64(0)),
-								TotalVolume:    ptr(int64(0)),
+								PutCall:        new("CALL"),
+								Symbol:         new("AAPL  260116C00200000"),
+								ExpirationDate: new("2026-01-16"),
+								StrikePrice:    new(200.0),
+								Bid:            new(0.01),
+								Ask:            new(0.05),
+								Mark:           new(0.03),
+								Delta:          new(0.01),
+								Volatility:     new(0.90),
+								OpenInterest:   new(int64(0)),
+								TotalVolume:    new(int64(0)),
 							},
 						},
 					},
@@ -265,7 +358,19 @@ func TestOptionChainCompactRows(t *testing.T) {
 			wantCols: wantColumns,
 			wantRows: [][]any{
 				// Zero volume and zero OI are valid data points; the row must not be filtered out.
-				{"2026-01-16", 200.0, "CALL", "AAPL  260116C00200000", 0.01, 0.05, 0.03, 0.01, 0.90, int64(0), int64(0)},
+				{
+					"2026-01-16",
+					200.0,
+					"CALL",
+					"AAPL  260116C00200000",
+					0.01,
+					0.05,
+					0.03,
+					0.01,
+					0.90,
+					int64(0),
+					int64(0),
+				},
 			},
 			wantErrNil: true,
 		},
@@ -306,7 +411,15 @@ func TestOptionChainCompactRows(t *testing.T) {
 						switch w := wantVal.(type) {
 						case float64:
 							gotFloat, ok := gotRow[j].(float64)
-							require.True(t, ok, "row %d col %q (%d): expected float64, got %T", i, colName, j, gotRow[j])
+							require.True(
+								t,
+								ok,
+								"row %d col %q (%d): expected float64, got %T",
+								i,
+								colName,
+								j,
+								gotRow[j],
+							)
 							assert.InDelta(t, w, gotFloat, 0.001, "row %d col %q (%d)", i, colName, j)
 						default:
 							assert.Equal(t, wantVal, gotRow[j], "row %d col %q (%d)", i, colName, j)
@@ -337,8 +450,20 @@ func TestOptionChainFieldProjection(t *testing.T) {
 		{
 			name:            "default fields",
 			requestedFields: nil,
-			wantColumns:     []string{"expiry", "strike", "cp", "symbol", "bid", "ask", "mark", "delta", "iv", "oi", "volume"},
-			wantErr:         false,
+			wantColumns: []string{
+				"expiry",
+				"strike",
+				"cp",
+				"symbol",
+				"bid",
+				"ask",
+				"mark",
+				"delta",
+				"iv",
+				"oi",
+				"volume",
+			},
+			wantErr: false,
 		},
 		{
 			name:            "custom fields exact order",
@@ -391,9 +516,9 @@ func TestOptionChainFieldProjection(t *testing.T) {
 // centering tests.
 func chainAPIResponse(underlyingPrice float64, calls, puts map[string]map[string][]*models.OptionContract) string {
 	chain := models.OptionChain{
-		Symbol:          ptr("AAPL"),
-		Status:          ptr("SUCCESS"),
-		UnderlyingPrice: ptr(underlyingPrice),
+		Symbol:          new("AAPL"),
+		Status:          new("SUCCESS"),
+		UnderlyingPrice: new(underlyingPrice),
 		CallExpDateMap:  calls,
 		PutExpDateMap:   puts,
 	}
@@ -408,11 +533,11 @@ func TestOptionChainCommand(t *testing.T) {
 			map[string]map[string][]*models.OptionContract{
 				"2026-06-19:43": {
 					"200.0": {{
-						PutCall: ptr("CALL"), Symbol: ptr("AAPL  260619C00200000"),
-						ExpirationDate: ptr("2026-06-19"), StrikePrice: ptr(200.0),
-						Bid: ptr(12.0), Ask: ptr(12.5), Mark: ptr(12.25),
-						Delta: ptr(0.55), Volatility: ptr(0.28),
-						OpenInterest: ptr(int64(500)), TotalVolume: ptr(int64(100)),
+						PutCall: new("CALL"), Symbol: new("AAPL  260619C00200000"),
+						ExpirationDate: new("2026-06-19"), StrikePrice: new(200.0),
+						Bid: new(12.0), Ask: new(12.5), Mark: new(12.25),
+						Delta: new(0.55), Volatility: new(0.28),
+						OpenInterest: new(int64(500)), TotalVolume: new(int64(100)),
 					}},
 				},
 			},
@@ -469,11 +594,11 @@ func TestOptionChainCommand(t *testing.T) {
 			map[string]map[string][]*models.OptionContract{
 				"2026-06-19:43": {
 					"200.0": {{
-						PutCall: ptr("CALL"), Symbol: ptr("AAPL  260619C00200000"),
-						ExpirationDate: ptr("2026-06-19"), StrikePrice: ptr(200.0),
-						Bid: ptr(12.0), Ask: ptr(12.5), Mark: ptr(12.25),
-						Delta: ptr(0.55), Gamma: ptr(0.03), Volatility: ptr(0.28),
-						OpenInterest: ptr(int64(500)), TotalVolume: ptr(int64(100)),
+						PutCall: new("CALL"), Symbol: new("AAPL  260619C00200000"),
+						ExpirationDate: new("2026-06-19"), StrikePrice: new(200.0),
+						Bid: new(12.0), Ask: new(12.5), Mark: new(12.25),
+						Delta: new(0.55), Gamma: new(0.03), Volatility: new(0.28),
+						OpenInterest: new(int64(500)), TotalVolume: new(int64(100)),
 					}},
 				},
 			},
@@ -522,18 +647,18 @@ func TestOptionChainCommand(t *testing.T) {
 			map[string]map[string][]*models.OptionContract{
 				"2026-06-19:43": {
 					"200.0": {{
-						PutCall: ptr("CALL"), Symbol: ptr("AAPL  260619C00200000"),
-						ExpirationDate: ptr("2026-06-19"), StrikePrice: ptr(200.0),
-						Bid: ptr(12.0), Ask: ptr(12.5), Mark: ptr(12.25),
-						Delta: ptr(0.55), Volatility: ptr(0.28),
-						OpenInterest: ptr(int64(500)), TotalVolume: ptr(int64(100)),
+						PutCall: new("CALL"), Symbol: new("AAPL  260619C00200000"),
+						ExpirationDate: new("2026-06-19"), StrikePrice: new(200.0),
+						Bid: new(12.0), Ask: new(12.5), Mark: new(12.25),
+						Delta: new(0.55), Volatility: new(0.28),
+						OpenInterest: new(int64(500)), TotalVolume: new(int64(100)),
 					}},
 					"210.0": {{
-						PutCall: ptr("CALL"), Symbol: ptr("AAPL  260619C00210000"),
-						ExpirationDate: ptr("2026-06-19"), StrikePrice: ptr(210.0),
-						Bid: ptr(7.0), Ask: ptr(7.5), Mark: ptr(7.25),
-						Delta: ptr(0.40), Volatility: ptr(0.25),
-						OpenInterest: ptr(int64(300)), TotalVolume: ptr(int64(50)),
+						PutCall: new("CALL"), Symbol: new("AAPL  260619C00210000"),
+						ExpirationDate: new("2026-06-19"), StrikePrice: new(210.0),
+						Bid: new(7.0), Ask: new(7.5), Mark: new(7.25),
+						Delta: new(0.40), Volatility: new(0.25),
+						OpenInterest: new(int64(300)), TotalVolume: new(int64(50)),
 					}},
 				},
 			},
@@ -617,11 +742,11 @@ func TestOptionChainCommand(t *testing.T) {
 					map[string]map[string][]*models.OptionContract{
 						"2026-06-19:43": {
 							"200.0": {{
-								PutCall: ptr("CALL"), Symbol: ptr("AAPL  260619C00200000"),
-								ExpirationDate: ptr("2026-06-19"), StrikePrice: ptr(200.0),
-								Bid: ptr(12.0), Ask: ptr(12.5), Mark: ptr(12.25),
-								Delta: ptr(0.55), Volatility: ptr(0.28),
-								OpenInterest: ptr(int64(500)), TotalVolume: ptr(int64(100)),
+								PutCall: new("CALL"), Symbol: new("AAPL  260619C00200000"),
+								ExpirationDate: new("2026-06-19"), StrikePrice: new(200.0),
+								Bid: new(12.0), Ask: new(12.5), Mark: new(12.25),
+								Delta: new(0.55), Volatility: new(0.28),
+								OpenInterest: new(int64(500)), TotalVolume: new(int64(100)),
 							}},
 						},
 					},

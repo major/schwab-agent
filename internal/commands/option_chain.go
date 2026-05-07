@@ -27,6 +27,10 @@ const (
 	// the third Friday of a month can fall.
 	thirdFridayMinDay = 15
 	thirdFridayMaxDay = 21
+
+	// keyUnderlying is the JSON key for the underlying symbol in porcelain
+	// command output envelopes.
+	keyUnderlying = "underlying"
 )
 
 // chainDefaultColumns is the default column order for the compact chain view.
@@ -505,11 +509,11 @@ func runOptionChain(
 	meta.Returned = len(result)
 
 	return output.WriteSuccess(w, map[string]any{
-		"underlying": symbol,
-		"expiration": expiration,
-		"columns":    columns,
-		"rows":       result,
-		"rowCount":   len(result),
+		keyUnderlying: symbol,
+		"expiration":  expiration,
+		"columns":     columns,
+		"rows":        result,
+		"rowCount":    len(result),
 	}, meta)
 }
 

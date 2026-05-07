@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -219,9 +220,11 @@ func TestOptionChainOptsValidation(t *testing.T) {
 			// Verify error message contains expected substring.
 			if tt.errMsg != "" {
 				var combined string
+				var combinedSb222 strings.Builder
 				for _, err := range errs {
-					combined += err.Error() + " "
+					combinedSb222.WriteString(err.Error() + " ")
 				}
+				combined += combinedSb222.String()
 				assert.Contains(t, combined, tt.errMsg,
 					"validateOptionChainOpts(%+v) error message should mention %q", tt.opts, tt.errMsg)
 			}
@@ -349,9 +352,11 @@ func TestOptionContractOptsValidation(t *testing.T) {
 			// Verify error message contains expected substring.
 			if tt.errMsg != "" {
 				var combined string
+				var combinedSb352 strings.Builder
 				for _, err := range errs {
-					combined += err.Error() + " "
+					combinedSb352.WriteString(err.Error() + " ")
 				}
+				combined += combinedSb352.String()
 				assert.Contains(t, combined, tt.errMsg,
 					"validateOptionContractOpts(%+v) error message should mention %q", tt.opts, tt.errMsg)
 			}

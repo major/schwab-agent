@@ -128,16 +128,59 @@ func TestSelectNearestExpiration(t *testing.T) {
 			// Assert
 			switch tt.wantErrType.(type) {
 			case nil:
-				require.NoError(t, err, "selectNearestExpiration(%v, %d) unexpected error", tt.expirations, tt.targetDTE)
-				assert.Equal(t, tt.want, got, "selectNearestExpiration(%v, %d) = %q, want %q", tt.expirations, tt.targetDTE, got, tt.want)
+				require.NoError(
+					t,
+					err,
+					"selectNearestExpiration(%v, %d) unexpected error",
+					tt.expirations,
+					tt.targetDTE,
+				)
+				assert.Equal(
+					t,
+					tt.want,
+					got,
+					"selectNearestExpiration(%v, %d) = %q, want %q",
+					tt.expirations,
+					tt.targetDTE,
+					got,
+					tt.want,
+				)
 			case *apperr.ValidationError:
-				require.Error(t, err, "selectNearestExpiration(%v, %d) expected ValidationError", tt.expirations, tt.targetDTE)
+				require.Error(
+					t,
+					err,
+					"selectNearestExpiration(%v, %d) expected ValidationError",
+					tt.expirations,
+					tt.targetDTE,
+				)
 				var target *apperr.ValidationError
-				require.ErrorAs(t, err, &target, "selectNearestExpiration(%v, %d) error type = %T, want *apperr.ValidationError", tt.expirations, tt.targetDTE, err)
+				require.ErrorAs(
+					t,
+					err,
+					&target,
+					"selectNearestExpiration(%v, %d) error type = %T, want *apperr.ValidationError",
+					tt.expirations,
+					tt.targetDTE,
+					err,
+				)
 			case *apperr.SymbolNotFoundError:
-				require.Error(t, err, "selectNearestExpiration(%v, %d) expected SymbolNotFoundError", tt.expirations, tt.targetDTE)
+				require.Error(
+					t,
+					err,
+					"selectNearestExpiration(%v, %d) expected SymbolNotFoundError",
+					tt.expirations,
+					tt.targetDTE,
+				)
 				var target *apperr.SymbolNotFoundError
-				require.ErrorAs(t, err, &target, "selectNearestExpiration(%v, %d) error type = %T, want *apperr.SymbolNotFoundError", tt.expirations, tt.targetDTE, err)
+				require.ErrorAs(
+					t,
+					err,
+					&target,
+					"selectNearestExpiration(%v, %d) error type = %T, want *apperr.SymbolNotFoundError",
+					tt.expirations,
+					tt.targetDTE,
+					err,
+				)
 			}
 		})
 	}
