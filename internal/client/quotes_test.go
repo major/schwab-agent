@@ -90,7 +90,8 @@ func TestQuotes_EmptyResult(t *testing.T) {
 func TestQuote_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/marketdata/v1/AAPL/quotes", r.URL.Path)
+		assert.Equal(t, "/marketdata/v1/quotes", r.URL.Path)
+		assert.Equal(t, "AAPL", r.URL.Query().Get("symbols"))
 		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
 
 		w.Header().Set("Content-Type", "application/json")
