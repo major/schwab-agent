@@ -74,7 +74,8 @@ func newOptionContractCmd(c *client.Ref, w io.Writer) *cobra.Command {
 Returns the contract details along with the underlying quote from the option
 chain response. Use this for single-contract lookups before order placement.`,
 		Example: `  schwab-agent option contract AAPL --expiration 2026-06-19 --strike 200 --call
-  schwab-agent option contract TSLA --expiration 2026-03-20 --strike 180 --put`,
+	  schwab-agent option contract TSLA --expiration 2026-03-20 --strike 180 --put
+	  schwab-agent option contract MSFT --expiration 2026-01-16 --strike 450 --call`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateCobraOptions(cmd.Context(), opts); err != nil {
@@ -128,7 +129,14 @@ func fetchOptionContract(
 
 	chain, err := c.OptionChain(ctx, optionTicketChainParams(symbol, expiration, putCall, opts.Strike))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf(
+			"fetch option chain for %s %s %s %g: %w",
+			symbol,
+			expiration.Format("2006-01-02"),
+			putCall,
+			opts.Strike,
+			err,
+		)
 	}
 
 	contracts := matchingTicketContracts(chain, expiration, putCall, opts.Strike)

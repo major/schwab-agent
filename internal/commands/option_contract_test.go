@@ -112,6 +112,16 @@ func TestOptionChainOptsValidation(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "strike-count conflicts with strike-min",
+			opts: optionChainOpts{
+				Type:        "ALL",
+				StrikeCount: 5,
+				StrikeMin:   190.0,
+			},
+			wantErr: true,
+			errMsg:  "strike-count",
+		},
+		{
 			name: "strike and strike-count mutually exclusive",
 			opts: optionChainOpts{
 				Type:        "ALL",
@@ -208,8 +218,7 @@ func TestOptionChainOptsValidation(t *testing.T) {
 			// Verify at least one error is a ValidationError.
 			var foundValidation bool
 			for _, err := range errs {
-				var valErr *apperr.ValidationError
-				if errors.As(err, &valErr) {
+				if _, ok := errors.AsType[*apperr.ValidationError](err); ok {
 					foundValidation = true
 					break
 				}
@@ -340,8 +349,7 @@ func TestOptionContractOptsValidation(t *testing.T) {
 			// Verify at least one error is a ValidationError.
 			var foundValidation bool
 			for _, err := range errs {
-				var valErr *apperr.ValidationError
-				if errors.As(err, &valErr) {
+				if _, ok := errors.AsType[*apperr.ValidationError](err); ok {
 					foundValidation = true
 					break
 				}
@@ -550,7 +558,7 @@ func TestOptionContractCommandNoMatch(t *testing.T) {
 }
 
 func TestOptionContractCommandMissingFlags(t *testing.T) {
-	// Arrange - command invoked without required --expiration flag.
+	// Arrange - command invoked without required --call/--put flag.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{}`))

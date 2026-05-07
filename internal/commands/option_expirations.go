@@ -23,7 +23,8 @@ compact table with expiration date, days to expiration, expiration type
 (R=regular monthly, S=weekly/special), and whether the date falls on a
 standard third Friday.`,
 		Example: `  schwab-agent option expirations AAPL
-  schwab-agent option expirations TSLA`,
+	  schwab-agent option expirations TSLA
+	  schwab-agent option expirations MSFT`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			symbol := strings.ToUpper(strings.TrimSpace(args[0]))

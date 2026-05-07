@@ -79,6 +79,13 @@ func validateOptionChainOpts(opts *optionChainOpts) []error {
 		))
 	}
 
+	// StrikeCount cannot be combined with a strike range filter.
+	if opts.StrikeCount > 0 && (opts.StrikeMin > 0 || opts.StrikeMax > 0) {
+		errs = append(errs, apperr.NewValidationError(
+			"strike-count is mutually exclusive with strike-min and strike-max", nil,
+		))
+	}
+
 	// Strike selector mutual exclusivity: --strike is exclusive with count, min/max, range.
 	hasStrikeRange := string(opts.StrikeRange) != ""
 	if opts.Strike > 0 && (opts.StrikeCount > 0 || opts.StrikeMin > 0 || opts.StrikeMax > 0 || hasStrikeRange) {
