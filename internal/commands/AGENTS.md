@@ -143,8 +143,11 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 | flag_aliases.go | (shared) | registerOrderFlagAliases, resolveOrderFlagAliasesViaFlags, RegisterOrderFlagAliasesOnTree |
 | symbol_builder.go | (shared) | buildOCCSymbol for option commands needing OCC symbol construction |
 | order_build.go | order build | equity, option, bracket, oco, vertical, iron-condor, straddle, strangle, covered-call, collar, calendar, diagonal, butterfly, condor, vertical-roll, back-ratio, double-diagonal, fts |
-| chain.go | chain | get, expiration |
-| option_ticket.go | option | ticket get |
+| option_ticket.go | option | (parent command; registers expirations, chain, contract subcommands) |
+| option_expirations.go | option expirations | &lt;symbol&gt; |
+| option_chain.go | option chain | &lt;symbol&gt; |
+| option_contract.go | option contract | &lt;symbol&gt; |
+| option_chain_opts.go | (shared) | option chain/contract opts structs and validation |
 | history.go | history | get (alias: price-history) |
 | instrument.go | instrument | search, get |
 | market.go | market | hours, movers |
