@@ -122,6 +122,17 @@ func TestBuildApp_AllCommandsPresent(t *testing.T) {
 	}
 }
 
+func TestOptionHelp_ListsPorcelainSubcommands(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	stdout, err := runApp(t, "schwab-agent", "option", "--help")
+	require.NoError(t, err)
+
+	for _, name := range []string{"expirations", "chain", "contract"} {
+		assert.Contains(t, stdout, name)
+	}
+}
+
 func TestBuildApp_JSONSchemaFlagIsNotRegistered(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
