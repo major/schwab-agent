@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"io"
 	"strconv"
 
@@ -15,14 +16,53 @@ import (
 
 // allMarkets returns the full list of Schwab market types, used as the default
 // when no specific markets are requested.
-func allMarkets() []string {
-	return []string{
-		string(marketdata.MarketIDEquity),
-		string(marketdata.MarketIDOption),
-		string(marketdata.MarketIDBond),
-		string(marketdata.MarketIDFuture),
-		string(marketdata.MarketIDForex),
+func allMarkets() []marketdata.MarketID {
+	return []marketdata.MarketID{
+		marketdata.MarketIDEquity,
+		marketdata.MarketIDOption,
+		marketdata.MarketIDBond,
+		marketdata.MarketIDFuture,
+		marketdata.MarketIDForex,
 	}
+}
+
+// parseMarketID converts CLI input to schwab-go's typed market identifier so
+// invalid market names stay first-class CLI validation errors instead of
+// falling through as untyped client-side errors.
+func parseMarketID(market string) (marketdata.MarketID, error) {
+	switch marketdata.MarketID(market) {
+	case marketdata.MarketIDEquity:
+		return marketdata.MarketIDEquity, nil
+	case marketdata.MarketIDOption:
+		return marketdata.MarketIDOption, nil
+	case marketdata.MarketIDBond:
+		return marketdata.MarketIDBond, nil
+	case marketdata.MarketIDFuture:
+		return marketdata.MarketIDFuture, nil
+	case marketdata.MarketIDForex:
+		return marketdata.MarketIDForex, nil
+	default:
+		return "", fmt.Errorf("invalid market %q: expected one of equity, option, bond, future, forex", market)
+	}
+}
+
+// marketIDsFromArgs converts positional market names to typed schwab-go IDs.
+func marketIDsFromArgs(markets []string) ([]marketdata.MarketID, error) {
+	ids := make([]marketdata.MarketID, 0, len(markets))
+	seen := make(map[marketdata.MarketID]struct{}, len(markets))
+	for _, market := range markets {
+		id, err := parseMarketID(market)
+		if err != nil {
+			return nil, apperr.NewValidationError(err.Error(), err)
+		}
+		if _, ok := seen[id]; ok {
+			duplicateErr := fmt.Errorf("duplicate market %q", market)
+			return nil, apperr.NewValidationError(duplicateErr.Error(), duplicateErr)
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 // moversData wraps the movers response.
@@ -66,7 +106,10 @@ more market names to filter.`,
   schwab-agent market hours equity
   schwab-agent market hours equity option`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			markets := args
+			markets, err := marketIDsFromArgs(args)
+			if err != nil {
+				return err
+			}
 			if len(markets) == 0 {
 				markets = allMarkets()
 			}
@@ -75,14 +118,14 @@ more market names to filter.`,
 			// schwab-go takes an optional date argument; the CLI does not expose that
 			// filter, so pass an empty string to preserve the existing behavior.
 			if len(markets) == 1 {
-				result, err := c.MarketData.GetMarketHoursSingle(cmd.Context(), markets[0], "")
-				if err != nil {
-					return mapSchwabGoError(err)
+				result, getErr := c.MarketData.GetMarketHoursSingleTyped(cmd.Context(), markets[0], "")
+				if getErr != nil {
+					return mapSchwabGoError(getErr)
 				}
 				return output.WriteSuccess(w, result, output.NewMetadata())
 			}
 
-			result, err := c.MarketData.GetMarketHours(cmd.Context(), markets, "")
+			result, err := c.MarketData.GetMarketHoursTyped(cmd.Context(), markets, "")
 			if err != nil {
 				return mapSchwabGoError(err)
 			}

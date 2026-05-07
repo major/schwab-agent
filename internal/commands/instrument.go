@@ -92,18 +92,10 @@ description, exchange, and other metadata for the specified CUSIP.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cusip := args[0]
 
-			// Schwab's live CUSIP endpoint currently returns the same wrapper shape as
-			// SearchInstruments (`{"instruments":[...]}`), while schwab-go v0.1.1
-			// decodes GetInstrumentByCUSIP as a bare Instrument and silently produces a
-			// zero-value result. Querying the schwab-go search method with the CUSIP keeps
-			// this command on the shared schwab-go client while matching live API behavior.
-			// Upstream bug: https://github.com/major/schwab-go/issues/33
-			result, err := c.MarketData.SearchInstruments(cmd.Context(), cusip, marketdata.ProjectionSymbolSearch)
+			instrument, err := c.MarketData.GetInstrumentByCUSIP(cmd.Context(), cusip)
 			if err != nil {
 				return mapInstrumentGetError(err)
 			}
-
-			instrument := findInstrumentByCUSIP(result, cusip)
 			if instrument == nil {
 				return apperr.NewSymbolNotFoundError("instrument not found", nil)
 			}
@@ -122,25 +114,20 @@ description, exchange, and other metadata for the specified CUSIP.`,
 // symbol lookup failures instead of generic HTTP failures.
 func mapInstrumentGetError(err error) error {
 	mappedErr := mapSchwabGoError(err)
+	if mappedErr == nil {
+		return nil
+	}
+
 	var httpErr *apperr.HTTPError
 	if errors.As(mappedErr, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 		return apperr.NewSymbolNotFoundError("instrument not found", nil)
 	}
+	// TODO: Replace this fallback when schwab-go exposes a sentinel or typed
+	// error for empty CUSIP responses. v0.1.3 returns only a formatted error, so
+	// keep the narrow message match to preserve the CLI's structured contract.
+	if strings.Contains(mappedErr.Error(), "no instrument found for CUSIP") {
+		return apperr.NewSymbolNotFoundError("instrument not found", nil)
+	}
 
 	return mappedErr
-}
-
-// findInstrumentByCUSIP returns the exact CUSIP match from a schwab-go search response.
-func findInstrumentByCUSIP(result *marketdata.InstrumentResponse, cusip string) *marketdata.Instrument {
-	if result == nil {
-		return nil
-	}
-
-	for i := range result.Instruments {
-		if strings.EqualFold(result.Instruments[i].Cusip, cusip) {
-			return &result.Instruments[i]
-		}
-	}
-
-	return nil
 }

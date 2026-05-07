@@ -98,9 +98,7 @@ func TestNewInstrumentCmd_Search_APIError(t *testing.T) {
 func TestNewInstrumentCmd_Get_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/marketdata/v1/instruments", r.URL.Path)
-		assert.Equal(t, "037833100", r.URL.Query().Get("symbol"))
-		assert.Equal(t, "symbol-search", r.URL.Query().Get("projection"))
+		assert.Equal(t, "/marketdata/v1/instruments/037833100", r.URL.Path)
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
@@ -120,15 +118,13 @@ func TestNewInstrumentCmd_Get_Success(t *testing.T) {
 	assert.NotEmpty(t, envelope.Metadata.Timestamp)
 }
 
-func TestNewInstrumentCmd_Get_NotFoundInSearchResults(t *testing.T) {
+func TestNewInstrumentCmd_Get_EmptyInstrumentResponse(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/marketdata/v1/instruments", r.URL.Path)
-		assert.Equal(t, "000000000", r.URL.Query().Get("symbol"))
-		assert.Equal(t, "symbol-search", r.URL.Query().Get("projection"))
+		assert.Equal(t, "/marketdata/v1/instruments/000000000", r.URL.Path)
 
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"instruments":[{"cusip":"037833100","symbol":"AAPL"}]}`))
+		_, _ = w.Write([]byte(`{"instruments":[]}`))
 	}))
 	defer srv.Close()
 
@@ -213,9 +209,4 @@ func TestMapInstrumentGetError(t *testing.T) {
 			require.Same(t, tc.expectedErr, got)
 		})
 	}
-}
-
-func TestFindInstrumentByCUSIP_NilResponse(t *testing.T) {
-	instrument := findInstrumentByCUSIP(nil, "037833100")
-	assert.Nil(t, instrument)
 }

@@ -143,13 +143,49 @@ func TestNewMarketCmd_Hours_SpecificMarketAPIError(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewMarketCmd(testClientWithMarketData(t, srv), &buf)
-	_, err := runTestCommand(t, cmd, "hours", "invalid")
+	_, err := runTestCommand(t, cmd, "hours", "equity")
 
 	// Assert
 	require.Error(t, err)
 	var httpErr *apperr.HTTPError
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
+}
+
+func TestNewMarketCmd_Hours_InvalidMarket(t *testing.T) {
+	// Arrange - schwab-go v0.1.3 validates market names before making the
+	// request, so the CLI maps that condition to its structured validation error.
+	server := jsonServer(`{}`)
+	defer server.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewMarketCmd(testClientWithMarketData(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "hours", "invalid")
+
+	// Assert
+	require.Error(t, err)
+	var validationErr *apperr.ValidationError
+	require.ErrorAs(t, err, &validationErr)
+}
+
+func TestNewMarketCmd_Hours_DuplicateMarket(t *testing.T) {
+	// Arrange - validate duplicates locally so upstream client-side validation
+	// still surfaces through the CLI's structured validation error contract.
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		t.Errorf("TestNewMarketCmd_Hours_DuplicateMarket made an unexpected API request")
+	}))
+	defer server.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewMarketCmd(testClientWithMarketData(t, server), &buf)
+	_, err := runTestCommand(t, cmd, "hours", "equity", "equity")
+
+	// Assert
+	require.Error(t, err)
+	var validationErr *apperr.ValidationError
+	require.ErrorAs(t, err, &validationErr)
 }
 
 func TestNewMarketCmd_Movers_Success(t *testing.T) {
