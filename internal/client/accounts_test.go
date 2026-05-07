@@ -58,6 +58,24 @@ func TestAccountNumbers_404_ReturnsAccountNotFoundError(t *testing.T) {
 	assert.Contains(t, accountErr.Error(), "account numbers not found")
 }
 
+func TestAccountNumbers_401_ReturnsAuthExpiredError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL))
+	result, err := c.AccountNumbers(context.Background())
+
+	require.Error(t, err)
+	assert.Nil(t, result)
+
+	var authErr *apperr.AuthExpiredError
+	require.ErrorAs(t, err, &authErr)
+	assert.Contains(t, authErr.Error(), "authentication expired")
+}
+
 func TestAccountNumbers_EmptyList(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
