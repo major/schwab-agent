@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"mime"
@@ -15,9 +16,11 @@ import (
 	"net/url"
 	"time"
 
+	schwab "github.com/major/schwab-go/schwab"
 	"resty.dev/v3"
 
 	"github.com/major/schwab-go/schwab/marketdata"
+	"github.com/major/schwab-go/schwab/trader"
 
 	"github.com/major/schwab-agent/internal/apperr"
 )
@@ -59,6 +62,7 @@ type Client struct {
 	baseURL   string
 	resty     *resty.Client
 	token     string
+	tlsConfig *tls.Config
 	userAgent string
 	logger    *slog.Logger
 }
@@ -93,6 +97,37 @@ func NewClient(token string, opts ...Option) *Client {
 	return c
 }
 
+func (c *Client) newTraderClient() *trader.Client {
+	// Keep the schwab-go trader client behind this adapter so command packages
+	// retain the existing internal/client boundary and typed error contract while
+	// endpoint methods migrate one at a time. Build it from the current token on
+	// demand because schwab-go v0.4.1 accepts WithTokenProvider but does not retain
+	// it in concrete trader clients; see major/schwab-go#53.
+	return trader.NewClient(
+		schwab.WithToken(c.token),
+		schwab.WithBaseURL(c.baseURL),
+		schwab.WithResponseBodyLimit(maxResponseSize),
+		schwab.WithUserAgent(c.userAgent),
+		schwab.WithTLSConfig(c.tlsConfig),
+	)
+}
+
+func schwabAPIErrorToHTTPError(err error) error {
+	var apiErr *schwab.APIError
+	if !errors.As(err, &apiErr) {
+		return err
+	}
+	if apiErr.StatusCode == http.StatusUnauthorized {
+		return apperr.NewAuthExpiredError("authentication expired", err)
+	}
+	return apperr.NewHTTPError(
+		fmt.Sprintf("HTTP %d", apiErr.StatusCode),
+		apiErr.StatusCode,
+		apiErr.Body,
+		err,
+	)
+}
+
 // WithBaseURL sets the base URL for the client.
 func WithBaseURL(baseURL string) Option {
 	return func(c *Client) {
@@ -107,6 +142,7 @@ func WithBaseURL(baseURL string) Option {
 func WithTLSConfig(tlsCfg *tls.Config) Option {
 	return func(c *Client) {
 		if tlsCfg != nil {
+			c.tlsConfig = tlsCfg
 			c.resty.SetTLSClientConfig(tlsCfg)
 		}
 	}

@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"strings"
 
+	schwab "github.com/major/schwab-go/schwab"
+	"github.com/major/schwab-go/schwab/trader"
+
 	"github.com/major/schwab-agent/internal/apperr"
 	"github.com/major/schwab-agent/internal/models"
 )
@@ -14,16 +17,34 @@ import (
 // AccountNumbers retrieves the list of account numbers and hash values.
 // Returns AccountNotFoundError on 404.
 func (c *Client) AccountNumbers(ctx context.Context) ([]models.AccountNumber, error) {
-	var result []models.AccountNumber
-	err := c.doGet(ctx, "/trader/v1/accounts/accountNumbers", nil, &result)
+	accountNumbers, err := c.newTraderClient().GetAccountNumbers(ctx)
 	if err != nil {
-		// Convert 404 HTTPError to AccountNotFoundError
-		if httpErr, ok := errors.AsType[*apperr.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
+		// Preserve the historical internal/client error contract while letting
+		// schwab-go own the request construction, authentication header, and JSON
+		// decoding for this endpoint.
+		if schwab.IsUnauthorized(err) {
+			return nil, apperr.NewAuthExpiredError("authentication expired", err)
+		}
+		if schwab.IsStatusCode(err, http.StatusNotFound) {
 			return nil, apperr.NewAccountNotFoundError("account numbers not found", err)
 		}
-		return nil, err
+		return nil, schwabAPIErrorToHTTPError(err)
 	}
-	return result, nil
+	return accountNumberHashesToModels(accountNumbers), nil
+}
+
+func accountNumberHashesToModels(accountNumbers []trader.AccountNumberHash) []models.AccountNumber {
+	if accountNumbers == nil {
+		return nil
+	}
+	result := make([]models.AccountNumber, 0, len(accountNumbers))
+	for _, accountNumber := range accountNumbers {
+		result = append(result, models.AccountNumber{
+			AccountNumber: accountNumber.AccountNumber,
+			HashValue:     accountNumber.HashValue,
+		})
+	}
+	return result
 }
 
 // Accounts retrieves all accounts.
