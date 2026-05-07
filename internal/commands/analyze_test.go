@@ -16,6 +16,14 @@ import (
 	"github.com/major/schwab-agent/internal/output"
 )
 
+const invalidAnalyzeQuoteEntryResponse = `{
+	"INVALID": {
+		"assetMainType": "EQUITY",
+		"symbol": "INVALID",
+		"quote": {"lastPrice": 100.0}
+	}
+}`
+
 // analyzeServer returns an [httptest.Server] that handles both quote and
 // price-history requests. quoteBody is keyed by symbol path suffix
 // (e.g., "/marketdata/v1/AAPL/quotes"), and candleBody applies to all
@@ -99,7 +107,7 @@ func TestNewAnalyzeCmd_HelpText(t *testing.T) {
 
 func TestNewAnalyzeCmd_SingleSymbol(t *testing.T) {
 	// Arrange - server handles both quote and price-history endpoints
-	quoteJSON := `{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`
+	quoteJSON := aaplQuoteEntryResponse
 	candleJSON := mockCandleListJSON("AAPL", 252)
 	srv := analyzeServer(t, quoteJSON, candleJSON)
 	defer srv.Close()
@@ -141,9 +149,9 @@ func TestNewAnalyzeCmd_MultiSymbol(t *testing.T) {
 
 		switch {
 		case strings.Contains(r.URL.Path, "AAPL/quotes"):
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
+			_, _ = w.Write([]byte(aaplQuoteEntryResponse))
 		case strings.Contains(r.URL.Path, "NVDA/quotes"):
-			_, _ = w.Write([]byte(`{"NVDA":{"symbol":"NVDA","lastPrice":800.0}}`))
+			_, _ = w.Write([]byte(`{"NVDA":{"assetMainType":"EQUITY","symbol":"NVDA","quote":{"lastPrice":800.0}}}`))
 		case strings.Contains(r.URL.Path, "/pricehistory"):
 			// Determine symbol from query param
 			sym := r.URL.Query().Get("symbol")
@@ -191,10 +199,10 @@ func TestNewAnalyzeCmd_PartialFailure_TAFails(t *testing.T) {
 
 		switch {
 		case strings.Contains(r.URL.Path, "AAPL/quotes"):
-			_, _ = w.Write([]byte(`{"AAPL":{"symbol":"AAPL","lastPrice":150.0}}`))
+			_, _ = w.Write([]byte(aaplQuoteEntryResponse))
 		case strings.Contains(r.URL.Path, "INVALID/quotes"):
 			// Quote succeeds for INVALID
-			_, _ = w.Write([]byte(`{"INVALID":{"symbol":"INVALID","lastPrice":100.0}}`))
+			_, _ = w.Write([]byte(invalidAnalyzeQuoteEntryResponse))
 		case strings.Contains(r.URL.Path, "/pricehistory"):
 			// Return valid candles for AAPL, empty for INVALID (TA will fail)
 			sym := r.URL.Query().Get("symbol")
