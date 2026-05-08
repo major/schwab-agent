@@ -277,6 +277,7 @@ run_help_test "option"             option
 run_help_test "option expirations" option expirations
 run_help_test "option chain"       option chain
 run_help_test "option contract"    option contract
+run_help_test "option screen"      option screen
 run_help_test "history"           history
 run_help_test "history get"       history get
 run_help_test "instrument"        instrument
@@ -320,6 +321,11 @@ run_help_contains_test "option chain shows --strike-count flag" "--strike-count"
 run_help_contains_test "option contract shows --expiration flag" "--expiration" option contract
 run_help_contains_test "option contract shows --call flag" "--call" option contract
 run_help_contains_test "option contract shows --put flag" "--put" option contract
+run_help_contains_test "option screen shows --delta-min flag" "--delta-min" option screen
+run_help_contains_test "option screen shows --min-bid flag" "--min-bid" option screen
+run_help_contains_test "option screen shows --max-spread-pct flag" "--max-spread-pct" option screen
+run_help_contains_test "option screen shows --sort flag" "--sort" option screen
+run_help_contains_test "option screen shows --limit flag" "--limit" option screen
 
 run_help_contains_test "quote get shows underlying flag" "--underlying" quote get
 run_help_contains_test "quote get shows call flag" "--call" quote get

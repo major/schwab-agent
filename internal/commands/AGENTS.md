@@ -135,10 +135,12 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 | flag_aliases.go | (shared) | registerOrderFlagAliases, resolveOrderFlagAliasesViaFlags, RegisterOrderFlagAliasesOnTree |
 | symbol_builder.go | (shared) | buildOCCSymbol for option commands needing OCC symbol construction |
 | order_build.go | order build | equity, option, bracket, oco, vertical, iron-condor, straddle, strangle, covered-call, collar, calendar, diagonal, butterfly, condor, vertical-roll, back-ratio, double-diagonal, fts |
-| option_ticket.go | option | (parent command; registers expirations, chain, contract subcommands) |
+| option_ticket.go | option | (parent command; registers expirations, chain, contract, screen subcommands) |
 | option_expirations.go | option expirations | &lt;symbol&gt; |
 | option_chain.go | option chain | &lt;symbol&gt; |
 | option_contract.go | option contract | &lt;symbol&gt; |
+| option_screen.go | option screen | &lt;symbol&gt; (client-side filter pipeline: DTE, delta, premium, liquidity, spread) |
+| option_screen_opts.go | (shared) | option screen opts struct and validation |
 | option_chain_opts.go | (shared) | option chain/contract opts structs and validation |
 | history.go | history | get (alias: price-history) |
 | instrument.go | instrument | search, get |
