@@ -603,7 +603,10 @@ bracket orders, OCO has no entry leg.`,
   schwab-agent order place oco --symbol TSLA --action BUY --quantity 10 --take-profit 200 --stop-loss 250`,
 	)
 
-	return []*cobra.Command{equityCmd, optionCmd, bracketCmd, ocoCmd, newBuyWithStopPlaceCmd(c, configPath, w)}
+	cmds := []*cobra.Command{equityCmd, optionCmd, bracketCmd, ocoCmd, newBuyWithStopPlaceCmd(c, configPath, w)}
+	cmds = append(cmds, orderPlacePorcelainCommands(c, configPath, w)...)
+
+	return cmds
 }
 
 // makeCobraPlaceOrderCommand creates a Cobra place subcommand with the same
@@ -810,7 +813,10 @@ will validate during preview.`,
 	  schwab-agent order preview oco --symbol TSLA --action BUY --quantity 10 --stop-loss 250`,
 	)
 
-	return []*cobra.Command{equityCmd, optionCmd, bracketCmd, ocoCmd, newBuyWithStopPreviewCmd(c, configPath, w)}
+	cmds := []*cobra.Command{equityCmd, optionCmd, bracketCmd, ocoCmd, newBuyWithStopPreviewCmd(c, configPath, w)}
+	cmds = append(cmds, orderPreviewPorcelainCommands(c, configPath, w)...)
+
+	return cmds
 }
 
 // makeCobraPreviewOrderCommand creates a typed preview subcommand that mirrors

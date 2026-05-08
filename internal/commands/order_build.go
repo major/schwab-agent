@@ -86,6 +86,7 @@ option, bracket, OCO, and multi-leg option strategies.`,
 
 	cmd.AddCommand(orderBuildCoreCommands(w)...)
 	cmd.AddCommand(orderBuildStrategyCommands(w)...)
+	cmd.AddCommand(orderBuildPorcelainCommands(w)...)
 	cmd.AddCommand(newBuildFTSCmd(w))
 
 	return cmd

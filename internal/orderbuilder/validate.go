@@ -930,6 +930,50 @@ func ValidateCollarOrder(params *CollarParams) error {
 	return validateSpreadPrice(params.Price, "collars")
 }
 
+// ValidateJadeLizardOrder validates jade lizard parameters.
+//
+// Strikes must be ordered: put < short-call < long-call. The put provides
+// downside premium, the short call provides upside premium, and the long call
+// caps the maximum loss on the call side.
+func ValidateJadeLizardOrder(params *JadeLizardParams) error {
+	if err := validateUnderlying(params.Underlying); err != nil {
+		return err
+	}
+
+	if err := validateQuantity(params.Quantity); err != nil {
+		return err
+	}
+
+	if err := validateExpiration(params.Expiration); err != nil {
+		return err
+	}
+
+	if err := validatePositiveStrikes([]namedStrike{
+		{value: params.PutStrike, name: "put-strike"},
+		{value: params.ShortCallStrike, name: "short-call-strike"},
+		{value: params.LongCallStrike, name: "long-call-strike"},
+	}); err != nil {
+		return err
+	}
+
+	// Strikes must be ordered: put < short-call < long-call.
+	if params.PutStrike >= params.ShortCallStrike {
+		return validationError(
+			"put strike must be below short call strike",
+			"Adjust `--put-strike` to be lower than `--short-call-strike`",
+		)
+	}
+
+	if params.ShortCallStrike >= params.LongCallStrike {
+		return validationError(
+			"short call strike must be below long call strike",
+			"Adjust `--short-call-strike` to be lower than `--long-call-strike`",
+		)
+	}
+
+	return validateSpreadPrice(params.Price, "jade lizards")
+}
+
 // validateUnderlying checks that the underlying symbol is not empty.
 func validateUnderlying(underlying string) error {
 	if strings.TrimSpace(underlying) == "" {
