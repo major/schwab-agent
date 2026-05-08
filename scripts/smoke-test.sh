@@ -24,6 +24,12 @@ PASS=0
 FAIL=0
 SKIP=0
 
+# Dynamic future expiration dates for option order tests. Using computed dates
+# ensures tests don't fail as calendar dates pass. Symbol build/parse tests
+# keep hardcoded dates since they don't validate expiration.
+FUTURE_EXP=$(date -d "+1 year" +%Y-%m-%d)
+FUTURE_EXP_FAR=$(date -d "+18 months" +%Y-%m-%d)
+
 # Disable colors when stdout is not a terminal (CI logs, pipes).
 if [ -t 1 ]; then
     RED='\033[0;31m'
@@ -228,6 +234,45 @@ run_help_test "order build vertical-roll" order build vertical-roll
 run_help_test "order build back-ratio"   order build back-ratio
 run_help_test "order build double-diagonal" order build double-diagonal
 run_help_test "order build fts"          order build fts
+run_help_test "order build long-call"           order build long-call
+run_help_test "order build long-put"            order build long-put
+run_help_test "order build cash-secured-put"    order build cash-secured-put
+run_help_test "order build naked-call"          order build naked-call
+run_help_test "order build put-credit-spread"   order build put-credit-spread
+run_help_test "order build call-credit-spread"  order build call-credit-spread
+run_help_test "order build put-debit-spread"    order build put-debit-spread
+run_help_test "order build call-debit-spread"   order build call-debit-spread
+run_help_test "order build long-straddle"       order build long-straddle
+run_help_test "order build short-straddle"      order build short-straddle
+run_help_test "order build long-strangle"       order build long-strangle
+run_help_test "order build short-strangle"      order build short-strangle
+run_help_test "order build jade-lizard"         order build jade-lizard
+run_help_test "order place long-call"           order place long-call
+run_help_test "order place long-put"            order place long-put
+run_help_test "order place cash-secured-put"    order place cash-secured-put
+run_help_test "order place naked-call"          order place naked-call
+run_help_test "order place put-credit-spread"   order place put-credit-spread
+run_help_test "order place call-credit-spread"  order place call-credit-spread
+run_help_test "order place put-debit-spread"    order place put-debit-spread
+run_help_test "order place call-debit-spread"   order place call-debit-spread
+run_help_test "order place long-straddle"       order place long-straddle
+run_help_test "order place short-straddle"      order place short-straddle
+run_help_test "order place long-strangle"       order place long-strangle
+run_help_test "order place short-strangle"      order place short-strangle
+run_help_test "order place jade-lizard"         order place jade-lizard
+run_help_test "order preview long-call"         order preview long-call
+run_help_test "order preview long-put"          order preview long-put
+run_help_test "order preview cash-secured-put"  order preview cash-secured-put
+run_help_test "order preview naked-call"        order preview naked-call
+run_help_test "order preview put-credit-spread" order preview put-credit-spread
+run_help_test "order preview call-credit-spread" order preview call-credit-spread
+run_help_test "order preview put-debit-spread"  order preview put-debit-spread
+run_help_test "order preview call-debit-spread" order preview call-debit-spread
+run_help_test "order preview long-straddle"     order preview long-straddle
+run_help_test "order preview short-straddle"    order preview short-straddle
+run_help_test "order preview long-strangle"     order preview long-strangle
+run_help_test "order preview short-strangle"    order preview short-strangle
+run_help_test "order preview jade-lizard"       order preview jade-lizard
 run_help_test "option"             option
 run_help_test "option expirations" option expirations
 run_help_test "option chain"       option chain
@@ -383,36 +428,36 @@ run_build_test "equity: BUY LIMIT DO_NOT_REDUCE" \
 section "Order Build: Option"
 
 run_build_test "option: CALL BUY_TO_OPEN MARKET" \
-    order build option --underlying AAPL --expiration 2026-06-19 --strike 200 --call \
+    order build option --underlying AAPL --expiration $FUTURE_EXP --strike 200 --call \
     --action BUY_TO_OPEN --quantity 1
 run_build_test "option: PUT BUY_TO_OPEN MARKET" \
-    order build option --underlying AAPL --expiration 2026-06-19 --strike 200 --put \
+    order build option --underlying AAPL --expiration $FUTURE_EXP --strike 200 --put \
     --action BUY_TO_OPEN --quantity 1
 run_build_test "option: CALL SELL_TO_OPEN LIMIT" \
-    order build option --underlying AAPL --expiration 2026-06-19 --strike 200 --call \
+    order build option --underlying AAPL --expiration $FUTURE_EXP --strike 200 --call \
     --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 5
 run_build_test "option: PUT SELL_TO_OPEN LIMIT" \
-    order build option --underlying AAPL --expiration 2026-06-19 --strike 200 --put \
+    order build option --underlying AAPL --expiration $FUTURE_EXP --strike 200 --put \
     --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 5
 run_build_test "option: CALL BUY_TO_CLOSE MARKET" \
-    order build option --underlying AAPL --expiration 2026-06-19 --strike 200 --call \
+    order build option --underlying AAPL --expiration $FUTURE_EXP --strike 200 --call \
     --action BUY_TO_CLOSE --quantity 1
 run_build_test "option: PUT BUY_TO_CLOSE MARKET" \
-    order build option --underlying AAPL --expiration 2026-06-19 --strike 200 --put \
+    order build option --underlying AAPL --expiration $FUTURE_EXP --strike 200 --put \
     --action BUY_TO_CLOSE --quantity 1
 run_build_test "option: CALL SELL_TO_CLOSE LIMIT" \
-    order build option --underlying AAPL --expiration 2026-06-19 --strike 200 --call \
+    order build option --underlying AAPL --expiration $FUTURE_EXP --strike 200 --call \
     --action SELL_TO_CLOSE --quantity 1 --type LIMIT --price 5
 run_build_test "option: PUT SELL_TO_CLOSE LIMIT" \
-    order build option --underlying AAPL --expiration 2026-06-19 --strike 200 --put \
+    order build option --underlying AAPL --expiration $FUTURE_EXP --strike 200 --put \
     --action SELL_TO_CLOSE --quantity 1 --type LIMIT --price 5
 
 # Duration and session on options
 run_build_test "option: CALL BUY_TO_OPEN LIMIT GTC" \
-    order build option --underlying AAPL --expiration 2026-06-19 --strike 200 --call \
+    order build option --underlying AAPL --expiration $FUTURE_EXP --strike 200 --call \
     --action BUY_TO_OPEN --quantity 1 --type LIMIT --price 5 --duration GOOD_TILL_CANCEL
 run_build_test "option: PUT SELL_TO_OPEN LIMIT DAY AM" \
-    order build option --underlying AAPL --expiration 2026-06-19 --strike 200 --put \
+    order build option --underlying AAPL --expiration $FUTURE_EXP --strike 200 --put \
     --action SELL_TO_OPEN --quantity 1 --type LIMIT --price 5 --duration DAY --session AM
 
 # -------------------------------------------------------------------
@@ -486,16 +531,16 @@ run_error_test "buy-with-stop: invalid --type STOP" \
 section "Order Build: Vertical"
 
 run_build_test "vertical: CALL OPEN" \
-    order build vertical --underlying F --expiration 2026-06-18 \
+    order build vertical --underlying F --expiration $FUTURE_EXP \
     --long-strike 12 --short-strike 14 --call --open --quantity 1 --price 0.50
 run_build_test "vertical: CALL CLOSE" \
-    order build vertical --underlying F --expiration 2026-06-18 \
+    order build vertical --underlying F --expiration $FUTURE_EXP \
     --long-strike 12 --short-strike 14 --call --close --quantity 1 --price 0.50
 run_build_test "vertical: PUT OPEN" \
-    order build vertical --underlying F --expiration 2026-06-18 \
+    order build vertical --underlying F --expiration $FUTURE_EXP \
     --long-strike 14 --short-strike 12 --put --open --quantity 1 --price 0.50
 run_build_test "vertical: PUT CLOSE" \
-    order build vertical --underlying F --expiration 2026-06-18 \
+    order build vertical --underlying F --expiration $FUTURE_EXP \
     --long-strike 14 --short-strike 12 --put --close --quantity 1 --price 0.50
 
 # -------------------------------------------------------------------
@@ -505,11 +550,11 @@ run_build_test "vertical: PUT CLOSE" \
 section "Order Build: Iron Condor"
 
 run_build_test "iron-condor: OPEN" \
-    order build iron-condor --underlying F --expiration 2026-06-18 \
+    order build iron-condor --underlying F --expiration $FUTURE_EXP \
     --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 \
     --open --quantity 1 --price 0.50
 run_build_test "iron-condor: CLOSE" \
-    order build iron-condor --underlying F --expiration 2026-06-18 \
+    order build iron-condor --underlying F --expiration $FUTURE_EXP \
     --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 \
     --close --quantity 1 --price 0.50
 
@@ -520,16 +565,16 @@ run_build_test "iron-condor: CLOSE" \
 section "Order Build: Straddle"
 
 run_build_test "straddle: BUY OPEN" \
-    order build straddle --underlying F --expiration 2026-06-18 --strike 12 \
+    order build straddle --underlying F --expiration $FUTURE_EXP --strike 12 \
     --buy --open --quantity 1 --price 1.50
 run_build_test "straddle: BUY CLOSE" \
-    order build straddle --underlying F --expiration 2026-06-18 --strike 12 \
+    order build straddle --underlying F --expiration $FUTURE_EXP --strike 12 \
     --buy --close --quantity 1 --price 1.50
 run_build_test "straddle: SELL OPEN" \
-    order build straddle --underlying F --expiration 2026-06-18 --strike 12 \
+    order build straddle --underlying F --expiration $FUTURE_EXP --strike 12 \
     --sell --open --quantity 1 --price 1.50
 run_build_test "straddle: SELL CLOSE" \
-    order build straddle --underlying F --expiration 2026-06-18 --strike 12 \
+    order build straddle --underlying F --expiration $FUTURE_EXP --strike 12 \
     --sell --close --quantity 1 --price 1.50
 
 # -------------------------------------------------------------------
@@ -539,16 +584,16 @@ run_build_test "straddle: SELL CLOSE" \
 section "Order Build: Strangle"
 
 run_build_test "strangle: BUY OPEN" \
-    order build strangle --underlying F --expiration 2026-06-18 \
+    order build strangle --underlying F --expiration $FUTURE_EXP \
     --call-strike 14 --put-strike 10 --buy --open --quantity 1 --price 0.50
 run_build_test "strangle: BUY CLOSE" \
-    order build strangle --underlying F --expiration 2026-06-18 \
+    order build strangle --underlying F --expiration $FUTURE_EXP \
     --call-strike 14 --put-strike 10 --buy --close --quantity 1 --price 0.50
 run_build_test "strangle: SELL OPEN" \
-    order build strangle --underlying F --expiration 2026-06-18 \
+    order build strangle --underlying F --expiration $FUTURE_EXP \
     --call-strike 14 --put-strike 10 --sell --open --quantity 1 --price 0.50
 run_build_test "strangle: SELL CLOSE" \
-    order build strangle --underlying F --expiration 2026-06-18 \
+    order build strangle --underlying F --expiration $FUTURE_EXP \
     --call-strike 14 --put-strike 10 --sell --close --quantity 1 --price 0.50
 
 # -------------------------------------------------------------------
@@ -558,7 +603,7 @@ run_build_test "strangle: SELL CLOSE" \
 section "Order Build: Covered Call"
 
 run_build_test "covered-call: basic" \
-    order build covered-call --underlying F --expiration 2026-06-18 \
+    order build covered-call --underlying F --expiration $FUTURE_EXP \
     --strike 14 --quantity 1 --price 12.00
 
 # -------------------------------------------------------------------
@@ -569,10 +614,10 @@ section "Order Build: Collar"
 
 run_build_test "collar: OPEN" \
     order build collar --underlying F --put-strike 10 --call-strike 14 \
-    --expiration 2026-06-18 --quantity 1 --open --price 12.00
+    --expiration $FUTURE_EXP --quantity 1 --open --price 12.00
 run_build_test "collar: CLOSE" \
     order build collar --underlying F --put-strike 10 --call-strike 14 \
-    --expiration 2026-06-18 --quantity 1 --close --price 12.00
+    --expiration $FUTURE_EXP --quantity 1 --close --price 12.00
 
 # -------------------------------------------------------------------
 # Order build: Calendar - call/put x open/close
@@ -582,19 +627,19 @@ section "Order Build: Calendar"
 
 run_build_test "calendar: CALL OPEN" \
     order build calendar --underlying F \
-    --near-expiration 2026-05-15 --far-expiration 2026-07-17 \
+    --near-expiration $FUTURE_EXP --far-expiration $FUTURE_EXP_FAR \
     --strike 12 --call --open --quantity 1 --price 0.50
 run_build_test "calendar: CALL CLOSE" \
     order build calendar --underlying F \
-    --near-expiration 2026-05-15 --far-expiration 2026-07-17 \
+    --near-expiration $FUTURE_EXP --far-expiration $FUTURE_EXP_FAR \
     --strike 12 --call --close --quantity 1 --price 0.50
 run_build_test "calendar: PUT OPEN" \
     order build calendar --underlying F \
-    --near-expiration 2026-05-15 --far-expiration 2026-07-17 \
+    --near-expiration $FUTURE_EXP --far-expiration $FUTURE_EXP_FAR \
     --strike 12 --put --open --quantity 1 --price 0.50
 run_build_test "calendar: PUT CLOSE" \
     order build calendar --underlying F \
-    --near-expiration 2026-05-15 --far-expiration 2026-07-17 \
+    --near-expiration $FUTURE_EXP --far-expiration $FUTURE_EXP_FAR \
     --strike 12 --put --close --quantity 1 --price 0.50
 
 # -------------------------------------------------------------------
@@ -606,22 +651,22 @@ section "Order Build: Diagonal"
 run_build_test "diagonal: CALL OPEN" \
     order build diagonal --underlying F \
     --near-strike 12 --far-strike 14 \
-    --near-expiration 2026-05-15 --far-expiration 2026-07-17 \
+    --near-expiration $FUTURE_EXP --far-expiration $FUTURE_EXP_FAR \
     --call --open --quantity 1 --price 0.50
 run_build_test "diagonal: CALL CLOSE" \
     order build diagonal --underlying F \
     --near-strike 12 --far-strike 14 \
-    --near-expiration 2026-05-15 --far-expiration 2026-07-17 \
+    --near-expiration $FUTURE_EXP --far-expiration $FUTURE_EXP_FAR \
     --call --close --quantity 1 --price 0.50
 run_build_test "diagonal: PUT OPEN" \
     order build diagonal --underlying F \
     --near-strike 14 --far-strike 12 \
-    --near-expiration 2026-05-15 --far-expiration 2026-07-17 \
+    --near-expiration $FUTURE_EXP --far-expiration $FUTURE_EXP_FAR \
     --put --open --quantity 1 --price 0.50
 run_build_test "diagonal: PUT CLOSE" \
     order build diagonal --underlying F \
     --near-strike 14 --far-strike 12 \
-    --near-expiration 2026-05-15 --far-expiration 2026-07-17 \
+    --near-expiration $FUTURE_EXP --far-expiration $FUTURE_EXP_FAR \
     --put --close --quantity 1 --price 0.50
 
 # -------------------------------------------------------------------
@@ -631,24 +676,24 @@ run_build_test "diagonal: PUT CLOSE" \
 section "Order Build: Additional Option Strategies"
 
 run_build_test "butterfly: CALL BUY OPEN" \
-    order build butterfly --underlying F --expiration 2026-06-18 \
+    order build butterfly --underlying F --expiration $FUTURE_EXP \
     --lower-strike 10 --middle-strike 12 --upper-strike 14 \
     --call --buy --open --quantity 1 --price 0.50
 run_build_test "condor: PUT SELL OPEN" \
-    order build condor --underlying F --expiration 2026-06-18 \
+    order build condor --underlying F --expiration $FUTURE_EXP \
     --lower-strike 10 --lower-middle-strike 12 --upper-middle-strike 14 --upper-strike 16 \
     --put --sell --open --quantity 1 --price 0.75
 run_build_test "vertical-roll: CALL CREDIT" \
     order build vertical-roll --underlying F \
-    --close-expiration 2026-06-18 --open-expiration 2026-07-17 \
+    --close-expiration $FUTURE_EXP --open-expiration $FUTURE_EXP_FAR \
     --close-long-strike 12 --close-short-strike 14 --open-long-strike 13 --open-short-strike 15 \
     --call --credit --quantity 1 --price 0.25
 run_build_test "back-ratio: CALL DEBIT" \
-    order build back-ratio --underlying F --expiration 2026-06-18 \
+    order build back-ratio --underlying F --expiration $FUTURE_EXP \
     --short-strike 12 --long-strike 14 --call --open --quantity 1 --long-ratio 2 --debit --price 0.20
 run_build_test "double-diagonal: OPEN" \
     order build double-diagonal --underlying F \
-    --near-expiration 2026-06-18 --far-expiration 2026-07-17 \
+    --near-expiration $FUTURE_EXP --far-expiration $FUTURE_EXP_FAR \
     --put-far-strike 9 --put-near-strike 10 --call-near-strike 14 --call-far-strike 15 \
     --open --quantity 1 --price 0.80
 
@@ -692,7 +737,7 @@ run_build_test "alias: equity --instruction BUY --order-type MARKET" \
 run_build_test "alias: equity --instruction SELL --order-type LIMIT" \
     order build equity --symbol AAPL --instruction SELL --quantity 10 --order-type LIMIT --price 200
 run_build_test "alias: option --instruction BUY_TO_OPEN --order-type LIMIT" \
-    order build option --underlying AAPL --expiration 2026-06-19 --strike 200 --call \
+    order build option --underlying AAPL --expiration $FUTURE_EXP --strike 200 --call \
     --instruction BUY_TO_OPEN --quantity 1 --order-type LIMIT --price 5.00
 run_build_test "alias: bracket --instruction BUY --order-type MARKET" \
     order build bracket --symbol NVDA --instruction BUY --quantity 10 \
@@ -710,13 +755,148 @@ run_error_test "alias conflict: --type + --order-type" \
 
 # Multi-leg strategies must NOT have alias flags
 run_error_test "vertical rejects --instruction" \
-    order build vertical --underlying F --expiration 2026-06-18 \
+    order build vertical --underlying F --expiration $FUTURE_EXP \
     --long-strike 12 --short-strike 14 --call --open --quantity 1 --price 0.50 \
     --instruction BUY
 run_error_test "iron-condor rejects --order-type" \
-    order build iron-condor --underlying F --expiration 2026-06-18 \
+    order build iron-condor --underlying F --expiration $FUTURE_EXP \
     --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 \
     --open --quantity 1 --price 0.50 --order-type LIMIT
+
+# -------------------------------------------------------------------
+# Order build: Porcelain Single-Leg
+# -------------------------------------------------------------------
+
+section "Order Build: Porcelain Single-Leg"
+
+run_build_test "long-call: basic" \
+    order build long-call --underlying AAPL --expiration $FUTURE_EXP \
+    --strike 200 --quantity 1 --type LIMIT --price 5.00
+run_build_test "long-call: MARKET" \
+    order build long-call --underlying AAPL --expiration $FUTURE_EXP \
+    --strike 200 --quantity 1
+run_build_test "long-put: basic" \
+    order build long-put --underlying AAPL --expiration $FUTURE_EXP \
+    --strike 200 --quantity 1 --type LIMIT --price 3.00
+run_build_test "cash-secured-put: basic" \
+    order build cash-secured-put --underlying AAPL --expiration $FUTURE_EXP \
+    --strike 180 --quantity 1 --type LIMIT --price 4.00
+run_build_test "naked-call: basic" \
+    order build naked-call --underlying AAPL --expiration $FUTURE_EXP \
+    --strike 220 --quantity 1 --type LIMIT --price 2.00
+run_build_test "long-call: GTC duration" \
+    order build long-call --underlying AAPL --expiration $FUTURE_EXP \
+    --strike 200 --quantity 1 --type LIMIT --price 5.00 --duration GOOD_TILL_CANCEL
+
+# Porcelain single-leg must NOT accept direction flags
+run_error_test "long-call rejects --action" \
+    order build long-call --underlying AAPL --expiration $FUTURE_EXP \
+    --strike 200 --quantity 1 --action BUY_TO_OPEN
+run_error_test "long-call rejects --call" \
+    order build long-call --underlying AAPL --expiration $FUTURE_EXP \
+    --strike 200 --quantity 1 --call
+
+# Help-contains: porcelain shows expected flags
+run_help_contains_test "long-call shows --underlying" "--underlying" order build long-call
+run_help_contains_test "long-call shows --strike" "--strike" order build long-call
+run_help_contains_test "long-call shows --quantity" "--quantity" order build long-call
+
+# -------------------------------------------------------------------
+# Order build: Porcelain Vertical Spread
+# -------------------------------------------------------------------
+
+section "Order Build: Porcelain Vertical Spread"
+
+run_build_test "put-credit-spread: basic" \
+    order build put-credit-spread --underlying F --expiration $FUTURE_EXP \
+    --high-strike 14 --low-strike 12 --quantity 1 --price 0.50
+run_build_test "call-credit-spread: basic" \
+    order build call-credit-spread --underlying F --expiration $FUTURE_EXP \
+    --high-strike 14 --low-strike 12 --quantity 1 --price 0.50
+run_build_test "put-debit-spread: basic" \
+    order build put-debit-spread --underlying F --expiration $FUTURE_EXP \
+    --high-strike 14 --low-strike 12 --quantity 1 --price 0.50
+run_build_test "call-debit-spread: basic" \
+    order build call-debit-spread --underlying F --expiration $FUTURE_EXP \
+    --high-strike 14 --low-strike 12 --quantity 1 --price 0.50
+run_build_test "put-credit-spread: GTC" \
+    order build put-credit-spread --underlying F --expiration $FUTURE_EXP \
+    --high-strike 14 --low-strike 12 --quantity 1 --price 0.50 --duration GOOD_TILL_CANCEL
+
+# Porcelain vertical must NOT accept direction flags
+run_error_test "put-credit-spread rejects --call" \
+    order build put-credit-spread --underlying F --expiration $FUTURE_EXP \
+    --high-strike 14 --low-strike 12 --quantity 1 --price 0.50 --call
+run_error_test "put-credit-spread rejects --open" \
+    order build put-credit-spread --underlying F --expiration $FUTURE_EXP \
+    --high-strike 14 --low-strike 12 --quantity 1 --price 0.50 --open
+run_error_test "put-credit-spread rejects --long-strike" \
+    order build put-credit-spread --underlying F --expiration $FUTURE_EXP \
+    --high-strike 14 --low-strike 12 --quantity 1 --price 0.50 --long-strike 12
+run_error_test "put-credit-spread rejects high <= low strike" \
+    order build put-credit-spread --underlying F --expiration $FUTURE_EXP \
+    --high-strike 12 --low-strike 14 --quantity 1 --price 0.50
+
+# Help-contains: porcelain vertical shows factual strike names
+run_help_contains_test "put-credit-spread shows --high-strike" "--high-strike" order build put-credit-spread
+run_help_contains_test "put-credit-spread shows --low-strike" "--low-strike" order build put-credit-spread
+
+# -------------------------------------------------------------------
+# Order build: Porcelain Straddle/Strangle
+# -------------------------------------------------------------------
+
+section "Order Build: Porcelain Straddle/Strangle"
+
+run_build_test "long-straddle: basic" \
+    order build long-straddle --underlying F --expiration $FUTURE_EXP \
+    --strike 12 --quantity 1 --price 1.50
+run_build_test "short-straddle: basic" \
+    order build short-straddle --underlying F --expiration $FUTURE_EXP \
+    --strike 12 --quantity 1 --price 1.50
+run_build_test "long-strangle: basic" \
+    order build long-strangle --underlying F --expiration $FUTURE_EXP \
+    --call-strike 14 --put-strike 10 --quantity 1 --price 0.50
+run_build_test "short-strangle: basic" \
+    order build short-strangle --underlying F --expiration $FUTURE_EXP \
+    --call-strike 14 --put-strike 10 --quantity 1 --price 0.50
+
+# Porcelain symmetric must NOT accept direction flags
+run_error_test "long-straddle rejects --buy" \
+    order build long-straddle --underlying F --expiration $FUTURE_EXP \
+    --strike 12 --quantity 1 --price 1.50 --buy
+run_error_test "long-straddle rejects --open" \
+    order build long-straddle --underlying F --expiration $FUTURE_EXP \
+    --strike 12 --quantity 1 --price 1.50 --open
+
+# -------------------------------------------------------------------
+# Order build: Porcelain Jade Lizard
+# -------------------------------------------------------------------
+
+section "Order Build: Porcelain Jade Lizard"
+
+run_build_test "jade-lizard: basic" \
+    order build jade-lizard --underlying F --expiration $FUTURE_EXP \
+    --put-strike 10 --short-call-strike 14 --long-call-strike 16 \
+    --quantity 1 --price 1.00
+run_build_test "jade-lizard: GTC" \
+    order build jade-lizard --underlying F --expiration $FUTURE_EXP \
+    --put-strike 10 --short-call-strike 14 --long-call-strike 16 \
+    --quantity 1 --price 1.00 --duration GOOD_TILL_CANCEL
+
+# Strike ordering validation
+run_error_test "jade-lizard: put >= short-call" \
+    order build jade-lizard --underlying F --expiration $FUTURE_EXP \
+    --put-strike 14 --short-call-strike 14 --long-call-strike 16 \
+    --quantity 1 --price 1.00
+run_error_test "jade-lizard: short-call >= long-call" \
+    order build jade-lizard --underlying F --expiration $FUTURE_EXP \
+    --put-strike 10 --short-call-strike 16 --long-call-strike 14 \
+    --quantity 1 --price 1.00
+
+# Help-contains: jade lizard shows its 3-strike flags
+run_help_contains_test "jade-lizard shows --put-strike" "--put-strike" order build jade-lizard
+run_help_contains_test "jade-lizard shows --short-call-strike" "--short-call-strike" order build jade-lizard
+run_help_contains_test "jade-lizard shows --long-call-strike" "--long-call-strike" order build jade-lizard
 
 fi  # end TIER 1
 
