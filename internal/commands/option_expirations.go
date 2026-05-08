@@ -51,9 +51,9 @@ standard third Friday.`,
 
 			return output.WriteSuccess(w, map[string]any{
 				keyUnderlying: symbol,
-				"columns":     cols,
-				"rows":        rows,
-				"rowCount":    len(rows),
+				keyColumns:    cols,
+				keyRows:       rows,
+				keyRowCount:   len(rows),
 			}, meta)
 		},
 	}

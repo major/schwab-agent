@@ -31,6 +31,11 @@ const (
 	// keyUnderlying is the JSON key for the underlying symbol in porcelain
 	// command output envelopes.
 	keyUnderlying = "underlying"
+
+	// Envelope key constants shared by option commands.
+	keyColumns  = "columns"
+	keyRows     = "rows"
+	keyRowCount = "rowCount"
 )
 
 // chainDefaultColumns is the default column order for the compact chain view.
@@ -511,9 +516,9 @@ func runOptionChain(
 	return output.WriteSuccess(w, map[string]any{
 		keyUnderlying: symbol,
 		"expiration":  expiration,
-		"columns":     columns,
-		"rows":        result,
-		"rowCount":    len(result),
+		keyColumns:    columns,
+		keyRows:       result,
+		keyRowCount:   len(result),
 	}, meta)
 }
 

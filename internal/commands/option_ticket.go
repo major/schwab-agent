@@ -32,6 +32,7 @@ func NewOptionCmd(c *client.Ref, w io.Writer) *cobra.Command {
 	cmd.AddCommand(newOptionExpirationsCmd(c, w))
 	cmd.AddCommand(newOptionChainCmd(c, w))
 	cmd.AddCommand(newOptionContractCmd(c, w))
+	cmd.AddCommand(newOptionScreenCmd(c, w))
 
 	return cmd
 }
