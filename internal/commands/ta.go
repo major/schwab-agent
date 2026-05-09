@@ -103,19 +103,28 @@ type hvOutput struct {
 	MeanVol        float64 `json:"mean_vol"`
 }
 
+type expectedMoveRange struct {
+	Lower float64 `json:"lower"`
+	Upper float64 `json:"upper"`
+}
+
 type expectedMoveOutput struct {
-	Indicator       string  `json:"indicator"`
-	Symbol          string  `json:"symbol"`
-	UnderlyingPrice float64 `json:"underlying_price"`
-	Expiration      string  `json:"expiration"`
-	DTE             int     `json:"dte"`
-	StraddlePrice   float64 `json:"straddle_price"`
-	ExpectedMove    float64 `json:"expected_move"`
-	AdjustedMove    float64 `json:"adjusted_move"`
-	Upper1x         float64 `json:"upper_1x"`
-	Lower1x         float64 `json:"lower_1x"`
-	Upper2x         float64 `json:"upper_2x"`
-	Lower2x         float64 `json:"lower_2x"`
+	Indicator        string                       `json:"indicator"`
+	Symbol           string                       `json:"symbol"`
+	UnderlyingPrice  float64                      `json:"underlying_price"`
+	Expiration       string                       `json:"expiration"`
+	DTE              int                          `json:"dte"`
+	StraddlePrice    float64                      `json:"straddle_price"`
+	ExpectedMove     float64                      `json:"expected_move"`
+	ExpectedMovePct  float64                      `json:"expected_move_pct"`
+	AdjustedMove     float64                      `json:"adjusted_move"`
+	AdjustmentMethod string                       `json:"adjustment_method"`
+	CurrentIV        float64                      `json:"current_iv,omitempty"`
+	Ranges           map[string]expectedMoveRange `json:"ranges"`
+	Upper1x          float64                      `json:"upper_1x"`
+	Lower1x          float64                      `json:"lower_1x"`
+	Upper2x          float64                      `json:"upper_2x"`
+	Lower2x          float64                      `json:"lower_2x"`
 }
 
 type dashboardParameters struct {
@@ -200,6 +209,7 @@ const (
 	percentMultiplier             = 100.0
 	expectedMoveExpirationParts   = 2
 	quoteMidpointDivisor          = 2.0
+	roundingEpsilon               = 1e-9
 )
 
 // taOutput is the common envelope for single-value time series indicators (SMA, EMA, RSI, etc.).
@@ -1495,8 +1505,9 @@ func cobraTAExpectedMoveCommand(c *client.Ref, w io.Writer) *cobra.Command {
 		short: "Expected price move from ATM straddle pricing",
 		long: `Compute expected price move from ATM straddle pricing. Fetches the option
 chain, finds the nearest expiration to --dte (default 30), and prices the
-ATM straddle. Output includes 1x and 2x standard deviation ranges (upper
-and lower bounds).`,
+ATM straddle. The raw expected move is the straddle price. The adjusted move
+applies the standard 0.85x multiplier used by many options desks before
+building the 1x and 2x range bounds.`,
 		example: `  schwab-agent ta expected-move AAPL
   schwab-agent ta expected-move AAPL --dte 45`,
 		newOpts: func() *expectedMoveOpts { return &expectedMoveOpts{} },
@@ -1573,20 +1584,54 @@ func buildExpectedMoveOutput(
 	}
 
 	actualDTE, _ := strconv.Atoi(expParts[1])
+	ranges := map[string]expectedMoveRange{
+		"1x": {Lower: result.Lower1x, Upper: result.Upper1x},
+		"2x": {Lower: result.Lower2x, Upper: result.Upper2x},
+	}
+	currentIV := expectedMoveCurrentIV(callContracts[0], putContracts[0])
+	adjustmentMethod := fmt.Sprintf("raw ATM straddle price multiplied by %.2fx", ta.DefaultMultiplier)
+
 	return expectedMoveOutput{
-		Indicator:       "expected-move",
-		Symbol:          symbol,
-		UnderlyingPrice: underlyingPrice,
-		Expiration:      expDate,
-		DTE:             actualDTE,
-		StraddlePrice:   result.StraddlePrice,
-		ExpectedMove:    result.ExpectedMove,
-		AdjustedMove:    result.AdjustedMove,
-		Upper1x:         result.Upper1x,
-		Lower1x:         result.Lower1x,
-		Upper2x:         result.Upper2x,
-		Lower2x:         result.Lower2x,
+		Indicator:        "expected-move",
+		Symbol:           symbol,
+		UnderlyingPrice:  round2(underlyingPrice),
+		Expiration:       expDate,
+		DTE:              actualDTE,
+		StraddlePrice:    result.StraddlePrice,
+		ExpectedMove:     result.ExpectedMove,
+		ExpectedMovePct:  result.ExpectedMovePct,
+		AdjustedMove:     result.AdjustedMove,
+		AdjustmentMethod: adjustmentMethod,
+		CurrentIV:        currentIV,
+		Ranges:           ranges,
+		Upper1x:          result.Upper1x,
+		Lower1x:          result.Lower1x,
+		Upper2x:          result.Upper2x,
+		Lower2x:          result.Lower2x,
 	}, nil
+}
+
+func expectedMoveCurrentIV(callContract, putContract marketdata.OptionContract) float64 {
+	var vols []float64
+	if callContract.Volatility > 0 {
+		vols = append(vols, callContract.Volatility)
+	}
+	if putContract.Volatility > 0 {
+		vols = append(vols, putContract.Volatility)
+	}
+	if len(vols) == 0 {
+		return 0
+	}
+
+	total := 0.0
+	for _, vol := range vols {
+		total += vol
+	}
+	return round2(total / float64(len(vols)))
+}
+
+func round2(v float64) float64 {
+	return math.Round((v+roundingEpsilon)*percentMultiplier) / percentMultiplier
 }
 
 func expectedMoveUnderlyingPrice(chain *marketdata.OptionChain, symbol string) (float64, error) {

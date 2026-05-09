@@ -2,6 +2,7 @@ package ta
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/major/schwab-agent/internal/apperr"
 )
@@ -9,17 +10,23 @@ import (
 // DefaultMultiplier is the default straddle price adjustment factor.
 const DefaultMultiplier = 0.85
 
-const expectedMoveOuterBandMultiplier = 2.0
+const (
+	expectedMoveOuterBandMultiplier = 2.0
+	expectedMovePercentMultiplier   = 100.0
+	roundPrecision                  = 100.0
+	roundingEpsilon                 = 1e-9
+)
 
 // ExpectedMoveResult contains the calculated expected move values.
 type ExpectedMoveResult struct {
-	StraddlePrice float64 `json:"straddle_price"`
-	ExpectedMove  float64 `json:"expected_move"`
-	AdjustedMove  float64 `json:"adjusted_move"`
-	Upper1x       float64 `json:"upper_1x"`
-	Lower1x       float64 `json:"lower_1x"`
-	Upper2x       float64 `json:"upper_2x"`
-	Lower2x       float64 `json:"lower_2x"`
+	StraddlePrice   float64 `json:"straddle_price"`
+	ExpectedMove    float64 `json:"expected_move"`
+	ExpectedMovePct float64 `json:"expected_move_pct"`
+	AdjustedMove    float64 `json:"adjusted_move"`
+	Upper1x         float64 `json:"upper_1x"`
+	Lower1x         float64 `json:"lower_1x"`
+	Upper2x         float64 `json:"upper_2x"`
+	Lower2x         float64 `json:"lower_2x"`
 }
 
 // ExpectedMove calculates the expected move based on option prices and a multiplier.
@@ -73,12 +80,19 @@ func ExpectedMove(underlyingPrice, callPrice, putPrice, multiplier float64) (*Ex
 	lower2x := underlyingPrice - (expectedMoveOuterBandMultiplier * adjustedMove)
 
 	return &ExpectedMoveResult{
-		StraddlePrice: straddle,
-		ExpectedMove:  straddle,
-		AdjustedMove:  adjustedMove,
-		Upper1x:       upper1x,
-		Lower1x:       lower1x,
-		Upper2x:       upper2x,
-		Lower2x:       lower2x,
+		StraddlePrice: round2(straddle),
+		// ExpectedMove intentionally mirrors the raw ATM straddle price for API
+		// compatibility. AdjustedMove carries the 0.85x desk-practice multiplier.
+		ExpectedMove:    round2(straddle),
+		ExpectedMovePct: round2((straddle / underlyingPrice) * expectedMovePercentMultiplier),
+		AdjustedMove:    round2(adjustedMove),
+		Upper1x:         round2(upper1x),
+		Lower1x:         round2(lower1x),
+		Upper2x:         round2(upper2x),
+		Lower2x:         round2(lower2x),
 	}, nil
+}
+
+func round2(v float64) float64 {
+	return math.Round((v+roundingEpsilon)*roundPrecision) / roundPrecision
 }

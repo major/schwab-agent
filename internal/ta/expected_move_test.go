@@ -23,9 +23,10 @@ func TestExpectedMove_Correct(t *testing.T) {
 	require.NoError(t, err)
 	assert.InDelta(t, 9.50, result.StraddlePrice, 0.001)
 	assert.InDelta(t, 9.50, result.ExpectedMove, 0.001)
-	assert.InDelta(t, 8.075, result.AdjustedMove, 0.001)
-	assert.InDelta(t, 158.075, result.Upper1x, 0.001)
-	assert.InDelta(t, 141.925, result.Lower1x, 0.001)
+	assert.InDelta(t, 6.33, result.ExpectedMovePct, 0.001)
+	assert.InDelta(t, 8.08, result.AdjustedMove, 0.001)
+	assert.InDelta(t, 158.08, result.Upper1x, 0.001)
+	assert.InDelta(t, 141.93, result.Lower1x, 0.001)
 	assert.InDelta(t, 166.15, result.Upper2x, 0.001)
 	assert.InDelta(t, 133.85, result.Lower2x, 0.001)
 }
