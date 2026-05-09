@@ -278,6 +278,8 @@ func writeOrderPreviewResult(
 	savePreview bool,
 	safetyChecks ...previewSafetyCheck,
 ) error {
+	prepareOrderPreviewForOutput(acct, order, preview)
+
 	data := orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}
 	if savePreview {
 		digestData, err := saveOrderPreview(acct.Hash, order, preview, safetyChecks...)
@@ -295,6 +297,91 @@ func writeOrderPreviewResult(
 	metadata.AccountDisplayLabel = acct.DisplayLabel
 
 	return output.WriteSuccess(w, data, metadata)
+}
+
+// prepareOrderPreviewForOutput normalizes Schwab's preview payload for agent use.
+// Schwab echoes plaintext account numbers in preview responses even though this
+// CLI routes every account operation by hash, and multi-leg previews can return
+// zero quantities even when Schwab accepted the built order quantities. The raw
+// built order remains available in the response and preview ledger, but the
+// preview branch is made safe and directly verifiable before it is stored or
+// printed.
+func prepareOrderPreviewForOutput(
+	acct resolvedAccountInfo,
+	order *models.OrderRequest,
+	preview *models.PreviewOrder,
+) {
+	if preview == nil {
+		return
+	}
+
+	if preview.OrderStrategy != nil {
+		preview.OrderStrategy.AccountNumber = nil
+		if acct.Hash != "" {
+			accountHash := acct.Hash
+			preview.OrderStrategy.AccountNumber = &accountHash
+		}
+		repairPreviewLegQuantities(order, preview.OrderStrategy.OrderLegs)
+		populateCommissionAndFeeTotals(preview.OrderStrategy.CommissionAndFee)
+	}
+	populateCommissionAndFeeTotals(preview.CommissionAndFee)
+}
+
+func repairPreviewLegQuantities(order *models.OrderRequest, previewLegs []models.OrderLegCollection) {
+	if order == nil || len(order.OrderLegCollection) == 0 || len(previewLegs) == 0 {
+		return
+	}
+
+	for i := range previewLegs {
+		if i >= len(order.OrderLegCollection) {
+			return
+		}
+		if previewLegs[i].Quantity != 0 || order.OrderLegCollection[i].Quantity == 0 {
+			continue
+		}
+		previewLegs[i].Quantity = order.OrderLegCollection[i].Quantity
+	}
+}
+
+func populateCommissionAndFeeTotals(costs *models.CommissionAndFee) {
+	if costs == nil {
+		return
+	}
+
+	if costs.Commission != nil && costs.TotalCommission == nil {
+		total := totalCommissionValues(costs.Commission)
+		costs.TotalCommission = &total
+	}
+	if costs.Fee != nil && costs.TotalFees == nil {
+		total := totalFeeValues(costs.Fee)
+		costs.TotalFees = &total
+	}
+}
+
+func totalCommissionValues(detail *models.CommissionDetail) float64 {
+	var total float64
+	for _, leg := range detail.CommissionLegs {
+		for _, value := range leg.CommissionValues {
+			if value.Value == nil {
+				continue
+			}
+			total += *value.Value
+		}
+	}
+	return total
+}
+
+func totalFeeValues(detail *models.FeeDetail) float64 {
+	var total float64
+	for _, leg := range detail.FeeLegs {
+		for _, value := range leg.FeeValues {
+			if value.Value == nil {
+				continue
+			}
+			total += *value.Value
+		}
+	}
+	return total
 }
 
 func effectiveConfigFlag(cmd *cobra.Command, fallback string) (string, error) {
