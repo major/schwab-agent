@@ -421,7 +421,7 @@ func TestFromPreviewIncludesAccountMetadata(t *testing.T) {
 	}))
 	defer server.Close()
 
-	digestData, err := saveOrderPreview("ABCDEF1234567890ABCDEF1234567890", testPreviewLedgerOrder(t), nil)
+	digestData, err := saveOrderPreview("ABCDEF1234567890ABCDEF1234567890", testPreviewLedgerOrder(t), nil, nil)
 	require.NoError(t, err)
 
 	stdout, err := runOrderCommand(
@@ -1309,7 +1309,7 @@ func TestNewOrderCmdPlaceFromPreviewRejectsAccountMismatch(t *testing.T) {
 	t.Setenv("SCHWAB_AGENT_STATE_DIR", t.TempDir())
 	configPath := writeTestConfigMutable(t, "hash123")
 	cliClient := &client.Ref{}
-	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil)
+	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil, nil)
 	require.NoError(t, err)
 
 	_, err = runOrderCommand(

@@ -65,11 +65,10 @@ func saveOrderPreview(
 	account string,
 	order *models.OrderRequest,
 	preview *models.PreviewOrder,
-	safetyChecks ...previewSafetyCheck,
+	safetyCheck *previewSafetyCheck,
 ) (*previewDigestData, error) {
 	createdAt := time.Now().UTC()
 	expiresAt := createdAt.Add(previewLedgerTTL)
-	safetyCheck := previewSafetyCheckFromVariadic(safetyChecks)
 	canonicalOrder, digest, err := previewDigestFor(account, order, safetyCheck)
 	if err != nil {
 		return nil, err
@@ -212,13 +211,6 @@ func previewDigestFor(
 
 	sum := sha256.Sum256(encoded)
 	return canonicalOrder, hex.EncodeToString(sum[:]), nil
-}
-
-func previewSafetyCheckFromVariadic(safetyChecks []previewSafetyCheck) *previewSafetyCheck {
-	if len(safetyChecks) == 0 {
-		return nil
-	}
-	return &safetyChecks[0]
 }
 
 // previewLedgerDir resolves the local state directory for saved previews.

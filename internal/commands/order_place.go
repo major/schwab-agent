@@ -276,13 +276,13 @@ func writeOrderPreviewResult(
 	order *models.OrderRequest,
 	preview *models.PreviewOrder,
 	savePreview bool,
-	safetyChecks ...previewSafetyCheck,
+	safetyCheck *previewSafetyCheck,
 ) error {
 	prepareOrderPreviewForOutput(acct, order, preview)
 
 	data := orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}
 	if savePreview {
-		digestData, err := saveOrderPreview(acct.Hash, order, preview, safetyChecks...)
+		digestData, err := saveOrderPreview(acct.Hash, order, preview, safetyCheck)
 		if err != nil {
 			return err
 		}
@@ -845,7 +845,7 @@ func runOrderPreviewSpec(
 		return err
 	}
 
-	return writeOrderPreviewResult(w, acct, order, preview, opts.SavePreview)
+	return writeOrderPreviewResult(w, acct, order, preview, opts.SavePreview, nil)
 }
 
 func orderPreviewTypedCommands(c *client.Ref, configPath string, w io.Writer) []*cobra.Command {
@@ -984,7 +984,7 @@ func runTypedOrderPreview[O any, P any](
 	if err != nil {
 		return err
 	}
-	return writeOrderPreviewResult(w, acct, order, preview, savePreview)
+	return writeOrderPreviewResult(w, acct, order, preview, savePreview, nil)
 }
 
 // newOrderCancelCmd cancels an existing order.

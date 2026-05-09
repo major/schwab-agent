@@ -425,6 +425,14 @@ func TestVerifyCoveredCallShares(t *testing.T) {
 			wantErrMsg: "account has 50",
 		},
 		{
+			name: "enough shares split across matching positions",
+			positions: []map[string]any{
+				{"longQuantity": 60, "instrument": map[string]any{"symbol": "F", "assetType": "EQUITY"}},
+				{"longQuantity": 40, "instrument": map[string]any{"symbol": "f", "assetType": "EQUITY"}},
+			},
+			contracts: 1,
+		},
+		{
 			name: "no matching equity position",
 			positions: []map[string]any{
 				{"longQuantity": 100, "instrument": map[string]any{"symbol": "F", "assetType": "OPTION"}},

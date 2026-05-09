@@ -78,7 +78,7 @@ func TestPreviewLedgerRejectsTamperedOrderPayload(t *testing.T) {
 	stateDir := t.TempDir()
 	t.Setenv("SCHWAB_AGENT_STATE_DIR", stateDir)
 
-	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil)
+	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil, nil)
 	require.NoError(t, err)
 	entry := testSavedPreviewEntry(t, stateDir, digestData.Digest)
 	entry.Order.OrderLegCollection[0].Instrument.Symbol = "MSFT"
@@ -93,7 +93,7 @@ func TestPreviewLedgerRejectsTamperedCanonicalOrder(t *testing.T) {
 	stateDir := t.TempDir()
 	t.Setenv("SCHWAB_AGENT_STATE_DIR", stateDir)
 
-	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil)
+	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil, nil)
 	require.NoError(t, err)
 	entry := testSavedPreviewEntry(t, stateDir, digestData.Digest)
 	entry.CanonicalOrder = json.RawMessage(`{"tampered":true}`)
@@ -105,21 +105,26 @@ func TestPreviewLedgerRejectsTamperedCanonicalOrder(t *testing.T) {
 }
 
 func TestPreviewLedgerRejectsTamperedSafetyCheck(t *testing.T) {
+	// Arrange
 	stateDir := t.TempDir()
 	t.Setenv("SCHWAB_AGENT_STATE_DIR", stateDir)
+	safetyCheck := &previewSafetyCheck{Type: previewSafetyCoveredCall, Underlying: "F", Contracts: 1}
 
 	digestData, err := saveOrderPreview(
 		"hash123",
 		testPreviewLedgerOrder(t),
 		nil,
-		previewSafetyCheck{Type: previewSafetyCoveredCall, Underlying: "F", Contracts: 1},
+		safetyCheck,
 	)
 	require.NoError(t, err)
 	entry := testSavedPreviewEntry(t, stateDir, digestData.Digest)
 	entry.SafetyCheck = nil
 	writeSavedPreviewEntry(t, stateDir, &entry)
 
+	// Act
 	_, err = loadOrderPreview(digestData.Digest)
+
+	// Assert
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no longer matches")
 }
@@ -128,7 +133,7 @@ func TestPreviewLedgerRejectsExpiredEntry(t *testing.T) {
 	stateDir := t.TempDir()
 	t.Setenv("SCHWAB_AGENT_STATE_DIR", stateDir)
 
-	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil)
+	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil, nil)
 	require.NoError(t, err)
 	entry := testSavedPreviewEntry(t, stateDir, digestData.Digest)
 	entry.ExpiresAt = time.Now().UTC().Add(-time.Minute)
@@ -145,7 +150,7 @@ func TestPreviewLedgerSecuresExistingDirectory(t *testing.T) {
 	require.NoError(t, os.MkdirAll(ledgerDir, 0o755))
 	t.Setenv("SCHWAB_AGENT_STATE_DIR", stateDir)
 
-	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil)
+	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil, nil)
 	require.NoError(t, err)
 
 	dirInfo, err := os.Stat(ledgerDir)
