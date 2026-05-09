@@ -368,7 +368,7 @@ func totalCommissionValues(detail *models.CommissionDetail) float64 {
 			total += *value.Value
 		}
 	}
-	return total
+	return round2(total)
 }
 
 func totalFeeValues(detail *models.FeeDetail) float64 {
@@ -381,7 +381,7 @@ func totalFeeValues(detail *models.FeeDetail) float64 {
 			total += *value.Value
 		}
 	}
-	return total
+	return round2(total)
 }
 
 func effectiveConfigFlag(cmd *cobra.Command, fallback string) (string, error) {
