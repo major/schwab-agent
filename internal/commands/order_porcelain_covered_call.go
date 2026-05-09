@@ -148,13 +148,14 @@ func runSellCoveredCallPreview(
 	if err != nil {
 		return err
 	}
+	safetyCheck := sellCoveredCallPreviewSafetyCheck(params)
 	return writeOrderPreviewResult(
 		w,
 		acct,
 		order,
 		preview,
 		savePreview,
-		sellCoveredCallPreviewSafetyCheck(params),
+		&safetyCheck,
 	)
 }
 
@@ -246,22 +247,29 @@ func verifyCoveredCallShares(
 		return fmt.Errorf("verify covered call shares: %w", err)
 	}
 
+	var availableShares float64
+	foundMatchingEquity := false
 	for _, position := range account.SecuritiesAccount.Positions {
 		if !positionMatchesEquitySymbol(position, underlying) || position.LongQuantity == nil {
 			continue
 		}
 
-		if *position.LongQuantity >= requiredShares {
-			return nil
-		}
+		foundMatchingEquity = true
+		availableShares += *position.LongQuantity
+	}
 
+	if availableShares >= requiredShares {
+		return nil
+	}
+
+	if foundMatchingEquity {
 		return newValidationError(
 			fmt.Sprintf(
 				"sell-covered-call requires at least %.0f long shares of %s for %.0f contract(s); account has %.0f",
 				requiredShares,
 				strings.ToUpper(strings.TrimSpace(underlying)),
 				contracts,
-				*position.LongQuantity,
+				availableShares,
 			),
 		)
 	}

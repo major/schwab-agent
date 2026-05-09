@@ -227,6 +227,33 @@ func TestOrderPreviewIncludesAccountMetadata(t *testing.T) {
 	t.Parallel()
 
 	orderID := int64(1002)
+	commissionOne := 0.65
+	commissionTwo := 0.65
+	regFee := 0.01
+	secFee := 0.02
+	price := 1.25
+	strategy := models.ComplexOrderStrategyTypeVertical
+	previewAccountNumber := "12345678"
+	order := models.OrderRequest{
+		Session:                  models.SessionNormal,
+		Duration:                 models.DurationDay,
+		OrderType:                models.OrderTypeNetDebit,
+		ComplexOrderStrategyType: &strategy,
+		Price:                    &price,
+		OrderStrategyType:        models.OrderStrategyTypeSingle,
+		OrderLegCollection: []models.OrderLegCollection{
+			{
+				Instrument:  models.OrderInstrument{AssetType: models.AssetTypeOption, Symbol: "AAPL  260116C00200000"},
+				Instruction: models.InstructionBuyToOpen,
+				Quantity:    1,
+			},
+			{
+				Instrument:  models.OrderInstrument{AssetType: models.AssetTypeOption, Symbol: "AAPL  260116C00210000"},
+				Instruction: models.InstructionSellToOpen,
+				Quantity:    1,
+			},
+		},
+	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if writeTestAccountMetadataResponses(t, w, r.URL.Path) {
 			return
@@ -235,7 +262,30 @@ func TestOrderPreviewIncludesAccountMetadata(t *testing.T) {
 		if r.Method == http.MethodPost &&
 			r.URL.Path == "/trader/v1/accounts/ABCDEF1234567890ABCDEF1234567890/previewOrder" {
 			w.Header().Set("Content-Type", "application/json")
-			assert.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{OrderID: &orderID}))
+			assert.NoError(t, json.NewEncoder(w).Encode(models.PreviewOrder{
+				OrderID: &orderID,
+				OrderStrategy: &models.OrderStrategy{
+					AccountNumber:     &previewAccountNumber,
+					OrderType:         models.OrderTypeNetDebit,
+					Duration:          models.DurationDay,
+					Session:           models.SessionNormal,
+					OrderStrategyType: models.OrderStrategyTypeSingle,
+					OrderLegs: []models.OrderLegCollection{
+						{Instruction: models.InstructionBuyToOpen, Quantity: 0},
+						{Instruction: models.InstructionSellToOpen, Quantity: 0},
+					},
+				},
+				CommissionAndFee: &models.CommissionAndFee{
+					Commission: &models.CommissionDetail{CommissionLegs: []models.CommissionLeg{
+						{CommissionValues: []models.CommissionValue{{Value: &commissionOne, Type: "COMMISSION"}}},
+						{CommissionValues: []models.CommissionValue{{Value: &commissionTwo, Type: "COMMISSION"}}},
+					}},
+					Fee: &models.FeeDetail{FeeLegs: []models.FeeLeg{
+						{FeeValues: []models.FeeValue{{Value: &regFee, Type: "OPT_REG_FEE"}}},
+						{FeeValues: []models.FeeValue{{Value: &secFee, Type: "SEC_FEE"}}},
+					}},
+				},
+			}))
 			return
 		}
 
@@ -248,18 +298,32 @@ func TestOrderPreviewIncludesAccountMetadata(t *testing.T) {
 		t,
 		testClient(t, server),
 		writeTestConfig(t, "ABCDEF1234567890ABCDEF1234567890"),
-		"",
-		"order", "preview", "equity",
+		mustMarshalJSON(t, order),
+		"order", "preview",
 		"--account", "12345678",
-		"--symbol", "AAPL",
-		"--action", "BUY",
-		"--quantity", "10",
-		"--type", "LIMIT",
-		"--price", "185.25",
+		"--spec", "-",
 	)
 	require.NoError(t, err)
 
-	assertTestAccountMetadata(t, decodeEnvelope(t, stdout).Metadata, "explicit")
+	envelope := decodeEnvelope(t, stdout)
+	assertTestAccountMetadata(t, envelope.Metadata, "explicit")
+	encodedData, err := json.Marshal(envelope.Data)
+	require.NoError(t, err)
+	assert.NotContains(t, string(encodedData), `"accountNumber":"12345678"`)
+
+	var data orderPreviewData
+	require.NoError(t, json.Unmarshal(encodedData, &data))
+	require.NotNil(t, data.Preview.OrderStrategy)
+	require.NotNil(t, data.Preview.OrderStrategy.AccountNumber)
+	assert.Equal(t, "ABCDEF1234567890ABCDEF1234567890", *data.Preview.OrderStrategy.AccountNumber)
+	require.Len(t, data.Preview.OrderStrategy.OrderLegs, 2)
+	assert.InDelta(t, 1, data.Preview.OrderStrategy.OrderLegs[0].Quantity, 0.001)
+	assert.InDelta(t, 1, data.Preview.OrderStrategy.OrderLegs[1].Quantity, 0.001)
+	require.NotNil(t, data.Preview.CommissionAndFee)
+	require.NotNil(t, data.Preview.CommissionAndFee.TotalCommission)
+	require.NotNil(t, data.Preview.CommissionAndFee.TotalFees)
+	assert.InDelta(t, 1.30, *data.Preview.CommissionAndFee.TotalCommission, 0.001)
+	assert.InDelta(t, 0.03, *data.Preview.CommissionAndFee.TotalFees, 0.001)
 }
 
 func TestOrderCancelIncludesAccountMetadata(t *testing.T) {
@@ -357,7 +421,7 @@ func TestFromPreviewIncludesAccountMetadata(t *testing.T) {
 	}))
 	defer server.Close()
 
-	digestData, err := saveOrderPreview("ABCDEF1234567890ABCDEF1234567890", testPreviewLedgerOrder(t), nil)
+	digestData, err := saveOrderPreview("ABCDEF1234567890ABCDEF1234567890", testPreviewLedgerOrder(t), nil, nil)
 	require.NoError(t, err)
 
 	stdout, err := runOrderCommand(
@@ -1245,7 +1309,7 @@ func TestNewOrderCmdPlaceFromPreviewRejectsAccountMismatch(t *testing.T) {
 	t.Setenv("SCHWAB_AGENT_STATE_DIR", t.TempDir())
 	configPath := writeTestConfigMutable(t, "hash123")
 	cliClient := &client.Ref{}
-	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil)
+	digestData, err := saveOrderPreview("hash123", testPreviewLedgerOrder(t), nil, nil)
 	require.NoError(t, err)
 
 	_, err = runOrderCommand(

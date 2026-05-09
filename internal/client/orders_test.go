@@ -373,15 +373,23 @@ func TestPreviewOrder_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		commValue := 0.65
+		feeValue := 0.02
+		totalCommission := 0.65
+		totalFees := 0.02
 		response := models.PreviewOrder{
 			OrderID: new(int64(11111)),
 			CommissionAndFee: &models.CommissionAndFee{
+				TotalCommission: &totalCommission,
+				TotalFees:       &totalFees,
 				Commission: &models.CommissionDetail{
 					CommissionLegs: []models.CommissionLeg{
 						{CommissionValues: []models.CommissionValue{
 							{Value: &commValue, Type: "COMMISSION"},
 						}},
 					},
+				},
+				Fee: &models.FeeDetail{
+					FeeLegs: []models.FeeLeg{{FeeValues: []models.FeeValue{{Value: &feeValue, Type: "SEC_FEE"}}}},
 				},
 			},
 		}
@@ -395,6 +403,10 @@ func TestPreviewOrder_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, int64(11111), *result.OrderID)
+	require.NotNil(t, result.CommissionAndFee.TotalCommission)
+	require.NotNil(t, result.CommissionAndFee.TotalFees)
+	assert.InDelta(t, 0.65, *result.CommissionAndFee.TotalCommission, 0.001)
+	assert.InDelta(t, 0.02, *result.CommissionAndFee.TotalFees, 0.001)
 	require.NotNil(t, result.CommissionAndFee.Commission)
 	require.Len(t, result.CommissionAndFee.Commission.CommissionLegs, 1)
 	require.Len(t, result.CommissionAndFee.Commission.CommissionLegs[0].CommissionValues, 1)

@@ -522,9 +522,11 @@ type FeeDetail struct {
 // The Schwab API returns commission/fee/trueCommission as nested objects
 // (not flat floats), with per-leg breakdowns by cost type.
 type CommissionAndFee struct {
-	Commission     *CommissionDetail `json:"commission,omitempty"`
-	Fee            *FeeDetail        `json:"fee,omitempty"`
-	TrueCommission *CommissionDetail `json:"trueCommission,omitempty"`
+	TotalCommission *float64          `json:"totalCommission,omitempty"`
+	TotalFees       *float64          `json:"totalFees,omitempty"`
+	Commission      *CommissionDetail `json:"commission,omitempty"`
+	Fee             *FeeDetail        `json:"fee,omitempty"`
+	TrueCommission  *CommissionDetail `json:"trueCommission,omitempty"`
 }
 
 // OrderBalance represents the projected account balance impact of an order.

@@ -843,6 +843,8 @@ func TestPreviewOrderJSONRoundTrip(t *testing.T) {
 				"projectedCommission": 0.00
 			},
 			"commissionAndFee": {
+				"totalCommission": 0.00,
+				"totalFees": 0.03,
 				"commission": {
 					"commissionLegs": [
 						{
@@ -897,6 +899,10 @@ func TestPreviewOrderJSONRoundTrip(t *testing.T) {
 
 	// Nested commission/fee.
 	require.NotNil(t, preview.OrderStrategy.CommissionAndFee)
+	require.NotNil(t, preview.OrderStrategy.CommissionAndFee.TotalCommission)
+	require.NotNil(t, preview.OrderStrategy.CommissionAndFee.TotalFees)
+	assert.InDelta(t, 0.00, *preview.OrderStrategy.CommissionAndFee.TotalCommission, 0.001)
+	assert.InDelta(t, 0.03, *preview.OrderStrategy.CommissionAndFee.TotalFees, 0.001)
 	require.NotNil(t, preview.OrderStrategy.CommissionAndFee.Fee)
 	require.Len(t, preview.OrderStrategy.CommissionAndFee.Fee.FeeLegs, 1)
 	require.Len(t, preview.OrderStrategy.CommissionAndFee.Fee.FeeLegs[0].FeeValues, 2)
