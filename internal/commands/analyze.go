@@ -276,39 +276,62 @@ func fetchAnalyzeDashboards(
 	req analyzeRequest,
 ) map[string]analyzeTAResult {
 	results := make(map[string]analyzeTAResult, len(symbols))
+	if len(symbols) == 0 {
+		return results
+	}
+
 	limit := min(len(symbols), analyzeTAConcurrency)
-	sem := make(chan struct{}, limit)
+	jobs := make(chan string)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	for _, symbol := range symbols {
+	for range limit {
 		wg.Go(func() {
-			select {
-			case sem <- struct{}{}:
-				defer func() { <-sem }()
-			case <-ctx.Done():
+			for symbol := range jobs {
+				dashboard, err := buildTADashboard(ctx, c, symbol, req.Interval, req.Points)
+				if err == nil && (req.LatestOnly || req.Compact) {
+					// latest already contains the only row most scans need. Dropping values
+					// here keeps ta dashboard's historical contract while avoiding duplicate
+					// analyze output for latest-only workflows.
+					dashboard.Values = nil
+				}
+
 				mu.Lock()
-				results[symbol] = analyzeTAResult{Err: ctx.Err()}
+				results[symbol] = analyzeTAResult{Dashboard: dashboard, Err: err}
 				mu.Unlock()
-				return
 			}
-
-			dashboard, err := buildTADashboard(ctx, c, symbol, req.Interval, req.Points)
-			if err == nil && (req.LatestOnly || req.Compact) {
-				// latest already contains the only row most scans need. Dropping values
-				// here keeps ta dashboard's historical contract while avoiding duplicate
-				// analyze output for latest-only workflows.
-				dashboard.Values = nil
-			}
-
-			mu.Lock()
-			results[symbol] = analyzeTAResult{Dashboard: dashboard, Err: err}
-			mu.Unlock()
 		})
 	}
+
+	sendAnalyzeDashboardJobs(ctx, jobs, symbols, results, &mu)
 	wg.Wait()
 
 	return results
+}
+
+func sendAnalyzeDashboardJobs(
+	ctx context.Context,
+	jobs chan<- string,
+	symbols []string,
+	results map[string]analyzeTAResult,
+	mu *sync.Mutex,
+) {
+	defer close(jobs)
+
+	for i, symbol := range symbols {
+		select {
+		case jobs <- symbol:
+		case <-ctx.Done():
+			mu.Lock()
+			for _, pendingSymbol := range symbols[i:] {
+				if _, ok := results[pendingSymbol]; !ok {
+					results[pendingSymbol] = analyzeTAResult{Err: ctx.Err()}
+				}
+			}
+			mu.Unlock()
+			return
+		}
+	}
 }
 
 func analyzeResultError(quoteErr, taErr error) error {

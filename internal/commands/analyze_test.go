@@ -220,6 +220,9 @@ func TestNewAnalyzeCmd_MultiSymbolFetchesTAConcurrently(t *testing.T) {
 		case r.URL.Path == "/marketdata/v1/quotes":
 			_, _ = w.Write([]byte(`{
 				"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","quote":{"lastPrice":150.0}},
+				"AMZN":{"assetMainType":"EQUITY","symbol":"AMZN","quote":{"lastPrice":190.0}},
+				"GOOG":{"assetMainType":"EQUITY","symbol":"GOOG","quote":{"lastPrice":175.0}},
+				"META":{"assetMainType":"EQUITY","symbol":"META","quote":{"lastPrice":500.0}},
 				"MSFT":{"assetMainType":"EQUITY","symbol":"MSFT","quote":{"lastPrice":410.0}},
 				"NVDA":{"assetMainType":"EQUITY","symbol":"NVDA","quote":{"lastPrice":800.0}}
 			}`))
@@ -247,11 +250,17 @@ func TestNewAnalyzeCmd_MultiSymbolFetchesTAConcurrently(t *testing.T) {
 	// Act
 	var buf bytes.Buffer
 	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
-	_, err := runTestCommand(t, cmd, "AAPL", "MSFT", "NVDA")
+	_, err := runTestCommand(t, cmd, "AAPL", "AMZN", "GOOG", "META", "MSFT", "NVDA")
 	require.NoError(t, err)
 
 	// Assert
 	assert.Greater(t, maxActiveHistoryRequests.Load(), int64(1), "multi-symbol analyze should overlap TA requests")
+	assert.LessOrEqual(
+		t,
+		maxActiveHistoryRequests.Load(),
+		int64(analyzeTAConcurrency),
+		"multi-symbol analyze should cap active TA requests",
+	)
 }
 
 func TestNewAnalyzeCmd_LatestOnlyOmitsDashboardValues(t *testing.T) {
