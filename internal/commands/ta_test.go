@@ -362,6 +362,34 @@ func TestTADashboard_PointsFlag(t *testing.T) {
 	assert.InDelta(t, 101.0, latest["range_252_low"], 0.1, "latest row should use candles 2-253")
 }
 
+func TestTADashboard_PointsAllKeepsFullLongRangeRows(t *testing.T) {
+	// Arrange: --points 0 means all complete dashboard rows. With 260 candles, the
+	// first full 252-range row starts at candle 251 and the latest row still has the
+	// long-window fields, so no skipped-range warning should be emitted.
+	srv := httptest.NewServer(priceHistoryHandler(t, "NET", 260))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewTACmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "dashboard", "--points", "0", "NET")
+	require.NoError(t, err)
+
+	// Assert
+	_, data := decodeTAEnvelope(t, &buf)
+	values, ok := data["values"].([]any)
+	require.True(t, ok, "values should be an array")
+	require.Len(t, values, 9, "260 candles should produce nine complete 252-range rows")
+
+	first, ok := values[0].(map[string]any)
+	require.True(t, ok, "first value should be an object")
+	latest, ok := data["latest"].(map[string]any)
+	require.True(t, ok, "latest should be an object")
+	assert.Contains(t, first, "range_252_high")
+	assert.Contains(t, latest, "range_252_high")
+	assert.NotContains(t, data, "warnings")
+}
+
 func TestTADashboard_FlatHistoryDoesNotPanic(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -392,6 +420,43 @@ func TestTADashboard_FlatHistoryDoesNotPanic(t *testing.T) {
 func TestTADashboard_InsufficientHistory(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 100))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewTACmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "dashboard", "AAPL")
+
+	// Assert: dashboard should keep shorter but still useful histories. Long-window
+	// context is omitted with warnings instead of making the whole command fail.
+	require.NoError(t, err)
+	_, data := decodeTAEnvelope(t, &buf)
+
+	latest, ok := data["latest"].(map[string]any)
+	require.True(t, ok, "latest should be an object")
+	assert.Contains(t, latest, "sma_50")
+	assert.Contains(t, latest, "rsi_14")
+	assert.NotContains(t, latest, "sma_200")
+	assert.NotContains(t, latest, "range_252_high")
+	assert.NotContains(t, latest, "distance_from_sma_200_percent")
+
+	signals, ok := data["signals"].(map[string]any)
+	require.True(t, ok, "signals should be an object")
+	assert.Contains(t, signals, "momentum")
+	assert.NotContains(t, signals, "trend")
+	assert.NotContains(t, signals, "close_above_sma_200")
+
+	warnings, ok := data["warnings"].([]any)
+	require.True(t, ok, "warnings should be an array")
+	require.NotEmpty(t, warnings)
+	assert.Contains(t, warnings[0], "skipped sma_200")
+	assert.Contains(t, warnings[0], "100 candles")
+}
+
+func TestTADashboard_TooFewCoreCandlesStillFails(t *testing.T) {
+	// Arrange: fewer than 50 candles cannot produce the dashboard's core SMA 50
+	// context, so this remains a validation error instead of a sparse shell.
+	srv := httptest.NewServer(priceHistoryHandler(t, "AAPL", 49))
 	defer srv.Close()
 
 	// Act
