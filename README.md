@@ -93,8 +93,11 @@ Run any command with `--help` to see detailed usage, examples, and available fla
 ### Quick examples
 
 ```bash
-# Get a stock quote
+# Get a compact stock quote. Defaults to --fields quote.
 schwab-agent quote get AAPL
+
+# Opt in to fundamentals when needed
+schwab-agent quote get AAPL --fields quote,fundamental
 
 # Get an option quote by contract details (instead of OCC symbol)
 schwab-agent quote get --underlying AAPL --expiration 2025-06-20 --strike 200 --call

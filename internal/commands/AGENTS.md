@@ -31,7 +31,7 @@ Most command flags are defined with project-owned struct tags and registered by
 
 ```go
 type quoteGetOpts struct {
-    Fields     []string `flag:"fields" flagdescr:"Quote fields to return (repeatable): quote, fundamental, extended, reference, regular"`
+    Fields     []string `flag:"fields" flagdescr:"Quote fields to return (repeatable, default quote): quote, fundamental, extended, reference, regular"`
     Indicative bool     `flag:"indicative" flagdescr:"Request indicative (non-tradeable) quotes"`
     Underlying string   `flag:"underlying" flagdescr:"Underlying symbol for option quote"`
     Expiration string   `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD) for option quote"`

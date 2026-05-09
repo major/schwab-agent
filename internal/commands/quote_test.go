@@ -337,13 +337,13 @@ func TestNewQuoteGetTechnicalFieldSuggestsTAHelp(t *testing.T) {
 }
 
 func TestNewQuoteGetNoFlagsNoExtraParams(t *testing.T) {
-	// When no --fields or --indicative flags are provided, no extra
-	// query parameters should appear in the request URL.
+	// When no --fields flag is provided, quote-only is sent explicitly so the
+	// Schwab API does not return every quote section by default.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		q := r.URL.Query()
-		assert.Empty(t, q.Get("fields"), "fields should be absent when not specified")
+		assert.Equal(t, "quote", q.Get("fields"))
 		assert.Empty(t, q.Get("indicative"), "indicative should be absent when not specified")
 
 		if r.URL.Path == "/marketdata/v1/AAPL/quotes" {

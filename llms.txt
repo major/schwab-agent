@@ -2409,7 +2409,7 @@ Examples:
 Flags:
       --call                 Call option
       --expiration string    Expiration date (YYYY-MM-DD) for option quote
-      --fields stringArray   Quote fields to return (repeatable): quote, fundamental, extended, reference, regular
+      --fields stringArray   Quote fields to return (repeatable, default quote): quote, fundamental, extended, reference, regular
       --indicative           Request indicative (non-tradeable) quotes
       --put                  Put option
       --strike float         Strike price for option quote
