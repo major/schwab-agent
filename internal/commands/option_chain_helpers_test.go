@@ -89,6 +89,22 @@ func TestOptionChainFieldExtractionAndSorting(t *testing.T) {
 	assert.Equal(t, []string{"CALL", "PUT", "CALL"}, []string{rows[0].putCall, rows[1].putCall, rows[2].putCall})
 }
 
+func TestOptionChainAgentFieldAliases(t *testing.T) {
+	contract := fullOptionContractForTest()
+	columns := []string{"mid", "volatility", "openInterest", "totalVolume", "daysToExpiration"}
+
+	row := extractContractRow(contract, "2026-06-19", columns)
+
+	assert.InEpsilon(t, 1.15, row.values[0], 0.0001)
+	assert.InEpsilon(t, 25.0, row.values[1], 0.0001)
+	assert.Equal(t, int64(100), row.values[2])
+	assert.Equal(t, int64(25), row.values[3])
+	assert.Equal(t, 42, row.values[4])
+
+	missingSide := &models.OptionContract{Bid: new(1.0)}
+	assert.Nil(t, contractFieldValue(missingSide, "mid", "2026-06-19"))
+}
+
 func TestOptionChainExpirationHelpers(t *testing.T) {
 	chain := &models.OptionChain{
 		CallExpDateMap: map[string]map[string][]*models.OptionContract{
@@ -175,6 +191,35 @@ func TestOptionChainStrikeFilters(t *testing.T) {
 	assert.Equal(t, rows, applyStrikeSelectors(rows, &optionChainOpts{StrikeRange: strikeRangeNTM}, chain))
 }
 
+func TestOptionChainDeltaFilters(t *testing.T) {
+	rows := []chainRow{
+		{strike: 90, contract: &models.OptionContract{Delta: new(-0.30)}},
+		{strike: 92, contract: &models.OptionContract{Delta: new(-0.25)}},
+		{strike: 95, contract: &models.OptionContract{Delta: new(-0.20)}},
+		{strike: 98, contract: &models.OptionContract{Delta: new(-0.15)}},
+		{strike: 100, contract: &models.OptionContract{Delta: new(-0.10)}},
+		{strike: 105, contract: &models.OptionContract{}},
+	}
+
+	assert.Equal(t, rows, filterRowsByDelta(rows, &optionChainOpts{}))
+
+	filtered := filterRowsByDelta(rows, &optionChainOpts{
+		DeltaMin:    -0.25,
+		DeltaMax:    -0.15,
+		deltaMinSet: true,
+		deltaMaxSet: true,
+	})
+	require.Len(t, filtered, 3)
+	assert.Equal(t, []float64{92, 95, 98}, []float64{filtered[0].strike, filtered[1].strike, filtered[2].strike})
+
+	zeroFiltered := filterRowsByDelta([]chainRow{
+		{strike: 100, contract: &models.OptionContract{Delta: new(0.0)}},
+		{strike: 105, contract: &models.OptionContract{Delta: new(0.10)}},
+	}, &optionChainOpts{DeltaMax: 0, deltaMaxSet: true})
+	require.Len(t, zeroFiltered, 1)
+	assert.InEpsilon(t, 100.0, zeroFiltered[0].strike, 0.0001)
+}
+
 func TestPorcelainChainParams(t *testing.T) {
 	params := porcelainChainParams("AAPL", &optionChainOpts{
 		Type:        chainContractTypeCall,
@@ -200,6 +245,10 @@ func TestOptionChainOptsValidationAdditionalConflicts(t *testing.T) {
 	}{
 		{name: "invalid type", opts: optionChainOpts{Type: chainContractType("BAD")}},
 		{name: "dte expiration", opts: optionChainOpts{DTE: 30, Expiration: "2026-06-19"}},
+		{
+			name: "delta min greater than max",
+			opts: optionChainOpts{DeltaMin: 0.5, DeltaMax: 0.2, deltaMinSet: true, deltaMaxSet: true},
+		},
 		{name: "negative count", opts: optionChainOpts{StrikeCount: -1}},
 		{name: "count min", opts: optionChainOpts{StrikeCount: 2, StrikeMin: 100}},
 		{name: "strike combined", opts: optionChainOpts{Strike: 100, StrikeRange: strikeRangeNTM}},
@@ -258,26 +307,28 @@ func fullOptionContractForTest() *models.OptionContract {
 	vega := 0.3
 	rho := 0.4
 	iv := 25.0
+	daysToExpiration := 42
 	openInterest := int64(100)
 	volume := int64(25)
 	inTheMoney := true
 
 	return &models.OptionContract{
-		Symbol:       &symbol,
-		PutCall:      &putCall,
-		StrikePrice:  &strike,
-		Bid:          &bid,
-		Ask:          &ask,
-		Mark:         &mark,
-		Last:         &last,
-		Delta:        &delta,
-		Gamma:        &gamma,
-		Theta:        &theta,
-		Vega:         &vega,
-		Rho:          &rho,
-		Volatility:   &iv,
-		OpenInterest: &openInterest,
-		TotalVolume:  &volume,
-		InTheMoney:   &inTheMoney,
+		Symbol:           &symbol,
+		PutCall:          &putCall,
+		StrikePrice:      &strike,
+		Bid:              &bid,
+		Ask:              &ask,
+		Mark:             &mark,
+		Last:             &last,
+		Delta:            &delta,
+		Gamma:            &gamma,
+		Theta:            &theta,
+		Vega:             &vega,
+		Rho:              &rho,
+		Volatility:       &iv,
+		DaysToExpiration: &daysToExpiration,
+		OpenInterest:     &openInterest,
+		TotalVolume:      &volume,
+		InTheMoney:       &inTheMoney,
 	}
 }

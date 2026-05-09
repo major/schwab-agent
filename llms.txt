@@ -819,14 +819,16 @@ Usage:
 Examples:
   schwab-agent option chain AAPL
   schwab-agent option chain AAPL --type CALL --dte 30
-  schwab-agent option chain AAPL --expiration 2026-06-19 --fields strike,bid,ask,delta
+  schwab-agent option chain AMD --type PUT --strike-range OTM --expiration 2026-06-19 --delta-min -0.25 --delta-max -0.15 --fields strike,delta,bid,ask,mid,openInterest,totalVolume,volatility,daysToExpiration
   schwab-agent option chain AAPL --strike-count 5
   schwab-agent option chain AAPL --strike-min 190 --strike-max 210
 
 Flags:
+      --delta-max float      Maximum option delta (inclusive)
+      --delta-min float      Minimum option delta (inclusive)
       --dte int               Target days to expiration
       --expiration string     Exact expiration date (YYYY-MM-DD)
-      --fields string         Comma-separated field names for column projection
+      --fields string         Comma-separated field names for column projection (e.g., strike, delta, bid, ask, mid, openInterest, totalVolume, volatility, daysToExpiration)
       --order-type string     alias for --type (order type)
       --strike float          Exact strike price
       --strike-count int      Number of strikes around ATM
