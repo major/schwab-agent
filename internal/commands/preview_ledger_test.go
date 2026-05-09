@@ -104,6 +104,26 @@ func TestPreviewLedgerRejectsTamperedCanonicalOrder(t *testing.T) {
 	assert.Contains(t, err.Error(), "no longer matches")
 }
 
+func TestPreviewLedgerRejectsTamperedSafetyCheck(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("SCHWAB_AGENT_STATE_DIR", stateDir)
+
+	digestData, err := saveOrderPreview(
+		"hash123",
+		testPreviewLedgerOrder(t),
+		nil,
+		previewSafetyCheck{Type: previewSafetyCoveredCall, Underlying: "F", Contracts: 1},
+	)
+	require.NoError(t, err)
+	entry := testSavedPreviewEntry(t, stateDir, digestData.Digest)
+	entry.SafetyCheck = nil
+	writeSavedPreviewEntry(t, stateDir, &entry)
+
+	_, err = loadOrderPreview(digestData.Digest)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no longer matches")
+}
+
 func TestPreviewLedgerRejectsExpiredEntry(t *testing.T) {
 	stateDir := t.TempDir()
 	t.Setenv("SCHWAB_AGENT_STATE_DIR", stateDir)

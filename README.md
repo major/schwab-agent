@@ -157,6 +157,28 @@ schwab-agent order build equity \
   --price 150.00 \
   --duration DAY
 
+# Sell a covered call against existing shares.
+# Preview and place both verify the selected account has at least 100 shares per contract.
+schwab-agent order preview sell-covered-call \
+  --underlying F \
+  --expiration 2026-06-18 \
+  --strike 14 \
+  --quantity 1 \
+  --type LIMIT \
+  --price 1.00 \
+  --save-preview
+
+# Build an opening short iron condor without specifying open/close direction.
+schwab-agent order build short-iron-condor \
+  --underlying F \
+  --expiration 2026-06-18 \
+  --put-long-strike 9 \
+  --put-short-strike 10 \
+  --call-short-strike 14 \
+  --call-long-strike 15 \
+  --quantity 1 \
+  --price 0.50
+
 # Use flag aliases (--instruction for --action, --order-type for --type)
 schwab-agent order place equity \
   --symbol AAPL \
@@ -198,8 +220,8 @@ schwab-agent order place --spec @order.json
 | `account` | Compact summaries, full account details, hashes, set default, transactions |
 | `position` | List, filter, and sort positions for one or all accounts (with computed cost basis and P&L) |
 | `quote` | Get quotes for one or more symbols (supports structured option flags) |
-| `order` | List, get, place, preview, build, cancel, replace (equity and option) |
-| `option` | Option discovery and contract details (`expirations`, `chain`, `contract`) |
+| `order` | List, get, place, preview, build, cancel, replace, and strategy porcelain |
+| `option` | Option discovery, screening, and contract details (`expirations`, `chain`, `contract`, `screen`) |
 | `history` | Price history for a symbol (alias: `price-history`) |
 | `ta` | Technical analysis with symbol-keyed JSON output (dashboard, sma, ema, rsi, macd, atr, bbands, stoch, adx, vwap, hv, expected-move) |
 | `indicators` | Technical analysis dashboard shortcut with symbol-keyed JSON output |

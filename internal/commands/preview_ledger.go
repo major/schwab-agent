@@ -47,6 +47,16 @@ type savedOrderPreview struct {
 	Order          *models.OrderRequest `json:"order"`
 	Preview        *models.PreviewOrder `json:"preview,omitempty"`
 	OrderID        *int64               `json:"orderId,omitempty"`
+	SafetyCheck    *previewSafetyCheck  `json:"safetyCheck,omitempty"`
+}
+
+// previewSafetyCheck records strategy-specific preflight checks that must be
+// repeated when a saved preview is converted into a mutable order placement.
+// It is included in the preview digest payload so local tampering fails closed.
+type previewSafetyCheck struct {
+	Type       string  `json:"type"`
+	Underlying string  `json:"underlying,omitempty"`
+	Contracts  float64 `json:"contracts,omitempty"`
 }
 
 // saveOrderPreview stores a previewed order in the local state ledger and
@@ -55,10 +65,12 @@ func saveOrderPreview(
 	account string,
 	order *models.OrderRequest,
 	preview *models.PreviewOrder,
+	safetyChecks ...previewSafetyCheck,
 ) (*previewDigestData, error) {
 	createdAt := time.Now().UTC()
 	expiresAt := createdAt.Add(previewLedgerTTL)
-	canonicalOrder, digest, err := previewDigestFor(account, order)
+	safetyCheck := previewSafetyCheckFromVariadic(safetyChecks)
+	canonicalOrder, digest, err := previewDigestFor(account, order, safetyCheck)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +86,7 @@ func saveOrderPreview(
 		CanonicalOrder: canonicalOrder,
 		Order:          order,
 		Preview:        preview,
+		SafetyCheck:    safetyCheck,
 	}
 	if preview != nil {
 		entry.OrderID = preview.OrderID
@@ -147,7 +160,7 @@ func loadOrderPreview(digest string) (*savedOrderPreview, error) {
 		return nil, apperr.NewValidationError("preview ledger entry is missing its order payload", nil)
 	}
 
-	canonicalOrder, expectedDigest, err := previewDigestFor(entry.Account, entry.Order)
+	canonicalOrder, expectedDigest, err := previewDigestFor(entry.Account, entry.Order, entry.SafetyCheck)
 	if err != nil {
 		return nil, err
 	}
@@ -167,24 +180,30 @@ func loadOrderPreview(digest string) (*savedOrderPreview, error) {
 
 // previewDigestFor returns the canonical order JSON and the account-bound digest
 // used as the immutable handoff between preview and place.
-func previewDigestFor(account string, order *models.OrderRequest) (json.RawMessage, string, error) {
+func previewDigestFor(
+	account string,
+	order *models.OrderRequest,
+	safetyCheck *previewSafetyCheck,
+) (json.RawMessage, string, error) {
 	canonicalOrder, err := json.Marshal(order)
 	if err != nil {
 		return nil, "", fmt.Errorf("marshal canonical order: %w", err)
 	}
 
 	boundPayload := struct {
-		Version        int             `json:"version"`
-		Operation      string          `json:"operation"`
-		Endpoint       string          `json:"endpoint"`
-		Account        string          `json:"account"`
-		CanonicalOrder json.RawMessage `json:"canonicalOrder"`
+		Version        int                 `json:"version"`
+		Operation      string              `json:"operation"`
+		Endpoint       string              `json:"endpoint"`
+		Account        string              `json:"account"`
+		CanonicalOrder json.RawMessage     `json:"canonicalOrder"`
+		SafetyCheck    *previewSafetyCheck `json:"safetyCheck,omitempty"`
 	}{
 		Version:        previewLedgerSchemaVersion,
 		Operation:      previewLedgerOperation,
 		Endpoint:       previewLedgerEndpoint,
 		Account:        account,
 		CanonicalOrder: canonicalOrder,
+		SafetyCheck:    safetyCheck,
 	}
 	encoded, err := json.Marshal(boundPayload)
 	if err != nil {
@@ -193,6 +212,13 @@ func previewDigestFor(account string, order *models.OrderRequest) (json.RawMessa
 
 	sum := sha256.Sum256(encoded)
 	return canonicalOrder, hex.EncodeToString(sum[:]), nil
+}
+
+func previewSafetyCheckFromVariadic(safetyChecks []previewSafetyCheck) *previewSafetyCheck {
+	if len(safetyChecks) == 0 {
+		return nil
+	}
+	return &safetyChecks[0]
 }
 
 // previewLedgerDir resolves the local state directory for saved previews.

@@ -256,6 +256,9 @@ func resolveOrderPlacePreviewPayload(
 		Source:        accountSourcePreview,
 		DisplayLabel:  accountDisplayLabel(nickName, entry.Account),
 	}
+	if safetyErr := verifySavedPreviewSafetyCheck(cmd, c, entry); safetyErr != nil {
+		return nil, safetyErr
+	}
 
 	return &orderPlacePayload{
 		Account:       entry.Account,
@@ -273,10 +276,11 @@ func writeOrderPreviewResult(
 	order *models.OrderRequest,
 	preview *models.PreviewOrder,
 	savePreview bool,
+	safetyChecks ...previewSafetyCheck,
 ) error {
 	data := orderPreviewData{BuiltOrder: order, Preview: preview, OrderID: preview.OrderID}
 	if savePreview {
-		digestData, err := saveOrderPreview(acct.Hash, order, preview)
+		digestData, err := saveOrderPreview(acct.Hash, order, preview, safetyChecks...)
 		if err != nil {
 			return err
 		}

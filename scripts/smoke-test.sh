@@ -238,6 +238,7 @@ run_help_test "order build long-call"           order build long-call
 run_help_test "order build long-put"            order build long-put
 run_help_test "order build cash-secured-put"    order build cash-secured-put
 run_help_test "order build naked-call"          order build naked-call
+run_help_test "order build sell-covered-call"   order build sell-covered-call
 run_help_test "order build put-credit-spread"   order build put-credit-spread
 run_help_test "order build call-credit-spread"  order build call-credit-spread
 run_help_test "order build put-debit-spread"    order build put-debit-spread
@@ -246,11 +247,13 @@ run_help_test "order build long-straddle"       order build long-straddle
 run_help_test "order build short-straddle"      order build short-straddle
 run_help_test "order build long-strangle"       order build long-strangle
 run_help_test "order build short-strangle"      order build short-strangle
+run_help_test "order build short-iron-condor"   order build short-iron-condor
 run_help_test "order build jade-lizard"         order build jade-lizard
 run_help_test "order place long-call"           order place long-call
 run_help_test "order place long-put"            order place long-put
 run_help_test "order place cash-secured-put"    order place cash-secured-put
 run_help_test "order place naked-call"          order place naked-call
+run_help_test "order place sell-covered-call"   order place sell-covered-call
 run_help_test "order place put-credit-spread"   order place put-credit-spread
 run_help_test "order place call-credit-spread"  order place call-credit-spread
 run_help_test "order place put-debit-spread"    order place put-debit-spread
@@ -259,11 +262,13 @@ run_help_test "order place long-straddle"       order place long-straddle
 run_help_test "order place short-straddle"      order place short-straddle
 run_help_test "order place long-strangle"       order place long-strangle
 run_help_test "order place short-strangle"      order place short-strangle
+run_help_test "order place short-iron-condor"   order place short-iron-condor
 run_help_test "order place jade-lizard"         order place jade-lizard
 run_help_test "order preview long-call"         order preview long-call
 run_help_test "order preview long-put"          order preview long-put
 run_help_test "order preview cash-secured-put"  order preview cash-secured-put
 run_help_test "order preview naked-call"        order preview naked-call
+run_help_test "order preview sell-covered-call" order preview sell-covered-call
 run_help_test "order preview put-credit-spread" order preview put-credit-spread
 run_help_test "order preview call-credit-spread" order preview call-credit-spread
 run_help_test "order preview put-debit-spread"  order preview put-debit-spread
@@ -272,6 +277,7 @@ run_help_test "order preview long-straddle"     order preview long-straddle
 run_help_test "order preview short-straddle"    order preview short-straddle
 run_help_test "order preview long-strangle"     order preview long-strangle
 run_help_test "order preview short-strangle"    order preview short-strangle
+run_help_test "order preview short-iron-condor" order preview short-iron-condor
 run_help_test "order preview jade-lizard"       order preview jade-lizard
 run_help_test "option"             option
 run_help_test "option expirations" option expirations
@@ -313,6 +319,7 @@ run_help_contains_test "order replace option shows call flag" "--call" order rep
 run_help_contains_test "order replace option shows put flag" "--put" order replace option
 run_help_contains_test "order preview shows save-preview flag" "--save-preview" order preview
 run_help_contains_test "order preview equity shows save-preview flag" "--save-preview" order preview equity
+run_help_contains_test "order preview sell-covered-call shows save-preview flag" "--save-preview" order preview sell-covered-call
 run_help_contains_test "order place shows from-preview flag" "--from-preview" order place
 
 run_help_contains_test "option chain shows --dte flag" "--dte" option chain
@@ -790,6 +797,9 @@ run_build_test "cash-secured-put: basic" \
 run_build_test "naked-call: basic" \
     order build naked-call --underlying AAPL --expiration $FUTURE_EXP \
     --strike 220 --quantity 1 --type LIMIT --price 2.00
+run_build_test "sell-covered-call: basic" \
+    order build sell-covered-call --underlying F --expiration $FUTURE_EXP \
+    --strike 14 --quantity 1 --type LIMIT --price 1.00
 run_build_test "long-call: GTC duration" \
     order build long-call --underlying AAPL --expiration $FUTURE_EXP \
     --strike 200 --quantity 1 --type LIMIT --price 5.00 --duration GOOD_TILL_CANCEL
@@ -801,11 +811,15 @@ run_error_test "long-call rejects --action" \
 run_error_test "long-call rejects --call" \
     order build long-call --underlying AAPL --expiration $FUTURE_EXP \
     --strike 200 --quantity 1 --call
+run_error_test "sell-covered-call rejects --action" \
+    order build sell-covered-call --underlying F --expiration $FUTURE_EXP \
+    --strike 14 --quantity 1 --type LIMIT --price 1.00 --action SELL_TO_OPEN
 
 # Help-contains: porcelain shows expected flags
 run_help_contains_test "long-call shows --underlying" "--underlying" order build long-call
 run_help_contains_test "long-call shows --strike" "--strike" order build long-call
 run_help_contains_test "long-call shows --quantity" "--quantity" order build long-call
+run_help_contains_test "sell-covered-call shows --strike" "--strike" order build sell-covered-call
 
 # -------------------------------------------------------------------
 # Order build: Porcelain Vertical Spread
@@ -873,6 +887,31 @@ run_error_test "long-straddle rejects --buy" \
 run_error_test "long-straddle rejects --open" \
     order build long-straddle --underlying F --expiration $FUTURE_EXP \
     --strike 12 --quantity 1 --price 1.50 --open
+
+# -------------------------------------------------------------------
+# Order build: Porcelain Short Iron Condor
+# -------------------------------------------------------------------
+
+section "Order Build: Porcelain Short Iron Condor"
+
+run_build_test "short-iron-condor: basic" \
+    order build short-iron-condor --underlying F --expiration $FUTURE_EXP \
+    --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 \
+    --quantity 1 --price 0.50
+run_build_test "short-iron-condor: GTC" \
+    order build short-iron-condor --underlying F --expiration $FUTURE_EXP \
+    --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 \
+    --quantity 1 --price 0.50 --duration GOOD_TILL_CANCEL
+
+# Porcelain short iron condor hardcodes opening direction.
+run_error_test "short-iron-condor rejects --open" \
+    order build short-iron-condor --underlying F --expiration $FUTURE_EXP \
+    --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 \
+    --quantity 1 --price 0.50 --open
+
+# Help-contains: short iron condor shows factual strike names.
+run_help_contains_test "short-iron-condor shows --put-long-strike" "--put-long-strike" order build short-iron-condor
+run_help_contains_test "short-iron-condor shows --call-long-strike" "--call-long-strike" order build short-iron-condor
 
 # -------------------------------------------------------------------
 # Order build: Porcelain Jade Lizard
