@@ -331,6 +331,37 @@ func TestNewAnalyzeCmd_CompactOutput(t *testing.T) {
 	assert.NotContains(t, symbolData, "analysis", "compact output should omit full dashboard")
 }
 
+func TestNewAnalyzeCmd_CompactOutputIncludesDashboardWarnings(t *testing.T) {
+	// Arrange - compact output must keep degradation warnings because it drops the
+	// full dashboard where callers would otherwise see skipped long-window fields.
+	quoteJSON := `{"NET":{"assetMainType":"EQUITY","symbol":"NET","quote":{"lastPrice":100.0}}}`
+	srv := analyzeServer(t, quoteJSON, mockCandleListJSON("NET", 260))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "NET", "--interval", "15min", "--points", "30", "--compact")
+	require.NoError(t, err)
+
+	// Assert
+	var envelope output.Envelope
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok, "data should be a map")
+	symbolData, ok := data["NET"].(map[string]any)
+	require.True(t, ok, "NET entry should be a compact map")
+
+	technical, ok := symbolData["technical"].(map[string]any)
+	require.True(t, ok, "compact technical fields should be present")
+	assert.Contains(t, technical, "distance_from_sma_200_percent")
+	assert.NotContains(t, technical, "range_252_high")
+
+	warnings, ok := symbolData["warnings"].([]any)
+	require.True(t, ok, "compact warnings should be present")
+	assertWarningContains(t, warnings, "skipped range_252_high", "260 candles", "need 281")
+}
+
 func TestNewAnalyzeCmd_PartialFailure_TAFails(t *testing.T) {
 	// Arrange - test partial failure: AAPL succeeds completely, INVALID has quote
 	// succeed but TA fail (empty candles). This verifies that partial data (quote
@@ -411,13 +442,94 @@ func TestNewAnalyzeCmd_SingleSymbolTAInsufficientCandles(t *testing.T) {
 	symbolData, ok := data["INVALID"].(map[string]any)
 	require.True(t, ok, "INVALID entry should be a map")
 	assert.NotNil(t, symbolData["quote"], "quote should be present when quote fetch succeeds")
-	assert.Nil(t, symbolData["analysis"], "analysis should be nil when TA lacks enough candles")
+	analysis, ok := symbolData["analysis"].(map[string]any)
+	require.True(t, ok, "analysis should be present when core dashboard candles are available")
+	assert.Empty(t, envelope.Errors)
+	assert.Contains(t, analysis, "warnings")
+	assert.NotContains(t, analysis["latest"], "sma_200")
+}
 
-	require.Len(t, envelope.Errors, 1)
-	assert.Contains(t, envelope.Errors[0], "INVALID")
-	assert.Contains(t, envelope.Errors[0], "dashboard requires at least 252 candles, got 190")
-	assert.Equal(t, 1, envelope.Metadata.Requested)
-	assert.Equal(t, 1, envelope.Metadata.Returned)
+func TestNewAnalyzeCmd_IntradayDashboardDegradesAtSchwabLimit(t *testing.T) {
+	// Arrange - issue #157: 15-minute history caps at 260 candles, below the 281
+	// candles needed for 30 rows of 252-candle range context. Analyze should still
+	// return computable indicators and warn about the skipped long-window fields.
+	historyRequests := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case strings.Contains(r.URL.Path, "/quotes"):
+			_, _ = w.Write([]byte(`{"NET":{"assetMainType":"EQUITY","symbol":"NET","quote":{"lastPrice":100.0}}}`))
+		case strings.Contains(r.URL.Path, "/pricehistory"):
+			historyRequests++
+			assert.Equal(t, "NET", r.URL.Query().Get("symbol"))
+			assert.Equal(
+				t,
+				"10",
+				r.URL.Query().Get("period"),
+				"15-minute dashboard should request Schwab's max day period",
+			)
+			assert.Equal(t, "15", r.URL.Query().Get("frequency"))
+			_, _ = w.Write([]byte(mockCandleListJSON("NET", 260)))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "NET", "--interval", "15min", "--points", "30", "--latest-only")
+	require.NoError(t, err)
+
+	// Assert
+	var envelope output.Envelope
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+	assert.Empty(t, envelope.Errors)
+	assert.Equal(t, 1, historyRequests)
+
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok, "data should be a map")
+	symbolData, ok := data["NET"].(map[string]any)
+	require.True(t, ok, "NET entry should be a map")
+	assert.NotNil(t, symbolData["quote"], "quote should be present")
+
+	analysis, ok := symbolData["analysis"].(map[string]any)
+	require.True(t, ok, "analysis should be present")
+	assert.NotContains(t, analysis, "values", "latest-only should still omit duplicate rows")
+
+	latest, ok := analysis["latest"].(map[string]any)
+	require.True(t, ok, "latest should be present")
+	assert.Contains(t, latest, "sma_200", "260 candles can still compute SMA 200 for the latest 30-row window")
+	assert.NotContains(t, latest, "range_252_high")
+	assert.NotContains(t, latest, "distance_from_range_252_high_percent")
+
+	warnings, ok := analysis["warnings"].([]any)
+	require.True(t, ok, "warnings should be present")
+	assertWarningContains(t, warnings, "skipped range_252_high", "260 candles", "need 281")
+}
+
+func assertWarningContains(t *testing.T, warnings []any, substrings ...string) {
+	t.Helper()
+	require.NotEmpty(t, warnings, "warnings should not be empty")
+	for _, warning := range warnings {
+		warningText, ok := warning.(string)
+		if !ok {
+			continue
+		}
+		matched := true
+		for _, substring := range substrings {
+			if !strings.Contains(warningText, substring) {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return
+		}
+	}
+	t.Fatalf("warnings %v did not contain all substrings %v", warnings, substrings)
 }
 
 func TestNewAnalyzeCmd_QuoteHTTPNotFound(t *testing.T) {

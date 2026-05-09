@@ -96,6 +96,13 @@ func maxCandlesForInterval(interval string) int {
 	}
 }
 
+// MaxCandlesForInterval returns the theoretical Schwab API candle limit for an
+// interval. Dashboard-style callers use this to cap best-effort history requests
+// before IntervalToHistoryParams applies its hard validation for simple indicators.
+func MaxCandlesForInterval(interval string) int {
+	return maxCandlesForInterval(interval)
+}
+
 // IntervalToHistoryParams maps a human interval string to PriceHistory query params.
 // requiredCandles controls how much history to fetch: the period is scaled up so the
 // API returns at least that many candles. Pass 0 to use the default (minimum) lookback.

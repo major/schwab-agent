@@ -40,6 +40,7 @@ type compactAnalyzeResult struct {
 	Quote     map[string]any `json:"quote,omitempty"`
 	Technical map[string]any `json:"technical,omitempty"`
 	Signals   map[string]any `json:"signals,omitempty"`
+	Warnings  []string       `json:"warnings,omitempty"`
 }
 
 type analyzeRequest struct {
@@ -352,6 +353,7 @@ func buildCompactAnalyzeResult(quote *marketdata.QuoteEntry, dashboard dashboard
 		Quote:     compactAnalyzeQuote(quote),
 		Technical: compactAnalyzeTechnical(dashboard),
 		Signals:   compactAnalyzeSignals(dashboard),
+		Warnings:  dashboard.Warnings,
 	}
 }
 
@@ -401,12 +403,16 @@ func compactAnalyzeSignals(dashboard dashboardOutput) map[string]any {
 	if dashboard.Signals == nil {
 		return nil
 	}
-	return map[string]any{
-		"trend":            dashboard.Signals["trend"],
-		"momentum":         dashboard.Signals["momentum"],
-		fieldVolatility:    dashboard.Signals[fieldVolatility],
-		dashboardKeyVolume: dashboard.Signals[dashboardKeyVolume],
+	compact := make(map[string]any)
+	for _, key := range []string{
+		"trend",
+		"momentum",
+		fieldVolatility,
+		dashboardKeyVolume,
+	} {
+		copyCompactField(compact, dashboard.Signals, key, key)
 	}
+	return compact
 }
 
 func copyCompactField(dst, src map[string]any, dstKey, srcKey string) {

@@ -146,6 +146,7 @@ type dashboardOutput struct {
 	Symbol     string              `json:"symbol"`
 	Interval   string              `json:"interval"`
 	Parameters dashboardParameters `json:"parameters"`
+	Warnings   []string            `json:"warnings,omitempty"`
 	Latest     map[string]any      `json:"latest"`
 	Signals    map[string]any      `json:"signals"`
 	Values     []map[string]any    `json:"values,omitempty"`
@@ -174,6 +175,13 @@ type dashboardSeries struct {
 	BBandsMid   []float64
 	BBandsLower []float64
 	AvgVolume20 []float64
+}
+
+type dashboardRows struct {
+	Rows             []map[string]any
+	BaseStart        int
+	IncludesSMA200   bool
+	IncludesRange252 bool
 }
 
 const (
@@ -628,6 +636,7 @@ func buildTADashboard(
 	symbol, interval string,
 	points int,
 ) (dashboardOutput, error) {
+	requestedRows := dashboardRequestedRows(points)
 	inputs, err := fetchDashboardInputs(ctx, c, symbol, interval, points)
 	if err != nil {
 		return dashboardOutput{}, err
@@ -636,17 +645,26 @@ func buildTADashboard(
 	if err != nil {
 		return dashboardOutput{}, err
 	}
-	rows, err := buildDashboardRows(inputs, series)
+	rowSet, err := buildDashboardRows(inputs, series, points)
 	if err != nil {
 		return dashboardOutput{}, err
 	}
+	rows := rowSet.Rows
 
 	latest := cloneDashboardRow(rows[len(rows)-1])
 	signals, err := dashboardSignals(latest)
 	if err != nil {
 		return dashboardOutput{}, err
 	}
-	return newDashboardOutput(symbol, interval, points, latest, signals, rows), nil
+	warnings := dashboardWarnings(inputs, rowSet, requestedRows)
+	return newDashboardOutput(symbol, interval, points, warnings, latest, signals, rows), nil
+}
+
+func dashboardRequestedRows(points int) int {
+	if points > 0 {
+		return points
+	}
+	return 1
 }
 
 func fetchDashboardInputs(
@@ -655,13 +673,14 @@ func fetchDashboardInputs(
 	symbol, interval string,
 	points int,
 ) (dashboardInputs, error) {
-	requestedRows := 1
-	if points > 0 {
-		requestedRows = points
+	requestedRows := dashboardRequestedRows(points)
+	desiredCandles := dashboardLongRangePeriod + requestedRows - 1
+	requestCandles := desiredCandles
+	if maxCandles := ta.MaxCandlesForInterval(interval); maxCandles > 0 && requestCandles > maxCandles {
+		requestCandles = maxCandles
 	}
-	minCandles := dashboardLongRangePeriod + requestedRows - 1
 
-	candles, timestamps, err := fetchAndValidateCandles(ctx, c, symbol, interval, minCandles, "dashboard")
+	candles, timestamps, err := fetchDashboardCandles(ctx, c, symbol, interval, requestCandles)
 	if err != nil {
 		return dashboardInputs{}, err
 	}
@@ -684,6 +703,46 @@ func fetchDashboardInputs(
 	return inputs, nil
 }
 
+func fetchDashboardCandles(
+	ctx context.Context,
+	c *client.Ref,
+	symbol, interval string,
+	requestCandles int,
+) ([]marketdata.Candle, []string, error) {
+	periodType, periodVal, freqType, freq, err := ta.IntervalToHistoryParams(interval, requestCandles)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	params, err := newPriceHistoryParams(priceHistoryParamsInput{
+		PeriodType:    periodType,
+		Period:        periodVal,
+		FrequencyType: freqType,
+		Frequency:     freq,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	result, err := c.MarketData.GetPriceHistory(ctx, symbol, params)
+	if err != nil {
+		return nil, nil, mapSchwabGoError(err)
+	}
+
+	// The dashboard is an aggregate view. Unlike simple indicators, it should keep
+	// shorter but still useful histories instead of failing just because optional
+	// long-window context, such as SMA 200 or the 252-candle range, is unavailable.
+	if validateErr := ta.ValidateMinCandles(result.Candles, dashboardSMAMediumPeriod, "dashboard"); validateErr != nil {
+		return nil, nil, validateErr
+	}
+
+	timestamps, err := ta.ExtractTimestamps(result.Candles)
+	if err != nil {
+		return nil, nil, err
+	}
+	return result.Candles, timestamps, nil
+}
+
 func buildDashboardSeries(inputs dashboardInputs) (dashboardSeries, error) {
 	series := dashboardSeries{}
 	var err error
@@ -693,8 +752,10 @@ func buildDashboardSeries(inputs dashboardInputs) (dashboardSeries, error) {
 	if series.SMA50, err = ta.SMA(inputs.Closes, dashboardSMAMediumPeriod); err != nil {
 		return dashboardSeries{}, err
 	}
-	if series.SMA200, err = ta.SMA(inputs.Closes, dashboardSMALongPeriod); err != nil {
-		return dashboardSeries{}, err
+	if len(inputs.Closes) >= dashboardSMALongPeriod {
+		if series.SMA200, err = ta.SMA(inputs.Closes, dashboardSMALongPeriod); err != nil {
+			return dashboardSeries{}, err
+		}
 	}
 	if series.RSI14, err = ta.RSI(inputs.Closes, dashboardRSIPeriod); err != nil {
 		return dashboardSeries{}, err
@@ -726,22 +787,45 @@ func buildDashboardSeries(inputs dashboardInputs) (dashboardSeries, error) {
 	return series, nil
 }
 
-func buildDashboardRows(inputs dashboardInputs, series dashboardSeries) ([]map[string]any, error) {
-	baseStart := dashboardLongRangePeriod - 1
+func buildDashboardRows(inputs dashboardInputs, series dashboardSeries, points int) (dashboardRows, error) {
+	baseStart := dashboardBaseStart(inputs, series, points)
 	rows := dashboardBaseRows(inputs, baseStart)
 	if err := addDashboardSeries(rows, series); err != nil {
-		return nil, err
+		return dashboardRows{}, err
 	}
-	if err := addDashboardDerivedFields(rows, inputs, baseStart); err != nil {
-		return nil, err
+	includesRange252 := baseStart >= dashboardLongRangePeriod-1
+	if err := addDashboardDerivedFields(rows, inputs, baseStart, includesRange252); err != nil {
+		return dashboardRows{}, err
 	}
 
-	return rows, nil
+	return dashboardRows{
+		Rows:             rows,
+		BaseStart:        baseStart,
+		IncludesSMA200:   len(series.SMA200) > 0,
+		IncludesRange252: includesRange252,
+	}, nil
+}
+
+func dashboardBaseStart(inputs dashboardInputs, series dashboardSeries, points int) int {
+	longestRequiredIndex := dashboardSMAMediumPeriod - 1
+	if len(series.SMA200) > 0 {
+		longestRequiredIndex = dashboardSMALongPeriod - 1
+	}
+	if points == 0 {
+		if len(inputs.Candles) >= dashboardLongRangePeriod {
+			return dashboardLongRangePeriod - 1
+		}
+		return longestRequiredIndex
+	}
+
+	requestedRows := dashboardRequestedRows(points)
+	return max(longestRequiredIndex, len(inputs.Candles)-requestedRows)
 }
 
 func newDashboardOutput(
 	symbol, interval string,
 	points int,
+	warnings []string,
 	latest, signals map[string]any,
 	rows []map[string]any,
 ) dashboardOutput {
@@ -762,9 +846,10 @@ func newDashboardOutput(
 			RangePeriod:  dashboardRangePeriod,
 			LongRange:    dashboardLongRangePeriod,
 		},
-		Latest:  latest,
-		Signals: signals,
-		Values:  limitDashboardRows(rows, points),
+		Warnings: warnings,
+		Latest:   latest,
+		Signals:  signals,
+		Values:   limitDashboardRows(rows, points),
 	}
 }
 
@@ -801,6 +886,9 @@ func addDashboardSeries(rows []map[string]any, series dashboardSeries) error {
 		dashboardKeyBBandsLower:   series.BBandsLower,
 		dashboardKeyAvgVolume20:   series.AvgVolume20,
 	} {
+		if values == nil {
+			continue
+		}
 		if err := addTailAlignedFloat(rows, key, values); err != nil {
 			return err
 		}
@@ -809,9 +897,14 @@ func addDashboardSeries(rows []map[string]any, series dashboardSeries) error {
 	return nil
 }
 
-func addDashboardDerivedFields(rows []map[string]any, inputs dashboardInputs, baseStart int) error {
+func addDashboardDerivedFields(
+	rows []map[string]any,
+	inputs dashboardInputs,
+	baseStart int,
+	includeLongRange bool,
+) error {
 	for i := range rows {
-		if err := addDashboardDerivedRow(rows[i], inputs, baseStart+i); err != nil {
+		if err := addDashboardDerivedRow(rows[i], inputs, baseStart+i, includeLongRange); err != nil {
 			return err
 		}
 	}
@@ -819,7 +912,7 @@ func addDashboardDerivedFields(rows []map[string]any, inputs dashboardInputs, ba
 	return nil
 }
 
-func addDashboardDerivedRow(row map[string]any, inputs dashboardInputs, candleIndex int) error {
+func addDashboardDerivedRow(row map[string]any, inputs dashboardInputs, candleIndex int, includeLongRange bool) error {
 	closePrice, err := dashboardRowFloat(row, dashboardKeyClose)
 	if err != nil {
 		return err
@@ -844,24 +937,24 @@ func addDashboardDerivedRow(row map[string]any, inputs dashboardInputs, candleIn
 	if err != nil {
 		return err
 	}
-	sma200Value, err := dashboardRowFloat(row, dashboardKeySMA200)
-	if err != nil {
-		return err
-	}
 
 	rangeHigh20, rangeLow20 := highLowWindow(inputs.Highs, inputs.Lows, candleIndex, dashboardRangePeriod)
-	rangeHigh252, rangeLow252 := highLowWindow(inputs.Highs, inputs.Lows, candleIndex, dashboardLongRangePeriod)
 	row[dashboardKeyATRPercent] = percentOf(atrValue, closePrice)
 	row[dashboardKeyRelativeVolume] = ratio(volume, avgVolume)
 	row[dashboardKeyRange20High] = rangeHigh20
 	row[dashboardKeyRange20Low] = rangeLow20
-	row[dashboardKeyRange252High] = rangeHigh252
-	row[dashboardKeyRange252Low] = rangeLow252
 	row[dashboardKeyDistanceFromSMA21Pct] = percentChange(closePrice, sma21Value)
 	row[dashboardKeyDistanceFromSMA50Pct] = percentChange(closePrice, sma50Value)
-	row[dashboardKeyDistanceFromSMA200Pct] = percentChange(closePrice, sma200Value)
 	row[dashboardKeyDistanceFromRange20Pct] = percentChange(closePrice, rangeHigh20)
-	row[dashboardKeyDistanceFromRange252Pct] = percentChange(closePrice, rangeHigh252)
+	if sma200Value, ok := optionalDashboardRowFloat(row, dashboardKeySMA200); ok {
+		row[dashboardKeyDistanceFromSMA200Pct] = percentChange(closePrice, sma200Value)
+	}
+	if includeLongRange {
+		rangeHigh252, rangeLow252 := highLowWindow(inputs.Highs, inputs.Lows, candleIndex, dashboardLongRangePeriod)
+		row[dashboardKeyRange252High] = rangeHigh252
+		row[dashboardKeyRange252Low] = rangeLow252
+		row[dashboardKeyDistanceFromRange252Pct] = percentChange(closePrice, rangeHigh252)
+	}
 	return nil
 }
 
@@ -979,6 +1072,54 @@ func dashboardRowFloat(row map[string]any, key string) (float64, error) {
 	return floatValue, nil
 }
 
+func optionalDashboardRowFloat(row map[string]any, key string) (float64, bool) {
+	value, ok := row[key]
+	if !ok {
+		return 0, false
+	}
+	floatValue, ok := value.(float64)
+	return floatValue, ok
+}
+
+func dashboardWarnings(inputs dashboardInputs, rowSet dashboardRows, requestedRows int) []string {
+	var warnings []string
+	candleCount := len(inputs.Candles)
+	if !rowSet.IncludesSMA200 {
+		warnings = append(
+			warnings,
+			fmt.Sprintf(
+				"skipped sma_200, distance_from_sma_200_percent, trend, close_above_sma_200, sma_50_above_sma_200 because only %d candles are available; need %d",
+				candleCount,
+				dashboardSMALongPeriod,
+			),
+		)
+	}
+	if !rowSet.IncludesRange252 {
+		neededCandles := dashboardLongRangePeriod + requestedRows - 1
+		warnings = append(
+			warnings,
+			fmt.Sprintf(
+				"skipped range_252_high, range_252_low, distance_from_range_252_high_percent because only %d candles are available for %d requested output row(s); need %d",
+				candleCount,
+				requestedRows,
+				neededCandles,
+			),
+		)
+	}
+	if requestedRows > 0 && len(rowSet.Rows) < requestedRows {
+		warnings = append(
+			warnings,
+			fmt.Sprintf(
+				"returned %d dashboard row(s) because only %d candles are available; requested %d",
+				len(rowSet.Rows),
+				candleCount,
+				requestedRows,
+			),
+		)
+	}
+	return warnings
+}
+
 func dashboardSignals(latest map[string]any) (map[string]any, error) {
 	closePrice, err := dashboardRowFloat(latest, dashboardKeyClose)
 	if err != nil {
@@ -989,10 +1130,6 @@ func dashboardSignals(latest map[string]any) (map[string]any, error) {
 		return nil, err
 	}
 	sma50, err := dashboardRowFloat(latest, dashboardKeySMA50)
-	if err != nil {
-		return nil, err
-	}
-	sma200, err := dashboardRowFloat(latest, dashboardKeySMA200)
 	if err != nil {
 		return nil, err
 	}
@@ -1012,21 +1149,24 @@ func dashboardSignals(latest map[string]any) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	return map[string]any{
-		"trend":                   trendSignal(closePrice, sma21, sma50, sma200),
+	signals := map[string]any{
 		"momentum":                momentumSignal(rsi14, macdHist),
 		fieldVolatility:           volatilitySignal(atrPercent),
 		dashboardKeyVolume:        volumeSignal(relativeVolume),
 		"close_above_sma_21":      closePrice > sma21,
 		"close_above_sma_50":      closePrice > sma50,
-		"close_above_sma_200":     closePrice > sma200,
 		"sma_21_above_sma_50":     sma21 > sma50,
-		"sma_50_above_sma_200":    sma50 > sma200,
 		"rsi_overbought":          rsi14 >= rsiOverboughtThreshold,
 		"rsi_oversold":            rsi14 <= rsiOversoldThreshold,
 		"macd_histogram_positive": macdHist > 0,
-	}, nil
+	}
+	if sma200, ok := optionalDashboardRowFloat(latest, dashboardKeySMA200); ok {
+		signals["trend"] = trendSignal(closePrice, sma21, sma50, sma200)
+		signals["close_above_sma_200"] = closePrice > sma200
+		signals["sma_50_above_sma_200"] = sma50 > sma200
+	}
+
+	return signals, nil
 }
 
 func trendSignal(closePrice, sma21, sma50, sma200 float64) string {
