@@ -245,6 +245,39 @@ func TestNewAnalyzeCmd_PartialFailure_TAFails(t *testing.T) {
 	assert.Equal(t, 2, envelope.Metadata.Returned)
 }
 
+func TestNewAnalyzeCmd_SingleSymbolTAInsufficientCandles(t *testing.T) {
+	// Arrange - issue #150: a young symbol can have a valid quote but fewer
+	// candles than ta dashboard needs. analyze should keep the quote and report a
+	// partial failure instead of returning a command-level validation error.
+	srv := analyzeServer(t, invalidAnalyzeQuoteEntryResponse, mockCandleListJSON("INVALID", 190))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "INVALID")
+	require.NoError(t, err)
+
+	// Assert
+	var envelope output.Envelope
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok, "data should be a map")
+	require.Contains(t, data, "INVALID")
+
+	symbolData, ok := data["INVALID"].(map[string]any)
+	require.True(t, ok, "INVALID entry should be a map")
+	assert.NotNil(t, symbolData["quote"], "quote should be present when quote fetch succeeds")
+	assert.Nil(t, symbolData["analysis"], "analysis should be nil when TA lacks enough candles")
+
+	require.Len(t, envelope.Errors, 1)
+	assert.Contains(t, envelope.Errors[0], "INVALID")
+	assert.Contains(t, envelope.Errors[0], "dashboard requires at least 252 candles, got 190")
+	assert.Equal(t, 1, envelope.Metadata.Requested)
+	assert.Equal(t, 1, envelope.Metadata.Returned)
+}
+
 func TestNewAnalyzeCmd_QuoteHTTPNotFound(t *testing.T) {
 	// Arrange - schwab-go turns a 404 quote response into an API error. analyze
 	// should preserve the existing quote command behavior by mapping that to the
