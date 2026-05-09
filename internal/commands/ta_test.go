@@ -130,16 +130,16 @@ func mockOptionChainJSON(symbol string) string {
 		"underlyingPrice": 150.0,
 		"callExpDateMap": {
 			"2025-06-20:30": {
-				"148.0": [{"markPrice": 7.0, "bidPrice": 6.9, "askPrice": 7.1, "strikePrice": 148.0, "daysToExpiration": 30, "inTheMoney": true}],
-				"150.0": [{"markPrice": 5.0, "bidPrice": 4.9, "askPrice": 5.1, "strikePrice": 150.0, "daysToExpiration": 30, "inTheMoney": false}],
-				"152.0": [{"markPrice": 3.0, "bidPrice": 2.9, "askPrice": 3.1, "strikePrice": 152.0, "daysToExpiration": 30, "inTheMoney": false}]
+				"148.0": [{"markPrice": 7.0, "bidPrice": 6.9, "askPrice": 7.1, "strikePrice": 148.0, "daysToExpiration": 30, "volatility": 0.29, "inTheMoney": true}],
+				"150.0": [{"markPrice": 5.0, "bidPrice": 4.9, "askPrice": 5.1, "strikePrice": 150.0, "daysToExpiration": 30, "volatility": 0.31, "inTheMoney": false}],
+				"152.0": [{"markPrice": 3.0, "bidPrice": 2.9, "askPrice": 3.1, "strikePrice": 152.0, "daysToExpiration": 30, "volatility": 0.33, "inTheMoney": false}]
 			}
 		},
 		"putExpDateMap": {
 			"2025-06-20:30": {
-				"148.0": [{"markPrice": 2.5, "bidPrice": 2.4, "askPrice": 2.6, "strikePrice": 148.0, "daysToExpiration": 30, "inTheMoney": false}],
-				"150.0": [{"markPrice": 4.5, "bidPrice": 4.4, "askPrice": 4.6, "strikePrice": 150.0, "daysToExpiration": 30, "inTheMoney": false}],
-				"152.0": [{"markPrice": 6.5, "bidPrice": 6.4, "askPrice": 6.6, "strikePrice": 152.0, "daysToExpiration": 30, "inTheMoney": true}]
+				"148.0": [{"markPrice": 2.5, "bidPrice": 2.4, "askPrice": 2.6, "strikePrice": 148.0, "daysToExpiration": 30, "volatility": 0.30, "inTheMoney": false}],
+				"150.0": [{"markPrice": 4.5, "bidPrice": 4.4, "askPrice": 4.6, "strikePrice": 150.0, "daysToExpiration": 30, "volatility": 0.35, "inTheMoney": false}],
+				"152.0": [{"markPrice": 6.5, "bidPrice": 6.4, "askPrice": 6.6, "strikePrice": 152.0, "daysToExpiration": 30, "volatility": 0.34, "inTheMoney": true}]
 			}
 		}
 	}`, symbol)
@@ -1362,13 +1362,35 @@ func TestTAExpectedMove_ValidEnvelope(t *testing.T) {
 	assert.Contains(t, data, "dte")
 	assert.Contains(t, data, "straddle_price")
 	assert.Contains(t, data, "expected_move")
+	assert.Contains(t, data, "expected_move_pct")
 	assert.Contains(t, data, "adjusted_move")
+	assert.Contains(t, data, "adjustment_method")
+	assert.Contains(t, data, "current_iv")
+	assert.Contains(t, data, "ranges")
 	assert.Contains(t, data, "upper_1x")
 	assert.Contains(t, data, "lower_1x")
 	assert.Contains(t, data, "upper_2x")
 	assert.Contains(t, data, "lower_2x")
 	assert.InDelta(t, 9.5, data["straddle_price"], 0.01)
-	assert.InDelta(t, 8.075, data["adjusted_move"], 0.01)
+	assert.InDelta(t, 6.33, data["expected_move_pct"], 0.01)
+	assert.InDelta(t, 8.08, data["adjusted_move"], 0.01)
+	assert.Equal(t, "raw ATM straddle price multiplied by 0.85x", data["adjustment_method"])
+	assert.InDelta(t, 0.33, data["current_iv"], 0.01)
+
+	ranges, ok := data["ranges"].(map[string]any)
+	require.True(t, ok, "ranges should decode as a JSON object")
+	range1x, ok := ranges["1x"].(map[string]any)
+	require.True(t, ok, "ranges.1x should decode as a JSON object")
+	range2x, ok := ranges["2x"].(map[string]any)
+	require.True(t, ok, "ranges.2x should decode as a JSON object")
+	assert.InDelta(t, 141.93, range1x["lower"], 0.01)
+	assert.InDelta(t, 158.08, range1x["upper"], 0.01)
+	assert.InDelta(t, 133.85, range2x["lower"], 0.01)
+	assert.InDelta(t, 166.15, range2x["upper"], 0.01)
+	assert.InDelta(t, data["lower_1x"], range1x["lower"], 0.01)
+	assert.InDelta(t, data["upper_1x"], range1x["upper"], 0.01)
+	assert.InDelta(t, data["lower_2x"], range2x["lower"], 0.01)
+	assert.InDelta(t, data["upper_2x"], range2x["upper"], 0.01)
 }
 
 func TestTAExpectedMove_WithDTE(t *testing.T) {
