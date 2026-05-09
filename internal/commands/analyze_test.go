@@ -397,7 +397,8 @@ func TestNewAnalyzeCmd_SingleSymbolBothFail(t *testing.T) {
 	_, err := runTestCommand(t, cmd, "AAPL")
 
 	// Assert
-	require.Error(t, err)
+	var httpErr *apperr.HTTPError
+	require.ErrorAs(t, err, &httpErr)
 	assert.Empty(t, buf.String(), "analyze should not write a partial envelope when both data sources fail")
 }
 
