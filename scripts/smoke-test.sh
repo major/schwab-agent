@@ -316,7 +316,10 @@ run_help_contains_test "order preview equity shows save-preview flag" "--save-pr
 run_help_contains_test "order place shows from-preview flag" "--from-preview" order place
 
 run_help_contains_test "option chain shows --dte flag" "--dte" option chain
+run_help_contains_test "option chain shows --delta-min flag" "--delta-min" option chain
+run_help_contains_test "option chain shows --delta-max flag" "--delta-max" option chain
 run_help_contains_test "option chain shows --fields flag" "--fields" option chain
+run_help_contains_test "option chain shows compact delta example" "--fields strike,delta,bid,ask,mid,openInterest,totalVolume,volatility,daysToExpiration" option chain
 run_help_contains_test "option chain shows --strike-count flag" "--strike-count" option chain
 run_help_contains_test "option contract shows --expiration flag" "--expiration" option contract
 run_help_contains_test "option contract shows --call flag" "--call" option contract

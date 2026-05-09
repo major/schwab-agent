@@ -23,6 +23,12 @@ const (
 	// hoursPerDay converts [time.Duration] hours to calendar days.
 	hoursPerDay = 24
 
+	// midpointDivisor averages bid and ask for the agent-facing mid column.
+	midpointDivisor = 2
+
+	// fieldVolatility is the shared JSON/output field name for volatility values.
+	fieldVolatility = "volatility"
+
 	// thirdFridayMinDay and thirdFridayMaxDay bound the calendar days where
 	// the third Friday of a month can fall.
 	thirdFridayMinDay = 15
@@ -53,18 +59,19 @@ var chainDefaultColumns = []string{
 //nolint:gochecknoglobals,goconst // package-level constant slice; field names are clearer inline
 var chainValidFields = []string{
 	"expiry", "strike", "cp", "symbol",
-	"bid", "ask", "mark", "last",
+	"bid", "ask", "mid", "mark", "last",
 	"delta", "gamma", "theta", "vega", "rho",
-	"iv", "oi", "volume", "itm", "dte",
+	"iv", fieldVolatility, "oi", "openInterest", "volume", "totalVolume", "itm", "dte", "daysToExpiration",
 }
 
 // chainRow holds the sort key and extracted field values for a single contract.
 // Sorting happens on expiry+strike+putCall before the row values are emitted.
 type chainRow struct {
-	expiry  string
-	strike  float64
-	putCall string
-	values  []any
+	expiry   string
+	strike   float64
+	putCall  string
+	contract *models.OptionContract
+	values   []any
 }
 
 // flattenChainRows collects all contracts from an OptionChain's CallExpDateMap
@@ -139,10 +146,11 @@ func extractContractRow(c *models.OptionContract, expiry string, columns []strin
 	}
 
 	return chainRow{
-		expiry:  expiry,
-		strike:  strike,
-		putCall: putCall,
-		values:  values,
+		expiry:   expiry,
+		strike:   strike,
+		putCall:  putCall,
+		contract: c,
+		values:   values,
 	}
 }
 
@@ -162,6 +170,8 @@ func contractFieldValue(c *models.OptionContract, field, expiry string) any {
 		return nilableFloat64(c.Bid)
 	case "ask":
 		return nilableFloat64(c.Ask)
+	case "mid":
+		return nilableMidpoint(c.Bid, c.Ask)
 	case "mark":
 		return nilableFloat64(c.Mark)
 	case "last":
@@ -176,17 +186,19 @@ func contractFieldValue(c *models.OptionContract, field, expiry string) any {
 		return nilableFloat64(c.Vega)
 	case "rho":
 		return nilableFloat64(c.Rho)
-	case "iv":
+	case "iv", fieldVolatility:
 		return nilableFloat64(c.Volatility)
-	case "oi":
+	case "oi", "openInterest":
 		return nilableInt64(c.OpenInterest)
-	case "volume":
+	case "volume", "totalVolume":
 		return nilableInt64(c.TotalVolume)
 	case "itm":
 		return nilableBool(c.InTheMoney)
 	case "dte":
 		// Compute DTE from expiry string and current time.
 		return computeDTE(expiry, time.Now())
+	case "daysToExpiration":
+		return nilableInt(c.DaysToExpiration)
 	default:
 		return nil
 	}
@@ -377,6 +389,24 @@ func nilableFloat64(p *float64) any {
 	return *p
 }
 
+// nilableMidpoint returns the bid/ask midpoint when both sides are present.
+// The Schwab chain has a mark field, but issue 139 specifically called out a
+// mid column for agent workflows, so compute the simple spread midpoint here.
+func nilableMidpoint(bid, ask *float64) any {
+	if bid == nil || ask == nil {
+		return nil
+	}
+	return (*bid + *ask) / midpointDivisor
+}
+
+// nilableInt returns *p as any if non-nil, or nil if the pointer is nil.
+func nilableInt(p *int) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
 // nilableInt64 returns *p as any if non-nil, or nil if the pointer is nil.
 func nilableInt64(p *int64) any {
 	if p == nil {
@@ -412,11 +442,15 @@ func newOptionChainCmd(ref *client.Ref, w io.Writer) *cobra.Command {
 		Use:   "chain <symbol>",
 		Short: "Get compact option chain for a symbol",
 		Long: `Get a compact option chain with configurable columns, expiration selection,
-and strike filtering. Returns rows sorted by expiration, strike, then call
-before put. Use --dte or --expiration to narrow to one expiration cycle.
-Use --fields to select specific columns.`,
+strike filtering, and delta filtering. Returns rows sorted by expiration,
+strike, then call before put. Use --dte or --expiration to narrow to one
+expiration cycle. Use --delta-min/--delta-max to keep contracts within an
+inclusive raw API delta range, and --fields to select specific columns.`,
 		Example: `  schwab-agent option chain AAPL
   schwab-agent option chain AAPL --type CALL --dte 30
+  schwab-agent option chain AMD --type PUT --strike-range OTM --expiration 2026-06-19 \
+    --delta-min -0.25 --delta-max -0.15 \
+    --fields strike,delta,bid,ask,mid,openInterest,totalVolume,volatility,daysToExpiration
   schwab-agent option chain AAPL --expiration 2026-06-19 --fields strike,bid,ask,delta
   schwab-agent option chain AAPL --strike-count 5
   schwab-agent option chain AAPL --strike-min 190 --strike-max 210`,
@@ -442,6 +476,11 @@ func runOptionChain(
 	opts *optionChainOpts,
 	args []string,
 ) error {
+	// Record zero-sensitive delta flags before validation so --delta-min 0 and
+	// --delta-max 0 filter correctly instead of looking like omitted flags.
+	opts.deltaMinSet = cmd.Flags().Changed("delta-min")
+	opts.deltaMaxSet = cmd.Flags().Changed("delta-max")
+
 	if err := validateCobraOptions(cmd.Context(), opts); err != nil {
 		return err
 	}
@@ -493,6 +532,10 @@ func runOptionChain(
 
 	// Apply local strike selectors after flattening.
 	rows = applyStrikeSelectors(rows, opts, chain)
+
+	// Apply local delta bounds after strike selectors so legacy strike-count
+	// behavior still chooses ATM-adjacent strikes before greek filtering.
+	rows = filterRowsByDelta(rows, opts)
 
 	// Determine expiration label for output. Falls back to the first row's
 	// expiry when no explicit selector was provided.
@@ -627,6 +670,40 @@ func filterRowsByExpiration(rows []chainRow, expiration string) []chainRow {
 		}
 	}
 	return filtered
+}
+
+// filterRowsByDelta keeps rows whose API delta is within the requested bounds.
+// Missing deltas cannot satisfy a delta filter because treating absent greeks as
+// zero would incorrectly include contracts when agents ask for --delta-min 0 or
+// --delta-max 0.
+func filterRowsByDelta(rows []chainRow, opts *optionChainOpts) []chainRow {
+	if !opts.deltaMinSet && !opts.deltaMaxSet {
+		return rows
+	}
+
+	filtered := make([]chainRow, 0, len(rows))
+	for _, r := range rows {
+		if chainRowPassesDelta(r, opts) {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered
+}
+
+// chainRowPassesDelta applies inclusive delta bounds to one chain row.
+func chainRowPassesDelta(r chainRow, opts *optionChainOpts) bool {
+	if r.contract == nil || r.contract.Delta == nil {
+		return false
+	}
+
+	delta := *r.contract.Delta
+	if opts.deltaMinSet && delta < opts.DeltaMin {
+		return false
+	}
+	if opts.deltaMaxSet && delta > opts.DeltaMax {
+		return false
+	}
+	return true
 }
 
 // applyStrikeSelectors applies local strike filters after flattening.

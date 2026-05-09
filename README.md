@@ -112,6 +112,9 @@ schwab-agent option expirations AAPL
 # Discover option contracts (calls and puts near the money)
 schwab-agent option chain AAPL --type CALL --dte 30 --strike-count 5
 
+# Find OTM puts near a target delta with compact agent-friendly columns
+schwab-agent option chain AMD --type PUT --strike-range OTM --expiration 2026-06-19 --delta-min -0.25 --delta-max -0.15 --fields strike,delta,bid,ask,mid,openInterest,totalVolume,volatility,daysToExpiration
+
 # Get a single option contract with underlying quote and OCC symbol context
 schwab-agent option contract AAPL --expiration 2025-06-20 --strike 200 --call
 

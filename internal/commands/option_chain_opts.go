@@ -10,16 +10,25 @@ import (
 // optionChainOpts holds the flags for the porcelain option chain command.
 // Struct tags drive defineCobraFlags registration. Type and StrikeRange use
 // named enum types so Cobra validates allowed values at flag-parse time.
+//
+// The *Set fields are not flags; they track whether the corresponding flag was
+// explicitly provided via cmd.Flags().Changed(). Delta=0 is meaningful for far
+// OTM contracts, so a zero-valued bound cannot also mean "unset".
 type optionChainOpts struct {
 	Type        chainContractType `flag:"type"         flagdescr:"Contract type: CALL, PUT, or ALL"                    default:"ALL"`
 	DTE         int               `flag:"dte"          flagdescr:"Target days to expiration"`
 	Expiration  string            `flag:"expiration"   flagdescr:"Exact expiration date (YYYY-MM-DD)"`
+	DeltaMin    float64           `flag:"delta-min"    flagdescr:"Minimum delta (raw API value; puts are negative)"`
+	DeltaMax    float64           `flag:"delta-max"    flagdescr:"Maximum delta (raw API value; puts are negative)"`
 	Fields      string            `flag:"fields"       flagdescr:"Comma-separated field names for column projection"`
 	StrikeCount int               `flag:"strike-count" flagdescr:"Number of strikes around ATM"`
 	Strike      float64           `flag:"strike"       flagdescr:"Exact strike price"`
 	StrikeMin   float64           `flag:"strike-min"   flagdescr:"Minimum strike price"`
 	StrikeMax   float64           `flag:"strike-max"   flagdescr:"Maximum strike price"`
 	StrikeRange strikeRange       `flag:"strike-range" flagdescr:"Moneyness filter: ITM, NTM, OTM, SAK, SBK, SNK, ALL"`
+
+	deltaMinSet bool
+	deltaMaxSet bool
 }
 
 // Validate implements cobraValidatable so validateCobraOptions can delegate
@@ -69,6 +78,14 @@ func validateOptionChainOpts(opts *optionChainOpts) []error {
 	if opts.DTE > 0 && opts.Expiration != "" {
 		errs = append(errs, apperr.NewValidationError(
 			"dte and expiration are mutually exclusive; use one or the other", nil,
+		))
+	}
+
+	// DeltaMin must not exceed DeltaMax when both bounds are explicitly set.
+	// For puts, delta values are negative: delta-min=-0.30, delta-max=-0.20 is valid.
+	if opts.deltaMinSet && opts.deltaMaxSet && opts.DeltaMin > opts.DeltaMax {
+		errs = append(errs, apperr.NewValidationError(
+			fmt.Sprintf("delta-min (%g) must be <= delta-max (%g)", opts.DeltaMin, opts.DeltaMax), nil,
 		))
 	}
 

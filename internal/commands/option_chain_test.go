@@ -435,9 +435,9 @@ func TestOptionChainFieldProjection(t *testing.T) {
 	// validFields is the allowlist from the design doc.
 	validFields := []string{
 		"expiry", "strike", "cp", "symbol",
-		"bid", "ask", "mark", "last",
+		"bid", "ask", "mid", "mark", "last",
 		"delta", "gamma", "theta", "vega", "rho",
-		"iv", "oi", "volume", "itm", "dte",
+		"iv", "volatility", "oi", "openInterest", "volume", "totalVolume", "itm", "dte", "daysToExpiration",
 	}
 
 	tests := []struct {
@@ -767,5 +767,181 @@ func TestOptionChainCommand(t *testing.T) {
 
 		// Assert
 		require.NoError(t, err)
+	})
+
+	t.Run("delta filters combine with type range expiration and custom fields", func(t *testing.T) {
+		// Arrange - mock server verifies server-side narrowing flags while the
+		// command applies delta filtering locally after compact row projection.
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/marketdata/v1/chains" {
+				assert.Equal(t, "AMD", r.URL.Query().Get("symbol"))
+				assert.Equal(t, "PUT", r.URL.Query().Get("contractType"))
+				assert.Equal(t, "OTM", r.URL.Query().Get("range"))
+				assert.Equal(t, "2026-06-19", r.URL.Query().Get("fromDate"))
+				assert.Equal(t, "2026-06-19", r.URL.Query().Get("toDate"))
+
+				body := chainAPIResponse(100.0,
+					nil,
+					map[string]map[string][]*models.OptionContract{
+						"2026-06-19:43": {
+							"90.0": {{
+								PutCall: new("PUT"), Symbol: new("AMD   260619P00090000"),
+								ExpirationDate: new("2026-06-19"), StrikePrice: new(90.0), DaysToExpiration: new(43),
+								Bid: new(1.0), Ask: new(1.2), Delta: new(-0.30), Volatility: new(0.42),
+								OpenInterest: new(int64(100)), TotalVolume: new(int64(20)),
+							}},
+							"92.0": {{
+								PutCall: new("PUT"), Symbol: new("AMD   260619P00092000"),
+								ExpirationDate: new("2026-06-19"), StrikePrice: new(92.0), DaysToExpiration: new(43),
+								Bid: new(1.2), Ask: new(1.4), Delta: new(-0.25), Volatility: new(0.41),
+								OpenInterest: new(int64(150)), TotalVolume: new(int64(25)),
+							}},
+							"95.0": {{
+								PutCall: new("PUT"), Symbol: new("AMD   260619P00095000"),
+								ExpirationDate: new("2026-06-19"), StrikePrice: new(95.0), DaysToExpiration: new(43),
+								Bid: new(1.5), Ask: new(1.7), Delta: new(-0.20), Volatility: new(0.40),
+								OpenInterest: new(int64(200)), TotalVolume: new(int64(30)),
+							}},
+							"96.0": {{
+								PutCall: new("PUT"), Symbol: new("AMD   260619P00096000"),
+								ExpirationDate: new("2026-06-19"), StrikePrice: new(96.0), DaysToExpiration: new(43),
+								Bid: new(1.8), Ask: new(2.0), Delta: new(-0.15), Volatility: new(0.39),
+								OpenInterest: new(int64(250)), TotalVolume: new(int64(35)),
+							}},
+							"97.0": {{
+								PutCall: new("PUT"), Symbol: new("AMD   260619P00097000"),
+								ExpirationDate: new("2026-06-19"), StrikePrice: new(97.0), DaysToExpiration: new(43),
+								Bid: new(2.0), Ask: new(2.2), Delta: new(-0.10), Volatility: new(0.38),
+								OpenInterest: new(int64(300)), TotalVolume: new(int64(40)),
+							}},
+							"99.0": {{
+								PutCall: new("PUT"), Symbol: new("AMD   260619P00099000"),
+								ExpirationDate: new("2026-06-19"), StrikePrice: new(99.0), DaysToExpiration: new(43),
+								Bid: new(2.5), Ask: new(2.7), Volatility: new(0.36),
+								OpenInterest: new(int64(400)), TotalVolume: new(int64(50)),
+							}},
+						},
+					},
+				)
+				_, _ = w.Write([]byte(body))
+				return
+			}
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer server.Close()
+
+		var buf bytes.Buffer
+		cmd := NewOptionCmd(testClient(t, server), &buf)
+
+		// Act
+		_, err := runTestCommand(
+			t,
+			cmd,
+			"chain", "AMD",
+			"--type", "PUT",
+			"--strike-range", "OTM",
+			"--expiration", "2026-06-19",
+			"--delta-min", "-0.25",
+			"--delta-max", "-0.15",
+			"--fields", "strike,delta,bid,ask,mid,openInterest,totalVolume,volatility,daysToExpiration",
+		)
+
+		// Assert
+		require.NoError(t, err)
+
+		var envelope output.Envelope
+		require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+		data, ok := envelope.Data.(map[string]any)
+		require.True(t, ok)
+
+		assert.Equal(
+			t,
+			[]any{
+				"strike", "delta", "bid", "ask", "mid",
+				"openInterest", "totalVolume", "volatility", "daysToExpiration",
+			},
+			data["columns"],
+		)
+
+		rows, ok := data["rows"].([]any)
+		require.True(t, ok)
+		require.Len(t, rows, 3)
+		row, ok := rows[1].([]any)
+		require.True(t, ok)
+		assert.Equal(
+			t,
+			[]any{95.0, -0.20, 1.5, 1.7, 1.6, float64(200), float64(30), 0.40, float64(43)},
+			row,
+		)
+
+		firstRow, ok := rows[0].([]any)
+		require.True(t, ok)
+		lastRow, ok := rows[2].([]any)
+		require.True(t, ok)
+		assert.InEpsilon(t, -0.25, firstRow[1], 0.0001)
+		assert.InEpsilon(t, -0.15, lastRow[1], 0.0001)
+		assert.Equal(t, 3, envelope.Metadata.Returned)
+	})
+
+	t.Run("delta zero bound is honored", func(t *testing.T) {
+		// Arrange - --delta-max 0 should keep only non-positive deltas. This
+		// proves zero is an explicit bound, not the default unset value.
+		body := chainAPIResponse(100.0,
+			map[string]map[string][]*models.OptionContract{
+				"2026-06-19:43": {
+					"100.0": {{
+						PutCall:     new("CALL"),
+						Symbol:      new("AAPL  260619C00100000"),
+						StrikePrice: new(100.0),
+						Delta:       new(0.0),
+					}},
+					"105.0": {{
+						PutCall:     new("CALL"),
+						Symbol:      new("AAPL  260619C00105000"),
+						StrikePrice: new(105.0),
+						Delta:       new(0.10),
+					}},
+				},
+			},
+			nil,
+		)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(body))
+		}))
+		defer server.Close()
+
+		var buf bytes.Buffer
+		cmd := NewOptionCmd(testClient(t, server), &buf)
+
+		// Act
+		_, err := runTestCommand(t, cmd, "chain", "AAPL", "--delta-max", "0", "--fields", "strike,delta")
+
+		// Assert
+		require.NoError(t, err)
+		var envelope output.Envelope
+		require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+		data, ok := envelope.Data.(map[string]any)
+		require.True(t, ok)
+		rows, ok := data["rows"].([]any)
+		require.True(t, ok)
+		require.Len(t, rows, 1)
+	})
+
+	t.Run("delta min greater than max fails validation", func(t *testing.T) {
+		// Arrange
+		server := jsonServer(`{}`)
+		defer server.Close()
+
+		var buf bytes.Buffer
+		cmd := NewOptionCmd(testClient(t, server), &buf)
+
+		// Act
+		_, err := runTestCommand(t, cmd, "chain", "AAPL", "--delta-min", "0.50", "--delta-max", "0.20")
+
+		// Assert
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "delta-min (0.5) must be <= delta-max (0.2)")
 	})
 }
