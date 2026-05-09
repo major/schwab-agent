@@ -148,4 +148,4 @@ Build tags: `//go:build task16` (auth), `//go:build task17` (account), etc.
 | symbol.go | symbol | build, parse |
 | ta.go | ta | sma, ema, rsi, macd, atr, bbands, stoch, adx, vwap, hv, expected-move |
 | indicators.go | indicators | (shortcut for ta dashboard) |
-| analyze.go | analyze | (quote + ta dashboard composite) |
+| analyze.go | analyze | (quote + ta dashboard composite; batched quotes, concurrent TA, compact/latest-only output) |

@@ -315,9 +315,13 @@ Examples:
   schwab-agent analyze AAPL
   schwab-agent analyze AAPL NVDA
   schwab-agent analyze AAPL --interval weekly --points 5
+  schwab-agent analyze AAPL MSFT NVDA --compact
+  schwab-agent analyze AAPL --latest-only
 
 Flags:
+      --compact           Return compact quote and TA fields for multi-symbol scans
       --interval string   Data interval (daily, weekly, 1min, 5min, 15min, 30min) (default "daily")
+      --latest-only       Omit duplicate dashboard values rows when only latest context is needed
       --points int        Number of TA output points (default 1; 0 = all) (default 1)
 
 Global Flags:
