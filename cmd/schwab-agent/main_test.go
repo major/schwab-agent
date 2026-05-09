@@ -595,3 +595,47 @@ func TestBuildApp_VersionFlag(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "dev")
 }
+
+func TestDisplayVersion_ReleaseVersionUnchanged(t *testing.T) {
+	originalVersion := version
+	t.Cleanup(func() { version = originalVersion })
+
+	version = "v1.2.3"
+
+	assert.Equal(t, "v1.2.3", displayVersion())
+}
+
+func TestShortRevision(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "truncates long revision",
+			in:   "abcdef1234567890",
+			want: "abcdef1",
+		},
+		{
+			name: "leaves exact length revision unchanged",
+			in:   "abcdef1",
+			want: "abcdef1",
+		},
+		{
+			name: "leaves short revision unchanged",
+			in:   "abc123",
+			want: "abc123",
+		},
+		{
+			name: "leaves empty revision unchanged",
+			in:   "",
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, shortRevision(tt.in))
+		})
+	}
+}

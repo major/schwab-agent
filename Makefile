@@ -1,7 +1,10 @@
 .PHONY: build test lint clean install release smoke smoke-ci
 
+BUILD_VERSION ?= $(shell if git describe --tags --exact-match >/dev/null 2>&1; then git describe --tags --exact-match; else printf 'dev-%s' "$$(git rev-parse --short=7 HEAD)"; fi)
+GO_LDFLAGS ?= -X main.version=$(BUILD_VERSION)
+
 build:
-	go build -o schwab-agent ./cmd/schwab-agent/
+	go build -ldflags "$(GO_LDFLAGS)" -o schwab-agent ./cmd/schwab-agent/
 
 test:
 	go test -v -race -coverprofile=coverage.out ./...
@@ -15,7 +18,7 @@ clean:
 	rm -rf dist/
 
 install:
-	go install ./cmd/schwab-agent/
+	go install -ldflags "$(GO_LDFLAGS)" ./cmd/schwab-agent/
 
 smoke:
 	SMOKE_TIER=all ./scripts/smoke-test.sh
