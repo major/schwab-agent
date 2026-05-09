@@ -228,7 +228,7 @@ schwab-agent order place --spec @order.json
 | `history` | Price history for a symbol (alias: `price-history`) |
 | `ta` | Technical analysis with symbol-keyed JSON output (dashboard, sma, ema, rsi, macd, atr, bbands, stoch, adx, vwap, hv, expected-move) |
 | `indicators` | Technical analysis dashboard shortcut with symbol-keyed JSON output |
-| `analyze` | Combined quote and technical analysis dashboard |
+| `analyze` | Combined quote and technical analysis dashboard with compact and latest-only output modes |
 | `market` | Market hours and top movers |
 | `symbol` | Build and parse OCC option symbols (no auth required) |
 | `instrument` | Search instruments |

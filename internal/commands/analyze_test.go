@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -72,6 +74,14 @@ func TestNewAnalyzeCmd_Flags(t *testing.T) {
 	pointsFlag := cmd.Flags().Lookup("points")
 	require.NotNil(t, pointsFlag, "--points flag should be registered")
 	assert.Equal(t, "1", pointsFlag.DefValue)
+
+	latestOnlyFlag := cmd.Flags().Lookup("latest-only")
+	require.NotNil(t, latestOnlyFlag, "--latest-only flag should be registered")
+	assert.Equal(t, "false", latestOnlyFlag.DefValue)
+
+	compactFlag := cmd.Flags().Lookup("compact")
+	require.NotNil(t, compactFlag, "--compact flag should be registered")
+	assert.Equal(t, "false", compactFlag.DefValue)
 }
 
 func TestNewAnalyzeCmd_NoArgs(t *testing.T) {
@@ -103,6 +113,8 @@ func TestNewAnalyzeCmd_HelpText(t *testing.T) {
 	assert.Contains(t, helpOutput, "ta dashboard")
 	assert.Contains(t, helpOutput, "--interval")
 	assert.Contains(t, helpOutput, "--points")
+	assert.Contains(t, helpOutput, "--latest-only")
+	assert.Contains(t, helpOutput, "--compact")
 }
 
 func TestNewAnalyzeCmd_SingleSymbol(t *testing.T) {
@@ -141,17 +153,22 @@ func TestNewAnalyzeCmd_SingleSymbol(t *testing.T) {
 }
 
 func TestNewAnalyzeCmd_MultiSymbol(t *testing.T) {
-	// Arrange - server returns quote data for both symbols and candle data
-	// for price-history requests. The quote endpoint path for multi-analyze
-	// is /marketdata/v1/SYMBOL/quotes (called per-symbol).
+	// Arrange - server returns quote data for both symbols from one batched
+	// /quotes request and candle data for each price-history request.
+	quoteRequests := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch {
-		case strings.Contains(r.URL.Path, "AAPL/quotes"):
-			_, _ = w.Write([]byte(aaplQuoteEntryResponse))
-		case strings.Contains(r.URL.Path, "NVDA/quotes"):
-			_, _ = w.Write([]byte(`{"NVDA":{"assetMainType":"EQUITY","symbol":"NVDA","quote":{"lastPrice":800.0}}}`))
+		case r.URL.Path == "/marketdata/v1/quotes":
+			quoteRequests++
+			assert.ElementsMatch(t, []string{"AAPL", "NVDA"}, strings.Split(r.URL.Query().Get("symbols"), ","))
+			_, _ = w.Write([]byte(`{
+				"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","quote":{"lastPrice":150.0}},
+				"NVDA":{"assetMainType":"EQUITY","symbol":"NVDA","quote":{"lastPrice":800.0}}
+			}`))
+		case strings.Contains(r.URL.Path, "/quotes"):
+			t.Fatalf("analyze should batch multi-symbol quotes, got path %s", r.URL.Path)
 		case strings.Contains(r.URL.Path, "/pricehistory"):
 			// Determine symbol from query param
 			sym := r.URL.Query().Get("symbol")
@@ -175,6 +192,7 @@ func TestNewAnalyzeCmd_MultiSymbol(t *testing.T) {
 	var envelope output.Envelope
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
 	assert.Empty(t, envelope.Errors)
+	assert.Equal(t, 1, quoteRequests, "multi-symbol analyze should fetch quotes once")
 
 	data, ok := envelope.Data.(map[string]any)
 	require.True(t, ok)
@@ -190,6 +208,120 @@ func TestNewAnalyzeCmd_MultiSymbol(t *testing.T) {
 	}
 }
 
+func TestNewAnalyzeCmd_MultiSymbolFetchesTAConcurrently(t *testing.T) {
+	// Arrange - quote batching happens before TA, then price-history requests
+	// should overlap instead of making each symbol wait for the previous one.
+	var activeHistoryRequests atomic.Int64
+	var maxActiveHistoryRequests atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case r.URL.Path == "/marketdata/v1/quotes":
+			_, _ = w.Write([]byte(`{
+				"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","quote":{"lastPrice":150.0}},
+				"MSFT":{"assetMainType":"EQUITY","symbol":"MSFT","quote":{"lastPrice":410.0}},
+				"NVDA":{"assetMainType":"EQUITY","symbol":"NVDA","quote":{"lastPrice":800.0}}
+			}`))
+		case strings.Contains(r.URL.Path, "/pricehistory"):
+			active := activeHistoryRequests.Add(1)
+			for {
+				maxActive := maxActiveHistoryRequests.Load()
+				if active <= maxActive || maxActiveHistoryRequests.CompareAndSwap(maxActive, active) {
+					break
+				}
+			}
+			defer activeHistoryRequests.Add(-1)
+
+			// Hold the handler briefly so parallel requests are observable. If analyze
+			// regresses to sequential TA, maxActiveHistoryRequests remains 1.
+			time.Sleep(25 * time.Millisecond)
+			sym := r.URL.Query().Get("symbol")
+			_, _ = w.Write([]byte(mockCandleListJSON(sym, 252)))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "AAPL", "MSFT", "NVDA")
+	require.NoError(t, err)
+
+	// Assert
+	assert.Greater(t, maxActiveHistoryRequests.Load(), int64(1), "multi-symbol analyze should overlap TA requests")
+}
+
+func TestNewAnalyzeCmd_LatestOnlyOmitsDashboardValues(t *testing.T) {
+	// Arrange
+	srv := analyzeServer(t, aaplQuoteEntryResponse, mockCandleListJSON("AAPL", 252))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "AAPL", "--latest-only")
+	require.NoError(t, err)
+
+	// Assert
+	var envelope output.Envelope
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok, "data should be a map")
+	symbolData, ok := data["AAPL"].(map[string]any)
+	require.True(t, ok, "AAPL entry should be a map")
+	analysis, ok := symbolData["analysis"].(map[string]any)
+	require.True(t, ok, "analysis should be a map")
+	assert.NotNil(t, analysis["latest"], "latest should still be present")
+	assert.NotContains(t, analysis, "values", "latest-only should omit duplicate values row")
+}
+
+func TestNewAnalyzeCmd_CompactOutput(t *testing.T) {
+	// Arrange
+	quoteJSON := `{"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","quote":{"bidPrice":149.9,"askPrice":150.1,"lastPrice":150.0,"mark":150.0,"netPercentChange":1.25,"totalVolume":1234567,"quoteTime":1710000000000}}}`
+	srv := analyzeServer(t, quoteJSON, mockCandleListJSON("AAPL", 252))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "AAPL", "--compact")
+	require.NoError(t, err)
+
+	// Assert
+	var envelope output.Envelope
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok, "data should be a map")
+	symbolData, ok := data["AAPL"].(map[string]any)
+	require.True(t, ok, "AAPL entry should be a compact map")
+
+	quote, ok := symbolData["quote"].(map[string]any)
+	require.True(t, ok, "compact quote should be a map")
+	assert.Equal(t, "AAPL", quote["symbol"])
+	assert.InDelta(t, 149.9, quote["bid"], 0.001)
+	assert.InDelta(t, 150.1, quote["ask"], 0.001)
+	assert.InDelta(t, 150.0, quote["last"], 0.001)
+	assert.InDelta(t, 1.25, quote["netPercentChange"], 0.001)
+	assert.InDelta(t, 1234567, quote["volume"], 0.001)
+
+	technical, ok := symbolData["technical"].(map[string]any)
+	require.True(t, ok, "compact technical fields should be present")
+	assert.Contains(t, technical, "close")
+	assert.Contains(t, technical, "distance_from_sma_200_percent")
+	assert.Contains(t, technical, "rsi_14")
+	assert.Contains(t, technical, "atr_percent")
+	assert.Contains(t, technical, "relative_volume")
+
+	signals, ok := symbolData["signals"].(map[string]any)
+	require.True(t, ok, "compact signals should be present")
+	assert.Contains(t, signals, "trend")
+	assert.Contains(t, signals, "momentum")
+	assert.NotContains(t, symbolData, "analysis", "compact output should omit full dashboard")
+}
+
 func TestNewAnalyzeCmd_PartialFailure_TAFails(t *testing.T) {
 	// Arrange - test partial failure: AAPL succeeds completely, INVALID has quote
 	// succeed but TA fail (empty candles). This verifies that partial data (quote
@@ -198,11 +330,12 @@ func TestNewAnalyzeCmd_PartialFailure_TAFails(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch {
-		case strings.Contains(r.URL.Path, "AAPL/quotes"):
-			_, _ = w.Write([]byte(aaplQuoteEntryResponse))
-		case strings.Contains(r.URL.Path, "INVALID/quotes"):
-			// Quote succeeds for INVALID
-			_, _ = w.Write([]byte(invalidAnalyzeQuoteEntryResponse))
+		case r.URL.Path == "/marketdata/v1/quotes":
+			// Quotes succeed for both symbols in one batch.
+			_, _ = w.Write([]byte(`{
+				"AAPL":{"assetMainType":"EQUITY","symbol":"AAPL","quote":{"lastPrice":150.0}},
+				"INVALID":{"assetMainType":"EQUITY","symbol":"INVALID","quote":{"lastPrice":100.0}}
+			}`))
 		case strings.Contains(r.URL.Path, "/pricehistory"):
 			// Return valid candles for AAPL, empty for INVALID (TA will fail)
 			sym := r.URL.Query().Get("symbol")

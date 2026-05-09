@@ -148,7 +148,7 @@ type dashboardOutput struct {
 	Parameters dashboardParameters `json:"parameters"`
 	Latest     map[string]any      `json:"latest"`
 	Signals    map[string]any      `json:"signals"`
-	Values     []map[string]any    `json:"values"`
+	Values     []map[string]any    `json:"values,omitempty"`
 }
 
 type dashboardInputs struct {
@@ -788,18 +788,18 @@ func dashboardBaseRows(inputs dashboardInputs, baseStart int) []map[string]any {
 
 func addDashboardSeries(rows []map[string]any, series dashboardSeries) error {
 	for key, values := range map[string][]float64{
-		"sma_21":         series.SMA21,
-		"sma_50":         series.SMA50,
-		"sma_200":        series.SMA200,
-		"rsi_14":         series.RSI14,
-		dashboardKeyMACD: series.MACD,
-		"macd_signal":    series.MACDSignal,
-		"macd_histogram": series.MACDHist,
-		"atr_14":         series.ATR14,
-		"bbands_upper":   series.BBandsUpper,
-		"bbands_middle":  series.BBandsMid,
-		"bbands_lower":   series.BBandsLower,
-		"avg_volume_20":  series.AvgVolume20,
+		dashboardKeySMA21:         series.SMA21,
+		dashboardKeySMA50:         series.SMA50,
+		dashboardKeySMA200:        series.SMA200,
+		dashboardKeyRSI14:         series.RSI14,
+		dashboardKeyMACD:          series.MACD,
+		dashboardKeyMACDSignal:    series.MACDSignal,
+		dashboardKeyMACDHistogram: series.MACDHist,
+		dashboardKeyATR14:         series.ATR14,
+		dashboardKeyBBandsUpper:   series.BBandsUpper,
+		dashboardKeyBBandsMiddle:  series.BBandsMid,
+		dashboardKeyBBandsLower:   series.BBandsLower,
+		dashboardKeyAvgVolume20:   series.AvgVolume20,
 	} {
 		if err := addTailAlignedFloat(rows, key, values); err != nil {
 			return err
@@ -824,11 +824,11 @@ func addDashboardDerivedRow(row map[string]any, inputs dashboardInputs, candleIn
 	if err != nil {
 		return err
 	}
-	atrValue, err := dashboardRowFloat(row, "atr_14")
+	atrValue, err := dashboardRowFloat(row, dashboardKeyATR14)
 	if err != nil {
 		return err
 	}
-	avgVolume, err := dashboardRowFloat(row, "avg_volume_20")
+	avgVolume, err := dashboardRowFloat(row, dashboardKeyAvgVolume20)
 	if err != nil {
 		return err
 	}
@@ -836,32 +836,32 @@ func addDashboardDerivedRow(row map[string]any, inputs dashboardInputs, candleIn
 	if err != nil {
 		return err
 	}
-	sma21Value, err := dashboardRowFloat(row, "sma_21")
+	sma21Value, err := dashboardRowFloat(row, dashboardKeySMA21)
 	if err != nil {
 		return err
 	}
-	sma50Value, err := dashboardRowFloat(row, "sma_50")
+	sma50Value, err := dashboardRowFloat(row, dashboardKeySMA50)
 	if err != nil {
 		return err
 	}
-	sma200Value, err := dashboardRowFloat(row, "sma_200")
+	sma200Value, err := dashboardRowFloat(row, dashboardKeySMA200)
 	if err != nil {
 		return err
 	}
 
 	rangeHigh20, rangeLow20 := highLowWindow(inputs.Highs, inputs.Lows, candleIndex, dashboardRangePeriod)
 	rangeHigh252, rangeLow252 := highLowWindow(inputs.Highs, inputs.Lows, candleIndex, dashboardLongRangePeriod)
-	row["atr_percent"] = percentOf(atrValue, closePrice)
-	row["relative_volume"] = ratio(volume, avgVolume)
-	row["range_20_high"] = rangeHigh20
-	row["range_20_low"] = rangeLow20
-	row["range_252_high"] = rangeHigh252
-	row["range_252_low"] = rangeLow252
-	row["distance_from_sma_21_percent"] = percentChange(closePrice, sma21Value)
-	row["distance_from_sma_50_percent"] = percentChange(closePrice, sma50Value)
-	row["distance_from_sma_200_percent"] = percentChange(closePrice, sma200Value)
-	row["distance_from_range_20_high_percent"] = percentChange(closePrice, rangeHigh20)
-	row["distance_from_range_252_high_percent"] = percentChange(closePrice, rangeHigh252)
+	row[dashboardKeyATRPercent] = percentOf(atrValue, closePrice)
+	row[dashboardKeyRelativeVolume] = ratio(volume, avgVolume)
+	row[dashboardKeyRange20High] = rangeHigh20
+	row[dashboardKeyRange20Low] = rangeLow20
+	row[dashboardKeyRange252High] = rangeHigh252
+	row[dashboardKeyRange252Low] = rangeLow252
+	row[dashboardKeyDistanceFromSMA21Pct] = percentChange(closePrice, sma21Value)
+	row[dashboardKeyDistanceFromSMA50Pct] = percentChange(closePrice, sma50Value)
+	row[dashboardKeyDistanceFromSMA200Pct] = percentChange(closePrice, sma200Value)
+	row[dashboardKeyDistanceFromRange20Pct] = percentChange(closePrice, rangeHigh20)
+	row[dashboardKeyDistanceFromRange252Pct] = percentChange(closePrice, rangeHigh252)
 	return nil
 }
 
@@ -984,31 +984,31 @@ func dashboardSignals(latest map[string]any) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	sma21, err := dashboardRowFloat(latest, "sma_21")
+	sma21, err := dashboardRowFloat(latest, dashboardKeySMA21)
 	if err != nil {
 		return nil, err
 	}
-	sma50, err := dashboardRowFloat(latest, "sma_50")
+	sma50, err := dashboardRowFloat(latest, dashboardKeySMA50)
 	if err != nil {
 		return nil, err
 	}
-	sma200, err := dashboardRowFloat(latest, "sma_200")
+	sma200, err := dashboardRowFloat(latest, dashboardKeySMA200)
 	if err != nil {
 		return nil, err
 	}
-	rsi14, err := dashboardRowFloat(latest, "rsi_14")
+	rsi14, err := dashboardRowFloat(latest, dashboardKeyRSI14)
 	if err != nil {
 		return nil, err
 	}
-	macdHist, err := dashboardRowFloat(latest, "macd_histogram")
+	macdHist, err := dashboardRowFloat(latest, dashboardKeyMACDHistogram)
 	if err != nil {
 		return nil, err
 	}
-	atrPercent, err := dashboardRowFloat(latest, "atr_percent")
+	atrPercent, err := dashboardRowFloat(latest, dashboardKeyATRPercent)
 	if err != nil {
 		return nil, err
 	}
-	relativeVolume, err := dashboardRowFloat(latest, "relative_volume")
+	relativeVolume, err := dashboardRowFloat(latest, dashboardKeyRelativeVolume)
 	if err != nil {
 		return nil, err
 	}
