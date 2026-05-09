@@ -81,10 +81,14 @@ func writeAnalyzeResults(
 		result, err := buildAnalyzeResult(ctx, c, symbol, interval, points)
 		if err != nil {
 			// Keep the single-symbol output contract aligned with the multi-symbol
-			// path below. Young IPOs and thin history can make TA fail even when the
-			// quote is useful, so return a partial envelope instead of discarding the
-			// successful quote and turning the whole command into a hard failure.
-			if result.Quote != nil {
+			// path below. Young IPOs, thin history, or transient quote failures can
+			// leave one side useful, so return a partial envelope instead of discarding
+			// the successful data and turning the whole command into a hard failure.
+			// Symbol-not-found stays fatal because TA can still succeed from historical
+			// candles even when the quote endpoint proves the requested symbol is not
+			// available as a current quote.
+			var symErr *apperr.SymbolNotFoundError
+			if !errors.As(err, &symErr) && hasAnalyzeData(result) {
 				meta := output.NewMetadata()
 				meta.Requested = 1
 				meta.Returned = 1
