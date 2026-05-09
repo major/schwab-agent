@@ -328,6 +328,79 @@ func TestNewAnalyzeCmd_QuoteResponseMissingSymbol(t *testing.T) {
 	require.ErrorAs(t, err, &symErr)
 }
 
+func TestNewAnalyzeCmd_SingleSymbolQuoteFailsTASucceeds(t *testing.T) {
+	// Arrange - single-symbol analyze should preserve successful TA output when a
+	// non-symbol quote failure happens. This matches multi-symbol partial output
+	// behavior without weakening the SymbolNotFoundError hard-fail cases above.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case strings.Contains(r.URL.Path, "/quotes"):
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"message":"temporary quote failure"}`))
+		case strings.Contains(r.URL.Path, "/pricehistory"):
+			_, _ = w.Write([]byte(mockCandleListJSON("AAPL", 252)))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "AAPL")
+	require.NoError(t, err)
+
+	// Assert
+	var envelope output.Envelope
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+
+	data, ok := envelope.Data.(map[string]any)
+	require.True(t, ok, "data should be a map")
+	require.Contains(t, data, "AAPL")
+
+	symbolData, ok := data["AAPL"].(map[string]any)
+	require.True(t, ok, "AAPL entry should be a map")
+	assert.Nil(t, symbolData["quote"], "quote should be nil when quote fetch fails")
+	assert.NotNil(t, symbolData["analysis"], "analysis should be present when TA succeeds")
+
+	require.Len(t, envelope.Errors, 1)
+	assert.Contains(t, envelope.Errors[0], "AAPL")
+	assert.Contains(t, envelope.Errors[0], "quote failed")
+	assert.Equal(t, 1, envelope.Metadata.Requested)
+	assert.Equal(t, 1, envelope.Metadata.Returned)
+}
+
+func TestNewAnalyzeCmd_SingleSymbolBothFail(t *testing.T) {
+	// Arrange - when neither quote nor TA produces usable data, analyze should
+	// return the command-level error instead of writing an empty partial envelope.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case strings.Contains(r.URL.Path, "/quotes"):
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"message":"temporary quote failure"}`))
+		case strings.Contains(r.URL.Path, "/pricehistory"):
+			_, _ = w.Write([]byte(`{"symbol":"AAPL","empty":true,"candles":[]}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Act
+	var buf bytes.Buffer
+	cmd := NewAnalyzeCmd(testClientWithMarketData(t, srv), &buf)
+	_, err := runTestCommand(t, cmd, "AAPL")
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, buf.String(), "analyze should not write a partial envelope when both data sources fail")
+}
+
 func TestNewAnalyzeCmd_InvalidInterval(t *testing.T) {
 	// Arrange
 	ref := &client.Ref{}
