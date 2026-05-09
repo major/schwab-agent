@@ -1157,6 +1157,90 @@ func TestNewOrderCmdPreviewSaveAndPlaceFromPreview(t *testing.T) {
 	assert.Equal(t, "verified", placeData["verificationState"])
 }
 
+func TestNewOrderCmdPlaceFromCoveredCallPreviewRechecksShares(t *testing.T) {
+	orderID := int64(24680)
+	previewResponse := models.PreviewOrder{OrderID: &orderID}
+	accountPositionRequests := 0
+	placeRequests := 0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/trader/v1/accounts/hash123":
+			assert.Equal(t, "positions", r.URL.Query().Get("fields"))
+
+			longQuantity := 100
+			if accountPositionRequests > 0 {
+				longQuantity = 50
+			}
+			accountPositionRequests++
+
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(map[string]any{
+				"securitiesAccount": map[string]any{
+					"positions": []map[string]any{
+						{
+							"longQuantity": longQuantity,
+							"instrument": map[string]any{
+								"symbol":    "F",
+								"assetType": "EQUITY",
+							},
+						},
+					},
+				},
+			}); err != nil {
+				t.Errorf("Encode(test account response) error = %v", err)
+			}
+		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/hash123/previewOrder":
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(previewResponse); err != nil {
+				t.Errorf("Encode(test preview response) error = %v", err)
+			}
+		case r.Method == http.MethodPost && r.URL.Path == "/trader/v1/accounts/hash123/orders":
+			placeRequests++
+			assert.Fail(t, "covered-call saved preview should recheck shares before placement")
+			http.NotFound(w, r)
+		default:
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	t.Setenv("SCHWAB_AGENT_STATE_DIR", t.TempDir())
+	configPath := writeTestConfigMutable(t, "hash123")
+	cliClient := &client.Ref{Client: client.NewClient("test-token", client.WithBaseURL(server.URL))}
+
+	previewStdout, err := runOrderCommand(
+		t,
+		cliClient,
+		configPath,
+		"",
+		"order", "preview", "sell-covered-call",
+		"--underlying", "F",
+		"--expiration", testFutureExpDate(),
+		"--strike", "14",
+		"--quantity", "1",
+		"--type", "LIMIT",
+		"--price", "1.00",
+		"--save-preview",
+	)
+	require.NoError(t, err)
+
+	previewEnvelope := decodeEnvelope(t, previewStdout)
+	previewData, ok := previewEnvelope.Data.(map[string]any)
+	require.True(t, ok)
+	digestData, ok := previewData["previewDigest"].(map[string]any)
+	require.True(t, ok)
+	digest, ok := digestData["digest"].(string)
+	require.True(t, ok)
+
+	_, err = runOrderCommand(t, cliClient, configPath, "", "order", "place", "--from-preview", digest)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "account has 50")
+	assert.Equal(t, 2, accountPositionRequests)
+	assert.Zero(t, placeRequests)
+}
+
 func TestNewOrderCmdPlaceFromPreviewRejectsAccountMismatch(t *testing.T) {
 	t.Setenv("SCHWAB_AGENT_STATE_DIR", t.TempDir())
 	configPath := writeTestConfigMutable(t, "hash123")

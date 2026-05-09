@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -21,7 +23,7 @@ func porcelainCmdNames(cmds []*cobra.Command) []string {
 	return names
 }
 
-// TestPorcelainSingleLegBuild verifies all four single-leg porcelain build
+// TestPorcelainSingleLegBuild verifies single-leg porcelain build
 // commands produce correct order JSON with the right hardcoded direction.
 func TestPorcelainSingleLegBuild(t *testing.T) {
 	t.Parallel()
@@ -35,6 +37,7 @@ func TestPorcelainSingleLegBuild(t *testing.T) {
 		{subcmd: "long-put", wantInstruction: "BUY_TO_OPEN", wantPutCall: "PUT"},
 		{subcmd: "cash-secured-put", wantInstruction: "SELL_TO_OPEN", wantPutCall: "PUT"},
 		{subcmd: "naked-call", wantInstruction: "SELL_TO_OPEN", wantPutCall: "CALL"},
+		{subcmd: "sell-covered-call", wantInstruction: "SELL_TO_OPEN", wantPutCall: "CALL"},
 	}
 
 	for _, tt := range tests {
@@ -351,7 +354,129 @@ func TestPorcelainJadeLizardBuild(t *testing.T) {
 	assert.Equal(t, "BUY_TO_OPEN", longCallLeg["instruction"])
 }
 
-// TestPorcelainCommandRegistrationConsistency verifies that all 13 porcelain
+// TestPorcelainShortIronCondorBuild verifies the short iron condor porcelain
+// hardcodes an opening net-credit iron condor.
+func TestPorcelainShortIronCondorBuild(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	buf := &bytes.Buffer{}
+	cmd := newOrderBuildCmd(buf)
+
+	// Act
+	_, err := runTestCommand(t, cmd,
+		"short-iron-condor",
+		"--underlying", "F",
+		"--expiration", testFutureExpDate(),
+		"--put-long-strike", "9",
+		"--put-short-strike", "10",
+		"--call-short-strike", "14",
+		"--call-long-strike", "15",
+		"--quantity", "1",
+		"--price", "0.50",
+	)
+
+	// Assert
+	require.NoError(t, err)
+
+	var order map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &order))
+
+	assert.Equal(t, "NET_CREDIT", order["orderType"])
+	assert.Equal(t, "IRON_CONDOR", order["complexOrderStrategyType"])
+
+	legs, ok := order["orderLegCollection"].([]any)
+	require.True(t, ok)
+	require.Len(t, legs, 4, "iron condor should have 4 legs")
+
+	wantInstructions := []string{"BUY_TO_OPEN", "SELL_TO_OPEN", "SELL_TO_OPEN", "BUY_TO_OPEN"}
+	for i, want := range wantInstructions {
+		leg := legs[i].(map[string]any)
+		assert.Equal(t, want, leg["instruction"], "leg %d", i)
+	}
+}
+
+// TestVerifyCoveredCallShares verifies the preflight that prevents agents from
+// selling a covered call when the selected account lacks enough long shares.
+func TestVerifyCoveredCallShares(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		positions  []map[string]any
+		contracts  float64
+		wantErr    bool
+		wantErrMsg string
+	}{
+		{
+			name: "enough shares",
+			positions: []map[string]any{
+				{"longQuantity": 100, "instrument": map[string]any{"symbol": "F", "assetType": "EQUITY"}},
+			},
+			contracts: 1,
+		},
+		{
+			name: "insufficient shares",
+			positions: []map[string]any{
+				{"longQuantity": 50, "instrument": map[string]any{"symbol": "F", "assetType": "EQUITY"}},
+			},
+			contracts:  1,
+			wantErr:    true,
+			wantErrMsg: "account has 50",
+		},
+		{
+			name: "no matching equity position",
+			positions: []map[string]any{
+				{"longQuantity": 100, "instrument": map[string]any{"symbol": "F", "assetType": "OPTION"}},
+			},
+			contracts:  1,
+			wantErr:    true,
+			wantErrMsg: "no matching equity position",
+		},
+		{
+			name: "missing asset type is not trusted as equity",
+			positions: []map[string]any{
+				{"longQuantity": 100, "instrument": map[string]any{"symbol": "F"}},
+			},
+			contracts:  1,
+			wantErr:    true,
+			wantErrMsg: "no matching equity position",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "/trader/v1/accounts/hash123", r.URL.Path)
+				assert.Equal(t, "positions", r.URL.Query().Get("fields"))
+
+				w.Header().Set("Content-Type", "application/json")
+				if err := json.NewEncoder(w).Encode(map[string]any{
+					"securitiesAccount": map[string]any{"positions": tt.positions},
+				}); err != nil {
+					t.Errorf("Encode(test account response) error = %v", err)
+				}
+			}))
+			defer srv.Close()
+
+			// Act
+			err := verifyCoveredCallShares(context.Background(), testClient(t, srv), "hash123", "F", tt.contracts)
+
+			// Assert
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrMsg)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestPorcelainCommandRegistrationConsistency verifies that all 15 porcelain
 // commands are registered consistently under build, place, and preview. Uses
 // command Name() method instead of hardcoded strings to avoid goconst threshold
 // issues from cross-file counting.
@@ -362,10 +487,10 @@ func TestPorcelainCommandRegistrationConsistency(t *testing.T) {
 	placeCmds := orderPlacePorcelainCommands(nil, "", io.Discard)
 	previewCmds := orderPreviewPorcelainCommands(nil, "", io.Discard)
 
-	// All three groups should have the same 13 commands.
-	require.Len(t, buildCmds, 13)
-	require.Len(t, placeCmds, 13)
-	require.Len(t, previewCmds, 13)
+	// All three groups should have the same 15 commands.
+	require.Len(t, buildCmds, 15)
+	require.Len(t, placeCmds, 15)
+	require.Len(t, previewCmds, 15)
 
 	// Verify all three groups have matching command names.
 	buildNames := porcelainCmdNames(buildCmds)

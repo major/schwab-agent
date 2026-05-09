@@ -856,6 +856,8 @@ Available Commands:
   iron-condor     Build an iron condor order request
   oco             Build a one-cancels-other order request for an existing position
   option          Build an option order request
+  sell-covered-call Sell a covered call against existing shares
+  short-iron-condor Sell an opening iron condor
   straddle        Build a straddle order request
   strangle        Build a strangle order request
   vertical        Build a vertical spread order request
@@ -1126,6 +1128,35 @@ Global Flags:
   -v, --verbose                         Enable debug logging to stderr
 ```
 
+### `schwab-agent order build sell-covered-call`
+
+```bash
+Usage:
+  schwab-agent order build sell-covered-call [flags]
+
+Examples:
+  schwab-agent order build sell-covered-call --underlying F --expiration 2026-06-18 --strike 14 --quantity 1 --type LIMIT --price 1.00
+  schwab-agent order preview sell-covered-call --underlying F --expiration 2026-06-18 --strike 14 --quantity 1 --type LIMIT --price 1.00 --save-preview
+  schwab-agent order place sell-covered-call --underlying F --expiration 2026-06-18 --strike 14 --quantity 1 --type LIMIT --price 1.00
+
+Flags:
+      --duration string     Order duration
+      --expiration string   Expiration date (YYYY-MM-DD)
+      --price float         Option price
+      --quantity float      Number of contracts
+      --session string      Trading session
+      --strike float        Option strike price
+      --type string         Order type
+      --underlying string   Underlying symbol
+
+Global Flags:
+  -a, --account string                  Override default account by hash, account number, or nickname
+      --config string                   Path to config file
+      --debug-options string[="text"]   Print resolved flag values and exit (text or json)
+      --token string                    Path to token file
+  -v, --verbose                         Enable debug logging to stderr
+```
+
 ### `schwab-agent order build diagonal`
 
 ```bash
@@ -1269,6 +1300,37 @@ Flags:
       --expiration string         Expiration date (YYYY-MM-DD)
       --open                      Opening position
       --price float               Net credit or debit amount
+      --put-long-strike float     Lowest strike: put being bought (protection)
+      --put-short-strike float    Put being sold (premium)
+      --quantity float            Number of contracts
+      --session string            Trading session
+      --underlying string         Underlying symbol
+
+Global Flags:
+  -a, --account string                  Override default account by hash, account number, or nickname
+      --config string                   Path to config file
+      --debug-options string[="text"]   Print resolved flag values and exit (text or json)
+      --token string                    Path to token file
+  -v, --verbose                         Enable debug logging to stderr
+```
+
+### `schwab-agent order build short-iron-condor`
+
+```bash
+Usage:
+  schwab-agent order build short-iron-condor [flags]
+
+Examples:
+  schwab-agent order build short-iron-condor --underlying F --expiration 2026-06-18 --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 --quantity 1 --price 0.50
+  schwab-agent order preview short-iron-condor --underlying F --expiration 2026-06-18 --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 --quantity 1 --price 0.50 --save-preview
+  schwab-agent order place short-iron-condor --underlying F --expiration 2026-06-18 --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 --quantity 1 --price 0.50
+
+Flags:
+      --call-long-strike float    Highest strike: call being bought (protection)
+      --call-short-strike float   Call being sold (premium)
+      --duration string           Order duration
+      --expiration string         Expiration date (YYYY-MM-DD)
+      --price float               Net credit amount
       --put-long-strike float     Lowest strike: put being bought (protection)
       --put-short-strike float    Put being sold (premium)
       --quantity float            Number of contracts
@@ -1573,6 +1635,8 @@ Available Commands:
   equity        Place an equity order
   oco           Place a one-cancels-other order for an existing position
   option        Place an option order
+  sell-covered-call Sell a covered call against existing shares
+  short-iron-condor Sell an opening iron condor
 
 Flags:
       --from-preview string   Place the exact order payload saved by order preview --save-preview
@@ -1649,6 +1713,66 @@ Flags:
   -s, --symbol string       Stock symbol (e.g., AAPL)
       --take-profit float   Optional take-profit limit price
   -t, --type string         Entry order type (LIMIT or MARKET, default LIMIT)
+
+Global Flags:
+  -a, --account string                  Override default account by hash, account number, or nickname
+      --config string                   Path to config file
+      --debug-options string[="text"]   Print resolved flag values and exit (text or json)
+      --token string                    Path to token file
+  -v, --verbose                         Enable debug logging to stderr
+```
+
+### `schwab-agent order place sell-covered-call`
+
+```bash
+Usage:
+  schwab-agent order place sell-covered-call [flags]
+
+Examples:
+  schwab-agent order build sell-covered-call --underlying F --expiration 2026-06-18 --strike 14 --quantity 1 --type LIMIT --price 1.00
+  schwab-agent order preview sell-covered-call --underlying F --expiration 2026-06-18 --strike 14 --quantity 1 --type LIMIT --price 1.00 --save-preview
+  schwab-agent order place sell-covered-call --underlying F --expiration 2026-06-18 --strike 14 --quantity 1 --type LIMIT --price 1.00
+
+Flags:
+      --duration string     Order duration
+      --expiration string   Expiration date (YYYY-MM-DD)
+      --price float         Option price
+      --quantity float      Number of contracts
+      --session string      Trading session
+      --strike float        Option strike price
+      --type string         Order type
+      --underlying string   Underlying symbol
+
+Global Flags:
+  -a, --account string                  Override default account by hash, account number, or nickname
+      --config string                   Path to config file
+      --debug-options string[="text"]   Print resolved flag values and exit (text or json)
+      --token string                    Path to token file
+  -v, --verbose                         Enable debug logging to stderr
+```
+
+### `schwab-agent order place short-iron-condor`
+
+```bash
+Usage:
+  schwab-agent order place short-iron-condor [flags]
+
+Examples:
+  schwab-agent order build short-iron-condor --underlying F --expiration 2026-06-18 --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 --quantity 1 --price 0.50
+  schwab-agent order preview short-iron-condor --underlying F --expiration 2026-06-18 --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 --quantity 1 --price 0.50 --save-preview
+  schwab-agent order place short-iron-condor --underlying F --expiration 2026-06-18 --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 --quantity 1 --price 0.50
+
+Flags:
+      --call-long-strike float    Highest strike: call being bought (protection)
+      --call-short-strike float   Call being sold (premium)
+      --duration string           Order duration
+      --expiration string         Expiration date (YYYY-MM-DD)
+      --price float               Net credit amount
+      --put-long-strike float     Lowest strike: put being bought (protection)
+      --put-short-strike float    Put being sold (premium)
+      --quantity float            Number of contracts
+      --session string            Trading session
+      --underlying string         Underlying symbol
 
 Global Flags:
   -a, --account string                  Override default account by hash, account number, or nickname
@@ -1795,6 +1919,8 @@ Available Commands:
   equity        Preview an equity order
   oco           Preview a one-cancels-other order
   option        Preview an option order
+  sell-covered-call Preview a covered call against existing shares
+  short-iron-condor Preview an opening iron condor
 
 Flags:
       --save-preview   Save this preview locally and return a digest for order place --from-preview
@@ -1869,6 +1995,68 @@ Flags:
   -s, --symbol string       Stock symbol (e.g., AAPL)
       --take-profit float   Optional take-profit limit price
   -t, --type string         Entry order type (LIMIT or MARKET, default LIMIT)
+
+Global Flags:
+  -a, --account string                  Override default account by hash, account number, or nickname
+      --config string                   Path to config file
+      --debug-options string[="text"]   Print resolved flag values and exit (text or json)
+      --token string                    Path to token file
+  -v, --verbose                         Enable debug logging to stderr
+```
+
+### `schwab-agent order preview sell-covered-call`
+
+```bash
+Usage:
+  schwab-agent order preview sell-covered-call [flags]
+
+Examples:
+  schwab-agent order build sell-covered-call --underlying F --expiration 2026-06-18 --strike 14 --quantity 1 --type LIMIT --price 1.00
+  schwab-agent order preview sell-covered-call --underlying F --expiration 2026-06-18 --strike 14 --quantity 1 --type LIMIT --price 1.00 --save-preview
+  schwab-agent order place sell-covered-call --underlying F --expiration 2026-06-18 --strike 14 --quantity 1 --type LIMIT --price 1.00
+
+Flags:
+      --duration string     Order duration
+      --expiration string   Expiration date (YYYY-MM-DD)
+      --price float         Option price
+      --quantity float      Number of contracts
+      --save-preview        Save this preview locally and return a digest for order place --from-preview
+      --session string      Trading session
+      --strike float        Option strike price
+      --type string         Order type
+      --underlying string   Underlying symbol
+
+Global Flags:
+  -a, --account string                  Override default account by hash, account number, or nickname
+      --config string                   Path to config file
+      --debug-options string[="text"]   Print resolved flag values and exit (text or json)
+      --token string                    Path to token file
+  -v, --verbose                         Enable debug logging to stderr
+```
+
+### `schwab-agent order preview short-iron-condor`
+
+```bash
+Usage:
+  schwab-agent order preview short-iron-condor [flags]
+
+Examples:
+  schwab-agent order build short-iron-condor --underlying F --expiration 2026-06-18 --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 --quantity 1 --price 0.50
+  schwab-agent order preview short-iron-condor --underlying F --expiration 2026-06-18 --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 --quantity 1 --price 0.50 --save-preview
+  schwab-agent order place short-iron-condor --underlying F --expiration 2026-06-18 --put-long-strike 9 --put-short-strike 10 --call-short-strike 14 --call-long-strike 15 --quantity 1 --price 0.50
+
+Flags:
+      --call-long-strike float    Highest strike: call being bought (protection)
+      --call-short-strike float   Call being sold (premium)
+      --duration string           Order duration
+      --expiration string         Expiration date (YYYY-MM-DD)
+      --price float               Net credit amount
+      --put-long-strike float     Lowest strike: put being bought (protection)
+      --put-short-strike float    Put being sold (premium)
+      --quantity float            Number of contracts
+      --save-preview              Save this preview locally and return a digest for order place --from-preview
+      --session string            Trading session
+      --underlying string         Underlying symbol
 
 Global Flags:
   -a, --account string                  Override default account by hash, account number, or nickname
@@ -2544,4 +2732,3 @@ Global Flags:
       --token string                    Path to token file
   -v, --verbose                         Enable debug logging to stderr
 ```
-
