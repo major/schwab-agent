@@ -25,6 +25,8 @@ const (
 	quoteFieldRegular     = "regular"
 )
 
+const defaultQuoteFields = quoteFieldQuote
+
 // isValidQuoteField reports whether field names one of the Schwab API field
 // groups accepted by --fields.
 func isValidQuoteField(field string) bool {
@@ -56,7 +58,7 @@ func NewQuoteCmd(c *client.Ref, w io.Writer) *cobra.Command {
 
 // quoteGetOpts holds the options for the quote get subcommand.
 type quoteGetOpts struct {
-	Fields     []string `flag:"fields"     flagdescr:"Quote fields to return (repeatable): quote, fundamental, extended, reference, regular"`
+	Fields     []string `flag:"fields"     flagdescr:"Quote fields to return (repeatable, default quote): quote, fundamental, extended, reference, regular"`
 	Indicative bool     `flag:"indicative" flagdescr:"Request indicative (non-tradeable) quotes"`
 	Underlying string   `flag:"underlying" flagdescr:"Underlying symbol for option quote"`
 	Expiration string   `flag:"expiration" flagdescr:"Expiration date (YYYY-MM-DD) for option quote"`
@@ -113,10 +115,10 @@ func newQuoteGetCmd(c *client.Ref, w io.Writer) *cobra.Command {
 		Use:   "get [SYMBOL...]",
 		Short: "Get quotes for one or more symbols",
 		Long: `Get quotes for one or more symbols. Multiple symbols return a partial response
-when some are missing. Use --fields to select specific data groups (quote,
-fundamental, extended, reference, regular). Key output fields include last
-price, bid/ask, volume, 52-week high/low, PE ratio, dividend yield, and
-market cap.
+when some are missing. The default field set is quote-only for compact agent
+responses. Use --fields to opt in to additional data groups (fundamental,
+extended, reference, regular) when needed. Key quote output fields include
+last price, bid/ask, volume, and 52-week high/low.
 
 Use --underlying, --expiration, --strike, and --call/--put to quote an option
 by its components instead of providing a raw OCC symbol. These flags are
@@ -225,6 +227,12 @@ func buildCobraQuoteParams(opts *quoteGetOpts) schwabGoQuoteParams {
 			}
 			fields = append(fields, strings.ToLower(trimmed))
 		}
+	}
+	if len(fields) == 0 {
+		// The Schwab API returns every quote section when fields is omitted. Keep
+		// the CLI default explicit and compact so agent batch quote calls do not
+		// pay for rarely used fundamental, extended, reference, and regular data.
+		fields = append(fields, defaultQuoteFields)
 	}
 	return schwabGoQuoteParams{
 		Fields:     strings.Join(fields, ","),
