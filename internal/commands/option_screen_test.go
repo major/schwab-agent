@@ -549,6 +549,62 @@ func TestOptionScreenCommand(t *testing.T) {
 		assert.Len(t, row, 4)
 	})
 
+	t.Run("mid field aliases mark output", func(t *testing.T) {
+		// Arrange
+		server := screenServer(screenTestChain())
+		defer server.Close()
+
+		var markBuf bytes.Buffer
+		markCmd := NewOptionCmd(testClient(t, server), &markBuf)
+
+		var midBuf bytes.Buffer
+		midCmd := NewOptionCmd(testClient(t, server), &midBuf)
+
+		// Act
+		_, markErr := runTestCommand(t, markCmd, "screen", "AAPL", "--fields", "strike,delta,bid,ask,mark")
+		_, midErr := runTestCommand(t, midCmd, "screen", "AAPL", "--fields", "strike,delta,bid,ask,mid")
+
+		// Assert
+		require.NoError(t, markErr)
+		require.NoError(t, midErr)
+		assert.JSONEq(t, markBuf.String(), midBuf.String())
+
+		var envelope output.Envelope
+		require.NoError(t, json.Unmarshal(midBuf.Bytes(), &envelope))
+
+		data, ok := envelope.Data.(map[string]any)
+		require.True(t, ok)
+
+		cols, ok := data["columns"].([]any)
+		require.True(t, ok)
+		assert.Equal(t, []any{"strike", "delta", "bid", "ask", "mark"}, cols)
+	})
+
+	t.Run("mid and mark fields deduplicate after aliasing", func(t *testing.T) {
+		// Arrange
+		server := screenServer(screenTestChain())
+		defer server.Close()
+
+		var buf bytes.Buffer
+		cmd := NewOptionCmd(testClient(t, server), &buf)
+
+		// Act
+		_, err := runTestCommand(t, cmd, "screen", "AAPL", "--fields", "strike,mark,mid")
+
+		// Assert
+		require.NoError(t, err)
+
+		var envelope output.Envelope
+		require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
+
+		data, ok := envelope.Data.(map[string]any)
+		require.True(t, ok)
+
+		cols, ok := data["columns"].([]any)
+		require.True(t, ok)
+		assert.Equal(t, []any{"strike", "mark"}, cols)
+	})
+
 	t.Run("empty chain returns SymbolNotFoundError", func(t *testing.T) {
 		// Arrange
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

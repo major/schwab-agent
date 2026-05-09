@@ -53,7 +53,7 @@ var screenDefaultColumns = []string{
 //nolint:gochecknoglobals,goconst // package-level constant slice; field names are clearer inline
 var screenValidFields = []string{
 	"expiry", "strike", "cp", "symbol",
-	"bid", "ask", "mark", "last",
+	"bid", "ask", "mid", "mark", "last",
 	"delta", "gamma", "theta", "vega", "rho",
 	"iv", "oi", "volume", "itm", fieldDTE,
 	fieldSpreadPct,
@@ -255,7 +255,22 @@ func resolveScreenColumns(fieldsFlag string) ([]string, error) {
 		}
 	}
 
-	return fields, nil
+	// option chain accepts both mark and mid. Screen exposes the Schwab mark
+	// price for either spelling so agent workflows can reuse chain projections
+	// and still receive identical output from --fields ...,mark and ...,mid.
+	normalizedFields := make([]string, 0, len(fields))
+	seenFields := make(map[string]bool, len(fields))
+	for _, f := range fields {
+		if f == "mid" {
+			f = "mark"
+		}
+		if !seenFields[f] {
+			normalizedFields = append(normalizedFields, f)
+			seenFields[f] = true
+		}
+	}
+
+	return normalizedFields, nil
 }
 
 // buildScreenRows collects all contracts from a chain, computing DTE and
