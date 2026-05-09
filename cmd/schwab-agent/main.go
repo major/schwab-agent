@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 
 	"github.com/spf13/cobra"
 
@@ -43,13 +44,48 @@ func buildAppWithDeps(w io.Writer, deps commands.RootDeps) *cobra.Command {
 	tokenPath := defaultTokenPath()
 	authDeps := commands.DefaultAuthDeps()
 
-	root := commands.BuildCommandTree(w, configPath, tokenPath, version, deps, authDeps)
+	root := commands.BuildCommandTree(w, configPath, tokenPath, displayVersion(), deps, authDeps)
 
 	// Register --instruction/--order-type flag aliases on qualifying order
 	// commands after the command tree is fully built.
 	commands.RegisterOrderFlagAliasesOnTree(root)
 
 	return root
+}
+
+// displayVersion returns release versions unchanged, but annotates local dev
+// builds with the Git revision embedded by the Go toolchain. That keeps release
+// ldflags authoritative while making ad-hoc binaries traceable.
+func displayVersion() string {
+	if version != "dev" {
+		return version
+	}
+
+	if revision := buildRevision(); revision != "" {
+		return "dev-" + shortRevision(revision)
+	}
+	return version
+}
+
+func buildRevision() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+	for _, setting := range info.Settings {
+		if setting.Key == "vcs.revision" {
+			return setting.Value
+		}
+	}
+	return ""
+}
+
+func shortRevision(revision string) string {
+	const shortSHAChars = 7
+	if len(revision) <= shortSHAChars {
+		return revision
+	}
+	return revision[:shortSHAChars]
 }
 
 // defaultConfigPath returns the default config file location.

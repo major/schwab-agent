@@ -595,3 +595,17 @@ func TestBuildApp_VersionFlag(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "dev")
 }
+
+func TestDisplayVersion_ReleaseVersionUnchanged(t *testing.T) {
+	originalVersion := version
+	t.Cleanup(func() { version = originalVersion })
+
+	version = "v1.2.3"
+
+	assert.Equal(t, "v1.2.3", displayVersion())
+}
+
+func TestShortRevision(t *testing.T) {
+	assert.Equal(t, "abcdef1", shortRevision("abcdef1234567890"))
+	assert.Equal(t, "abc123", shortRevision("abc123"))
+}

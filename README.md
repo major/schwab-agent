@@ -34,6 +34,8 @@ cd schwab-agent
 make build
 ```
 
+Local Makefile builds report `dev-<short-git-sha>` from `schwab-agent --version`; release builds report the tagged version.
+
 ## Getting started
 
 ### 1. Create a Schwab developer app
