@@ -77,11 +77,27 @@ func writeAnalyzeResults(
 	points int,
 ) error {
 	if len(symbols) == 1 {
-		result, err := buildAnalyzeResult(ctx, c, symbols[0], interval, points)
+		symbol := symbols[0]
+		result, err := buildAnalyzeResult(ctx, c, symbol, interval, points)
 		if err != nil {
+			// Keep the single-symbol output contract aligned with the multi-symbol
+			// path below. Young IPOs and thin history can make TA fail even when the
+			// quote is useful, so return a partial envelope instead of discarding the
+			// successful quote and turning the whole command into a hard failure.
+			if result.Quote != nil {
+				meta := output.NewMetadata()
+				meta.Requested = 1
+				meta.Returned = 1
+				return output.WritePartial(
+					w,
+					map[string]any{symbol: result},
+					[]string{fmt.Sprintf("%s: %v", symbol, err)},
+					meta,
+				)
+			}
 			return err
 		}
-		return output.WriteSuccess(w, map[string]any{symbols[0]: result}, output.NewMetadata())
+		return output.WriteSuccess(w, map[string]any{symbol: result}, output.NewMetadata())
 	}
 
 	data := make(map[string]any, len(symbols))
@@ -94,7 +110,7 @@ func writeAnalyzeResults(
 			// Check if result has any partial data (quote or analysis succeeded).
 			// If either field is non-nil, include the partial result and report the error.
 			// Only skip the symbol entirely if both fields are nil (total failure).
-			if result.Quote != nil || result.Analysis != nil {
+			if hasAnalyzeData(result) {
 				data[symbol] = result
 			}
 			partialErrors = append(partialErrors, fmt.Sprintf("%s: %v", symbol, err))
@@ -115,6 +131,10 @@ func writeAnalyzeResults(
 	}
 
 	return output.WriteSuccess(w, data, output.NewMetadata())
+}
+
+func hasAnalyzeData(result analyzeResult) bool {
+	return result.Quote != nil || result.Analysis != nil
 }
 
 // buildAnalyzeResult fetches a quote and computes the TA dashboard for a
